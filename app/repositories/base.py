@@ -1,7 +1,7 @@
 """Base repository interface."""
 
 from abc import ABC, abstractmethod
-from typing import TypeVar
+from typing import Any, TypeVar
 from uuid import UUID
 
 ModelType = TypeVar("ModelType")
@@ -19,11 +19,11 @@ class IRepository[ModelType](ABC):
         """Get all records with pagination."""
 
     @abstractmethod
-    async def create(self, data: dict) -> ModelType:
+    async def create(self, data: dict[str, Any]) -> ModelType:
         """Create a new record."""
 
     @abstractmethod
-    async def update(self, id: UUID, data: dict) -> ModelType | None:
+    async def update(self, id: UUID, data: dict[str, Any]) -> ModelType | None:
         """Update an existing record."""
 
     @abstractmethod

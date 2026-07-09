@@ -45,4 +45,4 @@ class SSHConnector(BaseConnector):
         if not self._connection:
             raise RuntimeError("Not connected")
         result = await self._connection.run(command, timeout=self._timeout)
-        return result.output
+        return str(result.stdout)

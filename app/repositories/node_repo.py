@@ -1,5 +1,6 @@
 """Node repository implementation."""
 
+from typing import Any
 from uuid import UUID
 
 from sqlalchemy import select
@@ -29,14 +30,14 @@ class NodeRepository(IRepository[NodeModel]):
         )
         return list(result.scalars().all())
 
-    async def create(self, data: dict) -> NodeModel:
+    async def create(self, data: dict[str, Any]) -> NodeModel:
         """Create a new node."""
         node = NodeModel(**data)
         self._session.add(node)
         await self._session.flush()
         return node
 
-    async def update(self, id: UUID, data: dict) -> NodeModel | None:
+    async def update(self, id: UUID, data: dict[str, Any]) -> NodeModel | None:
         """Update an existing node."""
         node = await self.get_by_id(id)
         if node is None:

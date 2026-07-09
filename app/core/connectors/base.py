@@ -1,14 +1,14 @@
 """Base connector interface."""
 
 from abc import ABC, abstractmethod
-from typing import Any
+from types import TracebackType
 
 
 class BaseConnector(ABC):
     """Abstract base connector interface."""
 
     @abstractmethod
-    async def connect(self) -> Any:
+    async def connect(self) -> None:
         """Establish connection."""
 
     @abstractmethod
@@ -19,11 +19,16 @@ class BaseConnector(ABC):
     async def execute_command(self, command: str) -> str:
         """Execute a command on the remote system."""
 
-    async def __aenter__(self):
+    async def __aenter__(self) -> "BaseConnector":
         """Enter async context manager."""
         await self.connect()
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> None:
         """Exit async context manager."""
         await self.disconnect()
