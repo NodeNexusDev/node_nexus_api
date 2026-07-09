@@ -1,13 +1,12 @@
 """Tests for services."""
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 from app.core.exceptions import NodeNotFoundError
-from app.schemas.node import NodeCreate, NodeUpdate
 from app.services.node_service import NodeService
 
 
@@ -33,8 +32,8 @@ async def test_get_node_found(node_service, mock_repository):
     mock_node.port = 22
     mock_node.connection_type = "ssh"
     mock_node.status = "active"
-    mock_node.created_at = datetime.now(timezone.utc)
-    mock_node.updated_at = datetime.now(timezone.utc)
+    mock_node.created_at = datetime.now(UTC)
+    mock_node.updated_at = datetime.now(UTC)
     mock_repository.get_by_id.return_value = mock_node
 
     result = await node_service.get_node(node_id)

@@ -2,7 +2,6 @@
 
 import uuid
 from datetime import datetime
-from typing import Optional
 
 from pydantic import BaseModel, ConfigDict
 
@@ -19,11 +18,11 @@ class NodeCreate(BaseModel):
 class NodeUpdate(BaseModel):
     """Schema for updating a node."""
 
-    name: Optional[str] = None
-    host: Optional[str] = None
-    port: Optional[int] = None
-    connection_type: Optional[str] = None
-    status: Optional[str] = None
+    name: str | None = None
+    host: str | None = None
+    port: int | None = None
+    connection_type: str | None = None
+    status: str | None = None
 
 
 class NodeResponse(BaseModel):

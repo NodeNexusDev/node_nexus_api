@@ -49,7 +49,11 @@ def test_create_node(client):
         )
         response = client.post(
             "/api/v1/nodes",
-            json={"name": "test-node", "host": "192.168.1.100", "connection_type": "ssh"},
+            json={
+                "name": "test-node",
+                "host": "192.168.1.100",
+                "connection_type": "ssh",
+            },
         )
         assert response.status_code == 201
         assert response.json()["name"] == "test-node"

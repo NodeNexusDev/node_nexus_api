@@ -13,7 +13,9 @@ class DbProvider(Provider):
     """Database session provider."""
 
     @provide(scope=Scope.REQUEST)
-    async def get_session(self, sessionmaker: async_sessionmaker) -> AsyncIterable[AsyncSession]:
+    async def get_session(
+        self, sessionmaker: async_sessionmaker
+    ) -> AsyncIterable[AsyncSession]:
         """Get a database session."""
         async with sessionmaker() as session:
             yield session
@@ -39,4 +41,5 @@ class ServiceProvider(Provider):
 
 class AppProvider(Provider):
     """Main application provider."""
+
     pass

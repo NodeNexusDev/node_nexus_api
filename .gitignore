@@ -31,3 +31,5 @@ htmlcov/
 
 # Alembic
 alembic/versions/*.pyc
+
+AGENTS.md

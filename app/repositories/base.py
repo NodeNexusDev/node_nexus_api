@@ -1,13 +1,13 @@
 """Base repository interface."""
 
 from abc import ABC, abstractmethod
-from typing import Generic, TypeVar
+from typing import TypeVar
 from uuid import UUID
 
 ModelType = TypeVar("ModelType")
 
 
-class IRepository(ABC, Generic[ModelType]):
+class IRepository[ModelType](ABC):
     """Abstract base repository interface."""
 
     @abstractmethod

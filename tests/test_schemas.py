@@ -1,7 +1,7 @@
 """Tests for Pydantic schemas."""
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from app.schemas.node import NodeCreate, NodeResponse, NodeUpdate
 
@@ -32,8 +32,8 @@ def test_node_response_schema():
         "port": 22,
         "connection_type": "ssh",
         "status": "active",
-        "created_at": datetime.now(timezone.utc),
-        "updated_at": datetime.now(timezone.utc),
+        "created_at": datetime.now(UTC),
+        "updated_at": datetime.now(UTC),
     }
     node = NodeResponse(**data)
     assert node.name == "test-node"

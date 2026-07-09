@@ -1,7 +1,8 @@
 """Tests for SSH connector."""
 
+from unittest.mock import AsyncMock, patch
+
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
 
 from app.core.connectors.ssh import SSHConnector
 

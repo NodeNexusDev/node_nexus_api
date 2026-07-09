@@ -1,7 +1,6 @@
 """Tests for database models."""
 
 import uuid
-from datetime import datetime, timezone
 
 from app.models.node import NodeModel
 
