@@ -1,0 +1,44 @@
+"""Node database model."""
+
+import uuid
+from datetime import datetime, timezone
+
+from sqlalchemy import DateTime, Integer, String
+from sqlalchemy.orm import Mapped, mapped_column
+
+from app.models.base import Base
+
+
+def _default_port() -> int:
+    return 22
+
+
+def _default_status() -> str:
+    return "active"
+
+
+def _utcnow() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+class NodeModel(Base):
+    """Node database model."""
+
+    __tablename__ = "nodes"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        primary_key=True, default=uuid.uuid4
+    )
+    name: Mapped[str] = mapped_column(String(255))
+    host: Mapped[str] = mapped_column(String(255))
+    port: Mapped[int] = mapped_column(Integer, default=_default_port)
+    connection_type: Mapped[str] = mapped_column(String(50))
+    status: Mapped[str] = mapped_column(String(50), default=_default_status)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=_utcnow,
+        onupdate=_utcnow,
+    )
