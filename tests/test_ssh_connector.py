@@ -35,7 +35,7 @@ async def test_ssh_connector_execute_command(ssh_connector):
     with patch("app.core.connectors.ssh.asyncssh") as mock_ssh:
         mock_connection = AsyncMock()
         mock_process = AsyncMock()
-        mock_process.output = "test output"
+        mock_process.stdout = "test output"
         mock_connection.run = AsyncMock(return_value=mock_process)
         mock_ssh.connect = AsyncMock(return_value=mock_connection)
 

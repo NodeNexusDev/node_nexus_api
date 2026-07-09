@@ -51,7 +51,7 @@ async def test_get_node_found(node_service, mock_repository):
 
     result = await node_service.get_node(node_id)
 
-    assert result["id"] == node_id
+    assert result.id == node_id
     mock_repository.get_by_id.assert_called_once_with(node_id)
 
 
@@ -92,8 +92,8 @@ async def test_create_node(node_service, mock_repository):
 
     result = await node_service.create_node(data)
 
-    assert result["name"] == "test"
-    assert result["host"] == "192.168.1.100"
+    assert result.name == "test"
+    assert result.host == "192.168.1.100"
     mock_repository.create.assert_called_once()
 
 
@@ -106,7 +106,7 @@ async def test_update_node_found(node_service, mock_repository):
 
     result = await node_service.update_node(node_id, data)
 
-    assert result["name"] == "new-name"
+    assert result.name == "new-name"
     mock_repository.update.assert_called_once_with(node_id, {"name": "new-name"})
 
 
