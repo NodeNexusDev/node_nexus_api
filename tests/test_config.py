@@ -1,6 +1,11 @@
-"""Tests for core configuration."""
+"""Tests for core configuration and exceptions."""
 
 from app.core.config import Settings
+from app.core.exceptions import (
+    ConnectionFailedError,
+    DomainError,
+    NodeNotFoundError,
+)
 
 
 def test_settings_default_values():
@@ -11,3 +16,9 @@ def test_settings_default_values():
     )
     assert settings.DEBUG is False
     assert settings.LOG_LEVEL == "INFO"
+
+
+def test_domain_error_hierarchy():
+    """Test that domain errors inherit from DomainError."""
+    assert issubclass(NodeNotFoundError, DomainError)
+    assert issubclass(ConnectionFailedError, DomainError)
