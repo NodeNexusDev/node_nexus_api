@@ -103,7 +103,9 @@ async def _create_node(client: AsyncClient, **overrides: Any) -> dict[str, Any]:
 async def test_get_nodes_empty(integration_client: AsyncClient) -> None:
     resp = await integration_client.get(NODES_URL)
     assert resp.status_code == 200
-    assert resp.json() == []
+    data = resp.json()
+    assert data["items"] == []
+    assert data["total"] == 0
 
 
 @pytest.mark.asyncio
@@ -113,9 +115,10 @@ async def test_get_nodes_with_data(integration_client: AsyncClient) -> None:
 
     resp = await integration_client.get(NODES_URL)
     assert resp.status_code == 200
-    nodes = resp.json()
-    assert len(nodes) == 2
-    names = {n["name"] for n in nodes}
+    data = resp.json()
+    assert len(data["items"]) == 2
+    assert data["total"] == 2
+    names = {n["name"] for n in data["items"]}
     assert names == {"n1", "n2"}
 
 
@@ -124,9 +127,13 @@ async def test_get_nodes_pagination(integration_client: AsyncClient) -> None:
     for i in range(5):
         await _create_node(integration_client, name=f"node-{i}")
 
-    resp = await integration_client.get(f"{NODES_URL}?skip=2&limit=2")
+    resp = await integration_client.get(f"{NODES_URL}?page=1&size=2")
     assert resp.status_code == 200
-    assert len(resp.json()) == 2
+    data = resp.json()
+    assert len(data["items"]) == 2
+    assert data["total"] == 5
+    assert data["page"] == 1
+    assert data["size"] == 2
 
 
 # --- GET /nodes/{id} ---

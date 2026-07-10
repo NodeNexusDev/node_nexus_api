@@ -36,10 +36,11 @@ class NodeService:
 
     async def get_all_nodes(
         self, skip: int = 0, limit: int = 100
-    ) -> list[NodeResponse]:
-        """Get all nodes."""
+    ) -> tuple[list[NodeResponse], int]:
+        """Get all nodes with total count."""
         nodes = await self._repository.get_all(skip=skip, limit=limit)
-        return [NodeResponse.model_validate(node) for node in nodes]
+        total = await self._repository.count()
+        return [NodeResponse.model_validate(node) for node in nodes], total
 
     async def create_node(self, data: NodeCreate) -> NodeResponse:
         """Create a new node. Encrypts sensitive fields before storage."""

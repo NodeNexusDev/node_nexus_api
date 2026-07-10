@@ -63,15 +63,19 @@ class TestGetAllNodes:
     @pytest.mark.asyncio
     async def test_empty(self, service: NodeService, repo: AsyncMock) -> None:
         repo.get_all.return_value = []
-        result = await service.get_all_nodes()
-        assert result == []
+        repo.count.return_value = 0
+        nodes, total = await service.get_all_nodes()
+        assert nodes == []
+        assert total == 0
 
     @pytest.mark.asyncio
     async def test_with_data(self, service: NodeService, repo: AsyncMock) -> None:
         nodes = [_make_orm_node(name="n1"), _make_orm_node(name="n2")]
         repo.get_all.return_value = nodes
-        result = await service.get_all_nodes()
-        assert len(result) == 2
+        repo.count.return_value = 2
+        result_nodes, total = await service.get_all_nodes()
+        assert len(result_nodes) == 2
+        assert total == 2
 
 
 class TestCreateNode:

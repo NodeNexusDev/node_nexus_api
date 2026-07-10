@@ -2,8 +2,20 @@
 
 import uuid
 from datetime import datetime
+from typing import TypeVar
 
 from pydantic import BaseModel, ConfigDict
+
+T = TypeVar("T")
+
+
+class PaginatedResponse[T](BaseModel):
+    """Paginated response with total count."""
+
+    items: list[T]
+    total: int
+    page: int
+    size: int
 
 
 class NodeCreate(BaseModel):

@@ -3,7 +3,9 @@
 import uuid
 
 from dishka.integrations.fastapi import FromDishka, inject
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi_limiter.depends import RateLimiter
+from pyrate_limiter import Duration, Limiter, Rate
 
 from app.core.exceptions import ConnectionFailedError, NodeNotFoundError
 from app.schemas.node import (
@@ -12,19 +14,30 @@ from app.schemas.node import (
     NodeCreate,
     NodeResponse,
     NodeUpdate,
+    PaginatedResponse,
 )
 from app.services.node_service import NodeService
 
 router = APIRouter(prefix="/nodes", tags=["nodes"])
 
+_ssh_limiter = Limiter(Rate(10, Duration.MINUTE))
 
-@router.get("/", response_model=list[NodeResponse])
+
+def _ssh_rate_limit() -> RateLimiter:
+    return RateLimiter(_ssh_limiter)
+
+
+@router.get("/", response_model=PaginatedResponse[NodeResponse])
 @inject
 async def get_nodes(
-    service: FromDishka[NodeService], skip: int = 0, limit: int = 100
-) -> list[NodeResponse]:
-    """Get all nodes."""
-    return await service.get_all_nodes(skip=skip, limit=limit)
+    service: FromDishka[NodeService],
+    page: int = Query(1, ge=1),
+    size: int = Query(20, ge=1, le=100),
+) -> PaginatedResponse[NodeResponse]:
+    """Get all nodes with pagination."""
+    skip = (page - 1) * size
+    nodes, total = await service.get_all_nodes(skip=skip, limit=size)
+    return PaginatedResponse(items=nodes, total=total, page=page, size=size)
 
 
 @router.get("/{node_id}", response_model=NodeResponse)
@@ -70,7 +83,11 @@ async def delete_node(node_id: uuid.UUID, service: FromDishka[NodeService]) -> N
         raise HTTPException(status_code=404, detail="Node not found")
 
 
-@router.post("/{node_id}/check", response_model=NodeResponse)
+@router.post(
+    "/{node_id}/check",
+    response_model=NodeResponse,
+    dependencies=[Depends(_ssh_rate_limit)],
+)
 @inject
 async def check_node(
     node_id: uuid.UUID, service: FromDishka[NodeService]
@@ -84,7 +101,11 @@ async def check_node(
         raise HTTPException(status_code=503, detail=str(exc))
 
 
-@router.post("/{node_id}/execute", response_model=CommandResult)
+@router.post(
+    "/{node_id}/execute",
+    response_model=CommandResult,
+    dependencies=[Depends(_ssh_rate_limit)],
+)
 @inject
 async def execute_command(
     node_id: uuid.UUID,

@@ -67,26 +67,31 @@ def client(mock_service: AsyncMock) -> Generator[TestClient]:
 
 class TestGetNodes:
     def test_empty_list(self, client: TestClient, mock_service: AsyncMock) -> None:
-        mock_service.get_all_nodes.return_value = []
-        response = client.get("/api/v1/nodes")
-        assert response.status_code == 200
-        assert response.json() == []
-
-    def test_returns_nodes(self, client: TestClient, mock_service: AsyncMock) -> None:
-        nodes = [_make_node(name="n1"), _make_node(name="n2")]
-        mock_service.get_all_nodes.return_value = nodes
+        mock_service.get_all_nodes.return_value = ([], 0)
         response = client.get("/api/v1/nodes")
         assert response.status_code == 200
         data = response.json()
-        assert len(data) == 2
-        assert data[0]["name"] == "n1"
+        assert data["items"] == []
+        assert data["total"] == 0
+        assert data["page"] == 1
+        assert data["size"] == 20
+
+    def test_returns_nodes(self, client: TestClient, mock_service: AsyncMock) -> None:
+        nodes = [_make_node(name="n1"), _make_node(name="n2")]
+        mock_service.get_all_nodes.return_value = (nodes, 2)
+        response = client.get("/api/v1/nodes")
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data["items"]) == 2
+        assert data["total"] == 2
+        assert data["items"][0]["name"] == "n1"
 
     def test_pagination_params(
         self, client: TestClient, mock_service: AsyncMock
     ) -> None:
-        mock_service.get_all_nodes.return_value = []
-        client.get("/api/v1/nodes?skip=10&limit=5")
-        mock_service.get_all_nodes.assert_called_once_with(skip=10, limit=5)
+        mock_service.get_all_nodes.return_value = ([], 0)
+        client.get("/api/v1/nodes?page=2&size=10")
+        mock_service.get_all_nodes.assert_called_once_with(skip=10, limit=10)
 
 
 # --- GET /nodes/{id} ---

@@ -3,7 +3,7 @@
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.node import NodeModel
@@ -29,6 +29,11 @@ class NodeRepository(IRepository[NodeModel]):
             select(NodeModel).offset(skip).limit(limit)
         )
         return list(result.scalars().all())
+
+    async def count(self) -> int:
+        """Count total nodes."""
+        result = await self._session.execute(select(func.count(NodeModel.id)))
+        return result.scalar_one()
 
     async def create(self, data: dict[str, Any]) -> NodeModel:
         """Create a new node."""
