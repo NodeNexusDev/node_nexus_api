@@ -2,9 +2,20 @@
 
 from uuid import UUID
 
-from app.core.exceptions import NodeNotFoundError
+import structlog
+
+from app.core.connectors.ssh import SSHConnector
+from app.core.exceptions import ConnectionFailedError, NodeNotFoundError
 from app.repositories.node_repo import NodeRepository
-from app.schemas.node import NodeCreate, NodeResponse, NodeUpdate
+from app.schemas.node import (
+    CommandRequest,
+    CommandResult,
+    NodeCreate,
+    NodeResponse,
+    NodeUpdate,
+)
+
+logger = structlog.get_logger()
 
 
 class NodeService:
@@ -46,3 +57,63 @@ class NodeService:
         if not result:
             raise NodeNotFoundError(f"Node {node_id} not found")
         return True
+
+    def _build_connector(self, node: NodeResponse) -> SSHConnector:
+        """Build an SSH connector from node data."""
+        return SSHConnector(
+            host=node.host,
+            port=node.port,
+            username=node.username,
+        )
+
+    async def check_connectivity(self, node_id: UUID) -> NodeResponse:
+        """Check SSH connectivity to a node and update its status."""
+        node = await self.get_node(node_id)
+        connector = self._build_connector(node)
+
+        try:
+            async with connector:
+                await connector.execute_command("echo ok")
+            new_status = "active"
+            logger.info("node.connectivity.ok", node_id=str(node_id))
+        except Exception as exc:
+            new_status = "unreachable"
+            logger.warning(
+                "node.connectivity.failed",
+                node_id=str(node_id),
+                error=str(exc),
+            )
+
+        updated = await self._repository.update(node_id, {"status": new_status})
+        return NodeResponse.model_validate(updated)
+
+    async def execute_command(
+        self, node_id: UUID, data: CommandRequest
+    ) -> CommandResult:
+        """Execute a command on a node via SSH."""
+        node = await self.get_node(node_id)
+        connector = self._build_connector(node)
+
+        try:
+            async with connector:
+                result = await connector.execute_command(data.command)
+            logger.info(
+                "node.command.executed",
+                node_id=str(node_id),
+                command=data.command,
+            )
+            return CommandResult(
+                stdout=result,
+                stderr="",
+                exit_code=0,
+            )
+        except Exception as exc:
+            logger.error(
+                "node.command.failed",
+                node_id=str(node_id),
+                command=data.command,
+                error=str(exc),
+            )
+            raise ConnectionFailedError(
+                f"Failed to execute command on node {node_id}: {exc}"
+            ) from exc

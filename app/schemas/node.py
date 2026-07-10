@@ -13,6 +13,8 @@ class NodeCreate(BaseModel):
     host: str
     port: int = 22
     connection_type: str
+    username: str | None = None
+    ssh_key: str | None = None
 
 
 class NodeUpdate(BaseModel):
@@ -23,6 +25,8 @@ class NodeUpdate(BaseModel):
     port: int | None = None
     connection_type: str | None = None
     status: str | None = None
+    username: str | None = None
+    ssh_key: str | None = None
 
 
 class NodeResponse(BaseModel):
@@ -36,5 +40,20 @@ class NodeResponse(BaseModel):
     port: int
     connection_type: str
     status: str
+    username: str | None
     created_at: datetime
     updated_at: datetime
+
+
+class CommandRequest(BaseModel):
+    """Schema for executing a command on a node."""
+
+    command: str
+
+
+class CommandResult(BaseModel):
+    """Schema for command execution result."""
+
+    stdout: str
+    stderr: str
+    exit_code: int

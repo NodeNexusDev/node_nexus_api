@@ -5,8 +5,14 @@ import uuid
 from dishka.integrations.fastapi import FromDishka, inject
 from fastapi import APIRouter, HTTPException
 
-from app.core.exceptions import NodeNotFoundError
-from app.schemas.node import NodeCreate, NodeResponse, NodeUpdate
+from app.core.exceptions import ConnectionFailedError, NodeNotFoundError
+from app.schemas.node import (
+    CommandRequest,
+    CommandResult,
+    NodeCreate,
+    NodeResponse,
+    NodeUpdate,
+)
 from app.services.node_service import NodeService
 
 router = APIRouter(prefix="/nodes", tags=["nodes"])
@@ -62,3 +68,33 @@ async def delete_node(node_id: uuid.UUID, service: FromDishka[NodeService]) -> N
         await service.delete_node(node_id)
     except NodeNotFoundError:
         raise HTTPException(status_code=404, detail="Node not found")
+
+
+@router.post("/{node_id}/check", response_model=NodeResponse)
+@inject
+async def check_node(
+    node_id: uuid.UUID, service: FromDishka[NodeService]
+) -> NodeResponse:
+    """Check SSH connectivity to a node."""
+    try:
+        return await service.check_connectivity(node_id)
+    except NodeNotFoundError:
+        raise HTTPException(status_code=404, detail="Node not found")
+    except ConnectionFailedError as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
+
+
+@router.post("/{node_id}/execute", response_model=CommandResult)
+@inject
+async def execute_command(
+    node_id: uuid.UUID,
+    data: CommandRequest,
+    service: FromDishka[NodeService],
+) -> CommandResult:
+    """Execute a command on a node via SSH."""
+    try:
+        return await service.execute_command(node_id, data)
+    except NodeNotFoundError:
+        raise HTTPException(status_code=404, detail="Node not found")
+    except ConnectionFailedError as exc:
+        raise HTTPException(status_code=503, detail=str(exc))

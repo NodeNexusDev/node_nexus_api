@@ -14,8 +14,8 @@ from fastapi.testclient import TestClient
 
 from app.api.v1.health import router as health_router
 from app.api.v1.nodes import router as nodes_router
-from app.core.exceptions import NodeNotFoundError
-from app.schemas.node import NodeResponse
+from app.core.exceptions import ConnectionFailedError, NodeNotFoundError
+from app.schemas.node import CommandResult, NodeResponse
 from app.services.node_service import NodeService
 
 
@@ -27,6 +27,7 @@ def _make_node(**overrides: Any) -> NodeResponse:
         "port": 22,
         "connection_type": "ssh",
         "status": "active",
+        "username": "root",
         "created_at": datetime.now(UTC),
         "updated_at": datetime.now(UTC),
     }
@@ -167,6 +168,73 @@ class TestDeleteNode:
         mock_service.delete_node.side_effect = NodeNotFoundError("not found")
         response = client.delete(f"/api/v1/nodes/{uuid.uuid4()}")
         assert response.status_code == 404
+
+
+# --- POST /nodes/{id}/check ---
+
+
+class TestCheckNode:
+    def test_success(self, client: TestClient, mock_service: AsyncMock) -> None:
+        node = _make_node(status="active")
+        mock_service.check_connectivity.return_value = node
+        response = client.post(f"/api/v1/nodes/{node.id}/check")
+        assert response.status_code == 200
+        assert response.json()["status"] == "active"
+
+    def test_not_found(self, client: TestClient, mock_service: AsyncMock) -> None:
+        mock_service.check_connectivity.side_effect = NodeNotFoundError("not found")
+        response = client.post(f"/api/v1/nodes/{uuid.uuid4()}/check")
+        assert response.status_code == 404
+
+    def test_connection_failed(
+        self, client: TestClient, mock_service: AsyncMock
+    ) -> None:
+        mock_service.check_connectivity.side_effect = ConnectionFailedError("timeout")
+        response = client.post(f"/api/v1/nodes/{uuid.uuid4()}/check")
+        assert response.status_code == 503
+
+
+# --- POST /nodes/{id}/execute ---
+
+
+class TestExecuteCommand:
+    def test_success(self, client: TestClient, mock_service: AsyncMock) -> None:
+        result = CommandResult(stdout="ok", stderr="", exit_code=0)
+        mock_service.execute_command.return_value = result
+        response = client.post(
+            f"/api/v1/nodes/{uuid.uuid4()}/execute",
+            json={"command": "uptime"},
+        )
+        assert response.status_code == 200
+        assert response.json()["stdout"] == "ok"
+        assert response.json()["exit_code"] == 0
+
+    def test_not_found(self, client: TestClient, mock_service: AsyncMock) -> None:
+        mock_service.execute_command.side_effect = NodeNotFoundError("not found")
+        response = client.post(
+            f"/api/v1/nodes/{uuid.uuid4()}/execute",
+            json={"command": "ls"},
+        )
+        assert response.status_code == 404
+
+    def test_connection_failed(
+        self, client: TestClient, mock_service: AsyncMock
+    ) -> None:
+        mock_service.execute_command.side_effect = ConnectionFailedError("refused")
+        response = client.post(
+            f"/api/v1/nodes/{uuid.uuid4()}/execute",
+            json={"command": "ls"},
+        )
+        assert response.status_code == 503
+
+    def test_validation_error(
+        self, client: TestClient, mock_service: AsyncMock
+    ) -> None:
+        response = client.post(
+            f"/api/v1/nodes/{uuid.uuid4()}/execute",
+            json={},
+        )
+        assert response.status_code == 422
 
 
 # --- Health ---

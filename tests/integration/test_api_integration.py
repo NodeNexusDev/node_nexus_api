@@ -222,6 +222,39 @@ async def test_delete_node_not_found(integration_client: AsyncClient) -> None:
     assert resp.status_code == 404
 
 
+# --- POST /nodes/{id}/check ---
+
+
+@pytest.mark.asyncio
+async def test_check_node_not_found(integration_client: AsyncClient) -> None:
+    resp = await integration_client.post(f"/api/v1/nodes/{uuid.uuid4()}/check")
+    assert resp.status_code == 404
+
+
+# --- POST /nodes/{id}/execute ---
+
+
+@pytest.mark.asyncio
+async def test_execute_command_not_found(integration_client: AsyncClient) -> None:
+    resp = await integration_client.post(
+        f"/api/v1/nodes/{uuid.uuid4()}/execute",
+        json={"command": "ls"},
+    )
+    assert resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_execute_command_validation_error(
+    integration_client: AsyncClient,
+) -> None:
+    node = await _create_node(integration_client)
+    resp = await integration_client.post(
+        f"/api/v1/nodes/{node['id']}/execute",
+        json={},
+    )
+    assert resp.status_code == 422
+
+
 # --- Health ---
 
 

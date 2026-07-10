@@ -3,7 +3,7 @@
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import DateTime, Integer, String
+from sqlalchemy import DateTime, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base
@@ -32,6 +32,8 @@ class NodeModel(Base):
     port: Mapped[int] = mapped_column(Integer, default=_default_port)
     connection_type: Mapped[str] = mapped_column(String(50))
     status: Mapped[str] = mapped_column(String(50), default=_default_status)
+    username: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    ssh_key: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_utcnow
     )

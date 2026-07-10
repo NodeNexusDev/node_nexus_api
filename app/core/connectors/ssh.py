@@ -15,12 +15,14 @@ class SSHConnector(BaseConnector):
         username: str | None = None,
         password: str | None = None,
         timeout: int = 30,
+        known_hosts: str | None = "",
     ):
         self._host = host
         self._port = port
         self._username = username
         self._password = password
         self._timeout = timeout
+        self._known_hosts = known_hosts
         self._connection: asyncssh.SSHClientConnection | None = None
 
     async def connect(self) -> None:
@@ -30,7 +32,8 @@ class SSHConnector(BaseConnector):
             port=self._port,
             username=self._username,
             password=self._password,
-            timeout=self._timeout,
+            connect_timeout=self._timeout,
+            known_hosts=self._known_hosts,
         )
 
     async def disconnect(self) -> None:
