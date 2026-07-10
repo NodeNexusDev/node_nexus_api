@@ -31,3 +31,7 @@ htmlcov/
 
 # Alembic
 alembic/versions/*.pyc
+
+# Agent files (not for repo)
+AGENTS.md
+docs/compose/
