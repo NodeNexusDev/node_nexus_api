@@ -2,15 +2,17 @@
 
 from pyrate_limiter import Limiter
 
-from app.api.v1.nodes import _ssh_limiter
+from app.core.rate_limit import get_limiter
 
 
 class TestSSHRateLimiter:
     def test_limiter_exists(self) -> None:
-        assert _ssh_limiter is not None
+        limiter = get_limiter()
+        assert limiter is not None
 
     def test_limiter_is_limiter_instance(self) -> None:
-        assert isinstance(_ssh_limiter, Limiter)
+        limiter = get_limiter()
+        assert isinstance(limiter, Limiter)
 
 
 class TestRateLimitConfig:

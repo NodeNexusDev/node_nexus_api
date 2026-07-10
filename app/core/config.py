@@ -12,6 +12,7 @@ class Settings(BaseSettings):
 
     DATABASE_URL: str
     SECRET_KEY: str
+    REDIS_URL: str = "redis://localhost:6379/0"
     DEBUG: bool = False
     LOG_LEVEL: str = "INFO"
 

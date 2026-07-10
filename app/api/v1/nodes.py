@@ -5,9 +5,9 @@ import uuid
 from dishka.integrations.fastapi import FromDishka, inject
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi_limiter.depends import RateLimiter
-from pyrate_limiter import Duration, Limiter, Rate
 
 from app.core.exceptions import ConnectionFailedError, NodeNotFoundError
+from app.core.rate_limit import get_limiter
 from app.schemas.node import (
     CommandRequest,
     CommandResult,
@@ -20,11 +20,9 @@ from app.services.node_service import NodeService
 
 router = APIRouter(prefix="/nodes", tags=["nodes"])
 
-_ssh_limiter = Limiter(Rate(10, Duration.MINUTE))
-
 
 def _ssh_rate_limit() -> RateLimiter:
-    return RateLimiter(_ssh_limiter)
+    return RateLimiter(get_limiter())
 
 
 @router.get("/", response_model=PaginatedResponse[NodeResponse])
