@@ -11,6 +11,7 @@ from dishka.integrations.fastapi import FastapiProvider, setup_dishka
 from fastapi import FastAPI
 
 from alembic import command as alembic_command
+from app.api.v1.audit import router as audit_router
 from app.api.v1.health import router as health_router
 from app.api.v1.nodes import router as nodes_router
 from app.core.config import get_settings
@@ -59,6 +60,7 @@ def create_app() -> FastAPI:
     setup_dishka(container, app)
     app.include_router(health_router)
     app.include_router(nodes_router, prefix="/api/v1")
+    app.include_router(audit_router, prefix="/api/v1")
     return app
 
 

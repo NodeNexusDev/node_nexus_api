@@ -1,5 +1,6 @@
 """Node service for business logic."""
 
+from typing import Any
 from uuid import UUID
 
 import structlog
@@ -24,8 +25,22 @@ _SENSITIVE_FIELDS = ("password", "ssh_key")
 class NodeService:
     """Service for node operations."""
 
-    def __init__(self, repository: NodeRepository):
+    def __init__(
+        self,
+        repository: NodeRepository,
+        audit_service: "AuditService | None" = None,
+    ):
         self._repository = repository
+        self._audit = audit_service
+
+    async def _log(
+        self,
+        action: str,
+        node_id: UUID | None = None,
+        details: dict[str, Any] | None = None,
+    ) -> None:
+        if self._audit:
+            await self._audit.log(action=action, node_id=node_id, details=details)
 
     async def get_node(self, node_id: UUID) -> NodeResponse:
         """Get a node by ID."""
@@ -47,6 +62,7 @@ class NodeService:
         raw = data.model_dump()
         self._encrypt_fields(raw)
         node = await self._repository.create(raw)
+        await self._log("create", node_id=node.id, details={"name": data.name})
         return NodeResponse.model_validate(node)
 
     async def update_node(self, node_id: UUID, data: NodeUpdate) -> NodeResponse:
@@ -56,6 +72,7 @@ class NodeService:
         node = await self._repository.update(node_id, update_data)
         if node is None:
             raise NodeNotFoundError(f"Node {node_id} not found")
+        await self._log("update", node_id=node_id, details=update_data)
         return NodeResponse.model_validate(node)
 
     async def delete_node(self, node_id: UUID) -> bool:
@@ -63,6 +80,7 @@ class NodeService:
         result = await self._repository.delete(node_id)
         if not result:
             raise NodeNotFoundError(f"Node {node_id} not found")
+        await self._log("delete", node_id=node_id)
         return True
 
     @staticmethod
@@ -115,12 +133,16 @@ class NodeService:
                 await connector.execute_command("echo ok")
             new_status = "active"
             logger.info("node.connectivity.ok", node_id=str(node_id))
+            await self._log("check", node_id=node_id, details={"status": "active"})
         except Exception as exc:
             new_status = "unreachable"
             logger.warning(
                 "node.connectivity.failed",
                 node_id=str(node_id),
                 error=str(exc),
+            )
+            await self._log(
+                "check", node_id=node_id, details={"status": "unreachable"}
             )
 
         updated = await self._repository.update(node_id, {"status": new_status})
@@ -155,6 +177,11 @@ class NodeService:
                 node_id=str(node_id),
                 command=data.command,
             )
+            await self._log(
+                "execute",
+                node_id=node_id,
+                details={"command": data.command, "exit_code": exit_code},
+            )
             return CommandResult(
                 stdout=stdout,
                 stderr=stderr,
@@ -166,6 +193,11 @@ class NodeService:
                 node_id=str(node_id),
                 command=data.command,
                 error=str(exc),
+            )
+            await self._log(
+                "execute_failed",
+                node_id=node_id,
+                details={"command": data.command, "error": str(exc)},
             )
             raise ConnectionFailedError(
                 f"Failed to execute command on node {node_id}: {exc}"

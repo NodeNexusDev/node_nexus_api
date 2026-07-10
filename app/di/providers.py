@@ -6,7 +6,9 @@ from dishka import Provider, Scope, provide
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.core.config import Settings
+from app.repositories.audit_repo import AuditLogRepository
 from app.repositories.node_repo import NodeRepository
+from app.services.audit_service import AuditService
 from app.services.node_service import NodeService
 
 
@@ -37,14 +39,26 @@ class RepositoryProvider(Provider):
         """Get node repository."""
         return NodeRepository(session)
 
+    @provide(scope=Scope.REQUEST)
+    def get_audit_repository(self, session: AsyncSession) -> AuditLogRepository:
+        """Get audit log repository."""
+        return AuditLogRepository(session)
+
 
 class ServiceProvider(Provider):
     """Service providers."""
 
     @provide(scope=Scope.REQUEST)
-    def get_node_service(self, repository: NodeRepository) -> NodeService:
+    def get_audit_service(self, repository: AuditLogRepository) -> AuditService:
+        """Get audit service."""
+        return AuditService(repository=repository)
+
+    @provide(scope=Scope.REQUEST)
+    def get_node_service(
+        self, repository: NodeRepository, audit_service: AuditService
+    ) -> NodeService:
         """Get node service."""
-        return NodeService(repository=repository)
+        return NodeService(repository=repository, audit_service=audit_service)
 
 
 class ConfigProvider(Provider):
