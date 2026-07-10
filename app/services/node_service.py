@@ -1,7 +1,12 @@
 """Node service for business logic."""
 
-from typing import Any
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any
 from uuid import UUID
+
+if TYPE_CHECKING:
+    from app.services.audit_service import AuditService
 
 import structlog
 
@@ -28,7 +33,7 @@ class NodeService:
     def __init__(
         self,
         repository: NodeRepository,
-        audit_service: "AuditService | None" = None,
+        audit_service: AuditService | None = None,
     ):
         self._repository = repository
         self._audit = audit_service
@@ -141,9 +146,7 @@ class NodeService:
                 node_id=str(node_id),
                 error=str(exc),
             )
-            await self._log(
-                "check", node_id=node_id, details={"status": "unreachable"}
-            )
+            await self._log("check", node_id=node_id, details={"status": "unreachable"})
 
         updated = await self._repository.update(node_id, {"status": new_status})
         return NodeResponse.model_validate(updated)

@@ -23,14 +23,17 @@ def service(repo: AsyncMock) -> AuditService:
 
 class TestAuditLog:
     @pytest.mark.asyncio
-    async def test_log_creates_entry(self, service: AuditService, repo: AsyncMock) -> None:
+    async def test_log_creates_entry(
+        self, service: AuditService, repo: AsyncMock
+    ) -> None:
         await service.log("create", node_id=uuid.uuid4(), details={"name": "test"})
         repo.create.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_log_handles_exception(self, service: AuditService, repo: AsyncMock) -> None:
+    async def test_log_handles_exception(
+        self, service: AuditService, repo: AsyncMock
+    ) -> None:
         repo.create.side_effect = Exception("db error")
-        # Should not raise
         await service.log("create")
 
     @pytest.mark.asyncio

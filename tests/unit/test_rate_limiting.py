@@ -1,9 +1,6 @@
 """Unit tests for rate limiting."""
 
-import pytest
-from fastapi import FastAPI
-from fastapi.testclient import TestClient
-from pyrate_limiter import Duration, Limiter, Rate
+from pyrate_limiter import Limiter
 
 from app.api.v1.nodes import _ssh_limiter
 
