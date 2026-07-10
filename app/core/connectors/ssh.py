@@ -16,7 +16,7 @@ class SSHConnector(BaseConnector):
         password: str | None = None,
         ssh_key: str | None = None,
         timeout: int = 30,
-        known_hosts: str | None = "",
+        known_hosts: str | None = None,
     ):
         self._host = host
         self._port = port

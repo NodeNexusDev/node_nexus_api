@@ -19,6 +19,8 @@ RUN groupadd -r appuser && useradd -r -g appuser appuser
 
 COPY --from=builder /install /usr/local
 COPY app/ ./app/
+COPY alembic/ ./alembic/
+COPY alembic.ini .
 
 RUN chown -R appuser:appuser /app
 

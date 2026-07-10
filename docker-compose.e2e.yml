@@ -1,0 +1,51 @@
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: node_nexus_e2e
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 2s
+      timeout: 5s
+      retries: 10
+
+  ssh-server:
+    image: lscr.io/linuxserver/openssh-server:latest
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Etc/UTC
+      - USER_NAME=testuser
+      - USER_PASSWORD=testpass
+      - PASSWORD_ACCESS=true
+    ports:
+      - "2223:2222"
+    healthcheck:
+      test: ["CMD-SHELL", "echo ok"]
+      interval: 2s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build: .
+    ports:
+      - "8001:8000"
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@db:5432/node_nexus_e2e
+      - SECRET_KEY=e2e-test-secret-key-for-encryption
+      - DEBUG=true
+      - LOG_LEVEL=INFO
+    depends_on:
+      db:
+        condition: service_healthy
+      ssh-server:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\""]
+      interval: 3s
+      timeout: 10s
+      retries: 15
