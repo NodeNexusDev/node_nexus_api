@@ -32,4 +32,7 @@ htmlcov/
 # Alembic
 alembic/versions/*.pyc
 
+# Agent compose docs
+docs/compose/
+
 AGENTS.md
