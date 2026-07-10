@@ -16,8 +16,12 @@ class BaseConnector(ABC):
         """Close connection."""
 
     @abstractmethod
-    async def execute_command(self, command: str) -> str:
-        """Execute a command on the remote system."""
+    async def execute_command(self, command: str) -> tuple[str, str, int]:
+        """Execute a command on the remote system.
+
+        Returns:
+            Tuple of (stdout, stderr, exit_code).
+        """
 
     async def __aenter__(self) -> "BaseConnector":
         """Enter async context manager."""

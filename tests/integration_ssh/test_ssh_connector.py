@@ -2,12 +2,14 @@
 
 import uuid
 from datetime import UTC, datetime
+from typing import Any
 from unittest.mock import AsyncMock, patch
 
 import pytest
 
 from app.core.connectors.ssh import SSHConnector
-from app.schemas.node import CommandRequest, NodeResponse
+from app.models.node import NodeModel
+from app.schemas.node import CommandRequest
 from app.services.node_service import NodeService
 from tests.integration_ssh.conftest import SSHServer
 
@@ -22,18 +24,22 @@ def _connector(ssh_server: SSHServer) -> SSHConnector:
     )
 
 
-def _make_node(ssh_server: SSHServer) -> NodeResponse:
-    return NodeResponse(
-        id=uuid.uuid4(),
-        name="test-ssh-node",
-        host=ssh_server.host,
-        port=ssh_server.port,
-        connection_type="ssh",
-        status="active",
-        username=ssh_server.username,
-        created_at=datetime.now(UTC),
-        updated_at=datetime.now(UTC),
-    )
+def _make_orm_node(ssh_server: SSHServer, **overrides: Any) -> NodeModel:
+    defaults = {
+        "id": uuid.uuid4(),
+        "name": "test-ssh-node",
+        "host": ssh_server.host,
+        "port": ssh_server.port,
+        "connection_type": "ssh",
+        "status": "active",
+        "username": ssh_server.username,
+        "password": None,
+        "ssh_key": None,
+        "created_at": datetime.now(UTC),
+        "updated_at": datetime.now(UTC),
+    }
+    defaults.update(overrides)
+    return NodeModel(**defaults)
 
 
 @pytest.mark.asyncio
@@ -48,57 +54,66 @@ async def test_connect_and_disconnect(ssh_server: SSHServer) -> None:
 async def test_execute_simple_command(ssh_server: SSHServer) -> None:
     connector = _connector(ssh_server)
     async with connector:
-        result = await connector.execute_command("echo hello")
-    assert result.strip() == "hello"
+        stdout, stderr, exit_code = await connector.execute_command("echo hello")
+    assert stdout.strip() == "hello"
+    assert stderr == ""
+    assert exit_code == 0
 
 
 @pytest.mark.asyncio
 async def test_execute_command_with_exit_code(ssh_server: SSHServer) -> None:
     connector = _connector(ssh_server)
     async with connector:
-        result = await connector.execute_command("exit 1")
-    assert result == ""
+        stdout, stderr, exit_code = await connector.execute_command("exit 1")
+    assert stdout == ""
+    assert exit_code != 0
 
 
 @pytest.mark.asyncio
 async def test_execute_multiple_commands(ssh_server: SSHServer) -> None:
     connector = _connector(ssh_server)
     async with connector:
-        r1 = await connector.execute_command("echo first")
-        r2 = await connector.execute_command("echo second")
+        r1, _, _ = await connector.execute_command("echo first")
+        r2, _, _ = await connector.execute_command("echo second")
     assert r1.strip() == "first"
     assert r2.strip() == "second"
 
 
 @pytest.mark.asyncio
 async def test_service_check_connectivity(ssh_server: SSHServer) -> None:
-    node = _make_node(ssh_server)
+    orm_node = _make_orm_node(ssh_server)
     repo = AsyncMock()
-    repo.get_by_id.return_value = node
-    repo.update.return_value = node
+    repo.get_by_id.return_value = orm_node
+    repo.update.return_value = orm_node
 
     service = NodeService(repository=repo)
 
     test_connector = _connector(ssh_server)
-    with patch.object(service, "_build_connector", return_value=test_connector):
-        result = await service.check_connectivity(node.id)
+    with patch(
+        "app.services.node_service.SSHConnector",
+        return_value=test_connector,
+    ):
+        result = await service.check_connectivity(orm_node.id)
 
     assert result.status == "active"
-    repo.update.assert_called_once_with(node.id, {"status": "active"})
+    repo.update.assert_called_once_with(orm_node.id, {"status": "active"})
 
 
 @pytest.mark.asyncio
 async def test_service_execute_command(ssh_server: SSHServer) -> None:
-    node = _make_node(ssh_server)
+    orm_node = _make_orm_node(ssh_server)
     repo = AsyncMock()
-    repo.get_by_id.return_value = node
+    repo.get_by_id.return_value = orm_node
 
     service = NodeService(repository=repo)
 
     test_connector = _connector(ssh_server)
-    with patch.object(service, "_build_connector", return_value=test_connector):
+    with patch(
+        "app.services.node_service.SSHConnector",
+        return_value=test_connector,
+    ):
         result = await service.execute_command(
-            node.id, CommandRequest(command="echo works")
+            orm_node.id, CommandRequest(command="echo works")
         )
 
     assert result.stdout.strip() == "works"

@@ -14,6 +14,7 @@ class NodeCreate(BaseModel):
     port: int = 22
     connection_type: str
     username: str | None = None
+    password: str | None = None
     ssh_key: str | None = None
 
 
@@ -26,11 +27,12 @@ class NodeUpdate(BaseModel):
     connection_type: str | None = None
     status: str | None = None
     username: str | None = None
+    password: str | None = None
     ssh_key: str | None = None
 
 
 class NodeResponse(BaseModel):
-    """Schema for node response."""
+    """Schema for node response. Never includes secrets."""
 
     model_config = ConfigDict(from_attributes=True)
 

@@ -14,6 +14,7 @@ class SSHConnector(BaseConnector):
         port: int = 22,
         username: str | None = None,
         password: str | None = None,
+        ssh_key: str | None = None,
         timeout: int = 30,
         known_hosts: str | None = "",
     ):
@@ -21,20 +22,30 @@ class SSHConnector(BaseConnector):
         self._port = port
         self._username = username
         self._password = password
+        self._ssh_key = ssh_key
         self._timeout = timeout
         self._known_hosts = known_hosts
         self._connection: asyncssh.SSHClientConnection | None = None
 
     async def connect(self) -> None:
-        """Establish SSH connection."""
-        self._connection = await asyncssh.connect(
-            self._host,
-            port=self._port,
-            username=self._username,
-            password=self._password,
-            connect_timeout=self._timeout,
-            known_hosts=self._known_hosts,
-        )
+        """Establish SSH connection.
+
+        Key-based auth is used when ssh_key is provided.
+        Password auth is used otherwise.
+        """
+        kwargs: dict[str, object] = {
+            "port": self._port,
+            "username": self._username,
+            "connect_timeout": self._timeout,
+            "known_hosts": self._known_hosts,
+        }
+
+        if self._ssh_key:
+            kwargs["client_keys"] = [self._ssh_key.encode()]
+        elif self._password:
+            kwargs["password"] = self._password
+
+        self._connection = await asyncssh.connect(self._host, **kwargs)
 
     async def disconnect(self) -> None:
         """Close SSH connection."""
@@ -43,9 +54,17 @@ class SSHConnector(BaseConnector):
             await self._connection.wait_closed()
             self._connection = None
 
-    async def execute_command(self, command: str) -> str:
-        """Execute a command on the remote system."""
+    async def execute_command(self, command: str) -> tuple[str, str, int]:
+        """Execute a command on the remote system.
+
+        Returns:
+            Tuple of (stdout, stderr, exit_code).
+        """
         if not self._connection:
             raise RuntimeError("Not connected")
         result = await self._connection.run(command, timeout=self._timeout)
-        return str(result.stdout)
+        return (
+            str(result.stdout),
+            str(result.stderr),
+            result.exit_status or 0,
+        )

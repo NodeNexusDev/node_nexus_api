@@ -8,6 +8,7 @@ dependencies = [
     "alembic>=1.18.5",
     "asyncpg>=0.31.0",
     "asyncssh>=2.24.0",
+    "cryptography>=44.0.0",
     "dishka>=1.10.1",
     "fastapi>=0.139.0",
     "httpx>=0.28.1",
