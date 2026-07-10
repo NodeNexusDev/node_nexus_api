@@ -136,6 +136,67 @@ async def test_get_nodes_pagination(integration_client: AsyncClient) -> None:
     assert data["size"] == 2
 
 
+@pytest.mark.asyncio
+async def test_get_nodes_pagination_page_2(integration_client: AsyncClient) -> None:
+    for i in range(5):
+        await _create_node(integration_client, name=f"node-{i}")
+
+    resp = await integration_client.get(f"{NODES_URL}?page=2&size=2")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert len(data["items"]) == 2
+    assert data["total"] == 5
+    assert data["page"] == 2
+    names = {n["name"] for n in data["items"]}
+    assert names == {"node-2", "node-3"}
+
+
+@pytest.mark.asyncio
+async def test_get_nodes_pagination_empty_page(integration_client: AsyncClient) -> None:
+    for i in range(3):
+        await _create_node(integration_client, name=f"node-{i}")
+
+    resp = await integration_client.get(f"{NODES_URL}?page=10&size=10")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["items"] == []
+    assert data["total"] == 3
+
+
+@pytest.mark.asyncio
+async def test_get_nodes_pagination_invalid_params(
+    integration_client: AsyncClient,
+) -> None:
+    resp = await integration_client.get(f"{NODES_URL}?page=0")
+    assert resp.status_code == 422
+
+    resp = await integration_client.get(f"{NODES_URL}?size=0")
+    assert resp.status_code == 422
+
+    resp = await integration_client.get(f"{NODES_URL}?size=200")
+    assert resp.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_get_nodes_pagination_response_structure(
+    integration_client: AsyncClient,
+) -> None:
+    await _create_node(integration_client)
+
+    resp = await integration_client.get(NODES_URL)
+    assert resp.status_code == 200
+    data = resp.json()
+
+    assert "items" in data
+    assert "total" in data
+    assert "page" in data
+    assert "size" in data
+    assert isinstance(data["items"], list)
+    assert isinstance(data["total"], int)
+    assert isinstance(data["page"], int)
+    assert isinstance(data["size"], int)
+
+
 # --- GET /nodes/{id} ---
 
 

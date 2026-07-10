@@ -118,3 +118,26 @@ async def test_delete_found(repo: NodeRepository) -> None:
 async def test_delete_not_found(repo: NodeRepository) -> None:
     result = await repo.delete(uuid.uuid4())
     assert result is False
+
+
+@pytest.mark.asyncio
+async def test_count_empty(repo: NodeRepository) -> None:
+    count = await repo.count()
+    assert count == 0
+
+
+@pytest.mark.asyncio
+async def test_count_with_data(repo: NodeRepository) -> None:
+    await repo.create(_node_data(name="n1"))
+    await repo.create(_node_data(name="n2"))
+    await repo.create(_node_data(name="n3"))
+    count = await repo.count()
+    assert count == 3
+
+
+@pytest.mark.asyncio
+async def test_count_after_delete(repo: NodeRepository) -> None:
+    node = await repo.create(_node_data())
+    assert await repo.count() == 1
+    await repo.delete(node.id)
+    assert await repo.count() == 0
