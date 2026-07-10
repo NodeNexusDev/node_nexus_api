@@ -1,4 +1,4 @@
-"""Rate limiting configuration with Redis backend."""
+"""Rate limiting configuration with Redis/Valkey backend."""
 
 from __future__ import annotations
 
