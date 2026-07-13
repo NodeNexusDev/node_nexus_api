@@ -151,13 +151,14 @@ class TestUpdateNode:
 class TestDeleteNode:
     @pytest.mark.asyncio
     async def test_found(self, service: NodeService, repo: AsyncMock) -> None:
-        repo.delete.return_value = True
+        repo.get_by_id.return_value = _make_orm_node()
         result = await service.delete_node(uuid.uuid4())
         assert result is True
+        repo.delete.assert_awaited_once()
 
     @pytest.mark.asyncio
     async def test_not_found(self, service: NodeService, repo: AsyncMock) -> None:
-        repo.delete.return_value = False
+        repo.get_by_id.return_value = None
         with pytest.raises(NodeNotFoundError):
             await service.delete_node(uuid.uuid4())
 

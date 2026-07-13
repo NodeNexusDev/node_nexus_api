@@ -20,7 +20,7 @@ class AuditLogModel(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     node_id: Mapped[uuid.UUID | None] = mapped_column(
-        ForeignKey("nodes.id"), nullable=True
+        ForeignKey("nodes.id", ondelete="SET NULL"), nullable=True
     )
     action: Mapped[str] = mapped_column(String(50))
     user: Mapped[str | None] = mapped_column(String(255), nullable=True)

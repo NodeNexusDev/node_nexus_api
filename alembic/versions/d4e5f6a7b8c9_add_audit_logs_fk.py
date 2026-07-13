@@ -26,6 +26,7 @@ def upgrade() -> None:
         'nodes',
         ['node_id'],
         ['id'],
+        ondelete="SET NULL",
     )
 
 

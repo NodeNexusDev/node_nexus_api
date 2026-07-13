@@ -84,10 +84,11 @@ class NodeService:
 
     async def delete_node(self, node_id: UUID) -> bool:
         """Delete a node."""
-        result = await self._repository.delete(node_id)
-        if not result:
+        node = await self._repository.get_by_id(node_id)
+        if node is None:
             raise NodeNotFoundError(f"Node {node_id} not found")
         await self._log("delete", node_id=node_id)
+        await self._repository.delete(node_id)
         return True
 
     @staticmethod
