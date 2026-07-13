@@ -27,44 +27,6 @@ docker compose up -d --build
 
 Полная спецификация: [docs/api-spec.md](docs/api-spec.md)
 
-| Метод | Путь | Описание |
-|-------|------|----------|
-| `GET` | `/api/v1/nodes/` | Список нод (пагинация: `?page=1&size=20`) |
-| `GET` | `/api/v1/nodes/{id}` | Одна нода |
-| `POST` | `/api/v1/nodes/` | Создание ноды |
-| `PUT` | `/api/v1/nodes/{id}` | Обновление ноды |
-| `DELETE` | `/api/v1/nodes/{id}` | Удаление ноды |
-| `POST` | `/api/v1/nodes/{id}/check` | Проверка SSH-доступности |
-| `POST` | `/api/v1/nodes/{id}/execute` | Выполнение команды через SSH |
-| `GET` | `/api/v1/audit/` | Просмотр аудит-лога |
-| `GET` | `/health` | Healthcheck |
-
-### Пагинация
-
-```json
-GET /api/v1/nodes/?page=1&size=20
-
-{
-  "items": [...],
-  "total": 150,
-  "page": 1,
-  "size": 20
-}
-```
-
-### Выполнение команды
-
-```json
-POST /api/v1/nodes/{id}/execute
-{ "command": "uptime" }
-
-{
-  "stdout": " 12:00:00 up 10 days,  3:45,  1 user,  load average: 0.00, 0.01, 0.05",
-  "stderr": "",
-  "exit_code": 0
-}
-```
-
 ## Безопасность
 
 - **SSH-ключи и пароли** шифруются AES-256-GCM перед записью в БД
@@ -130,4 +92,4 @@ app/
 
 ## Лицензия
 
-MIT
+[MIT](LICENSE)
