@@ -10,6 +10,8 @@ from app.main import app
 async def client():
     """Create an async test client."""
     async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
+        transport=ASGITransport(app=app),
+        base_url="http://test",
+        follow_redirects=True,
     ) as ac:
         yield ac
