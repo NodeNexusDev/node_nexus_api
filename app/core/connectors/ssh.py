@@ -1,8 +1,12 @@
 """SSH connector implementation."""
 
 import asyncssh
+import structlog
 
 from app.core.connectors.base import BaseConnector
+
+logger = structlog.get_logger()  # operational: flow, performance
+audit = structlog.get_logger("audit")  # security: access, commands, failures
 
 
 class SSHConnector(BaseConnector):
@@ -33,6 +37,8 @@ class SSHConnector(BaseConnector):
         Key-based auth is used when ssh_key is provided.
         Password auth is used otherwise.
         """
+        logger.debug("ssh.connect.start", host=self._host, port=self._port)
+
         kwargs: dict[str, object] = {
             "port": self._port,
             "username": self._username,
@@ -45,7 +51,17 @@ class SSHConnector(BaseConnector):
         elif self._password:
             kwargs["password"] = self._password
 
-        self._connection = await asyncssh.connect(self._host, **kwargs)
+        try:
+            self._connection = await asyncssh.connect(self._host, **kwargs)
+            audit.info("ssh.connect.ok", host=self._host, port=self._port)
+        except Exception as exc:
+            audit.warning(
+                "ssh.connect.failed",
+                host=self._host,
+                port=self._port,
+                error=str(exc),
+            )
+            raise
 
     async def disconnect(self) -> None:
         """Close SSH connection."""
@@ -53,6 +69,7 @@ class SSHConnector(BaseConnector):
             self._connection.close()
             await self._connection.wait_closed()
             self._connection = None
+            logger.debug("ssh.disconnect", host=self._host)
 
     async def execute_command(self, command: str) -> tuple[str, str, int]:
         """Execute a command on the remote system.
@@ -62,12 +79,30 @@ class SSHConnector(BaseConnector):
         """
         if not self._connection:
             raise RuntimeError("Not connected")
-        result = await self._connection.run(command, timeout=self._timeout)
-        return (
-            str(result.stdout),
-            str(result.stderr),
-            result.exit_status or 0,
-        )
+
+        logger.debug("ssh.command.start", host=self._host, command=command)
+        try:
+            result = await self._connection.run(command, timeout=self._timeout)
+            exit_code = result.exit_status or 0
+            audit.info(
+                "ssh.command.ok",
+                host=self._host,
+                command=command,
+                exit_code=exit_code,
+            )
+            return (
+                str(result.stdout),
+                str(result.stderr),
+                exit_code,
+            )
+        except Exception as exc:
+            audit.error(
+                "ssh.command.failed",
+                host=self._host,
+                command=command,
+                error=str(exc),
+            )
+            raise
 
 
 class SSHConnectorFactory:

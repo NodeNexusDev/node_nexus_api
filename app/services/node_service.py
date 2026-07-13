@@ -22,7 +22,7 @@ from app.schemas.node import (
     NodeUpdate,
 )
 
-logger = structlog.get_logger()
+audit = structlog.get_logger("audit")
 
 _SENSITIVE_FIELDS = ("password", "ssh_key")
 
@@ -69,6 +69,7 @@ class NodeService:
         raw = data.model_dump()
         self._encrypt_fields(raw)
         node = await self._repository.create(raw)
+        audit.info("node.create.ok", node_id=str(node.id), name=data.name)
         await self._log("create", node_id=node.id, details={"name": data.name})
         return NodeResponse.model_validate(node)
 
@@ -79,6 +80,7 @@ class NodeService:
         node = await self._repository.update(node_id, update_data)
         if node is None:
             raise NodeNotFoundError(f"Node {node_id} not found")
+        audit.info("node.update.ok", node_id=str(node_id))
         await self._log("update", node_id=node_id, details=update_data)
         return NodeResponse.model_validate(node)
 
@@ -89,6 +91,7 @@ class NodeService:
             raise NodeNotFoundError(f"Node {node_id} not found")
         await self._log("delete", node_id=node_id)
         await self._repository.delete(node_id)
+        audit.info("node.delete.ok", node_id=str(node_id))
         return True
 
     @staticmethod
@@ -135,11 +138,11 @@ class NodeService:
             async with connector:
                 await connector.execute_command("echo ok")
             new_status = "active"
-            logger.info("node.connectivity.ok", node_id=str(node_id))
+            audit.info("node.connectivity.ok", node_id=str(node_id))
             await self._log("check", node_id=node_id, details={"status": "active"})
         except Exception as exc:
             new_status = "unreachable"
-            logger.warning(
+            audit.warning(
                 "node.connectivity.failed",
                 node_id=str(node_id),
                 error=str(exc),
@@ -173,7 +176,7 @@ class NodeService:
                 stdout, stderr, exit_code = await connector.execute_command(
                     data.command
                 )
-            logger.info(
+            audit.info(
                 "node.command.executed",
                 node_id=str(node_id),
                 command=data.command,
@@ -189,7 +192,7 @@ class NodeService:
                 exit_code=exit_code,
             )
         except Exception as exc:
-            logger.error(
+            audit.error(
                 "node.command.failed",
                 node_id=str(node_id),
                 command=data.command,

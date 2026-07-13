@@ -2,12 +2,15 @@
 
 import uuid
 
+import structlog
 from dishka.integrations.fastapi import FromDishka, inject
 from fastapi import APIRouter, Query
 
 from app.schemas.audit_log import AuditLogResponse
 from app.schemas.node import PaginatedResponse
 from app.services.audit_service import AuditService
+
+audit = structlog.get_logger("audit")
 
 router = APIRouter(prefix="/audit", tags=["audit"])
 
@@ -22,6 +25,13 @@ async def get_audit_logs(
     size: int = Query(20, ge=1, le=100),
 ) -> PaginatedResponse[AuditLogResponse]:
     """Get audit logs with optional filters and pagination."""
+    audit.info(
+        "api.audit.list",
+        node_id=str(node_id) if node_id else None,
+        action=action,
+        page=page,
+        size=size,
+    )
     logs, total = await service.get_logs(
         node_id=node_id, action=action, page=page, size=size
     )

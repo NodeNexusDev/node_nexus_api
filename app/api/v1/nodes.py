@@ -2,6 +2,7 @@
 
 import uuid
 
+import structlog
 from dishka.integrations.fastapi import FromDishka, inject
 from fastapi import APIRouter, HTTPException, Query
 
@@ -16,6 +17,8 @@ from app.schemas.node import (
 )
 from app.services.node_service import NodeService
 
+audit = structlog.get_logger("audit")
+
 router = APIRouter(prefix="/nodes", tags=["nodes"])
 
 
@@ -27,6 +30,7 @@ async def get_nodes(
     size: int = Query(20, ge=1, le=100),
 ) -> PaginatedResponse[NodeResponse]:
     """Get all nodes with pagination."""
+    audit.info("api.nodes.list", page=page, size=size)
     skip = (page - 1) * size
     nodes, total = await service.get_all_nodes(skip=skip, limit=size)
     return PaginatedResponse(items=nodes, total=total, page=page, size=size)
@@ -38,9 +42,11 @@ async def get_node(
     node_id: uuid.UUID, service: FromDishka[NodeService]
 ) -> NodeResponse:
     """Get a node by ID."""
+    audit.info("api.nodes.get", node_id=str(node_id))
     try:
         return await service.get_node(node_id)
     except NodeNotFoundError:
+        audit.warning("api.nodes.not_found", node_id=str(node_id))
         raise HTTPException(status_code=404, detail="Node not found")
 
 
@@ -50,6 +56,7 @@ async def create_node(
     data: NodeCreate, service: FromDishka[NodeService]
 ) -> NodeResponse:
     """Create a new node."""
+    audit.info("api.nodes.create", name=data.name, connection_type=data.connection_type)
     return await service.create_node(data)
 
 
@@ -59,9 +66,11 @@ async def update_node(
     node_id: uuid.UUID, data: NodeUpdate, service: FromDishka[NodeService]
 ) -> NodeResponse:
     """Update an existing node."""
+    audit.info("api.nodes.update", node_id=str(node_id))
     try:
         return await service.update_node(node_id, data)
     except NodeNotFoundError:
+        audit.warning("api.nodes.not_found", node_id=str(node_id))
         raise HTTPException(status_code=404, detail="Node not found")
 
 
@@ -69,9 +78,11 @@ async def update_node(
 @inject
 async def delete_node(node_id: uuid.UUID, service: FromDishka[NodeService]) -> None:
     """Delete a node."""
+    audit.info("api.nodes.delete", node_id=str(node_id))
     try:
         await service.delete_node(node_id)
     except NodeNotFoundError:
+        audit.warning("api.nodes.not_found", node_id=str(node_id))
         raise HTTPException(status_code=404, detail="Node not found")
 
 
@@ -84,11 +95,18 @@ async def check_node(
     node_id: uuid.UUID, service: FromDishka[NodeService]
 ) -> NodeResponse:
     """Check SSH connectivity to a node."""
+    audit.info("api.nodes.check", node_id=str(node_id))
     try:
         return await service.check_connectivity(node_id)
     except NodeNotFoundError:
+        audit.warning("api.nodes.not_found", node_id=str(node_id))
         raise HTTPException(status_code=404, detail="Node not found")
     except ConnectionFailedError as exc:
+        audit.error(
+            "api.nodes.connection_failed",
+            node_id=str(node_id),
+            error=str(exc),
+        )
         raise HTTPException(status_code=503, detail=str(exc))
 
 
@@ -103,9 +121,16 @@ async def execute_command(
     service: FromDishka[NodeService],
 ) -> CommandResult:
     """Execute a command on a node via SSH."""
+    audit.info("api.nodes.execute", node_id=str(node_id), command=data.command)
     try:
         return await service.execute_command(node_id, data)
     except NodeNotFoundError:
+        audit.warning("api.nodes.not_found", node_id=str(node_id))
         raise HTTPException(status_code=404, detail="Node not found")
     except ConnectionFailedError as exc:
+        audit.error(
+            "api.nodes.connection_failed",
+            node_id=str(node_id),
+            error=str(exc),
+        )
         raise HTTPException(status_code=503, detail=str(exc))

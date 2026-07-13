@@ -9,7 +9,7 @@ import structlog
 from app.repositories.audit_repo import AuditLogRepository
 from app.schemas.audit_log import AuditLogResponse
 
-logger = structlog.get_logger()
+audit = structlog.get_logger("audit")
 
 
 class AuditService:
@@ -35,8 +35,13 @@ class AuditService:
                     "details": json.dumps(details) if details else None,
                 }
             )
+            audit.debug(
+                "audit.log.ok",
+                action=action,
+                node_id=str(node_id) if node_id else None,
+            )
         except Exception:
-            logger.warning("audit.log.failed", action=action, node_id=str(node_id))
+            audit.warning("audit.log.failed", action=action, node_id=str(node_id))
 
     async def get_logs(
         self,
