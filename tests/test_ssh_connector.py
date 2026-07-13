@@ -36,10 +36,13 @@ async def test_ssh_connector_execute_command(ssh_connector):
         mock_connection = AsyncMock()
         mock_process = AsyncMock()
         mock_process.stdout = "test output"
+        mock_process.stderr = ""
+        mock_process.exit_status = 0
         mock_connection.run = AsyncMock(return_value=mock_process)
         mock_ssh.connect = AsyncMock(return_value=mock_connection)
 
         async with ssh_connector as conn:
-            result = await conn.execute_command("echo test")
+            stdout, stderr, exit_code = await conn.execute_command("echo test")
 
-        assert result == "test output"
+        assert stdout == "test output"
+        assert exit_code == 0

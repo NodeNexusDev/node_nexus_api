@@ -32,6 +32,7 @@ def test_node_response_schema():
         "port": 22,
         "connection_type": "ssh",
         "status": "active",
+        "username": "testuser",
         "created_at": datetime.now(UTC),
         "updated_at": datetime.now(UTC),
     }

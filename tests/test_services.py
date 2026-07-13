@@ -30,6 +30,7 @@ def _make_mock_node(
     port: int = 22,
     connection_type: str = "ssh",
     status: str = "active",
+    username: str | None = "testuser",
 ) -> MagicMock:
     """Create a mock node object."""
     mock_node = MagicMock()
@@ -39,6 +40,7 @@ def _make_mock_node(
     mock_node.port = port
     mock_node.connection_type = connection_type
     mock_node.status = status
+    mock_node.username = username
     mock_node.created_at = datetime.now(UTC)
     mock_node.updated_at = datetime.now(UTC)
     return mock_node

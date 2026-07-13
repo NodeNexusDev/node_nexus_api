@@ -1,8 +1,11 @@
-"""Tests for API endpoints."""
+"""Tests for API endpoints. Require running PostgreSQL via Docker."""
 
 import uuid
 
+import pytest
 from httpx import AsyncClient
+
+pytestmark = pytest.mark.docker
 
 
 async def _create_node(client: AsyncClient, **overrides) -> dict:
