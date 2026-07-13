@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     REDIS_URL: str = "redis://localhost:6379/0"
     DEBUG: bool = False
     LOG_LEVEL: str = "INFO"
+    PORT: int = 8000
 
     # CORS
     CORS_ORIGINS: list[str] = Field(default=["http://localhost:3000"])
