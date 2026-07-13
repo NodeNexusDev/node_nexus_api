@@ -15,12 +15,12 @@ REST API для управления серверными нодами с SSH-п
 uv sync
 
 # Запуск (требуется PostgreSQL)
-docker-compose up -d db
+docker compose up -d db
 uv run alembic upgrade head
 uv run uvicorn app.main:app --reload
 
 # Или всё через Docker
-docker-compose up -d --build
+docker compose up -d --build
 ```
 
 ## API
@@ -90,14 +90,14 @@ uv run pytest tests/unit/ tests/integration/ --cov=app --cov-report=term-missing
 uv run pytest tests/e2e/ -v
 ```
 
-**102 теста, покрытие 91%**
+**173 теста, покрытие 96%**
 
 | Тип | Кол-во | Описание |
 |-----|--------|----------|
-| Unit | 70 | Моки, in-memory SQLite |
-| Integration | 15 | Реальные SQL-запросы |
+| Unit | 136 | Моки, in-memory SQLite |
+| Integration | 19 | Реальные SQL-запросы |
 | Integration SSH | 6 | Реальный Docker SSH-сервер |
-| E2E | 9 | Полный стек (PostgreSQL + SSH + API) |
+| E2E | 12 | Полный стек (PostgreSQL + SSH + API) |
 
 ## Архитектура
 
