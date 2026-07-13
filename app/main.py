@@ -54,7 +54,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     logger.info("migrations.applied")
 
     if settings.RATE_LIMIT_ENABLED:
-        await init_rate_limiter(settings.REDIS_URL)
+        await init_rate_limiter(settings.REDIS_URL, settings.RATE_LIMIT_SSH)
 
     yield
 

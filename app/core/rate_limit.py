@@ -12,6 +12,26 @@ if TYPE_CHECKING:
 
 logger = structlog.get_logger()
 
+_DURATIONS: dict[str, Duration] = {
+    "second": Duration.SECOND,
+    "minute": Duration.MINUTE,
+    "hour": Duration.HOUR,
+    "day": Duration.DAY,
+}
+
+
+def parse_rate(rate_str: str) -> Rate:
+    """Parse a rate string like '10/minute' into a Rate object."""
+    count_str, unit = rate_str.strip().split("/")
+    unit = unit.lower().rstrip("s")
+    duration = _DURATIONS.get(unit)
+    if duration is None:
+        raise ValueError(
+            f"Unknown duration unit '{unit}'. "
+            f"Supported: {', '.join(_DURATIONS)}"
+        )
+    return Rate(int(count_str), duration)
+
 
 class RateLimitState:
     """Encapsulates rate limiter state to avoid module-level globals."""
@@ -28,12 +48,13 @@ class RateLimitState:
         assert self._limiter is not None
         return self._limiter
 
-    def _fallback_init(self) -> None:
-        rate = Rate(10, Duration.MINUTE)
+    def _fallback_init(self, rate: Rate | None = None) -> None:
+        if rate is None:
+            rate = Rate(10, Duration.MINUTE)
         self._bucket = InMemoryBucket(rates=[rate])
         self._limiter = Limiter(self._bucket)
 
-    async def init(self, redis_url: str) -> None:
+    async def init(self, redis_url: str, rate: Rate) -> None:
         """Initialize Redis-backed rate limiter."""
         try:
             import redis.asyncio as aioredis
@@ -41,18 +62,16 @@ class RateLimitState:
             self._redis = aioredis.from_url(redis_url, decode_responses=True)
             await self._redis.ping()
 
-            rate = Rate(10, Duration.MINUTE)
-            self._bucket = RedisBucket(
+            self._bucket = await RedisBucket.init(
                 rates=[rate],
                 redis=self._redis,
                 bucket_key="rate-limit:ssh",
-                script_hash="be8167afc95f25615961866ad639b736828f12b5",
             )
             self._limiter = Limiter(self._bucket)
-            logger.info("rate_limiter.initialized", backend="redis")
+            logger.info("rate_limiter.initialized", backend="redis", rate=rate)
         except Exception:
             logger.warning("rate_limiter.redis_failed", backend="in-memory")
-            self._fallback_init()
+            self._fallback_init(rate)
 
     async def close(self) -> None:
         """Close Redis connection and reset state."""
@@ -71,9 +90,10 @@ def get_limiter() -> Limiter:
     return _state.limiter
 
 
-async def init_rate_limiter(redis_url: str) -> None:
+async def init_rate_limiter(redis_url: str, rate_str: str) -> None:
     """Initialize Redis-backed rate limiter."""
-    await _state.init(redis_url)
+    rate = parse_rate(rate_str)
+    await _state.init(redis_url, rate)
 
 
 async def close_rate_limiter() -> None:
