@@ -29,7 +29,15 @@ def _run_migrations_sync() -> None:
     settings = get_settings()
     alembic_cfg = AlembicConfig("alembic.ini")
     alembic_cfg.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
-    alembic_command.upgrade(alembic_cfg, "head")
+    try:
+        alembic_command.upgrade(alembic_cfg, "head")
+    except Exception as exc:
+        logger.exception("migrations.failed", database=settings.DATABASE_URL)
+        raise RuntimeError(
+            f"Database migrations failed. "
+            f"Ensure the database is reachable and the schema is compatible. "
+            f"Original error: {exc}"
+        ) from exc
 
 
 async def _run_migrations() -> None:
@@ -42,11 +50,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Application lifespan manager."""
     settings = get_settings()
     logger.info("app.startup")
-    try:
-        await _run_migrations()
-        logger.info("migrations.applied")
-    except Exception:
-        logger.exception("migrations.failed")
+    await _run_migrations()
+    logger.info("migrations.applied")
 
     if settings.RATE_LIMIT_ENABLED:
         await init_rate_limiter(settings.REDIS_URL)
