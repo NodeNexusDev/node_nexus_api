@@ -346,19 +346,6 @@ wheels = [
 ]
 
 [[package]]
-name = "fastapi-limiter"
-version = "0.2.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "fastapi" },
-    { name = "pyrate-limiter" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/b7/32/81f64b69a79345caca0a90d1601ae7c84c39438145793514ee82daac4fc6/fastapi_limiter-0.2.0.tar.gz", hash = "sha256:b042259f6280056b5b2b3f506edd76c8e0648d7a5ce86c3485216a4a0fd0ec14", size = 7401, upload-time = "2026-02-06T07:00:09.831Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/c4/9b/35278a18254f187d55bb450ded6bc9a59c7b3010d164e1796f3dfb7aa73d/fastapi_limiter-0.2.0-py3-none-any.whl", hash = "sha256:e576ebb29cc9614c2f38471c60ed0e849024e9a1b7a2aeb4c2a31a6d708b4aea", size = 5219, upload-time = "2026-02-06T07:00:07.824Z" },
-]
-
-[[package]]
 name = "greenlet"
 version = "3.5.3"
 source = { registry = "https://pypi.org/simple" }
@@ -535,11 +522,9 @@ dependencies = [
     { name = "cryptography" },
     { name = "dishka" },
     { name = "fastapi" },
-    { name = "fastapi-limiter" },
     { name = "httpx" },
     { name = "pydantic" },
     { name = "pydantic-settings" },
-    { name = "redis" },
     { name = "sqlalchemy" },
     { name = "structlog" },
     { name = "uvicorn" },
@@ -571,7 +556,6 @@ requires-dist = [
     { name = "cryptography", specifier = ">=49.0.0" },
     { name = "dishka", specifier = ">=1.10.1" },
     { name = "fastapi", specifier = ">=0.139.0" },
-    { name = "fastapi-limiter", specifier = ">=0.2.0" },
     { name = "httpx", specifier = ">=0.28.1" },
     { name = "pydantic", specifier = ">=2.13.4" },
     { name = "pydantic-settings", specifier = ">=2.14.2" },
@@ -580,7 +564,6 @@ requires-dist = [
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=7.1.0" },
     { name = "pytest-docker", marker = "extra == 'dev'", specifier = ">=3.2.5" },
     { name = "pytest-mock", marker = "extra == 'dev'", specifier = ">=3.15.1" },
-    { name = "redis", specifier = ">=8.0.1" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.15.21" },
     { name = "sqlalchemy", specifier = ">=2.0.51" },
     { name = "structlog", specifier = ">=26.1.0" },
@@ -714,15 +697,6 @@ wheels = [
 ]
 
 [[package]]
-name = "pyrate-limiter"
-version = "4.4.0"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/19/27/e564f33ea085c63d5540f707b31aeb50a4992eac2da655dc02435a760a07/pyrate_limiter-4.4.0.tar.gz", hash = "sha256:2c0c720c4fa16c5d8199e4821bf34507fb49c007a25b786cec6fb94ffd0844aa", size = 90955, upload-time = "2026-06-14T10:52:03.021Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/2b/77/2b5ea2e5e343fd7f74ba9c50a282d7cb66d1be3d12bd647510338d78fcf1/pyrate_limiter-4.4.0-py3-none-any.whl", hash = "sha256:f738dfa3c7ac1222a5ea3d31e00cfd31b5592b13ade4077afe9e8ac6293381f5", size = 43102, upload-time = "2026-06-14T10:52:01.334Z" },
-]
-
-[[package]]
 name = "pytest"
 version = "9.1.1"
 source = { registry = "https://pypi.org/simple" }
@@ -796,15 +770,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/82/ed/0301aeeac3e5353ef3d94b6ec08bbcabd04a72018415dcb29e588514bba8/python_dotenv-1.2.2.tar.gz", hash = "sha256:2c371a91fbd7ba082c2c1dc1f8bf89ca22564a087c2c287cd9b662adde799cf3", size = 50135, upload-time = "2026-03-01T16:00:26.196Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/0b/d7/1959b9648791274998a9c3526f6d0ec8fd2233e4d4acce81bbae76b44b2a/python_dotenv-1.2.2-py3-none-any.whl", hash = "sha256:1d8214789a24de455a8b8bd8ae6fe3c6b69a5e3d64aa8a8e5d68e694bbcb285a", size = 22101, upload-time = "2026-03-01T16:00:25.09Z" },
-]
-
-[[package]]
-name = "redis"
-version = "8.0.1"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/cc/c3/928b290c2c0ca99ab96eea5b4ff8f30be8112b075301a7d3ba214a3c8c12/redis-8.0.1.tar.gz", hash = "sha256:afc5a7a2f5a084f5b1880dec548dd45be17db7e43c82a30d84f952aefb05cfb0", size = 5114170, upload-time = "2026-06-23T14:52:37.728Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/fd/0a/c2345ebf1ebe70840ce3f6c6ee612f8fa749cfbd1b03069c53bf0c62aaad/redis-8.0.1-py3-none-any.whl", hash = "sha256:47daa35a058c23468d6437f17a8c76882cb316b838ef763036af99b96cedd743", size = 502406, upload-time = "2026-06-23T14:52:36.137Z" },
 ]
 
 [[package]]

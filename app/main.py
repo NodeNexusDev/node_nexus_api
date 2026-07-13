@@ -16,7 +16,6 @@ from app.api.v1.audit import router as audit_router
 from app.api.v1.health import router as health_router
 from app.api.v1.nodes import router as nodes_router
 from app.core.config import get_settings
-from app.core.rate_limit import close_rate_limiter, init_rate_limiter
 from app.di.providers import AppProvider
 
 logger = structlog.get_logger()
@@ -48,18 +47,12 @@ async def _run_migrations() -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Application lifespan manager."""
-    settings = get_settings()
     logger.info("app.startup")
     await _run_migrations()
     logger.info("migrations.applied")
 
-    if settings.RATE_LIMIT_ENABLED:
-        await init_rate_limiter(settings.REDIS_URL, settings.RATE_LIMIT_SSH)
-
     yield
 
-    if settings.RATE_LIMIT_ENABLED:
-        await close_rate_limiter()
     await container.close()
     logger.info("app.shutdown")
 

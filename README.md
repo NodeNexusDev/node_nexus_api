@@ -6,7 +6,7 @@ REST API для управления серверными нодами с SSH-п
 
 - **Python 3.13**, **FastAPI**, **SQLAlchemy 2.0** (async), **Alembic**
 - **dishka** (DI), **asyncssh**, **cryptography** (AES-256-GCM)
-- **PostgreSQL**, **Valkey** (rate limiting), **Docker**
+- **PostgreSQL**, **Docker**
 
 ## Быстрый старт
 
@@ -14,8 +14,8 @@ REST API для управления серверными нодами с SSH-п
 # Установка зависимостей
 uv sync
 
-# Запуск (требуется PostgreSQL + Valkey)
-docker-compose up -d db redis
+# Запуск (требуется PostgreSQL)
+docker-compose up -d db
 uv run alembic upgrade head
 uv run uvicorn app.main:app --reload
 
@@ -66,7 +66,6 @@ POST /api/v1/nodes/{id}/execute
 ## Безопасность
 
 - **SSH-ключи и пароли** шифруются AES-256-GCM перед записью в БД
-- **Rate limiting**: 10 req/min на SSH-эндпоинты (Valkey backend)
 - Секреты **не возвращаются** в API-ответах
 
 ## Конфигурация
@@ -75,9 +74,6 @@ POST /api/v1/nodes/{id}/execute
 |------------|----------|--------------|
 | `DATABASE_URL` | URL PostgreSQL | — |
 | `SECRET_KEY` | Ключ шифрования | — |
-| `REDIS_URL` | URL Valkey/Redis | `redis://localhost:6379/0` |
-| `RATE_LIMIT_ENABLED` | Включить rate limiting | `true` |
-| `RATE_LIMIT_SSH` | Лимит для SSH-эндпоинтов | `10/minute` |
 
 ## Тесты
 
@@ -99,7 +95,7 @@ uv run pytest tests/e2e/ -v
 | Unit | 70 | Моки, in-memory SQLite |
 | Integration | 15 | Реальные SQL-запросы |
 | Integration SSH | 6 | Реальный Docker SSH-сервер |
-| E2E | 9 | Полный стек (PostgreSQL + SSH + API + Valkey) |
+| E2E | 9 | Полный стек (PostgreSQL + SSH + API) |
 
 ## Архитектура
 
@@ -114,7 +110,6 @@ Model (ORM)
 
 Connectors (SSH) ← Service
 Security (AES-256-GCM) ← Service
-Rate Limiting (Valkey) ← API
 Audit Log ← Service
 ```
 

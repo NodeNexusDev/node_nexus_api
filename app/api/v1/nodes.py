@@ -3,11 +3,9 @@
 import uuid
 
 from dishka.integrations.fastapi import FromDishka, inject
-from fastapi import APIRouter, Depends, HTTPException, Query
-from fastapi_limiter.depends import RateLimiter
+from fastapi import APIRouter, HTTPException, Query
 
 from app.core.exceptions import ConnectionFailedError, NodeNotFoundError
-from app.core.rate_limit import get_limiter
 from app.schemas.node import (
     CommandRequest,
     CommandResult,
@@ -19,10 +17,6 @@ from app.schemas.node import (
 from app.services.node_service import NodeService
 
 router = APIRouter(prefix="/nodes", tags=["nodes"])
-
-
-def _ssh_rate_limit() -> RateLimiter:
-    return RateLimiter(get_limiter())
 
 
 @router.get("/", response_model=PaginatedResponse[NodeResponse])
@@ -84,7 +78,6 @@ async def delete_node(node_id: uuid.UUID, service: FromDishka[NodeService]) -> N
 @router.post(
     "/{node_id}/check",
     response_model=NodeResponse,
-    dependencies=[Depends(_ssh_rate_limit)],
 )
 @inject
 async def check_node(
@@ -102,7 +95,6 @@ async def check_node(
 @router.post(
     "/{node_id}/execute",
     response_model=CommandResult,
-    dependencies=[Depends(_ssh_rate_limit)],
 )
 @inject
 async def execute_command(
