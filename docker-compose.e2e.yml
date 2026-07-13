@@ -1,10 +1,7 @@
 services:
   db:
     image: postgres:16
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: node_nexus_e2e
+    env_file: .env.e2e
     ports:
       - "5433:5432"
     healthcheck:
@@ -44,12 +41,7 @@ services:
     build: .
     ports:
       - "8001:8000"
-    environment:
-      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@db:5432/node_nexus_e2e
-      - SECRET_KEY=e2e-test-secret-key-for-encryption
-      - REDIS_URL=redis://redis:6379/0
-      - DEBUG=true
-      - LOG_LEVEL=INFO
+    env_file: .env.e2e
     depends_on:
       db:
         condition: service_healthy
