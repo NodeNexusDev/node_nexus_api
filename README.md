@@ -25,6 +25,8 @@ docker-compose up -d --build
 
 ## API
 
+Полная спецификация: [docs/api-spec.md](docs/api-spec.md)
+
 | Метод | Путь | Описание |
 |-------|------|----------|
 | `GET` | `/api/v1/nodes/` | Список нод (пагинация: `?page=1&size=20`) |
