@@ -49,7 +49,7 @@ def service_ports(
 
 
 @pytest.fixture(scope="session")
-def e2e_client(service_ports: ServicePorts) -> Generator[httpx.Client, None, None]:
+def e2e_client(service_ports: ServicePorts) -> Generator[httpx.Client]:
     base_url = f"http://{service_ports.api_host}:{service_ports.api_port}"
     with httpx.Client(base_url=base_url, timeout=30.0) as client:
         yield client
