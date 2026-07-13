@@ -104,6 +104,7 @@ class TestSSHConnector:
     async def test_context_manager_calls_connect_disconnect(self) -> None:
         connector = SSHConnector(host="127.0.0.1", known_hosts=None)
         mock_conn = AsyncMock()
+        mock_conn.close = MagicMock()
         connect_path = "app.core.connectors.ssh.asyncssh.connect"
         with patch(connect_path, new_callable=AsyncMock) as mock_connect:
             mock_connect.return_value = mock_conn
@@ -117,6 +118,7 @@ class TestSSHConnector:
     async def test_context_manager_disconnects_on_exception(self) -> None:
         connector = SSHConnector(host="127.0.0.1", known_hosts=None)
         mock_conn = AsyncMock()
+        mock_conn.close = MagicMock()
         connect_path = "app.core.connectors.ssh.asyncssh.connect"
         with patch(connect_path, new_callable=AsyncMock) as mock_connect:
             mock_connect.return_value = mock_conn

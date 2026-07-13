@@ -25,8 +25,12 @@ def test_node_repository_inherits_from_base():
 
 @pytest.fixture
 def mock_session():
-    """Create a mock AsyncSession."""
-    return AsyncMock()
+    """Create a mock AsyncSession with correct sync/async method types."""
+    session = MagicMock()
+    session.execute = AsyncMock()
+    session.flush = AsyncMock()
+    session.delete = AsyncMock()
+    return session
 
 
 @pytest.fixture
