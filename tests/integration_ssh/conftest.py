@@ -5,6 +5,7 @@ from collections.abc import Generator
 from dataclasses import dataclass
 
 import pytest
+from pytest_docker.plugin import Services
 
 
 @dataclass
@@ -29,9 +30,9 @@ def docker_compose_file() -> str:
 
 
 @pytest.fixture(scope="session")
-def ssh_server(docker_ip: str, docker_services: object) -> Generator[SSHServer]:
-    port = docker_services.port_for("ssh-server", 2222)  # type: ignore[attr-defined]
-    docker_services.wait_until_responsive(  # type: ignore[attr-defined]
+def ssh_server(docker_ip: str, docker_services: Services) -> Generator[SSHServer]:
+    port = docker_services.port_for("ssh-server", 2222)
+    docker_services.wait_until_responsive(
         check=lambda: _is_port_open(docker_ip, port),
         timeout=60.0,
         pause=0.5,

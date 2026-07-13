@@ -1,6 +1,7 @@
 """Unit tests for NodeRepository with in-memory SQLite."""
 
 import uuid
+from collections.abc import AsyncGenerator
 
 import pytest
 import pytest_asyncio
@@ -16,7 +17,7 @@ from app.repositories.node_repo import NodeRepository
 
 
 @pytest_asyncio.fixture
-async def engine() -> AsyncEngine:
+async def engine() -> AsyncGenerator[AsyncEngine]:
     eng = create_async_engine("sqlite+aiosqlite:///:memory:")
     async with eng.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
@@ -25,7 +26,7 @@ async def engine() -> AsyncEngine:
 
 
 @pytest_asyncio.fixture
-async def session(engine: AsyncEngine) -> AsyncSession:
+async def session(engine: AsyncEngine) -> AsyncGenerator[AsyncSession]:
     sm = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
     async with sm() as s:
         async with s.begin():
