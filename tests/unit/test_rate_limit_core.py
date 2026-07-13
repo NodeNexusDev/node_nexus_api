@@ -4,7 +4,7 @@ import pytest
 from pyrate_limiter import Limiter
 
 from app.core.rate_limit import (
-    _fallback_init,
+    RateLimitState,
     close_rate_limiter,
     get_limiter,
 )
@@ -16,9 +16,9 @@ class TestRateLimitModule:
         assert isinstance(limiter, Limiter)
 
     def test_fallback_init(self) -> None:
-        _fallback_init()
-        limiter = get_limiter()
-        assert isinstance(limiter, Limiter)
+        state = RateLimitState()
+        state._fallback_init()
+        assert isinstance(state.limiter, Limiter)
 
     @pytest.mark.asyncio
     async def test_close_rate_limiter(self) -> None:
