@@ -2,6 +2,7 @@
 
 import base64
 import os
+from functools import lru_cache
 
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
@@ -9,14 +10,10 @@ from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 
 from app.core.config import get_settings
 
-_KEY_CACHE: bytes | None = None
 
-
+@lru_cache
 def _derive_key() -> bytes:
     """Derive a 32-byte AES key from SECRET_KEY via HKDF."""
-    global _KEY_CACHE
-    if _KEY_CACHE is not None:
-        return _KEY_CACHE
     settings = get_settings()
     hkdf = HKDF(
         algorithm=hashes.SHA256(),
@@ -24,8 +21,7 @@ def _derive_key() -> bytes:
         salt=b"node-nexus-ssh-v1",
         info=b"aes-256-gcm",
     )
-    _KEY_CACHE = hkdf.derive(settings.SECRET_KEY.encode())
-    return _KEY_CACHE
+    return hkdf.derive(settings.SECRET_KEY.encode())
 
 
 def encrypt(plaintext: str) -> str:
