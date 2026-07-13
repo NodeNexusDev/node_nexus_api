@@ -24,7 +24,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "aiosqlite>=0.22.1",
-    "mypy>=2.2.0",
+    "ty>=0.0.59",
     "pytest>=9.1.1",
     "pytest-asyncio>=1.4.0",
     "pytest-cov>=7.1.0",
@@ -40,12 +40,14 @@ line-length = 88
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "W", "UP"]
 
-[tool.mypy]
-python_version = "3.13"
-strict = true
-warn_return_any = true
-warn_unused_configs = true
+[tool.ty.environment]
+python-version = "3.13"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+
+[dependency-groups]
+dev = [
+    "ty>=0.0.59",
+]
