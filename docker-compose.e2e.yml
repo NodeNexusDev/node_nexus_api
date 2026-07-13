@@ -9,6 +9,11 @@ services:
       interval: 2s
       timeout: 5s
       retries: 10
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   ssh-server:
     image: lscr.io/linuxserver/openssh-server:latest
@@ -26,6 +31,11 @@ services:
       interval: 2s
       timeout: 5s
       retries: 10
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   api:
     build: .
@@ -42,3 +52,8 @@ services:
       interval: 3s
       timeout: 10s
       retries: 15
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
