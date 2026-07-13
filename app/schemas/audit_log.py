@@ -2,8 +2,13 @@
 
 import uuid
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
+
+AuditAction = Literal[
+    "create", "update", "delete", "check", "execute", "execute_failed"
+]
 
 
 class AuditLogResponse(BaseModel):

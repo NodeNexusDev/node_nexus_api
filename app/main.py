@@ -16,6 +16,7 @@ from app.api.v1.audit import router as audit_router
 from app.api.v1.health import router as health_router
 from app.api.v1.nodes import router as nodes_router
 from app.core.config import get_settings
+from app.core.logging import configure_logging
 from app.di.providers import AppProvider
 
 logger = structlog.get_logger()
@@ -47,6 +48,8 @@ async def _run_migrations() -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Application lifespan manager."""
+    settings = get_settings()
+    configure_logging(log_level=settings.LOG_LEVEL, debug=settings.DEBUG)
     logger.info("app.startup")
     await _run_migrations()
     logger.info("migrations.applied")
@@ -62,9 +65,13 @@ def create_app() -> FastAPI:
     settings = get_settings()
     app = FastAPI(
         title="Node Nexus API",
-        description="REST API for managing server nodes",
+        description="REST API для управления серверными нодами с SSH-подключениями",
         version="0.1.0",
         lifespan=lifespan,
+        openapi_tags=[
+            {"name": "nodes", "description": "CRUD-операции и SSH-команды для нод"},
+            {"name": "audit", "description": "Просмотр аудит-лога операций"},
+        ],
     )
 
     app.add_middleware(

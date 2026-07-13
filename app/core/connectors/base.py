@@ -2,6 +2,7 @@
 
 from abc import ABC, abstractmethod
 from types import TracebackType
+from typing import Protocol
 
 
 class BaseConnector(ABC):
@@ -36,3 +37,18 @@ class BaseConnector(ABC):
     ) -> None:
         """Exit async context manager."""
         await self.disconnect()
+
+
+class ConnectorFactory(Protocol):
+    """Factory protocol for creating connectors."""
+
+    def create_ssh(
+        self,
+        host: str,
+        port: int,
+        username: str | None,
+        password: str | None,
+        ssh_key: str | None,
+    ) -> BaseConnector:
+        """Create an SSH connector with the given parameters."""
+        ...

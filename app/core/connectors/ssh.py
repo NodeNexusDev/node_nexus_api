@@ -68,3 +68,23 @@ class SSHConnector(BaseConnector):
             str(result.stderr),
             result.exit_status or 0,
         )
+
+
+class SSHConnectorFactory:
+    """Factory for creating SSH connectors."""
+
+    def create_ssh(
+        self,
+        host: str,
+        port: int,
+        username: str | None,
+        password: str | None,
+        ssh_key: str | None,
+    ) -> SSHConnector:
+        return SSHConnector(
+            host=host,
+            port=port,
+            username=username,
+            password=password,
+            ssh_key=ssh_key,
+        )

@@ -38,6 +38,8 @@ docker compose up -d --build
 |------------|----------|--------------|
 | `DATABASE_URL` | URL PostgreSQL | — |
 | `SECRET_KEY` | Ключ шифрования | — |
+| `LOG_LEVEL` | Уровень логирования | INFO |
+| `DEBUG` | Режим отладки | false |
 
 ## Тесты
 
@@ -51,15 +53,6 @@ uv run pytest tests/unit/ tests/integration/ --cov=app --cov-report=term-missing
 # E2E (требует Docker)
 uv run pytest tests/e2e/ -v
 ```
-
-**173 теста, покрытие 96%**
-
-| Тип | Кол-во | Описание |
-|-----|--------|----------|
-| Unit | 136 | Моки, in-memory SQLite |
-| Integration | 19 | Реальные SQL-запросы |
-| Integration SSH | 6 | Реальный Docker SSH-сервер |
-| E2E | 12 | Полный стек (PostgreSQL + SSH + API) |
 
 ## Архитектура
 

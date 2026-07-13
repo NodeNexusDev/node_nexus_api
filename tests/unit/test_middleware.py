@@ -60,7 +60,9 @@ class TestCORS:
                 "Access-Control-Request-Method": "GET",
             },
         )
-        assert resp.headers.get("access-control-allow-origin") == "http://localhost:3000"
+        assert (
+            resp.headers.get("access-control-allow-origin") == "http://localhost:3000"
+        )
 
     async def test_cors_allowed_methods(self, client: AsyncClient) -> None:
         resp = await client.options(

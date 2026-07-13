@@ -3,7 +3,7 @@
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import DateTime, Integer, String, Text
+from sqlalchemy import DateTime, Index, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base
@@ -25,6 +25,11 @@ class NodeModel(Base):
     """Node database model."""
 
     __tablename__ = "nodes"
+    __table_args__ = (
+        Index("ix_nodes_name", "name"),
+        Index("ix_nodes_host", "host"),
+        Index("ix_nodes_status", "status"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     name: Mapped[str] = mapped_column(String(255))

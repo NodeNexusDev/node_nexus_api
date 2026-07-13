@@ -2,11 +2,14 @@
 
 import uuid
 from datetime import datetime
-from typing import TypeVar
+from typing import Literal, TypeVar
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 T = TypeVar("T")
+
+ConnectionType = Literal["ssh", "docker", "proxmox"]
+NodeStatus = Literal["active", "unreachable", "error"]
 
 
 class PaginatedResponse[T](BaseModel):
@@ -21,10 +24,10 @@ class PaginatedResponse[T](BaseModel):
 class NodeCreate(BaseModel):
     """Schema for creating a node."""
 
-    name: str
-    host: str
-    port: int = 22
-    connection_type: str
+    name: str = Field(min_length=1, max_length=255)
+    host: str = Field(min_length=1, max_length=255)
+    port: int = Field(default=22, ge=1, le=65535)
+    connection_type: ConnectionType
     username: str | None = None
     password: str | None = None
     ssh_key: str | None = None
@@ -33,11 +36,11 @@ class NodeCreate(BaseModel):
 class NodeUpdate(BaseModel):
     """Schema for updating a node."""
 
-    name: str | None = None
-    host: str | None = None
-    port: int | None = None
-    connection_type: str | None = None
-    status: str | None = None
+    name: str | None = Field(default=None, min_length=1, max_length=255)
+    host: str | None = Field(default=None, min_length=1, max_length=255)
+    port: int | None = Field(default=None, ge=1, le=65535)
+    connection_type: ConnectionType | None = None
+    status: NodeStatus | None = None
     username: str | None = None
     password: str | None = None
     ssh_key: str | None = None
@@ -62,7 +65,7 @@ class NodeResponse(BaseModel):
 class CommandRequest(BaseModel):
     """Schema for executing a command on a node."""
 
-    command: str
+    command: str = Field(min_length=1, max_length=4096)
 
 
 class CommandResult(BaseModel):

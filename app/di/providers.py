@@ -6,6 +6,7 @@ from dishka import Provider, Scope, provide
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.core.config import Settings
+from app.core.connectors.ssh import SSHConnectorFactory
 from app.repositories.audit_repo import AuditLogRepository
 from app.repositories.node_repo import NodeRepository
 from app.services.audit_service import AuditService
@@ -45,6 +46,15 @@ class RepositoryProvider(Provider):
         return AuditLogRepository(session)
 
 
+class ConnectorProvider(Provider):
+    """Connector providers."""
+
+    @provide(scope=Scope.APP)
+    def get_ssh_connector_factory(self) -> SSHConnectorFactory:
+        """Get SSH connector factory."""
+        return SSHConnectorFactory()
+
+
 class ServiceProvider(Provider):
     """Service providers."""
 
@@ -55,10 +65,17 @@ class ServiceProvider(Provider):
 
     @provide(scope=Scope.REQUEST)
     def get_node_service(
-        self, repository: NodeRepository, audit_service: AuditService
+        self,
+        repository: NodeRepository,
+        audit_service: AuditService,
+        connector_factory: SSHConnectorFactory,
     ) -> NodeService:
         """Get node service."""
-        return NodeService(repository=repository, audit_service=audit_service)
+        return NodeService(
+            repository=repository,
+            audit_service=audit_service,
+            connector_factory=connector_factory,
+        )
 
 
 class ConfigProvider(Provider):
@@ -70,7 +87,9 @@ class ConfigProvider(Provider):
         return Settings()  # type: ignore[call-arg]
 
 
-class AppProvider(ConfigProvider, DbProvider, RepositoryProvider, ServiceProvider):
+class AppProvider(
+    ConfigProvider, DbProvider, RepositoryProvider, ConnectorProvider, ServiceProvider
+):
     """Main application provider."""
 
     pass

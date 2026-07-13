@@ -6,11 +6,11 @@ from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 if TYPE_CHECKING:
+    from app.core.connectors.base import ConnectorFactory
     from app.services.audit_service import AuditService
 
 import structlog
 
-from app.core.connectors.ssh import SSHConnector
 from app.core.exceptions import ConnectionFailedError, NodeNotFoundError
 from app.core.security import decrypt, encrypt
 from app.repositories.node_repo import NodeRepository
@@ -34,9 +34,11 @@ class NodeService:
         self,
         repository: NodeRepository,
         audit_service: AuditService | None = None,
+        connector_factory: ConnectorFactory | None = None,
     ):
         self._repository = repository
         self._audit = audit_service
+        self._connector_factory = connector_factory
 
     async def _log(
         self,
@@ -106,15 +108,10 @@ class NodeService:
         except Exception:
             return value
 
-    def _build_connector(self, node: NodeResponse) -> SSHConnector:
-        """Build an SSH connector from node data with decrypted credentials."""
-        return SSHConnector(
-            host=node.host,
-            port=node.port,
-            username=node.username,
-            password=self._decrypt_value(getattr(node, "password", None)),
-            ssh_key=self._decrypt_value(getattr(node, "ssh_key", None)),
-        )
+    def _get_connector_factory(self) -> ConnectorFactory:
+        if self._connector_factory is None:
+            raise RuntimeError("ConnectorFactory not configured")
+        return self._connector_factory
 
     async def check_connectivity(self, node_id: UUID) -> NodeResponse:
         """Check SSH connectivity to a node and update its status."""
@@ -125,7 +122,7 @@ class NodeService:
 
         password = self._decrypt_value(node.password)
         ssh_key = self._decrypt_value(node.ssh_key)
-        connector = SSHConnector(
+        connector = self._get_connector_factory().create_ssh(
             host=node_response.host,
             port=node_response.port,
             username=node_response.username,
@@ -162,7 +159,7 @@ class NodeService:
 
         password = self._decrypt_value(node.password)
         ssh_key = self._decrypt_value(node.ssh_key)
-        connector = SSHConnector(
+        connector = self._get_connector_factory().create_ssh(
             host=node_response.host,
             port=node_response.port,
             username=node_response.username,
