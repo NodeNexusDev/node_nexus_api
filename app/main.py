@@ -8,18 +8,22 @@ import structlog
 from alembic.config import Config as AlembicConfig
 from dishka import make_async_container
 from dishka.integrations.fastapi import FastapiProvider, setup_dishka
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from alembic import command as alembic_command
+from app.api.middleware import RequestLoggingMiddleware
 from app.api.v1.audit import router as audit_router
 from app.api.v1.health import router as health_router
 from app.api.v1.nodes import router as nodes_router
 from app.core.config import get_settings
+from app.core.exceptions import DomainError
 from app.core.logging import configure_logging
 from app.di.providers import AppProvider
 
-logger = structlog.get_logger()
+logger = structlog.get_logger()  # operational: lifecycle, performance
+audit = structlog.get_logger("audit")  # security: exceptions, errors
 
 container = make_async_container(AppProvider(), FastapiProvider())
 
@@ -81,11 +85,12 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+    app.add_middleware(RequestLoggingMiddleware)
 
     @app.middleware("http")
-    async def _security_headers(request: Request, call_next) -> Response:  # noqa: ANN001
+    async def _security_headers(request: Request, call_next):  # noqa: ANN001
         """Add security headers to every response."""
-        response: Response = await call_next(request)
+        response = await call_next(request)
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["X-XSS-Protection"] = "1; mode=block"
@@ -93,6 +98,14 @@ def create_app() -> FastAPI:
             "max-age=31536000; includeSubDomains"
         )
         return response
+
+    @app.exception_handler(DomainError)
+    async def _domain_error_handler(request: Request, exc: DomainError):  # noqa: ANN001
+        audit.error("app.exception", error_type=type(exc).__name__, detail=str(exc))
+        return JSONResponse(
+            status_code=422,
+            content={"detail": str(exc)},
+        )
 
     setup_dishka(container, app)
     app.include_router(health_router)
