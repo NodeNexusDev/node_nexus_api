@@ -8,7 +8,8 @@ import structlog
 from alembic.config import Config as AlembicConfig
 from dishka import make_async_container
 from dishka.integrations.fastapi import FastapiProvider, setup_dishka
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, Response
+from fastapi.middleware.cors import CORSMiddleware
 
 from alembic import command as alembic_command
 from app.api.v1.audit import router as audit_router
@@ -60,12 +61,34 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 def create_app() -> FastAPI:
     """Create and configure the FastAPI application."""
+    settings = get_settings()
     app = FastAPI(
         title="Node Nexus API",
         description="REST API for managing server nodes",
         version="0.1.0",
         lifespan=lifespan,
     )
+
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=settings.CORS_ORIGINS,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+    @app.middleware("http")
+    async def _security_headers(request: Request, call_next) -> Response:  # noqa: ANN001
+        """Add security headers to every response."""
+        response: Response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+        response.headers["Strict-Transport-Security"] = (
+            "max-age=31536000; includeSubDomains"
+        )
+        return response
+
     setup_dishka(container, app)
     app.include_router(health_router)
     app.include_router(nodes_router, prefix="/api/v1")

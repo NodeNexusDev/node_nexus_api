@@ -2,6 +2,7 @@
 
 from functools import lru_cache
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -15,6 +16,9 @@ class Settings(BaseSettings):
     REDIS_URL: str = "redis://localhost:6379/0"
     DEBUG: bool = False
     LOG_LEVEL: str = "INFO"
+
+    # CORS
+    CORS_ORIGINS: list[str] = Field(default=["http://localhost:3000"])
 
     # Rate limiting
     RATE_LIMIT_ENABLED: bool = True
