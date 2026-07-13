@@ -1,7 +1,6 @@
 """Integration tests for AuditLogRepository with in-memory SQLite."""
 
 import uuid
-from datetime import UTC, datetime
 
 import pytest
 import pytest_asyncio
@@ -12,7 +11,6 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
-from app.models.audit_log import AuditLogModel
 from app.models.base import Base
 from app.repositories.audit_repo import AuditLogRepository
 

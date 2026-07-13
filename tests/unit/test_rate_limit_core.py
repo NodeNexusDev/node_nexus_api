@@ -24,3 +24,24 @@ class TestRateLimitModule:
     async def test_close_rate_limiter(self) -> None:
         await close_rate_limiter()
         # Should not raise
+
+    @pytest.mark.asyncio
+    async def test_init_falls_back_on_bad_redis(self) -> None:
+        state = RateLimitState()
+        await state.init("redis://invalid:99999")
+        assert isinstance(state.limiter, Limiter)
+
+    def test_limiter_property_creates_on_first_access(self) -> None:
+        state = RateLimitState()
+        assert state._limiter is None
+        _ = state.limiter
+        assert state._limiter is not None
+
+    @pytest.mark.asyncio
+    async def test_close_resets_state(self) -> None:
+        state = RateLimitState()
+        _ = state.limiter
+        assert state._limiter is not None
+        await state.close()
+        assert state._limiter is None
+        assert state._bucket is None
