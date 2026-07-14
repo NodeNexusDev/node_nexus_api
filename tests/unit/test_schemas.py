@@ -1,5 +1,8 @@
 """Tests for Pydantic schema validation."""
 
+import uuid
+from datetime import UTC, datetime
+
 import pytest
 from pydantic import ValidationError
 
@@ -8,6 +11,7 @@ from app.schemas.node import (
     NodeCreate,
     NodeUpdate,
 )
+from app.schemas.script_execution import ScriptExecutionResponse
 
 
 class TestNodeCreate:
@@ -101,3 +105,35 @@ class TestCommandRequest:
     def test_max_length_valid(self) -> None:
         req = CommandRequest(command="x" * 4096)
         assert len(req.command) == 4096
+
+
+class TestScriptExecutionResponse:
+    def test_valid(self) -> None:
+        resp = ScriptExecutionResponse(
+            id=uuid.uuid4(),
+            script_id=uuid.uuid4(),
+            node_id=uuid.uuid4(),
+            params={"key": "value"},
+            status="completed",
+            steps=[{"step_index": 0, "label": "Step 1", "stdout": "ok", "stderr": "", "exit_code": 0}],
+            started_at=datetime.now(UTC),
+            finished_at=datetime.now(UTC),
+        )
+        assert resp.status == "completed"
+        assert resp.node_id is not None
+
+    def test_optional_fields(self) -> None:
+        resp = ScriptExecutionResponse(
+            id=uuid.uuid4(),
+            script_id=uuid.uuid4(),
+            node_id=None,
+            params=None,
+            status="failed",
+            steps=None,
+            started_at=datetime.now(UTC),
+            finished_at=None,
+        )
+        assert resp.node_id is None
+        assert resp.params is None
+        assert resp.steps is None
+        assert resp.finished_at is None

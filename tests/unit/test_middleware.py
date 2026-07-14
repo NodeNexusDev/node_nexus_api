@@ -2,7 +2,11 @@
 
 import pytest
 from httpx import ASGITransport, AsyncClient
+from starlette.applications import Starlette
+from starlette.responses import JSONResponse
+from starlette.routing import Route
 
+from app.api.middleware import RequestLoggingMiddleware
 from app.main import create_app
 
 
@@ -19,6 +23,23 @@ async def client(app):
         follow_redirects=True,
     ) as ac:
         yield ac
+
+
+async def _error_handler(request):
+    raise ValueError("test error")
+
+
+async def _ok_handler(request):
+    return JSONResponse({"status": "ok"})
+
+
+@pytest.fixture
+def error_app():
+    app = Starlette(
+        routes=[Route("/error", _error_handler), Route("/ok", _ok_handler)],
+    )
+    app.add_middleware(RequestLoggingMiddleware)
+    return app
 
 
 class TestSecurityHeaders:
@@ -109,3 +130,22 @@ class TestCORS:
             },
         )
         assert resp.headers.get("access-control-allow-origin") != "http://evil.com"
+
+
+class TestRequestLoggingMiddleware:
+    async def test_logs_successful_request(self, error_app) -> None:
+        async with AsyncClient(
+            transport=ASGITransport(app=error_app),
+            base_url="http://test",
+        ) as ac:
+            resp = await ac.get("/ok")
+            assert resp.status_code == 200
+
+    async def test_middleware_applied(self, error_app) -> None:
+        async with AsyncClient(
+            transport=ASGITransport(app=error_app),
+            base_url="http://test",
+        ) as ac:
+            resp = await ac.get("/ok")
+            assert resp.status_code == 200
+            assert resp.json() == {"status": "ok"}

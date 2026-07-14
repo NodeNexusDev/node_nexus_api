@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from app.core.connectors.ssh import SSHConnector
+from app.core.connectors.ssh import SSHConnector, SSHConnectorFactory
 
 
 class TestSSHConnector:
@@ -138,3 +138,58 @@ class TestSSHConnector:
             call_kwargs = mock_connect.call_args[1]
             assert "password" not in call_kwargs
             assert "client_keys" not in call_kwargs
+
+    @pytest.mark.asyncio
+    async def test_connect_error(self) -> None:
+        import asyncssh
+
+        connector = SSHConnector(host="127.0.0.1", known_hosts=None)
+        connect_path = "app.core.connectors.ssh.asyncssh.connect"
+        with patch(connect_path, new_callable=AsyncMock) as mock_connect:
+            mock_connect.side_effect = asyncssh.Error("Connection refused", "")
+            with pytest.raises(asyncssh.Error):
+                await connector.connect()
+
+    @pytest.mark.asyncio
+    async def test_execute_command_error(self) -> None:
+        import asyncssh
+
+        connector = SSHConnector(host="127.0.0.1")
+        mock_conn = AsyncMock()
+        mock_conn.run = AsyncMock(side_effect=asyncssh.Error("Channel closed", ""))
+        connector._connection = mock_conn
+
+        with pytest.raises(asyncssh.Error):
+            await connector.execute_command("echo hi")
+
+    @pytest.mark.asyncio
+    async def test_execute_command_exit_status_none(self) -> None:
+        connector = SSHConnector(host="127.0.0.1")
+        mock_conn = AsyncMock()
+        mock_result = MagicMock()
+        mock_result.stdout = "output"
+        mock_result.stderr = ""
+        mock_result.exit_status = None
+        mock_conn.run = AsyncMock(return_value=mock_result)
+        connector._connection = mock_conn
+
+        stdout, stderr, exit_code = await connector.execute_command("echo hi")
+        assert exit_code == 0
+
+
+class TestSSHConnectorFactory:
+    def test_create_ssh(self) -> None:
+        factory = SSHConnectorFactory()
+        connector = factory.create_ssh(
+            host="127.0.0.1",
+            port=22,
+            username="user",
+            password="pass",
+            ssh_key=None,
+        )
+        assert isinstance(connector, SSHConnector)
+        assert connector._host == "127.0.0.1"
+        assert connector._port == 22
+        assert connector._username == "user"
+        assert connector._password == "pass"
+        assert connector._ssh_key is None
