@@ -1,0 +1,60 @@
+# Version control
+.git
+.gitignore
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info
+*.egg
+.eggs
+dist
+build
+.venv
+venv
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# Testing
+.pytest_cache
+.coverage
+htmlcov
+coverage.xml
+tests
+
+# Documentation
+docs
+*.md
+LICENSE
+
+# Docker
+Dockerfile
+docker-compose*.yml
+.dockerignore
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# CI/CD
+.github
+
+# Pre-commit
+.pre-commit-config.yaml
+
+# MyPy
+.mypy_cache
+
+# Ruff
+.ruff_cache
+
+# Alembic (will be copied separately)
+alembic/versions/*.pyc
