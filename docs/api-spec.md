@@ -5,6 +5,86 @@ Base URL: `/api/v1`
 
 ---
 
+## Содержание
+
+### Ресурсы
+
+| Ресурс | Описание |
+|--------|----------|
+| [Nodes](#nodes) | CRUD ноды, проверка доступности, SSH-команды |
+| [Audit](#audit) | Аудит-лог операций |
+| [Commands](#commands) | Шаблоны команд с параметрами |
+| [Scripts](#scripts) | Пайплайны команд (скрипты) |
+| [Health](#health) | Healthcheck |
+
+### Nodes
+
+| Метод | Endpoint | Описание |
+|-------|----------|----------|
+| GET | [`/api/v1/nodes/`](#get-apiv1nodes) | Список нод |
+| GET | [`/api/v1/nodes/{node_id}`](#get-apiv1nodesnode_id) | Нода по ID |
+| POST | [`/api/v1/nodes/`](#post-apiv1nodes) | Создать ноду |
+| PUT | [`/api/v1/nodes/{node_id}`](#put-apiv1nodesnode_id) | Обновить ноду |
+| DELETE | [`/api/v1/nodes/{node_id}`](#delete-apiv1nodesnode_id) | Удалить ноду |
+| POST | [`/api/v1/nodes/{node_id}/check`](#post-apiv1nodesnode_idcheck) | Проверить SSH |
+| POST | [`/api/v1/nodes/{node_id}/execute`](#post-apiv1nodesnode_idexecute) | Выполнить команду |
+
+### Commands
+
+| Метод | Endpoint | Описание |
+|-------|----------|----------|
+| GET | [`/api/v1/commands/`](#get-apiv1commands) | Список команд |
+| GET | [`/api/v1/commands/{command_id}`](#get-apiv1commandscommand_id) | Команда по ID |
+| POST | [`/api/v1/commands/`](#post-apiv1commands) | Создать команду |
+| PUT | [`/api/v1/commands/{command_id}`](#put-apiv1commandscommand_id) | Обновить команду |
+| DELETE | [`/api/v1/commands/{command_id}`](#delete-apiv1commandscommand_id) | Удалить команду |
+| POST | [`/api/v1/commands/{command_id}/execute`](#post-apiv1commandscommand_idexecute) | Выполнить на ноде |
+
+### Scripts
+
+| Метод | Endpoint | Описание |
+|-------|----------|----------|
+| GET | [`/api/v1/scripts/`](#get-apiv1scripts) | Список скриптов |
+| GET | [`/api/v1/scripts/{script_id}`](#get-apiv1scriptsscript_id) | Скрипт по ID |
+| POST | [`/api/v1/scripts/`](#post-apiv1scripts) | Создать скрипт |
+| PUT | [`/api/v1/scripts/{script_id}`](#put-apiv1scriptsscript_id) | Обновить скрипт |
+| DELETE | [`/api/v1/scripts/{script_id}`](#delete-apiv1scriptsscript_id) | Удалить скрипт |
+| POST | [`/api/v1/scripts/{script_id}/execute`](#post-apiv1scriptsscript_idexecute) | Выполнить на нодах |
+| GET | [`/api/v1/scripts/{script_id}/executions`](#get-apiv1scriptsscript_idexecutions) | История выполнений |
+
+### Схемы
+
+| Схема | Описание |
+|-------|----------|
+| [NodeResponse](#noderesponse) | Ответ с данными ноды |
+| [PaginatedResponse\<T\>](#paginatedresponset) | Пагинированный ответ |
+| [CommandParameter](#commandparameter) | Параметр шаблона команды |
+| [CommandCreate](#commandcreate) | Создание команды |
+| [CommandUpdate](#commandupdate) | Обновление команды |
+| [CommandResponse](#commandresponse) | Ответ с данными команды |
+| [CommandExecuteRequest](#commandexecuterequest) | Запрос выполнения команды |
+| [CommandResult](#commandresult) | Результат выполнения |
+| [ScriptStep](#scriptstep) | Шаг скрипта |
+| [ScriptCreate](#scriptcreate) | Создание скрипта |
+| [ScriptUpdate](#scriptupdate) | Обновление скрипта |
+| [ScriptResponse](#scriptresponse) | Ответ с данными скрипта |
+| [ScriptExecuteRequest](#scriptexecuterequest) | Запрос выполнения скрипта |
+| [ScriptStepResult](#scriptstepresult) | Результат шага |
+| [ScriptNodeResult](#scriptnoderesult) | Результат по ноде |
+| [ScriptExecutionBatchResult](#scriptexecutionbatchresult) | Пакетный результат |
+| [ScriptExecutionResponse](#scriptexecutionresponse) | Запись выполнения |
+| [AuditLogResponse](#auditlogresponse) | Запись аудит-лога |
+
+### Ошибки
+
+| HTTP | Описание |
+|------|----------|
+| [404](#коды-ошибок) | Ресурс не найден |
+| [422](#коды-ошибок) | Ошибка валидации / TemplateRenderError |
+| [503](#коды-ошибок) | Ошибка подключения к ноде |
+
+---
+
 ## Nodes
 
 ### GET /api/v1/nodes/
