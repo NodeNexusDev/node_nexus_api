@@ -9,7 +9,10 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from alembic import context
 from app.models.base import Base
+from app.models.command import CommandModel  # noqa: F401
 from app.models.node import NodeModel  # noqa: F401
+from app.models.script import ScriptModel  # noqa: F401
+from app.models.script_execution import ScriptExecutionModel  # noqa: F401
 
 config = context.config
 if config.config_file_name is not None:

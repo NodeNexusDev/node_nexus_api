@@ -8,9 +8,14 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from app.core.config import Settings
 from app.core.connectors.ssh import SSHConnectorFactory
 from app.repositories.audit_repo import AuditLogRepository
+from app.repositories.command_repo import CommandRepository
 from app.repositories.node_repo import NodeRepository
+from app.repositories.script_execution_repo import ScriptExecutionRepository
+from app.repositories.script_repo import ScriptRepository
 from app.services.audit_service import AuditService
+from app.services.command_service import CommandService
 from app.services.node_service import NodeService
+from app.services.script_service import ScriptService
 
 
 class DbProvider(Provider):
@@ -45,6 +50,23 @@ class RepositoryProvider(Provider):
         """Get audit log repository."""
         return AuditLogRepository(session)
 
+    @provide(scope=Scope.REQUEST)
+    def get_command_repository(self, session: AsyncSession) -> CommandRepository:
+        """Get command repository."""
+        return CommandRepository(session)
+
+    @provide(scope=Scope.REQUEST)
+    def get_script_repository(self, session: AsyncSession) -> ScriptRepository:
+        """Get script repository."""
+        return ScriptRepository(session)
+
+    @provide(scope=Scope.REQUEST)
+    def get_script_execution_repository(
+        self, session: AsyncSession
+    ) -> ScriptExecutionRepository:
+        """Get script execution repository."""
+        return ScriptExecutionRepository(session)
+
 
 class ConnectorProvider(Provider):
     """Connector providers."""
@@ -73,6 +95,42 @@ class ServiceProvider(Provider):
         """Get node service."""
         return NodeService(
             repository=repository,
+            audit_service=audit_service,
+            connector_factory=connector_factory,
+        )
+
+    @provide(scope=Scope.REQUEST)
+    def get_command_service(
+        self,
+        repository: CommandRepository,
+        node_repository: NodeRepository,
+        audit_service: AuditService,
+        connector_factory: SSHConnectorFactory,
+    ) -> CommandService:
+        """Get command service."""
+        return CommandService(
+            repository=repository,
+            node_repository=node_repository,
+            audit_service=audit_service,
+            connector_factory=connector_factory,
+        )
+
+    @provide(scope=Scope.REQUEST)
+    def get_script_service(
+        self,
+        repository: ScriptRepository,
+        command_repository: CommandRepository,
+        node_repository: NodeRepository,
+        execution_repository: ScriptExecutionRepository,
+        audit_service: AuditService,
+        connector_factory: SSHConnectorFactory,
+    ) -> ScriptService:
+        """Get script service."""
+        return ScriptService(
+            repository=repository,
+            command_repository=command_repository,
+            node_repository=node_repository,
+            execution_repository=execution_repository,
             audit_service=audit_service,
             connector_factory=connector_factory,
         )

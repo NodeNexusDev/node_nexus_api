@@ -11,3 +11,15 @@ class NodeNotFoundError(DomainError):
 
 class ConnectionFailedError(DomainError):
     """Raised when a connection to a node fails."""
+
+
+class CommandNotFoundError(DomainError):
+    """Raised when a command template is not found."""
+
+
+class ScriptNotFoundError(DomainError):
+    """Raised when a script is not found."""
+
+
+class TemplateRenderError(DomainError):
+    """Raised when a command template cannot be rendered."""

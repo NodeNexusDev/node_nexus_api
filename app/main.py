@@ -15,8 +15,10 @@ from fastapi.responses import JSONResponse
 from alembic import command as alembic_command
 from app.api.middleware import RequestLoggingMiddleware
 from app.api.v1.audit import router as audit_router
+from app.api.v1.commands import router as commands_router
 from app.api.v1.health import router as health_router
 from app.api.v1.nodes import router as nodes_router
+from app.api.v1.scripts import router as scripts_router
 from app.core.config import get_settings
 from app.core.exceptions import DomainError
 from app.core.logging import configure_logging
@@ -74,6 +76,8 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
         openapi_tags=[
             {"name": "nodes", "description": "CRUD-операции и SSH-команды для нод"},
+            {"name": "commands", "description": "Шаблоны команд с параметрами"},
+            {"name": "scripts", "description": "Пайплайны команд для нод"},
             {"name": "audit", "description": "Просмотр аудит-лога операций"},
         ],
     )
@@ -110,6 +114,8 @@ def create_app() -> FastAPI:
     setup_dishka(container, app)
     app.include_router(health_router)
     app.include_router(nodes_router, prefix="/api/v1")
+    app.include_router(commands_router, prefix="/api/v1")
+    app.include_router(scripts_router, prefix="/api/v1")
     app.include_router(audit_router, prefix="/api/v1")
     return app
 
