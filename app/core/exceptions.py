@@ -23,3 +23,15 @@ class ScriptNotFoundError(DomainError):
 
 class TemplateRenderError(DomainError):
     """Raised when a command template cannot be rendered."""
+
+
+class AuthenticationError(DomainError):
+    """Raised when authentication fails."""
+
+
+class APIKeyNotFoundError(DomainError):
+    """Raised when an API key is not found."""
+
+
+class APIKeyRevokedError(DomainError):
+    """Raised when an API key has been revoked."""

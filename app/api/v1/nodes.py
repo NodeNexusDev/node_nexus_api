@@ -4,8 +4,9 @@ import uuid
 
 import structlog
 from dishka.integrations.fastapi import FromDishka, inject
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Security
 
+from app.api.deps import get_current_api_key
 from app.core.exceptions import ConnectionFailedError, NodeNotFoundError
 from app.schemas.node import (
     CommandRequest,
@@ -28,6 +29,7 @@ async def get_nodes(
     service: FromDishka[NodeService],
     page: int = Query(1, ge=1),
     size: int = Query(20, ge=1, le=100),
+    _key: str = Security(get_current_api_key),
 ) -> PaginatedResponse[NodeResponse]:
     """Get all nodes with pagination."""
     audit.info("api.nodes.list", page=page, size=size)
@@ -39,7 +41,9 @@ async def get_nodes(
 @router.get("/{node_id}", response_model=NodeResponse)
 @inject
 async def get_node(
-    node_id: uuid.UUID, service: FromDishka[NodeService]
+    node_id: uuid.UUID,
+    service: FromDishka[NodeService],
+    _key: str = Security(get_current_api_key),
 ) -> NodeResponse:
     """Get a node by ID."""
     audit.info("api.nodes.get", node_id=str(node_id))
@@ -53,7 +57,9 @@ async def get_node(
 @router.post("/", response_model=NodeResponse, status_code=201)
 @inject
 async def create_node(
-    data: NodeCreate, service: FromDishka[NodeService]
+    data: NodeCreate,
+    service: FromDishka[NodeService],
+    _key: str = Security(get_current_api_key),
 ) -> NodeResponse:
     """Create a new node."""
     audit.info("api.nodes.create", name=data.name, connection_type=data.connection_type)
@@ -63,7 +69,10 @@ async def create_node(
 @router.put("/{node_id}", response_model=NodeResponse)
 @inject
 async def update_node(
-    node_id: uuid.UUID, data: NodeUpdate, service: FromDishka[NodeService]
+    node_id: uuid.UUID,
+    data: NodeUpdate,
+    service: FromDishka[NodeService],
+    _key: str = Security(get_current_api_key),
 ) -> NodeResponse:
     """Update an existing node."""
     audit.info("api.nodes.update", node_id=str(node_id))
@@ -76,7 +85,11 @@ async def update_node(
 
 @router.delete("/{node_id}", status_code=204)
 @inject
-async def delete_node(node_id: uuid.UUID, service: FromDishka[NodeService]) -> None:
+async def delete_node(
+    node_id: uuid.UUID,
+    service: FromDishka[NodeService],
+    _key: str = Security(get_current_api_key),
+) -> None:
     """Delete a node."""
     audit.info("api.nodes.delete", node_id=str(node_id))
     try:
@@ -92,7 +105,9 @@ async def delete_node(node_id: uuid.UUID, service: FromDishka[NodeService]) -> N
 )
 @inject
 async def check_node(
-    node_id: uuid.UUID, service: FromDishka[NodeService]
+    node_id: uuid.UUID,
+    service: FromDishka[NodeService],
+    _key: str = Security(get_current_api_key),
 ) -> NodeResponse:
     """Check SSH connectivity to a node."""
     audit.info("api.nodes.check", node_id=str(node_id))
@@ -119,6 +134,7 @@ async def execute_command(
     node_id: uuid.UUID,
     data: CommandRequest,
     service: FromDishka[NodeService],
+    _key: str = Security(get_current_api_key),
 ) -> CommandResult:
     """Execute a command on a node via SSH."""
     audit.info("api.nodes.execute", node_id=str(node_id), command=data.command)

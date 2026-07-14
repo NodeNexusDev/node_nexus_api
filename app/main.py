@@ -14,6 +14,7 @@ from fastapi.responses import JSONResponse
 
 from alembic import command as alembic_command
 from app.api.middleware import RequestLoggingMiddleware
+from app.api.v1.api_keys import router as api_keys_router
 from app.api.v1.audit import router as audit_router
 from app.api.v1.commands import router as commands_router
 from app.api.v1.health import router as health_router
@@ -59,6 +60,18 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     logger.info("app.startup")
     await _run_migrations()
     logger.info("migrations.applied")
+
+    # Store sessionmaker in app state for auth dependency
+    from sqlalchemy.ext.asyncio import (
+        AsyncSession,
+        async_sessionmaker,
+        create_async_engine,
+    )
+
+    engine = create_async_engine(settings.DATABASE_URL)
+    app.state.sessionmaker = async_sessionmaker(
+        engine, class_=AsyncSession, expire_on_commit=False
+    )
 
     yield
 
@@ -117,6 +130,7 @@ def create_app() -> FastAPI:
     app.include_router(commands_router, prefix="/api/v1")
     app.include_router(scripts_router, prefix="/api/v1")
     app.include_router(audit_router, prefix="/api/v1")
+    app.include_router(api_keys_router, prefix="/api/v1")
     return app
 
 

@@ -22,6 +22,9 @@ class Settings(BaseSettings):
     # CORS
     CORS_ORIGINS: list[str] = Field(default=["http://localhost:3000"])
 
+    # API Key Authentication
+    MASTER_API_KEY: str = ""
+
 
 @lru_cache
 def get_settings() -> Settings:

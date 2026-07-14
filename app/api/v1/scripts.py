@@ -4,8 +4,9 @@ import uuid
 
 import structlog
 from dishka.integrations.fastapi import FromDishka, inject
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Security
 
+from app.api.deps import get_current_api_key
 from app.core.exceptions import (
     CommandNotFoundError,
     ConnectionFailedError,
@@ -34,6 +35,7 @@ async def get_scripts(
     service: FromDishka[ScriptService],
     page: int = Query(1, ge=1),
     size: int = Query(20, ge=1, le=100),
+    _key: str = Security(get_current_api_key),
 ) -> PaginatedResponse[ScriptResponse]:
     """Get all scripts with pagination."""
     audit.info("api.scripts.list", page=page, size=size)
@@ -45,7 +47,9 @@ async def get_scripts(
 @router.get("/{script_id}", response_model=ScriptResponse)
 @inject
 async def get_script(
-    script_id: uuid.UUID, service: FromDishka[ScriptService]
+    script_id: uuid.UUID,
+    service: FromDishka[ScriptService],
+    _key: str = Security(get_current_api_key),
 ) -> ScriptResponse:
     """Get a script by ID."""
     audit.info("api.scripts.get", script_id=str(script_id))
@@ -59,7 +63,9 @@ async def get_script(
 @router.post("/", response_model=ScriptResponse, status_code=201)
 @inject
 async def create_script(
-    data: ScriptCreate, service: FromDishka[ScriptService]
+    data: ScriptCreate,
+    service: FromDishka[ScriptService],
+    _key: str = Security(get_current_api_key),
 ) -> ScriptResponse:
     """Create a new script."""
     audit.info("api.scripts.create", name=data.name)
@@ -69,7 +75,10 @@ async def create_script(
 @router.put("/{script_id}", response_model=ScriptResponse)
 @inject
 async def update_script(
-    script_id: uuid.UUID, data: ScriptUpdate, service: FromDishka[ScriptService]
+    script_id: uuid.UUID,
+    data: ScriptUpdate,
+    service: FromDishka[ScriptService],
+    _key: str = Security(get_current_api_key),
 ) -> ScriptResponse:
     """Update an existing script."""
     audit.info("api.scripts.update", script_id=str(script_id))
@@ -83,7 +92,9 @@ async def update_script(
 @router.delete("/{script_id}", status_code=204)
 @inject
 async def delete_script(
-    script_id: uuid.UUID, service: FromDishka[ScriptService]
+    script_id: uuid.UUID,
+    service: FromDishka[ScriptService],
+    _key: str = Security(get_current_api_key),
 ) -> None:
     """Delete a script."""
     audit.info("api.scripts.delete", script_id=str(script_id))
@@ -100,6 +111,7 @@ async def execute_script(
     script_id: uuid.UUID,
     data: ScriptExecuteRequest,
     service: FromDishka[ScriptService],
+    _key: str = Security(get_current_api_key),
 ) -> ScriptExecutionBatchResult:
     """Execute a script on multiple nodes."""
     audit.info(
@@ -130,6 +142,7 @@ async def get_executions(
     service: FromDishka[ScriptService],
     page: int = Query(1, ge=1),
     size: int = Query(20, ge=1, le=100),
+    _key: str = Security(get_current_api_key),
 ) -> PaginatedResponse[dict]:
     """Get execution history for a script."""
     audit.info("api.scripts.executions", script_id=str(script_id))

@@ -4,8 +4,9 @@ import uuid
 
 import structlog
 from dishka.integrations.fastapi import FromDishka, inject
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Security
 
+from app.api.deps import get_current_api_key
 from app.core.exceptions import (
     CommandNotFoundError,
     ConnectionFailedError,
@@ -33,6 +34,7 @@ async def get_commands(
     service: FromDishka[CommandService],
     page: int = Query(1, ge=1),
     size: int = Query(20, ge=1, le=100),
+    _key: str = Security(get_current_api_key),
 ) -> PaginatedResponse[CommandResponse]:
     """Get all commands with pagination."""
     audit.info("api.commands.list", page=page, size=size)
@@ -44,7 +46,9 @@ async def get_commands(
 @router.get("/{command_id}", response_model=CommandResponse)
 @inject
 async def get_command(
-    command_id: uuid.UUID, service: FromDishka[CommandService]
+    command_id: uuid.UUID,
+    service: FromDishka[CommandService],
+    _key: str = Security(get_current_api_key),
 ) -> CommandResponse:
     """Get a command by ID."""
     audit.info("api.commands.get", command_id=str(command_id))
@@ -58,7 +62,9 @@ async def get_command(
 @router.post("/", response_model=CommandResponse, status_code=201)
 @inject
 async def create_command(
-    data: CommandCreate, service: FromDishka[CommandService]
+    data: CommandCreate,
+    service: FromDishka[CommandService],
+    _key: str = Security(get_current_api_key),
 ) -> CommandResponse:
     """Create a new command template."""
     audit.info("api.commands.create", name=data.name)
@@ -68,7 +74,10 @@ async def create_command(
 @router.put("/{command_id}", response_model=CommandResponse)
 @inject
 async def update_command(
-    command_id: uuid.UUID, data: CommandUpdate, service: FromDishka[CommandService]
+    command_id: uuid.UUID,
+    data: CommandUpdate,
+    service: FromDishka[CommandService],
+    _key: str = Security(get_current_api_key),
 ) -> CommandResponse:
     """Update an existing command template."""
     audit.info("api.commands.update", command_id=str(command_id))
@@ -82,7 +91,9 @@ async def update_command(
 @router.delete("/{command_id}", status_code=204)
 @inject
 async def delete_command(
-    command_id: uuid.UUID, service: FromDishka[CommandService]
+    command_id: uuid.UUID,
+    service: FromDishka[CommandService],
+    _key: str = Security(get_current_api_key),
 ) -> None:
     """Delete a command template."""
     audit.info("api.commands.delete", command_id=str(command_id))
@@ -99,6 +110,7 @@ async def execute_command(
     command_id: uuid.UUID,
     data: CommandExecuteRequest,
     service: FromDishka[CommandService],
+    _key: str = Security(get_current_api_key),
 ) -> CommandResult:
     """Execute a command template on a node."""
     audit.info(

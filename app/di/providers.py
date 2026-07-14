@@ -7,11 +7,13 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from app.core.config import Settings
 from app.core.connectors.ssh import SSHConnectorFactory
+from app.repositories.api_key_repo import APIKeyRepository
 from app.repositories.audit_repo import AuditLogRepository
 from app.repositories.command_repo import CommandRepository
 from app.repositories.node_repo import NodeRepository
 from app.repositories.script_execution_repo import ScriptExecutionRepository
 from app.repositories.script_repo import ScriptRepository
+from app.services.api_key_service import APIKeyService
 from app.services.audit_service import AuditService
 from app.services.command_service import CommandService
 from app.services.node_service import NodeService
@@ -66,6 +68,11 @@ class RepositoryProvider(Provider):
     ) -> ScriptExecutionRepository:
         """Get script execution repository."""
         return ScriptExecutionRepository(session)
+
+    @provide(scope=Scope.REQUEST)
+    def get_api_key_repository(self, session: AsyncSession) -> APIKeyRepository:
+        """Get API key repository."""
+        return APIKeyRepository(session)
 
 
 class ConnectorProvider(Provider):
@@ -134,6 +141,11 @@ class ServiceProvider(Provider):
             audit_service=audit_service,
             connector_factory=connector_factory,
         )
+
+    @provide(scope=Scope.REQUEST)
+    def get_api_key_service(self, repository: APIKeyRepository) -> APIKeyService:
+        """Get API key service."""
+        return APIKeyService(repository=repository)
 
 
 class ConfigProvider(Provider):
