@@ -642,3 +642,452 @@ def test_script_executions_not_found(e2e_client: httpx.Client) -> None:
 
     resp = e2e_client.get(f"/api/v1/scripts/{uuid.uuid4()}/executions")
     assert resp.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# Connection type validation
+# ---------------------------------------------------------------------------
+
+
+def test_create_node_invalid_connection_type(e2e_client: httpx.Client) -> None:
+    resp = e2e_client.post(
+        "/api/v1/nodes/",
+        json={
+            "name": "bad-type",
+            "host": "10.0.0.1",
+            "port": 22,
+            "connection_type": "invalid",
+        },
+    )
+    assert resp.status_code == 422
+
+
+def test_create_node_valid_connection_types(e2e_client: httpx.Client) -> None:
+    for ctype in ("ssh", "docker", "proxmox"):
+        resp = e2e_client.post(
+            "/api/v1/nodes/",
+            json={
+                "name": f"type-{ctype}",
+                "host": "10.0.0.1",
+                "port": 22,
+                "connection_type": ctype,
+            },
+        )
+        assert resp.status_code == 201
+        assert resp.json()["connection_type"] == ctype
+        e2e_client.delete(f"/api/v1/nodes/{resp.json()['id']}")
+
+
+# ---------------------------------------------------------------------------
+# Command execute (requires SSH node)
+# ---------------------------------------------------------------------------
+
+
+def test_command_execute_on_node(e2e_client: httpx.Client) -> None:
+    node = _create_ssh_node(e2e_client, name="cmd-exec-node")
+    cmd = _create_command(e2e_client, name="cmd-exec", command="echo hello-cmd")
+
+    resp = e2e_client.post(
+        f"/api/v1/commands/{cmd['id']}/execute",
+        json={"node_id": node["id"], "params": {}},
+    )
+    assert resp.status_code == 200
+    result = resp.json()
+    assert result["stdout"].strip() == "hello-cmd"
+    assert result["exit_code"] == 0
+
+
+def test_command_execute_not_found(e2e_client: httpx.Client) -> None:
+    import uuid
+
+    node = _create_ssh_node(e2e_client, name="cmd-nf-node")
+    resp = e2e_client.post(
+        f"/api/v1/commands/{uuid.uuid4()}/execute",
+        json={"node_id": node["id"], "params": {}},
+    )
+    assert resp.status_code == 404
+
+
+def test_command_execute_node_not_found(e2e_client: httpx.Client) -> None:
+    import uuid
+
+    cmd = _create_command(e2e_client, name="cmd-no-node")
+    resp = e2e_client.post(
+        f"/api/v1/commands/{cmd['id']}/execute",
+        json={"node_id": str(uuid.uuid4()), "params": {}},
+    )
+    assert resp.status_code == 404
+
+
+def test_command_execute_missing_required_param(e2e_client: httpx.Client) -> None:
+    node = _create_ssh_node(e2e_client, name="cmd-param-node")
+    cmd = _create_command(
+        e2e_client,
+        name="cmd-param",
+        command="echo {greeting}",
+        parameters=[{"name": "greeting", "type": "string", "required": True}],
+    )
+
+    resp = e2e_client.post(
+        f"/api/v1/commands/{cmd['id']}/execute",
+        json={"node_id": node["id"], "params": {}},
+    )
+    assert resp.status_code == 422
+
+
+def test_command_execute_with_params(e2e_client: httpx.Client) -> None:
+    node = _create_ssh_node(e2e_client, name="cmd-params-node")
+    cmd = _create_command(
+        e2e_client,
+        name="cmd-with-params",
+        command="echo {greeting}",
+        parameters=[{"name": "greeting", "type": "string", "required": True}],
+    )
+
+    resp = e2e_client.post(
+        f"/api/v1/commands/{cmd['id']}/execute",
+        json={"node_id": node["id"], "params": {"greeting": "world"}},
+    )
+    assert resp.status_code == 200
+    result = resp.json()
+    assert result["stdout"].strip() == "world"
+    assert result["exit_code"] == 0
+
+
+# ---------------------------------------------------------------------------
+# API key CRUD
+# ---------------------------------------------------------------------------
+
+
+def _get_master_key() -> str:
+    """Read the master API key from settings."""
+    from app.core.config import get_settings
+
+    return get_settings().MASTER_API_KEY
+
+
+def test_api_key_create(e2e_client: httpx.Client) -> None:
+    master_key = _get_master_key()
+    resp = e2e_client.post(
+        "/api/v1/api-keys/",
+        json={"name": "e2e-key-create"},
+        headers={"X-API-Key": master_key},
+    )
+    assert resp.status_code == 201
+    data = resp.json()
+    assert data["name"] == "e2e-key-create"
+    assert data["key"].startswith("nnk_")
+    assert len(data["key"]) == 52
+    assert data["key_prefix"] == data["key"][:12]
+
+
+def test_api_key_list(e2e_client: httpx.Client) -> None:
+    master_key = _get_master_key()
+    # Create a key first
+    e2e_client.post(
+        "/api/v1/api-keys/",
+        json={"name": "e2e-key-list"},
+        headers={"X-API-Key": master_key},
+    )
+
+    resp = e2e_client.get(
+        "/api/v1/api-keys/",
+        headers={"X-API-Key": master_key},
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "items" in data
+    assert "total" in data
+    assert data["total"] >= 1
+
+
+def test_api_key_revoke(e2e_client: httpx.Client) -> None:
+    master_key = _get_master_key()
+    # Create
+    resp = e2e_client.post(
+        "/api/v1/api-keys/",
+        json={"name": "e2e-key-revoke"},
+        headers={"X-API-Key": master_key},
+    )
+    key_id = resp.json()["id"]
+    generated_key = resp.json()["key"]
+
+    # Revoke
+    resp = e2e_client.delete(
+        f"/api/v1/api-keys/{key_id}",
+        headers={"X-API-Key": master_key},
+    )
+    assert resp.status_code == 204
+
+    # Verify revoked key is rejected
+    resp = e2e_client.get(
+        "/api/v1/nodes/",
+        headers={"X-API-Key": generated_key},
+    )
+    assert resp.status_code == 401
+
+    # Verify list shows key as inactive
+    resp = e2e_client.get(
+        "/api/v1/api-keys/",
+        headers={"X-API-Key": master_key},
+    )
+    items = resp.json()["items"]
+    revoked = [k for k in items if k["id"] == key_id]
+    assert len(revoked) == 1
+    assert revoked[0]["is_active"] is False
+
+
+def test_api_key_revoke_not_found(e2e_client: httpx.Client) -> None:
+    import uuid
+
+    master_key = _get_master_key()
+    resp = e2e_client.delete(
+        f"/api/v1/api-keys/{uuid.uuid4()}",
+        headers={"X-API-Key": master_key},
+    )
+    assert resp.status_code == 404
+
+
+def test_api_key_use_generated_key(e2e_client: httpx.Client) -> None:
+    """Created API key can authenticate subsequent requests."""
+    master_key = _get_master_key()
+    resp = e2e_client.post(
+        "/api/v1/api-keys/",
+        json={"name": "e2e-key-auth"},
+        headers={"X-API-Key": master_key},
+    )
+    generated_key = resp.json()["key"]
+
+    # Use generated key to access a protected endpoint
+    resp = e2e_client.get(
+        "/api/v1/nodes/",
+        headers={"X-API-Key": generated_key},
+    )
+    assert resp.status_code == 200
+
+
+def test_api_key_missing_header(e2e_client: httpx.Client) -> None:
+    resp = e2e_client.get("/api/v1/nodes/")
+    assert resp.status_code == 401
+
+
+def test_api_key_invalid_key(e2e_client: httpx.Client) -> None:
+    resp = e2e_client.get(
+        "/api/v1/nodes/",
+        headers={"X-API-Key": "nnk_invalid_key_12345678901234567890"},
+    )
+    assert resp.status_code == 401
+
+
+def test_api_key_create_validation_error(e2e_client: httpx.Client) -> None:
+    master_key = _get_master_key()
+    resp = e2e_client.post(
+        "/api/v1/api-keys/",
+        json={"name": ""},
+        headers={"X-API-Key": master_key},
+    )
+    assert resp.status_code == 422
+
+
+# ---------------------------------------------------------------------------
+# Audit log pagination and combined filters
+# ---------------------------------------------------------------------------
+
+
+def test_audit_log_pagination(e2e_client: httpx.Client) -> None:
+    # Create multiple nodes to generate audit entries
+    for i in range(3):
+        _create_node(e2e_client, name=f"audit-page-{i}")
+
+    resp = e2e_client.get("/api/v1/audit/?page=1&size=2")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert len(data["items"]) == 2
+    assert data["total"] >= 3
+    assert data["page"] == 1
+    assert data["size"] == 2
+
+
+def test_audit_log_combined_filters(e2e_client: httpx.Client) -> None:
+    node = _create_node(e2e_client, name="audit-combined")
+    node_id = node["id"]
+
+    resp = e2e_client.get(f"/api/v1/audit/?node_id={node_id}&action=create")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["total"] >= 1
+    for log in data["items"]:
+        assert log["action"] == "create"
+        # node_id may be null for deleted nodes, but for existing ones it matches
+        if log["node_id"] is not None:
+            assert log["node_id"] == node_id
+
+
+# ---------------------------------------------------------------------------
+# Command and script pagination
+# ---------------------------------------------------------------------------
+
+
+def test_command_pagination(e2e_client: httpx.Client) -> None:
+    for i in range(3):
+        _create_command(e2e_client, name=f"page-cmd-{i}")
+
+    resp = e2e_client.get("/api/v1/commands/?page=1&size=2")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert len(data["items"]) == 2
+    assert data["total"] >= 3
+    assert data["page"] == 1
+    assert data["size"] == 2
+
+
+def test_script_pagination(e2e_client: httpx.Client) -> None:
+    for i in range(3):
+        _create_script(e2e_client, name=f"page-script-{i}")
+
+    resp = e2e_client.get("/api/v1/scripts/?page=1&size=2")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert len(data["items"]) == 2
+    assert data["total"] >= 3
+    assert data["page"] == 1
+    assert data["size"] == 2
+
+
+# ---------------------------------------------------------------------------
+# Script execute with command reference steps
+# ---------------------------------------------------------------------------
+
+
+def test_script_execute_with_command_reference(e2e_client: httpx.Client) -> None:
+    node = _create_ssh_node(e2e_client, name="script-cmd-ref")
+    cmd = _create_command(e2e_client, name="ref-cmd", command="echo ref-ok")
+
+    resp = e2e_client.post(
+        "/api/v1/scripts/",
+        json={
+            "name": "cmd-ref-script",
+            "steps": [
+                {
+                    "label": "Run referenced cmd",
+                    "type": "command",
+                    "command_id": cmd["id"],
+                    "on_failure": "stop",
+                }
+            ],
+        },
+    )
+    assert resp.status_code == 201
+    script = resp.json()
+
+    resp = e2e_client.post(
+        f"/api/v1/scripts/{script['id']}/execute",
+        json={"node_ids": [node["id"]], "params": {}},
+    )
+    assert resp.status_code == 200
+    batch = resp.json()
+    assert len(batch["results"]) == 1
+    result = batch["results"][0]
+    assert result["status"] == "completed"
+    assert result["steps"][0]["stdout"].strip() == "ref-ok"
+
+
+def test_script_execute_multi_node(e2e_client: httpx.Client) -> None:
+    node1 = _create_ssh_node(e2e_client, name="multi-node-1")
+    node2 = _create_ssh_node(e2e_client, name="multi-node-2")
+    script = _create_script(e2e_client, name="multi-script")
+
+    resp = e2e_client.post(
+        f"/api/v1/scripts/{script['id']}/execute",
+        json={"node_ids": [node1["id"], node2["id"]], "params": {}},
+    )
+    assert resp.status_code == 200
+    batch = resp.json()
+    assert len(batch["results"]) == 2
+    node_ids = {r["node_id"] for r in batch["results"]}
+    assert node1["id"] in node_ids
+    assert node2["id"] in node_ids
+    for r in batch["results"]:
+        assert r["status"] == "completed"
+
+
+# ---------------------------------------------------------------------------
+# Command partial update and edge cases
+# ---------------------------------------------------------------------------
+
+
+def test_command_partial_update(e2e_client: httpx.Client) -> None:
+    cmd = _create_command(e2e_client, name="cmd-partial")
+
+    resp = e2e_client.put(
+        f"/api/v1/commands/{cmd['id']}",
+        json={"name": "cmd-partial-updated"},
+    )
+    assert resp.status_code == 200
+    updated = resp.json()
+    assert updated["name"] == "cmd-partial-updated"
+    assert updated["command"] == "echo test"  # unchanged
+
+
+def test_script_partial_update(e2e_client: httpx.Client) -> None:
+    script = _create_script(e2e_client, name="script-partial")
+
+    resp = e2e_client.put(
+        f"/api/v1/scripts/{script['id']}",
+        json={"name": "script-partial-updated"},
+    )
+    assert resp.status_code == 200
+    updated = resp.json()
+    assert updated["name"] == "script-partial-updated"
+    assert len(updated["steps"]) == 1  # steps unchanged
+
+
+# ---------------------------------------------------------------------------
+# Node port validation
+# ---------------------------------------------------------------------------
+
+
+def test_create_node_invalid_port(e2e_client: httpx.Client) -> None:
+    resp = e2e_client.post(
+        "/api/v1/nodes/",
+        json={
+            "name": "bad-port",
+            "host": "10.0.0.1",
+            "port": 99999,
+            "connection_type": "ssh",
+        },
+    )
+    assert resp.status_code == 422
+
+
+def test_create_node_port_zero(e2e_client: httpx.Client) -> None:
+    resp = e2e_client.post(
+        "/api/v1/nodes/",
+        json={
+            "name": "port-zero",
+            "host": "10.0.0.1",
+            "port": 0,
+            "connection_type": "ssh",
+        },
+    )
+    assert resp.status_code == 422
+
+
+# ---------------------------------------------------------------------------
+# Duplicate name handling
+# ---------------------------------------------------------------------------
+
+
+def test_create_node_duplicate_name(e2e_client: httpx.Client) -> None:
+    """Nodes with same name should be allowed (no unique constraint on name)."""
+    _create_node(e2e_client, name="dup-name")
+    resp = e2e_client.post(
+        "/api/v1/nodes/",
+        json={
+            "name": "dup-name",
+            "host": "10.0.0.2",
+            "port": 22,
+            "connection_type": "ssh",
+        },
+    )
+    assert resp.status_code == 201
