@@ -3,7 +3,7 @@
 import uuid
 from datetime import UTC, datetime
 from typing import Any
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 
@@ -22,6 +22,12 @@ def _connector(ssh_server: SSHServer) -> SSHConnector:
         password=ssh_server.password,
         known_hosts=None,
     )
+
+
+def _make_connector_factory(ssh_server: SSHServer) -> AsyncMock:
+    factory = AsyncMock()
+    factory.create_ssh = Mock(return_value=_connector(ssh_server))
+    return factory
 
 
 def _make_orm_node(ssh_server: SSHServer, **overrides: Any) -> NodeModel:
@@ -86,14 +92,10 @@ async def test_service_check_connectivity(ssh_server: SSHServer) -> None:
     repo.get_by_id.return_value = orm_node
     repo.update.return_value = orm_node
 
-    service = NodeService(repository=repo)
+    factory = _make_connector_factory(ssh_server)
+    service = NodeService(repository=repo, connector_factory=factory)
 
-    test_connector = _connector(ssh_server)
-    with patch(
-        "app.services.node_service.SSHConnector",
-        return_value=test_connector,
-    ):
-        result = await service.check_connectivity(orm_node.id)
+    result = await service.check_connectivity(orm_node.id)
 
     assert result.status == "active"
     repo.update.assert_called_once_with(orm_node.id, {"status": "active"})
@@ -105,16 +107,12 @@ async def test_service_execute_command(ssh_server: SSHServer) -> None:
     repo = AsyncMock()
     repo.get_by_id.return_value = orm_node
 
-    service = NodeService(repository=repo)
+    factory = _make_connector_factory(ssh_server)
+    service = NodeService(repository=repo, connector_factory=factory)
 
-    test_connector = _connector(ssh_server)
-    with patch(
-        "app.services.node_service.SSHConnector",
-        return_value=test_connector,
-    ):
-        result = await service.execute_command(
-            orm_node.id, CommandRequest(command="echo works")
-        )
+    result = await service.execute_command(
+        orm_node.id, CommandRequest(command="echo works")
+    )
 
     assert result.stdout.strip() == "works"
     assert result.exit_code == 0
