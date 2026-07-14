@@ -50,5 +50,15 @@ def service_ports(docker_ip: str, docker_services: Services) -> ServicePorts:
 @pytest.fixture(scope="session")
 def e2e_client(service_ports: ServicePorts) -> Generator[httpx.Client]:
     base_url = f"http://{service_ports.api_host}:{service_ports.api_port}"
+    default_headers = {"X-API-Key": "e2e-master-key-12345"}
+    with httpx.Client(
+        base_url=base_url, timeout=30.0, headers=default_headers
+    ) as client:
+        yield client
+
+
+@pytest.fixture(scope="session")
+def e2e_client_no_auth(service_ports: ServicePorts) -> Generator[httpx.Client]:
+    base_url = f"http://{service_ports.api_host}:{service_ports.api_port}"
     with httpx.Client(base_url=base_url, timeout=30.0) as client:
         yield client

@@ -48,7 +48,7 @@ services:
       ssh-server:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\""]
+      test: ["CMD-SHELL", "python -c \"import urllib.request; req = urllib.request.Request('http://localhost:8000/health', headers={'X-API-Key': 'e2e-master-key-12345'}); urllib.request.urlopen(req)\""]
       interval: 3s
       timeout: 10s
       retries: 15

@@ -760,10 +760,8 @@ def test_command_execute_with_params(e2e_client: httpx.Client) -> None:
 
 
 def _get_master_key() -> str:
-    """Read the master API key from settings."""
-    from app.core.config import get_settings
-
-    return get_settings().MASTER_API_KEY
+    """Return the master API key used in the e2e Docker environment."""
+    return "e2e-master-key-12345"
 
 
 def test_api_key_create(e2e_client: httpx.Client) -> None:
@@ -866,8 +864,8 @@ def test_api_key_use_generated_key(e2e_client: httpx.Client) -> None:
     assert resp.status_code == 200
 
 
-def test_api_key_missing_header(e2e_client: httpx.Client) -> None:
-    resp = e2e_client.get("/api/v1/nodes/")
+def test_api_key_missing_header(e2e_client_no_auth: httpx.Client) -> None:
+    resp = e2e_client_no_auth.get("/api/v1/nodes/")
     assert resp.status_code == 401
 
 
