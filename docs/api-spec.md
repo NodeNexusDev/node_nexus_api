@@ -11,10 +11,12 @@ Base URL: `/api/v1`
 
 | Ресурс | Описание |
 |--------|----------|
+| [Аутентификация](#аутентификация) | API Key аутентификация |
 | [Nodes](#nodes) | CRUD ноды, проверка доступности, SSH-команды |
 | [Audit](#audit) | Аудит-лог операций |
 | [Commands](#commands) | Шаблоны команд с параметрами |
 | [Scripts](#scripts) | Пайплайны команд (скрипты) |
+| [API Keys](#api-keys) | Управление API ключами |
 | [Health](#health) | Healthcheck |
 
 ### Nodes
@@ -52,6 +54,14 @@ Base URL: `/api/v1`
 | POST | [`/api/v1/scripts/{script_id}/execute`](#post-apiv1scriptsscript_idexecute) | Выполнить на нодах |
 | GET | [`/api/v1/scripts/{script_id}/executions`](#get-apiv1scriptsscript_idexecutions) | История выполнений |
 
+### API Keys
+
+| Метод | Endpoint | Описание |
+|-------|----------|----------|
+| POST | [`/api/v1/api-keys/`](#post-apiv1api-keys) | Создать API ключ |
+| GET | [`/api/v1/api-keys/`](#get-apiv1api-keys) | Список API ключей |
+| DELETE | [`/api/v1/api-keys/{key_id}`](#delete-apiv1api-keyskey_id) | Отозвать API ключ |
+
 ### Схемы
 
 | Схема | Описание |
@@ -74,14 +84,45 @@ Base URL: `/api/v1`
 | [ScriptExecutionBatchResult](#scriptexecutionbatchresult) | Пакетный результат |
 | [ScriptExecutionResponse](#scriptexecutionresponse) | Запись выполнения |
 | [AuditLogResponse](#auditlogresponse) | Запись аудит-лога |
+| [APIKeyCreate](#apikeycreate) | Создание API ключа |
+| [APIKeyCreated](#apikeycreated) | Ответ при создании ключа |
+| [APIKeyResponse](#apikeyresponse) | Метаданные ключа |
+| [APIKeyList](#apikeylist) | Список ключей |
 
 ### Ошибки
 
 | HTTP | Описание |
 |------|----------|
+| [401](#коды-ошибок) | Не авторизован / невалидный API ключ |
 | [404](#коды-ошибок) | Ресурс не найден |
 | [422](#коды-ошибок) | Ошибка валидации / TemplateRenderError |
 | [503](#коды-ошибок) | Ошибка подключения к ноде |
+
+---
+
+## Аутентификация
+
+Все эндпоинты API требуют аутентификации через API ключ в заголовке `X-API-Key`.
+
+### Способы аутентификации
+
+1. **Master Key** — ключ из переменной `MASTER_API_KEY`. Имеет полный доступ ко всем эндпоинтам.
+2. **API Key** — ключ, созданный через `/api/v1/api-keys/`. Хранится в БД в хешированном виде.
+
+### Пример запроса
+
+```
+GET /api/v1/nodes/ HTTP/1.1
+Host: localhost:8000
+X-API-Key: nnk_abc123def456...
+```
+
+### Ошибки аутентификации
+
+| HTTP | Описание |
+|------|----------|
+| 401 | Заголовок `X-API-Key` отсутствует или невалиден |
+| 401 | API ключ был отозван |
 
 ---
 
@@ -875,6 +916,93 @@ Base URL: `/api/v1`
 
 ---
 
+## API Keys
+
+Управление API ключами для аутентификации.
+
+### POST /api/v1/api-keys/
+
+Создание нового API ключа. Полный ключ возвращается только один раз при создании.
+
+**Request Body:**
+
+```json
+{
+  "name": "my-app-key"
+}
+```
+
+| Поле | Тип | Обязательно | Описание |
+|------|-----|-------------|----------|
+| `name` | string | да | Имя ключа (1–255 символов) |
+
+**Response 201:**
+
+```json
+{
+  "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "name": "my-app-key",
+  "key": "nnk_dYU4Rb65xK9mN2pQ...",
+  "key_prefix": "nnk_dYU4",
+  "created_at": "2025-07-10T12:00:00Z"
+}
+```
+
+> **Важно:** Значение `key` показывается только при создании. Сохраните его — повторное получение невозможно.
+
+---
+
+### GET /api/v1/api-keys/
+
+Список API ключей (без самих ключей, только метаданные).
+
+**Query Parameters:**
+
+| Параметр | Тип | По умолчанию | Описание |
+|----------|-----|--------------|----------|
+| `page` | int | 1 | Номер страницы (≥1) |
+| `size` | int | 20 | Размер страницы (1–100) |
+
+**Response 200:**
+
+```json
+{
+  "items": [
+    {
+      "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "name": "my-app-key",
+      "key_prefix": "nnk_dYU4",
+      "is_active": true,
+      "created_at": "2025-07-10T12:00:00Z",
+      "last_used_at": "2025-07-10T14:30:00Z"
+    }
+  ],
+  "total": 3
+}
+```
+
+---
+
+### DELETE /api/v1/api-keys/{key_id}
+
+Отзыв API ключа. Отозванный ключ перестаёт работать.
+
+**Path Parameters:**
+
+| Параметр | Тип | Описание |
+|----------|-----|----------|
+| `key_id` | UUID | ID ключа |
+
+**Response 204:** Нет тела.
+
+**Response 404:**
+
+```json
+{ "detail": "API key not found" }
+```
+
+---
+
 ## Health
 
 ### GET /health
@@ -1082,6 +1210,40 @@ Healthcheck.
 | `details` | string \| null | Детали |
 | `created_at` | datetime | Время создания |
 
+### APIKeyCreate
+
+| Поле | Тип | Обязательно | Описание |
+|------|-----|-------------|----------|
+| `name` | string | да | Имя ключа (1–255 символов) |
+
+### APIKeyCreated
+
+| Поле | Тип | Описание |
+|------|-----|----------|
+| `id` | UUID | Уникальный идентификатор |
+| `name` | string | Имя ключа |
+| `key` | string | Полный ключ (только при создании) |
+| `key_prefix` | string | Префикс ключа для идентификации |
+| `created_at` | datetime | Время создания |
+
+### APIKeyResponse
+
+| Поле | Тип | Описание |
+|------|-----|----------|
+| `id` | UUID | Уникальный идентификатор |
+| `name` | string | Имя ключа |
+| `key_prefix` | string | Префикс ключа |
+| `is_active` | bool | Активен ли ключ |
+| `created_at` | datetime | Время создания |
+| `last_used_at` | datetime \| null | Время последнего использования |
+
+### APIKeyList
+
+| Поле | Тип | Описание |
+|------|-----|----------|
+| `items` | list[APIKeyResponse] | Список ключей |
+| `total` | int | Общее количество |
+
 ---
 
 ## Коды ошибок
@@ -1090,6 +1252,7 @@ Healthcheck.
 |------|----------|
 | 201 | Создано успешно |
 | 204 | Удалено успешно |
-| 404 | Ресурс не найден (Node, Command, Script) |
+| 401 | Не авторизован / невалидный API ключ |
+| 404 | Ресурс не найден (Node, Command, Script, API Key) |
 | 422 | Ошибка валидации запроса / TemplateRenderError |
 | 503 | Ошибка подключения к ноде (ConnectionFailedError) |

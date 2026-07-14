@@ -36,12 +36,15 @@ docker compose up -d --build
 | `/api/v1/commands` | Шаблоны команд с параметрами + выполнение |
 | `/api/v1/scripts` | Пайплайны команд (скрипты) + выполнение на нодах |
 | `/api/v1/audit` | Просмотр аудит-лога |
+| `/api/v1/api-keys` | Управление API ключами |
 | `/health` | Healthcheck |
 
 ## Безопасность
 
 - **SSH-ключи и пароли** шифруются AES-256-GCM перед записью в БД
 - Секреты **не возвращаются** в API-ответах
+- **API Key аутентификация** — все эндпоинты защищены заголовком `X-API-Key`
+- API ключи хранятся в БД в виде SHA-256 хешей
 
 ## Конфигурация
 
@@ -49,6 +52,7 @@ docker compose up -d --build
 |------------|----------|--------------|
 | `DATABASE_URL` | URL PostgreSQL | — |
 | `SECRET_KEY` | Ключ шифрования | — |
+| `MASTER_API_KEY` | Master API ключ для аутентификации | — |
 | `LOG_LEVEL` | Уровень логирования | INFO |
 | `DEBUG` | Режим отладки | false |
 | `PORT` | Порт сервера | 8000 |
@@ -90,11 +94,13 @@ Middleware (request logging) → API
 ```
 app/
 ├── api/
+│   ├── deps.py              # Auth dependency (X-API-Key)
 │   ├── v1/
 │   │   ├── nodes.py        # CRUD + SSH-команды для нод
 │   │   ├── commands.py     # Шаблоны команд с параметрами
 │   │   ├── scripts.py      # Пайплайны команд (скрипты)
 │   │   ├── audit.py        # Аудит-лог
+│   │   ├── api_keys.py     # Управление API ключами
 │   │   └── health.py       # Healthcheck
 │   └── middleware.py        # Request logging middleware
 ├── core/
@@ -113,14 +119,18 @@ app/
 │   ├── command.py          # Шаблон команды
 │   ├── script.py           # Скрипт
 │   ├── script_execution.py # Результат выполнения скрипта
-│   └── audit_log.py        # Аудит-лог
+│   ├── audit_log.py        # Аудит-лог
+│   └── api_key.py          # API ключ
 ├── repositories/           # Доступ к данным (CRUD)
 ├── schemas/                # Pydantic-схемы (Request/Response)
+│   ├── api_key.py          # Схемы API ключей
+│   └── ...
 └── services/
     ├── node_service.py     # Бизнес-логика нод
     ├── command_service.py  # Бизнес-логика команд
     ├── script_service.py   # Бизнес-логика скриптов
-    └── audit_service.py    # Сервис аудит-лога
+    ├── audit_service.py    # Сервис аудит-лога
+    └── api_key_service.py  # Сервис API ключей
 ```
 
 ## Лицензия
