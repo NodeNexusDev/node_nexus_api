@@ -3,6 +3,7 @@
 import uuid
 from collections.abc import AsyncGenerator, AsyncIterable
 from typing import Any
+from unittest.mock import MagicMock, patch
 
 import pytest
 import pytest_asyncio
@@ -23,6 +24,8 @@ from app.models.base import Base
 from app.repositories.command_repo import CommandRepository
 from app.repositories.node_repo import NodeRepository
 from app.services.command_service import CommandService
+
+MASTER_KEY = "test-master-key"
 
 COMMANDS_URL = "/api/v1/commands/"
 
@@ -74,6 +77,12 @@ class IntegrationDbProvider(Provider):
         )
 
 
+def _mock_settings(master_key: str = "") -> MagicMock:
+    settings = MagicMock()
+    settings.MASTER_API_KEY = master_key
+    return settings
+
+
 @pytest_asyncio.fixture
 async def integration_client(
     sessionmaker: async_sessionmaker[AsyncSession],
@@ -85,12 +94,15 @@ async def integration_client(
     app.include_router(health_router)
     app.include_router(commands_router, prefix="/api/v1")
     setup_dishka(container, app)
+    app.state.sessionmaker = sessionmaker
 
-    async with AsyncClient(
-        transport=ASGITransport(app=app),
-        base_url="http://test",
-    ) as ac:
-        yield ac
+    with patch("app.api.deps.get_settings", return_value=_mock_settings(MASTER_KEY)):
+        async with AsyncClient(
+            transport=ASGITransport(app=app),
+            base_url="http://test",
+            headers={"X-API-Key": MASTER_KEY},
+        ) as ac:
+            yield ac
 
     await container.close()
 

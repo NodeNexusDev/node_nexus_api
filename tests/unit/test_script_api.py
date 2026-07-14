@@ -4,7 +4,7 @@ import uuid
 from collections.abc import AsyncGenerator
 from datetime import UTC, datetime
 from typing import Any
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from dishka import Provider, Scope, make_async_container, provide
@@ -27,6 +27,7 @@ from app.schemas.script import (
     ScriptStepResult,
 )
 from app.services.script_service import ScriptService
+from tests.unit.conftest import MockSessionmaker, _mock_settings
 
 
 def _make_step_result(**overrides: Any) -> ScriptStepResult:
@@ -75,6 +76,7 @@ def _create_test_app(service: ScriptService | AsyncMock) -> FastAPI:
     app = FastAPI()
     app.include_router(health_router)
     app.include_router(scripts_router, prefix="/api/v1")
+    app.state.sessionmaker = MockSessionmaker()
 
     class MockServiceProvider(Provider):
         @provide(scope=Scope.REQUEST)
@@ -94,12 +96,14 @@ def mock_service() -> AsyncMock:
 @pytest.fixture
 async def client(mock_service: AsyncMock) -> AsyncGenerator[AsyncClient]:
     app = _create_test_app(mock_service)
-    async with AsyncClient(
-        transport=ASGITransport(app=app),
-        base_url="http://test",
-        follow_redirects=True,
-    ) as ac:
-        yield ac
+    with patch("app.api.deps.get_settings", return_value=_mock_settings("test-master")):
+        async with AsyncClient(
+            transport=ASGITransport(app=app),
+            base_url="http://test",
+            follow_redirects=True,
+            headers={"X-API-Key": "test-master"},
+        ) as ac:
+            yield ac
 
 
 # --- GET /scripts/ ---
