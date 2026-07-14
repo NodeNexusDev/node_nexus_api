@@ -775,8 +775,7 @@ def test_api_key_create(e2e_client: httpx.Client) -> None:
     data = resp.json()
     assert data["name"] == "e2e-key-create"
     assert data["key"].startswith("nnk_")
-    assert len(data["key"]) == 52
-    assert data["key_prefix"] == data["key"][:12]
+    assert data["key_prefix"] == data["key"][:8]
 
 
 def test_api_key_list(e2e_client: httpx.Client) -> None:

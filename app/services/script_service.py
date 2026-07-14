@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import json
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
@@ -153,26 +152,23 @@ class ScriptService:
 
         steps = [ScriptStep(**s) for s in json.loads(script.steps)]
 
-        tasks = [
-            self._execute_on_node(script_id, steps, node_id, data.params)
-            for node_id in data.node_ids
-        ]
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-
         node_results: list[ScriptNodeResult] = []
-        for i, result in enumerate(results):
-            if isinstance(result, Exception):
+        for node_id in data.node_ids:
+            try:
+                result = await self._execute_on_node(
+                    script_id, steps, node_id, data.params
+                )
+                node_results.append(result)
+            except Exception:
                 node_results.append(
                     ScriptNodeResult(
                         execution_id=UUID(int=0),
-                        node_id=data.node_ids[i],
+                        node_id=node_id,
                         node_name="unknown",
                         status="failed",
                         steps=[],
                     )
                 )
-            else:
-                node_results.append(result)
 
         return ScriptExecutionBatchResult(
             script_id=script_id,
