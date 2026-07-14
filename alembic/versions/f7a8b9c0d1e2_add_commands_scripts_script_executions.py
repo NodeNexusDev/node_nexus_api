@@ -1,7 +1,7 @@
 """add commands, scripts, script_executions tables
 
 Revision ID: f7a8b9c0d1e2
-Revises: d4e5f6a7b8c9
+Revises: e5f6a7b8c9d0
 Create Date: 2026-07-14 15:00:00.000000
 
 """
@@ -13,7 +13,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision: str = 'f7a8b9c0d1e2'
-down_revision: Union[str, Sequence[str], None] = 'd4e5f6a7b8c9'
+down_revision: Union[str, Sequence[str], None] = 'e5f6a7b8c9d0'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
