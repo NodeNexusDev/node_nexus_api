@@ -13,7 +13,7 @@ from app.repositories.command_repo import CommandRepository
 from app.repositories.node_repo import NodeRepository
 from app.repositories.script_execution_repo import ScriptExecutionRepository
 from app.repositories.script_repo import ScriptRepository
-from app.schemas.script import ScriptCreate, ScriptStep, ScriptUpdate
+from app.schemas.script import ScriptCreate, ScriptStep
 from app.services.script_service import ScriptService
 
 
@@ -21,7 +21,12 @@ def _make_orm_script(**overrides: Any) -> Any:
     from app.models.script import ScriptModel
 
     steps = [
-        {"label": "Check disk", "type": "inline", "command": "df -h", "on_failure": "stop"}
+        {
+            "label": "Check disk",
+            "type": "inline",
+            "command": "df -h",
+            "on_failure": "stop",
+        }
     ]
     defaults: dict[str, Any] = {
         "id": uuid.uuid4(),
@@ -80,7 +85,9 @@ class TestGetScript:
         assert len(result.steps) == 1
 
     @pytest.mark.asyncio
-    async def test_not_found(self, service: ScriptService, script_repo: AsyncMock) -> None:
+    async def test_not_found(
+        self, service: ScriptService, script_repo: AsyncMock
+    ) -> None:
         script_repo.get_by_id.return_value = None
         with pytest.raises(ScriptNotFoundError):
             await service.get_script(uuid.uuid4())
@@ -110,7 +117,9 @@ class TestDeleteScript:
         assert result is True
 
     @pytest.mark.asyncio
-    async def test_not_found(self, service: ScriptService, script_repo: AsyncMock) -> None:
+    async def test_not_found(
+        self, service: ScriptService, script_repo: AsyncMock
+    ) -> None:
         script_repo.get_by_id.return_value = None
         with pytest.raises(ScriptNotFoundError):
             await service.delete_script(uuid.uuid4())

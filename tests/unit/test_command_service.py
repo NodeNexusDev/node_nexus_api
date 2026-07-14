@@ -1,6 +1,5 @@
 """Unit tests for CommandService."""
 
-import json
 import uuid
 from datetime import UTC, datetime
 from typing import Any
@@ -8,10 +7,10 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from app.core.exceptions import CommandNotFoundError, NodeNotFoundError
+from app.core.exceptions import CommandNotFoundError
 from app.repositories.command_repo import CommandRepository
 from app.repositories.node_repo import NodeRepository
-from app.schemas.command import CommandCreate, CommandExecuteRequest, CommandUpdate
+from app.schemas.command import CommandCreate
 from app.services.command_service import CommandService
 
 
@@ -75,7 +74,9 @@ class TestGetCommand:
         assert result.name == "check_disk"
 
     @pytest.mark.asyncio
-    async def test_not_found(self, service: CommandService, cmd_repo: AsyncMock) -> None:
+    async def test_not_found(
+        self, service: CommandService, cmd_repo: AsyncMock
+    ) -> None:
         cmd_repo.get_by_id.return_value = None
         with pytest.raises(CommandNotFoundError):
             await service.get_command(uuid.uuid4())
@@ -102,7 +103,9 @@ class TestDeleteCommand:
         assert result is True
 
     @pytest.mark.asyncio
-    async def test_not_found(self, service: CommandService, cmd_repo: AsyncMock) -> None:
+    async def test_not_found(
+        self, service: CommandService, cmd_repo: AsyncMock
+    ) -> None:
         cmd_repo.get_by_id.return_value = None
         with pytest.raises(CommandNotFoundError):
             await service.delete_command(uuid.uuid4())
