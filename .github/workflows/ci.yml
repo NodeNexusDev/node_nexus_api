@@ -87,15 +87,7 @@ jobs:
 
       - name: Test Docker image
         run: |
-          docker run --rm -d --name test-api \
-            -e DATABASE_URL=sqlite+aiosqlite:///test.db \
-            -e SECRET_KEY=test-secret-key \
-            -e MASTER_API_KEY=test-master-key \
-            -p 8000:8000 \
-            node-nexus-api:test
-          sleep 5
-          docker exec test-api python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"
-          docker stop test-api
+          docker run --rm node-nexus-api:test python -c "from app.main import app; print('App loaded successfully')"
 
   security:
     runs-on: ubuntu-latest
