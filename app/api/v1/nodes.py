@@ -15,6 +15,8 @@ from app.schemas.node import (
     NodeResponse,
     NodeUpdate,
     PaginatedResponse,
+    TagAdd,
+    TagRemove,
 )
 from app.services.node_service import NodeService
 
@@ -150,3 +152,48 @@ async def execute_command(
             error=str(exc),
         )
         raise HTTPException(status_code=503, detail=str(exc))
+
+
+@router.get("/tags")
+@inject
+async def get_all_tags(
+    service: FromDishka[NodeService],
+    _key: str = Security(get_current_api_key),
+) -> list[str]:
+    """Get all unique tags across all nodes."""
+    audit.info("api.nodes.tags.list")
+    return await service.get_all_tags()
+
+
+@router.post("/{node_id}/tags", response_model=NodeResponse)
+@inject
+async def add_tag(
+    node_id: uuid.UUID,
+    data: TagAdd,
+    service: FromDishka[NodeService],
+    _key: str = Security(get_current_api_key),
+) -> NodeResponse:
+    """Add a tag to a node."""
+    audit.info("api.nodes.tags.add", node_id=str(node_id), tag=data.tag)
+    try:
+        return await service.add_tag(node_id, data)
+    except NodeNotFoundError:
+        audit.warning("api.nodes.not_found", node_id=str(node_id))
+        raise HTTPException(status_code=404, detail="Node not found")
+
+
+@router.delete("/{node_id}/tags", response_model=NodeResponse)
+@inject
+async def remove_tag(
+    node_id: uuid.UUID,
+    data: TagRemove,
+    service: FromDishka[NodeService],
+    _key: str = Security(get_current_api_key),
+) -> NodeResponse:
+    """Remove a tag from a node."""
+    audit.info("api.nodes.tags.remove", node_id=str(node_id), tag=data.tag)
+    try:
+        return await service.remove_tag(node_id, data)
+    except NodeNotFoundError:
+        audit.warning("api.nodes.not_found", node_id=str(node_id))
+        raise HTTPException(status_code=404, detail="Node not found")

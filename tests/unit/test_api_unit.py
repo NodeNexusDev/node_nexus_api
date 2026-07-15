@@ -29,6 +29,7 @@ def _make_node(**overrides: Any) -> NodeResponse:
         "connection_type": "ssh",
         "status": "active",
         "username": "root",
+        "tags": [],
         "created_at": datetime.now(UTC),
         "updated_at": datetime.now(UTC),
     }

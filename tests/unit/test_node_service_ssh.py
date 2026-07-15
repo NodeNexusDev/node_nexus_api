@@ -24,6 +24,7 @@ def _make_response(**overrides: Any) -> NodeResponse:
         "connection_type": "ssh",
         "status": "active",
         "username": "root",
+        "tags": [],
         "created_at": datetime.now(UTC),
         "updated_at": datetime.now(UTC),
     }
@@ -42,6 +43,7 @@ def _make_orm_node(**overrides: Any) -> NodeModel:
         "username": "root",
         "password": None,
         "ssh_key": None,
+        "tags": [],
         "created_at": datetime.now(UTC),
         "updated_at": datetime.now(UTC),
     }
