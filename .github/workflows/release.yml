@@ -16,12 +16,19 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Set image tag
+        id: meta
+        run: |
+          OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          REPO=$(echo "${{ github.event.repository.name }}" | tr '[:upper:]' '[:lower:]')
+          echo "image=ghcr.io/${OWNER}/${REPO}:${{ github.ref_name }}" >> $GITHUB_OUTPUT
+
       - name: Build Docker image
         uses: docker/build-push-action@v5
         with:
           context: .
           push: false
-          tags: ghcr.io/${{ github.repository }}:${{ github.ref_name }}
+          tags: ${{ steps.meta.outputs.image }}
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
