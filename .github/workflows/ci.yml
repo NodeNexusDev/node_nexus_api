@@ -37,6 +37,10 @@ jobs:
   test:
     runs-on: ubuntu-latest
     needs: lint
+    env:
+      DATABASE_URL: sqlite+aiosqlite:///test.db
+      SECRET_KEY: test-secret-key-for-ci
+      MASTER_API_KEY: test-master-key-for-ci
     steps:
       - uses: actions/checkout@v5
 
