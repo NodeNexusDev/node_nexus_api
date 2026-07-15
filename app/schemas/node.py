@@ -31,6 +31,7 @@ class NodeCreate(BaseModel):
     username: str | None = None
     password: str | None = None
     ssh_key: str | None = None
+    tags: list[str] = Field(default_factory=list)
 
 
 class NodeUpdate(BaseModel):
@@ -44,6 +45,7 @@ class NodeUpdate(BaseModel):
     username: str | None = None
     password: str | None = None
     ssh_key: str | None = None
+    tags: list[str] | None = None
 
 
 class NodeResponse(BaseModel):
@@ -58,6 +60,7 @@ class NodeResponse(BaseModel):
     connection_type: str
     status: str
     username: str | None
+    tags: list[str]
     created_at: datetime
     updated_at: datetime
 
@@ -74,3 +77,15 @@ class CommandResult(BaseModel):
     stdout: str
     stderr: str
     exit_code: int
+
+
+class TagAdd(BaseModel):
+    """Schema for adding a tag to a node."""
+
+    tag: str = Field(min_length=1, max_length=100)
+
+
+class TagRemove(BaseModel):
+    """Schema for removing a tag from a node."""
+
+    tag: str = Field(min_length=1, max_length=100)

@@ -35,3 +35,7 @@ class APIKeyNotFoundError(DomainError):
 
 class APIKeyRevokedError(DomainError):
     """Raised when an API key has been revoked."""
+
+
+class TagNotFoundError(DomainError):
+    """Raised when a tag is not found on a node."""
