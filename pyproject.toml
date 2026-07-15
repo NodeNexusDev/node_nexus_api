@@ -1,7 +1,57 @@
 [project]
 name = "node-nexus-api"
-version = "0.1.0"
-description = "Add your description here"
+version = "0.0.1"
+description = "REST API for managing server nodes"
 readme = "README.md"
 requires-python = ">=3.13"
-dependencies = []
+dependencies = [
+    "alembic>=1.18.5",
+    "asyncpg>=0.31.0",
+    "asyncssh>=2.24.0",
+    "cryptography>=49.0.0",
+    "dishka>=1.10.1",
+    "fastapi>=0.139.0",
+    "httpx>=0.28.1",
+    "pydantic>=2.13.4",
+    "pydantic-settings>=2.14.2",
+    "sqlalchemy>=2.0.51",
+    "structlog>=26.1.0",
+    "uvicorn>=0.51.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "aiosqlite>=0.22.1",
+    "pre-commit>=4.0.0",
+    "ty>=0.0.59",
+    "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.0",
+    "pytest-cov>=7.1.0",
+    "pytest-docker>=3.2.5",
+    "pytest-mock>=3.15.1",
+    "ruff>=0.15.21",
+]
+
+[tool.ruff]
+target-version = "py313"
+line-length = 88
+exclude = ["alembic/versions/"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP"]
+
+[tool.ty.environment]
+python-version = "3.13"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+addopts = '-m "not docker"'
+markers = [
+    "docker: tests requiring running Docker infrastructure (PostgreSQL, SSH)",
+]
+
+[dependency-groups]
+dev = [
+    "ty>=0.0.59",
+]
