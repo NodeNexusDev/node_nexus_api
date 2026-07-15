@@ -139,9 +139,7 @@ async def test_master_key_auth(
         async with AsyncClient(
             transport=ASGITransport(app=app), base_url="http://test"
         ) as client:
-            resp = await client.get(
-                "/api/v1/nodes/", headers={"X-API-Key": MASTER_KEY}
-            )
+            resp = await client.get("/api/v1/nodes/", headers={"X-API-Key": MASTER_KEY})
     assert resp.status_code == 200
     assert resp.json()["items"] == []
     await app.state._container.close()
@@ -170,9 +168,7 @@ async def test_health_with_master_key(
         async with AsyncClient(
             transport=ASGITransport(app=app), base_url="http://test"
         ) as client:
-            resp = await client.get(
-                "/health", headers={"X-API-Key": MASTER_KEY}
-            )
+            resp = await client.get("/health", headers={"X-API-Key": MASTER_KEY})
     assert resp.status_code == 200
     assert resp.json() == {"status": "healthy"}
     await app.state._container.close()
@@ -201,9 +197,7 @@ async def test_create_and_use_api_key(
             assert plain_key.startswith("nnk_")
 
             # Use created key
-            resp = await client.get(
-                "/api/v1/nodes/", headers={"X-API-Key": plain_key}
-            )
+            resp = await client.get("/api/v1/nodes/", headers={"X-API-Key": plain_key})
     assert resp.status_code == 200
     await app.state._container.close()
 
@@ -227,9 +221,7 @@ async def test_revoke_and_fail(
             plain_key = create_resp.json()["key"]
 
             # Verify it works
-            resp = await client.get(
-                "/api/v1/nodes/", headers={"X-API-Key": plain_key}
-            )
+            resp = await client.get("/api/v1/nodes/", headers={"X-API-Key": plain_key})
             assert resp.status_code == 200
 
             # Revoke
@@ -239,9 +231,7 @@ async def test_revoke_and_fail(
             assert revoke_resp.status_code == 204
 
             # Use revoked key -> 401
-            resp = await client.get(
-                "/api/v1/nodes/", headers={"X-API-Key": plain_key}
-            )
+            resp = await client.get("/api/v1/nodes/", headers={"X-API-Key": plain_key})
     assert resp.status_code == 401
     assert "revoked" in resp.json()["detail"].lower()
     await app.state._container.close()
@@ -273,9 +263,7 @@ async def test_last_used_at_updated(
             assert key_data["last_used_at"] is None
 
             # Use the key
-            await client.get(
-                "/api/v1/nodes/", headers={"X-API-Key": plain_key}
-            )
+            await client.get("/api/v1/nodes/", headers={"X-API-Key": plain_key})
 
             # Check last_used_at is now set
             list_resp = await client.get(

@@ -97,7 +97,11 @@ class ScriptService:
         """Update an existing script."""
         update_data = data.model_dump(exclude_unset=True)
         if "steps" in update_data and update_data["steps"] is not None:
-            steps_json = json.dumps([s.model_dump(mode="json") for s in data.steps])
+            steps_list = update_data["steps"]
+            if isinstance(steps_list[0], dict):
+                steps_json = json.dumps(steps_list)
+            else:
+                steps_json = json.dumps([s.model_dump(mode="json") for s in steps_list])
             update_data["steps"] = steps_json
         script = await self._repository.update(script_id, update_data)
         if script is None:

@@ -4,13 +4,12 @@ import json
 import uuid
 from datetime import UTC, datetime
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock, Mock, patch
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 
 from app.core.exceptions import (
     CommandNotFoundError,
-    NodeNotFoundError,
     ScriptNotFoundError,
     TemplateRenderError,
 )
@@ -80,7 +79,15 @@ def _make_orm_execution(**overrides: Any) -> Any:
         "params": json.dumps({"key": "value"}),
         "status": "completed",
         "steps": json.dumps(
-            [{"step_index": 0, "label": "Step 1", "stdout": "ok", "stderr": "", "exit_code": 0}]
+            [
+                {
+                    "step_index": 0,
+                    "label": "Step 1",
+                    "stdout": "ok",
+                    "stderr": "",
+                    "exit_code": 0,
+                }
+            ]
         ),
         "started_at": datetime.now(UTC),
         "finished_at": datetime.now(UTC),
@@ -97,7 +104,9 @@ def _make_orm_command(**overrides: Any) -> Any:
         "name": "check_disk",
         "description": "Check disk",
         "command": "df -h {mount_point}",
-        "parameters": json.dumps([{"name": "mount_point", "type": "string", "required": True}]),
+        "parameters": json.dumps(
+            [{"name": "mount_point", "type": "string", "required": True}]
+        ),
         "created_at": datetime.now(UTC),
         "updated_at": datetime.now(UTC),
     }
@@ -393,8 +402,18 @@ class TestExecuteScript:
         exec_repo: AsyncMock,
     ) -> None:
         steps = [
-            {"label": "Step 1", "type": "inline", "command": "exit 1", "on_failure": "stop"},
-            {"label": "Step 2", "type": "inline", "command": "echo 2", "on_failure": "stop"},
+            {
+                "label": "Step 1",
+                "type": "inline",
+                "command": "exit 1",
+                "on_failure": "stop",
+            },
+            {
+                "label": "Step 2",
+                "type": "inline",
+                "command": "echo 2",
+                "on_failure": "stop",
+            },
         ]
         orm_script = _make_orm_script(steps=json.dumps(steps))
         script_repo.get_by_id.return_value = orm_script
@@ -433,8 +452,18 @@ class TestExecuteScript:
         exec_repo: AsyncMock,
     ) -> None:
         steps = [
-            {"label": "Step 1", "type": "inline", "command": "exit 1", "on_failure": "continue"},
-            {"label": "Step 2", "type": "inline", "command": "echo 2", "on_failure": "stop"},
+            {
+                "label": "Step 1",
+                "type": "inline",
+                "command": "exit 1",
+                "on_failure": "continue",
+            },
+            {
+                "label": "Step 2",
+                "type": "inline",
+                "command": "echo 2",
+                "on_failure": "stop",
+            },
         ]
         orm_script = _make_orm_script(steps=json.dumps(steps))
         script_repo.get_by_id.return_value = orm_script
@@ -508,17 +537,13 @@ class TestExecuteScript:
 
 class TestResolveCommand:
     @pytest.mark.asyncio
-    async def test_inline(
-        self, service: ScriptService, cmd_repo: AsyncMock
-    ) -> None:
+    async def test_inline(self, service: ScriptService, cmd_repo: AsyncMock) -> None:
         step = ScriptStep(label="Step", type="inline", command="echo hello")
         result = await service._resolve_command(step, {})
         assert result == "echo hello"
 
     @pytest.mark.asyncio
-    async def test_inline_with_global_params(
-        self, service: ScriptService
-    ) -> None:
+    async def test_inline_with_global_params(self, service: ScriptService) -> None:
         step = ScriptStep(label="Step", type="inline", command="echo hello", params={})
         result = await service._resolve_command(step, {"unused": "value"})
         assert result == "echo hello"
@@ -536,7 +561,10 @@ class TestResolveCommand:
         orm_cmd = _make_orm_command()
         cmd_repo.get_by_id.return_value = orm_cmd
         step = ScriptStep(
-            label="Step", type="command", command_id=orm_cmd.id, params={"mount_point": "/"}
+            label="Step",
+            type="command",
+            command_id=orm_cmd.id,
+            params={"mount_point": "/"},
         )
         result = await service._resolve_command(step, {})
         assert "df -h /" == result

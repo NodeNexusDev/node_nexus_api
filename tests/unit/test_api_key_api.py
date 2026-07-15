@@ -114,8 +114,8 @@ class TestCreateApiKey:
         app = _create_test_app(mock_service)
         app.state.sessionmaker = MockSessionmaker()
 
-        mock_service.create_api_key.side_effect = (
-            lambda name: _make_api_key_created(name=name)
+        mock_service.create_api_key.side_effect = lambda name: _make_api_key_created(
+            name=name
         )
 
         async with AsyncClient(
@@ -160,9 +160,7 @@ class TestCreateApiKey:
 
 class TestListApiKeys:
     @patch("app.api.deps.get_settings")
-    async def test_empty(
-        self, mock_get_settings: Any, mock_service: AsyncMock
-    ) -> None:
+    async def test_empty(self, mock_get_settings: Any, mock_service: AsyncMock) -> None:
         mock_get_settings.return_value = _mock_settings("test-master-key")
         app = _create_test_app(mock_service)
         app.state.sessionmaker = MockSessionmaker()

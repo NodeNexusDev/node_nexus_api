@@ -115,7 +115,15 @@ class TestScriptExecutionResponse:
             node_id=uuid.uuid4(),
             params={"key": "value"},
             status="completed",
-            steps=[{"step_index": 0, "label": "Step 1", "stdout": "ok", "stderr": "", "exit_code": 0}],
+            steps=[
+                {
+                    "step_index": 0,
+                    "label": "Step 1",
+                    "stdout": "ok",
+                    "stderr": "",
+                    "exit_code": 0,
+                }
+            ],
             started_at=datetime.now(UTC),
             finished_at=datetime.now(UTC),
         )

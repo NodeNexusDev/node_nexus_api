@@ -52,7 +52,10 @@ class APIKeyRepository:
         total = count_result.scalar_one()
 
         result = await self._session.execute(
-            select(APIKeyModel).order_by(APIKeyModel.created_at.desc()).offset(offset).limit(limit)
+            select(APIKeyModel)
+            .order_by(APIKeyModel.created_at.desc())
+            .offset(offset)
+            .limit(limit)
         )
         items = [APIKeyResponse.model_validate(m) for m in result.scalars().all()]
         return items, total
