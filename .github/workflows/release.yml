@@ -12,7 +12,7 @@ jobs:
   release:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
@@ -24,7 +24,7 @@ jobs:
           echo "image=ghcr.io/${OWNER}/${REPO}:${{ github.ref_name }}" >> $GITHUB_OUTPUT
 
       - name: Build Docker image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: .
           push: false
