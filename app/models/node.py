@@ -3,7 +3,7 @@
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import DateTime, Index, Integer, String, Text
+from sqlalchemy import ARRAY, JSON, DateTime, Index, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base
@@ -29,6 +29,7 @@ class NodeModel(Base):
         Index("ix_nodes_name", "name"),
         Index("ix_nodes_host", "host"),
         Index("ix_nodes_status", "status"),
+        Index("ix_nodes_tags", "tags", postgresql_using="gin"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
@@ -40,6 +41,9 @@ class NodeModel(Base):
     username: Mapped[str | None] = mapped_column(String(255), nullable=True)
     password: Mapped[str | None] = mapped_column(Text, nullable=True)
     ssh_key: Mapped[str | None] = mapped_column(Text, nullable=True)
+    tags: Mapped[list[str] | None] = mapped_column(
+        ARRAY(String(100)).with_variant(JSON(), "sqlite"), nullable=True, default=list
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_utcnow
     )

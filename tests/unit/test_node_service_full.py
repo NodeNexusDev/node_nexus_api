@@ -27,6 +27,7 @@ def _make_orm_node(**overrides: Any) -> Any:
         "username": "root",
         "password": None,
         "ssh_key": None,
+        "tags": [],
         "created_at": datetime.now(UTC),
         "updated_at": datetime.now(UTC),
     }

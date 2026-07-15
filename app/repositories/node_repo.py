@@ -35,6 +35,31 @@ class NodeRepository(IRepository[NodeModel]):
         result = await self._session.execute(select(func.count(NodeModel.id)))
         return result.scalar_one()
 
+    async def get_by_tags(
+        self, tags: list[str], skip: int = 0, limit: int = 100
+    ) -> list[NodeModel]:
+        """Get nodes that have ALL specified tags."""
+        query = select(NodeModel)
+        for tag in tags:
+            query = query.where(NodeModel.tags.contains([tag]))
+        result = await self._session.execute(query.offset(skip).limit(limit))
+        return list(result.scalars().all())
+
+    async def count_by_tags(self, tags: list[str]) -> int:
+        """Count nodes that have ALL specified tags."""
+        query = select(func.count(NodeModel.id))
+        for tag in tags:
+            query = query.where(NodeModel.tags.contains([tag]))
+        result = await self._session.execute(query)
+        return result.scalar_one()
+
+    async def get_all_tags(self) -> list[str]:
+        """Get all unique tags across all nodes."""
+        result = await self._session.execute(
+            select(func.unnest(NodeModel.tags)).distinct()
+        )
+        return sorted(row[0] for row in result.all() if row[0])
+
     async def create(self, data: dict[str, Any]) -> NodeModel:
         """Create a new node."""
         node = NodeModel(**data)
