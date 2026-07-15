@@ -87,7 +87,11 @@ jobs:
 
       - name: Test Docker image
         run: |
-          docker run --rm node-nexus-api:test python -c "from app.main import app; print('App loaded successfully')"
+          docker run --rm \
+            -e DATABASE_URL=sqlite+aiosqlite:///test.db \
+            -e SECRET_KEY=test-secret-key \
+            -e MASTER_API_KEY=test-master-key \
+            node-nexus-api:test python -c "from app.main import app; print('App loaded successfully')"
 
   security:
     runs-on: ubuntu-latest
