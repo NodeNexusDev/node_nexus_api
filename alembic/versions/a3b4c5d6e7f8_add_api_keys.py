@@ -1,7 +1,7 @@
 """add api keys table
 
 Revision ID: a3b4c5d6e7f8
-Revises: f7a8b9c0d1e2
+Revises: b3c4d5e6f7a8
 Create Date: 2026-07-13 12:00:00.000000
 
 """
@@ -13,7 +13,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision: str = 'a3b4c5d6e7f8'
-down_revision: Union[str, Sequence[str], None] = 'f7a8b9c0d1e2'
+down_revision: Union[str, Sequence[str], None] = 'b3c4d5e6f7a8'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
