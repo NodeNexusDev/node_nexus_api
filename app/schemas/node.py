@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime
 from typing import Literal, TypeVar
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 T = TypeVar("T")
 
@@ -89,3 +89,37 @@ class TagRemove(BaseModel):
     """Schema for removing a tag from a node."""
 
     tag: str = Field(min_length=1, max_length=100)
+
+
+class BulkCommandRequest(BaseModel):
+    """Request to execute a command on multiple nodes."""
+
+    command: str = Field(min_length=1, max_length=4096)
+    node_ids: list[uuid.UUID] | None = Field(default=None, min_length=1)
+    tags: list[str] | None = Field(default=None, min_length=1)
+
+    @model_validator(mode="after")
+    def check_targets(self) -> "BulkCommandRequest":
+        if not self.node_ids and not self.tags:
+            raise ValueError("At least one of node_ids or tags must be provided")
+        return self
+
+
+class BulkNodeResult(BaseModel):
+    """Result of command execution on a single node."""
+
+    node_id: uuid.UUID
+    node_name: str
+    stdout: str
+    stderr: str
+    exit_code: int
+
+
+class BulkCommandResult(BaseModel):
+    """Result of bulk command execution across multiple nodes."""
+
+    command: str
+    results: list[BulkNodeResult]
+    total: int
+    succeeded: int
+    failed: int
