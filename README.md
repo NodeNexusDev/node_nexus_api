@@ -32,7 +32,7 @@ docker compose up -d --build
 
 | Ресурс | Описание |
 |--------|----------|
-| `/api/v1/nodes` | CRUD ноды + SSH-команды (check, execute) |
+| `/api/v1/nodes` | CRUD нод, теги, фильтрация/поиск, SSH-команды, bulk execute |
 | `/api/v1/commands` | Шаблоны команд с параметрами + выполнение |
 | `/api/v1/scripts` | Пайплайны команд (скрипты) + выполнение на нодах |
 | `/api/v1/audit` | Просмотр аудит-лога |
@@ -96,7 +96,7 @@ app/
 ├── api/
 │   ├── deps.py              # Auth dependency (X-API-Key)
 │   ├── v1/
-│   │   ├── nodes.py        # CRUD + SSH-команды для нод
+│   │   ├── nodes.py        # CRUD + теги + SSH-команды + bulk execute
 │   │   ├── commands.py     # Шаблоны команд с параметрами
 │   │   ├── scripts.py      # Пайплайны команд (скрипты)
 │   │   ├── audit.py        # Аудит-лог
