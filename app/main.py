@@ -96,8 +96,8 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title="Node Nexus API",
         description="REST API для управления серверными нодами с SSH-подключениями",
-        version="0.2.1"
-        lifespan=lifespan,
+        version="0.2.1",
+                lifespan=lifespan,
         openapi_tags=[
             {"name": "nodes", "description": "CRUD-операции и SSH-команды для нод"},
             {"name": "commands", "description": "Шаблоны команд с параметрами"},
