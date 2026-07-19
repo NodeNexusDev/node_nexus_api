@@ -3,7 +3,7 @@
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import DateTime, ForeignKey, Index, String, Text
+from sqlalchemy import JSON, DateTime, ForeignKey, Index, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base
@@ -34,9 +34,9 @@ class ScriptExecutionModel(Base):
     node_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("nodes.id", ondelete="SET NULL"), nullable=True
     )
-    params: Mapped[str | None] = mapped_column(Text, nullable=True)
+    params: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     status: Mapped[str] = mapped_column(String(50), default=_default_status)
-    steps: Mapped[str | None] = mapped_column(Text, nullable=True)
+    steps: Mapped[list[dict] | None] = mapped_column(JSON, nullable=True)
     started_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_utcnow
     )

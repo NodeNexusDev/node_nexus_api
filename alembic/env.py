@@ -8,6 +8,8 @@ from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from alembic import context
+from app.models.api_key import APIKeyModel  # noqa: F401
+from app.models.audit_log import AuditLogModel  # noqa: F401
 from app.models.base import Base
 from app.models.command import CommandModel  # noqa: F401
 from app.models.node import NodeModel  # noqa: F401
