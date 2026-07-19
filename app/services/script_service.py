@@ -85,7 +85,7 @@ class ScriptService:
 
     async def create_script(self, data: ScriptCreate) -> ScriptResponse:
         """Create a new script."""
-        raw = data.model_dump()
+        raw = data.model_dump(mode="json")
         script = await self._repository.create(raw)
         audit.info("script.create.ok", script_id=str(script.id), name=data.name)
         await self._log("create", details={"entity": "script", "name": data.name})
@@ -95,7 +95,7 @@ class ScriptService:
         self, script_id: UUID, data: ScriptUpdate
     ) -> ScriptResponse:
         """Update an existing script."""
-        update_data = data.model_dump(exclude_unset=True)
+        update_data = data.model_dump(mode="json", exclude_unset=True)
         script = await self._repository.update(script_id, update_data)
         if script is None:
             raise ScriptNotFoundError(f"Script {script_id} not found")
