@@ -49,7 +49,6 @@ def _make_orm_script(**overrides: Any) -> Any:
     return ScriptModel(**defaults)
 
 
-
 def _make_orm_execution(**overrides: Any) -> Any:
     from app.models.script_execution import ScriptExecutionModel
 

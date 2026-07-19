@@ -124,10 +124,7 @@ class ScriptService:
             script_id, skip=skip, limit=limit
         )
         total = await self._execution_repository.count_by_script_id(script_id)
-        return [
-            ScriptExecutionResponse.model_validate(e)
-            for e in executions
-        ], total
+        return [ScriptExecutionResponse.model_validate(e) for e in executions], total
 
     async def execute_script(
         self, script_id: UUID, data: ScriptExecuteRequest
