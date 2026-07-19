@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import json
+import asyncio
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
@@ -35,6 +35,7 @@ from app.schemas.script import (
     ScriptStepResult,
     ScriptUpdate,
 )
+from app.schemas.script_execution import ScriptExecutionResponse
 
 audit = structlog.get_logger("audit")
 
@@ -85,7 +86,6 @@ class ScriptService:
     async def create_script(self, data: ScriptCreate) -> ScriptResponse:
         """Create a new script."""
         raw = data.model_dump()
-        raw["steps"] = json.dumps([s.model_dump(mode="json") for s in data.steps])
         script = await self._repository.create(raw)
         audit.info("script.create.ok", script_id=str(script.id), name=data.name)
         await self._log("create", details={"entity": "script", "name": data.name})
@@ -96,13 +96,6 @@ class ScriptService:
     ) -> ScriptResponse:
         """Update an existing script."""
         update_data = data.model_dump(exclude_unset=True)
-        if "steps" in update_data and update_data["steps"] is not None:
-            steps_list = update_data["steps"]
-            if isinstance(steps_list[0], dict):
-                steps_json = json.dumps(steps_list)
-            else:
-                steps_json = json.dumps([s.model_dump(mode="json") for s in steps_list])
-            update_data["steps"] = steps_json
         script = await self._repository.update(script_id, update_data)
         if script is None:
             raise ScriptNotFoundError(f"Script {script_id} not found")
@@ -122,7 +115,7 @@ class ScriptService:
 
     async def get_executions(
         self, script_id: UUID, skip: int = 0, limit: int = 50
-    ) -> tuple[list[dict[str, Any]], int]:
+    ) -> tuple[list[ScriptExecutionResponse], int]:
         """Get execution history for a script."""
         script = await self._repository.get_by_id(script_id)
         if script is None:
@@ -133,16 +126,7 @@ class ScriptService:
         )
         total = await self._execution_repository.count_by_script_id(script_id)
         return [
-            {
-                "id": str(e.id),
-                "script_id": str(e.script_id),
-                "node_id": str(e.node_id) if e.node_id else None,
-                "params": json.loads(e.params) if e.params else None,
-                "status": e.status,
-                "steps": json.loads(e.steps) if e.steps else None,
-                "started_at": e.started_at.isoformat(),
-                "finished_at": e.finished_at.isoformat() if e.finished_at else None,
-            }
+            ScriptExecutionResponse.model_validate(e)
             for e in executions
         ], total
 
@@ -154,16 +138,17 @@ class ScriptService:
         if script is None:
             raise ScriptNotFoundError(f"Script {script_id} not found")
 
-        steps = [ScriptStep(**s) for s in json.loads(script.steps)]
+        steps = [ScriptStep(**s) for s in script.steps]
+
+        tasks = [
+            self._execute_on_node(script_id, steps, node_id, data.params)
+            for node_id in data.node_ids
+        ]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
 
         node_results: list[ScriptNodeResult] = []
-        for node_id in data.node_ids:
-            try:
-                result = await self._execute_on_node(
-                    script_id, steps, node_id, data.params
-                )
-                node_results.append(result)
-            except Exception:
+        for node_id, result in zip(data.node_ids, results):
+            if isinstance(result, Exception):
                 node_results.append(
                     ScriptNodeResult(
                         execution_id=UUID(int=0),
@@ -173,6 +158,8 @@ class ScriptService:
                         steps=[],
                     )
                 )
+            else:
+                node_results.append(result)
 
         return ScriptExecutionBatchResult(
             script_id=script_id,
@@ -195,9 +182,9 @@ class ScriptService:
             {
                 "script_id": script_id,
                 "node_id": node_id,
-                "params": json.dumps(params),
+                "params": params,
                 "status": "running",
-                "steps": json.dumps([]),
+                "steps": [],
                 "started_at": datetime.now(UTC),
             }
         )
@@ -262,7 +249,7 @@ class ScriptService:
                 execution.id,
                 {
                     "status": final_status,
-                    "steps": json.dumps(step_results),
+                    "steps": step_results,
                     "finished_at": datetime.now(UTC),
                 },
             )
@@ -290,7 +277,7 @@ class ScriptService:
             command = await self._command_repository.get_by_id(step.command_id)
             if command is None:
                 raise CommandNotFoundError(f"Command {step.command_id} not found")
-            parameters = json.loads(command.parameters) if command.parameters else []
+            parameters = command.parameters if command.parameters else []
             merged_params = {**global_params, **step.params}
             return render_command(command.command, parameters, merged_params)
 
@@ -312,7 +299,7 @@ class ScriptService:
 
     @staticmethod
     def _to_response(script: Any) -> ScriptResponse:
-        steps = [ScriptStep(**s) for s in json.loads(script.steps)]
+        steps = [ScriptStep(**s) for s in script.steps]
         return ScriptResponse(
             id=script.id,
             name=script.name,
