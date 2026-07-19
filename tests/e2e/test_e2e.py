@@ -1269,7 +1269,7 @@ def test_bulk_execute_by_ids(e2e_client: httpx.Client) -> None:
     node2 = _create_ssh_node(e2e_client, name="bulk-2")
 
     resp = e2e_client.post(
-        "/api/v1/nodes/execute",
+        "/api/v1/nodes/bulk/execute",
         json={
             "command": "echo bulk-ok",
             "node_ids": [node1["id"], node2["id"]],
@@ -1297,7 +1297,7 @@ def test_bulk_execute_by_tags(e2e_client: httpx.Client) -> None:
     _create_ssh_node(e2e_client, name="bulk-tag-other", tags=["other"])
 
     resp = e2e_client.post(
-        "/api/v1/nodes/execute",
+        "/api/v1/nodes/bulk/execute",
         json={"command": "echo tagged", "tags": ["bulk-test"]},
     )
     assert resp.status_code == 200
@@ -1312,7 +1312,7 @@ def test_bulk_execute_no_nodes(e2e_client: httpx.Client) -> None:
     import uuid
 
     resp = e2e_client.post(
-        "/api/v1/nodes/execute",
+        "/api/v1/nodes/bulk/execute",
         json={"command": "ls", "node_ids": [str(uuid.uuid4())]},
     )
     assert resp.status_code == 404
@@ -1329,7 +1329,7 @@ def test_bulk_execute_partial_failure(e2e_client: httpx.Client) -> None:
     )
 
     resp = e2e_client.post(
-        "/api/v1/nodes/execute",
+        "/api/v1/nodes/bulk/execute",
         json={
             "command": "echo partial",
             "node_ids": [good_node["id"], bad_node["id"]],
@@ -1348,7 +1348,7 @@ def test_bulk_execute_partial_failure(e2e_client: httpx.Client) -> None:
 
 def test_bulk_execute_validation_no_targets(e2e_client: httpx.Client) -> None:
     resp = e2e_client.post(
-        "/api/v1/nodes/execute",
+        "/api/v1/nodes/bulk/execute",
         json={"command": "ls"},
     )
     assert resp.status_code == 422
@@ -1356,7 +1356,7 @@ def test_bulk_execute_validation_no_targets(e2e_client: httpx.Client) -> None:
 
 def test_bulk_execute_validation_empty_command(e2e_client: httpx.Client) -> None:
     resp = e2e_client.post(
-        "/api/v1/nodes/execute",
+        "/api/v1/nodes/bulk/execute",
         json={"command": "", "node_ids": ["00000000-0000-0000-0000-000000000001"]},
     )
     assert resp.status_code == 422
