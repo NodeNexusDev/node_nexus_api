@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
@@ -140,15 +139,14 @@ class ScriptService:
 
         steps = [ScriptStep(**s) for s in script.steps]
 
-        tasks = [
-            self._execute_on_node(script_id, steps, node_id, data.params)
-            for node_id in data.node_ids
-        ]
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-
         node_results: list[ScriptNodeResult] = []
-        for node_id, result in zip(data.node_ids, results):
-            if isinstance(result, Exception):
+        for node_id in data.node_ids:
+            try:
+                result = await self._execute_on_node(
+                    script_id, steps, node_id, data.params
+                )
+                node_results.append(result)
+            except Exception:
                 node_results.append(
                     ScriptNodeResult(
                         execution_id=UUID(int=0),
@@ -158,8 +156,6 @@ class ScriptService:
                         steps=[],
                     )
                 )
-            else:
-                node_results.append(result)
 
         return ScriptExecutionBatchResult(
             script_id=script_id,
