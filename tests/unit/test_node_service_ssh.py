@@ -1,54 +1,16 @@
 """Unit tests for NodeService SSH integration."""
 
 import uuid
-from datetime import UTC, datetime
-from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 from app.core.exceptions import ConnectionFailedError, NodeNotFoundError
 from app.core.security import decrypt, encrypt
-from app.models.node import NodeModel
 from app.repositories.node_repo import NodeRepository
-from app.schemas.node import CommandRequest, NodeResponse
+from app.schemas.node import CommandRequest
 from app.services.node_service import NodeService
-
-
-def _make_response(**overrides: Any) -> NodeResponse:
-    defaults: dict[str, Any] = {
-        "id": uuid.uuid4(),
-        "name": "server-1",
-        "host": "10.0.0.1",
-        "port": 22,
-        "connection_type": "ssh",
-        "status": "active",
-        "username": "root",
-        "tags": [],
-        "created_at": datetime.now(UTC),
-        "updated_at": datetime.now(UTC),
-    }
-    defaults.update(overrides)
-    return NodeResponse(**defaults)
-
-
-def _make_orm_node(**overrides: Any) -> NodeModel:
-    defaults: dict[str, Any] = {
-        "id": uuid.uuid4(),
-        "name": "server-1",
-        "host": "10.0.0.1",
-        "port": 22,
-        "connection_type": "ssh",
-        "status": "active",
-        "username": "root",
-        "password": None,
-        "ssh_key": None,
-        "tags": [],
-        "created_at": datetime.now(UTC),
-        "updated_at": datetime.now(UTC),
-    }
-    defaults.update(overrides)
-    return NodeModel(**defaults)
+from tests.unit.conftest import make_orm_node, make_response
 
 
 @pytest.fixture
@@ -90,8 +52,8 @@ class TestCheckConnectivity:
     async def test_sets_active_on_success(
         self, service: NodeService, repo: AsyncMock, mock_factory: MagicMock
     ) -> None:
-        node_response = _make_response()
-        orm_node = _make_orm_node(id=node_response.id)
+        node_response = make_response()
+        orm_node = make_orm_node(id=node_response.id)
         repo.get_by_id.return_value = orm_node
         repo.update.return_value = orm_node
 
@@ -111,9 +73,9 @@ class TestCheckConnectivity:
     async def test_sets_unreachable_on_failure(
         self, service: NodeService, repo: AsyncMock, mock_factory: MagicMock
     ) -> None:
-        node_response = _make_response()
-        orm_node = _make_orm_node(id=node_response.id)
-        unreachable_node = _make_orm_node(id=node_response.id, status="unreachable")
+        node_response = make_response()
+        orm_node = make_orm_node(id=node_response.id)
+        unreachable_node = make_orm_node(id=node_response.id, status="unreachable")
         repo.get_by_id.return_value = orm_node
         repo.update.return_value = unreachable_node
 
@@ -136,8 +98,8 @@ class TestExecuteCommand:
     async def test_returns_result(
         self, service: NodeService, repo: AsyncMock, mock_factory: MagicMock
     ) -> None:
-        node_response = _make_response()
-        orm_node = _make_orm_node(id=node_response.id)
+        node_response = make_response()
+        orm_node = make_orm_node(id=node_response.id)
         repo.get_by_id.return_value = orm_node
 
         mock_connector = mock_factory.create_ssh.return_value
@@ -156,8 +118,8 @@ class TestExecuteCommand:
     async def test_raises_on_connection_error(
         self, service: NodeService, repo: AsyncMock, mock_factory: MagicMock
     ) -> None:
-        node_response = _make_response()
-        orm_node = _make_orm_node(id=node_response.id)
+        node_response = make_response()
+        orm_node = make_orm_node(id=node_response.id)
         repo.get_by_id.return_value = orm_node
 
         mock_connector = mock_factory.create_ssh.return_value

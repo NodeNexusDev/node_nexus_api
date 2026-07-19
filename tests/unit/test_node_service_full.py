@@ -1,8 +1,6 @@
 """Full coverage tests for NodeService."""
 
 import uuid
-from datetime import UTC, datetime
-from typing import Any
 from unittest.mock import AsyncMock
 
 import pytest
@@ -12,27 +10,7 @@ from app.core.security import decrypt, encrypt
 from app.repositories.node_repo import NodeRepository
 from app.schemas.node import BulkCommandRequest, NodeCreate, NodeUpdate
 from app.services.node_service import NodeService
-
-
-def _make_orm_node(**overrides: Any) -> Any:
-    from app.models.node import NodeModel
-
-    defaults: dict[str, Any] = {
-        "id": uuid.uuid4(),
-        "name": "server-1",
-        "host": "10.0.0.1",
-        "port": 22,
-        "connection_type": "ssh",
-        "status": "active",
-        "username": "root",
-        "password": None,
-        "ssh_key": None,
-        "tags": [],
-        "created_at": datetime.now(UTC),
-        "updated_at": datetime.now(UTC),
-    }
-    defaults.update(overrides)
-    return NodeModel(**defaults)
+from tests.unit.conftest import make_orm_node
 
 
 @pytest.fixture
@@ -48,7 +26,7 @@ def service(repo: AsyncMock) -> NodeService:
 class TestGetNode:
     @pytest.mark.asyncio
     async def test_found(self, service: NodeService, repo: AsyncMock) -> None:
-        orm_node = _make_orm_node()
+        orm_node = make_orm_node()
         repo.get_by_id.return_value = orm_node
         result = await service.get_node(orm_node.id)
         assert result.name == "server-1"
@@ -71,7 +49,7 @@ class TestGetAllNodes:
 
     @pytest.mark.asyncio
     async def test_with_data(self, service: NodeService, repo: AsyncMock) -> None:
-        nodes = [_make_orm_node(name="n1"), _make_orm_node(name="n2")]
+        nodes = [make_orm_node(name="n1"), make_orm_node(name="n2")]
         repo.get_all.return_value = nodes
         repo.count.return_value = 2
         result_nodes, total = await service.get_all_nodes()
@@ -82,7 +60,7 @@ class TestGetAllNodes:
 class TestCreateNode:
     @pytest.mark.asyncio
     async def test_creates_node(self, service: NodeService, repo: AsyncMock) -> None:
-        orm_node = _make_orm_node()
+        orm_node = make_orm_node()
         repo.create.return_value = orm_node
         data = NodeCreate(name="test", host="1.2.3.4", connection_type="ssh")
         result = await service.create_node(data)
@@ -93,7 +71,7 @@ class TestCreateNode:
     async def test_encrypts_password(
         self, service: NodeService, repo: AsyncMock
     ) -> None:
-        orm_node = _make_orm_node()
+        orm_node = make_orm_node()
         repo.create.return_value = orm_node
         data = NodeCreate(
             name="test",
@@ -110,7 +88,7 @@ class TestCreateNode:
     async def test_encrypts_ssh_key(
         self, service: NodeService, repo: AsyncMock
     ) -> None:
-        orm_node = _make_orm_node()
+        orm_node = make_orm_node()
         repo.create.return_value = orm_node
         key = "-----BEGIN RSA PRIVATE KEY-----\nfake\n-----END RSA PRIVATE KEY-----"
         data = NodeCreate(
@@ -127,7 +105,7 @@ class TestCreateNode:
 class TestUpdateNode:
     @pytest.mark.asyncio
     async def test_found(self, service: NodeService, repo: AsyncMock) -> None:
-        orm_node = _make_orm_node()
+        orm_node = make_orm_node()
         repo.update.return_value = orm_node
         data = NodeUpdate(name="updated")
         result = await service.update_node(orm_node.id, data)
@@ -141,7 +119,7 @@ class TestUpdateNode:
 
     @pytest.mark.asyncio
     async def test_encrypts_fields(self, service: NodeService, repo: AsyncMock) -> None:
-        orm_node = _make_orm_node()
+        orm_node = make_orm_node()
         repo.update.return_value = orm_node
         data = NodeUpdate(password="newpass")
         await service.update_node(orm_node.id, data)
@@ -152,7 +130,7 @@ class TestUpdateNode:
 class TestDeleteNode:
     @pytest.mark.asyncio
     async def test_found(self, service: NodeService, repo: AsyncMock) -> None:
-        repo.get_by_id.return_value = _make_orm_node()
+        repo.get_by_id.return_value = make_orm_node()
         result = await service.delete_node(uuid.uuid4())
         assert result is True
         repo.delete.assert_awaited_once()
@@ -185,7 +163,7 @@ class TestCheckConnectivityEdgeCases:
         self, service: NodeService, repo: AsyncMock
     ) -> None:
         """When get_node succeeds but ORM node is gone (race condition)."""
-        orm_node = _make_orm_node()
+        orm_node = make_orm_node()
         repo.get_by_id.side_effect = [orm_node, None]
         with pytest.raises(NodeNotFoundError):
             await service.check_connectivity(orm_node.id)
@@ -197,7 +175,7 @@ class TestExecuteCommandEdgeCases:
         self, service: NodeService, repo: AsyncMock
     ) -> None:
         """When get_node succeeds but ORM node is gone (race condition)."""
-        orm_node = _make_orm_node()
+        orm_node = make_orm_node()
         repo.get_by_id.side_effect = [orm_node, None]
         with pytest.raises(NodeNotFoundError):
             from app.schemas.node import CommandRequest
@@ -210,7 +188,7 @@ class TestGetAllNodesFiltering:
     async def test_delegates_to_filtered_with_tags(
         self, service: NodeService, repo: AsyncMock
     ) -> None:
-        nodes = [_make_orm_node(name="n1")]
+        nodes = [make_orm_node(name="n1")]
         repo.get_filtered.return_value = nodes
         repo.count_filtered.return_value = 1
         result_nodes, total = await service.get_all_nodes(tags=["prod"])
@@ -237,7 +215,7 @@ class TestGetAllNodesFiltering:
     async def test_falls_back_to_get_all_without_filters(
         self, service: NodeService, repo: AsyncMock
     ) -> None:
-        nodes = [_make_orm_node()]
+        nodes = [make_orm_node()]
         repo.get_all.return_value = nodes
         repo.count.return_value = 1
         result_nodes, total = await service.get_all_nodes()
@@ -253,8 +231,8 @@ class TestBulkExecuteCommand:
     ) -> None:
         from unittest.mock import AsyncMock, MagicMock
 
-        n1 = _make_orm_node(name="n1")
-        n2 = _make_orm_node(name="n2")
+        n1 = make_orm_node(name="n1")
+        n2 = make_orm_node(name="n2")
         repo.get_by_ids.return_value = [n1, n2]
 
         connector = AsyncMock()
@@ -278,8 +256,8 @@ class TestBulkExecuteCommand:
     async def test_partial_failure(self, service: NodeService, repo: AsyncMock) -> None:
         from unittest.mock import AsyncMock, MagicMock
 
-        n1 = _make_orm_node(name="n1")
-        n2 = _make_orm_node(name="n2")
+        n1 = make_orm_node(name="n1")
+        n2 = make_orm_node(name="n2")
         repo.get_by_ids.return_value = [n1, n2]
 
         call_count = 0
@@ -321,7 +299,7 @@ class TestBulkExecuteCommand:
     ) -> None:
         from unittest.mock import AsyncMock, MagicMock
 
-        n1 = _make_orm_node(name="n1")
+        n1 = make_orm_node(name="n1")
         repo.get_by_ids.return_value = [n1]
 
         connector = AsyncMock()
@@ -344,7 +322,7 @@ class TestBulkExecuteCommand:
     async def test_resolve_by_tags(self, service: NodeService, repo: AsyncMock) -> None:
         from unittest.mock import AsyncMock, MagicMock
 
-        n1 = _make_orm_node(name="n1")
+        n1 = make_orm_node(name="n1")
         repo.get_by_tags.return_value = [n1]
 
         connector = AsyncMock()
@@ -368,9 +346,9 @@ class TestBulkExecuteCommand:
     ) -> None:
         from unittest.mock import AsyncMock, MagicMock
 
-        n1 = _make_orm_node(name="n1")
-        n2 = _make_orm_node(name="n2")
-        n3 = _make_orm_node(name="n3")
+        n1 = make_orm_node(name="n1")
+        n2 = make_orm_node(name="n2")
+        n3 = make_orm_node(name="n3")
         # node_ids returns n1, n2; tags returns n1, n3 → intersection = n1
         repo.get_by_ids.return_value = [n1, n2]
         repo.get_by_tags.return_value = [n1, n3]
@@ -404,8 +382,8 @@ class TestBulkExecuteCommand:
     async def test_resolve_by_both_empty_intersection(
         self, service: NodeService, repo: AsyncMock
     ) -> None:
-        n1 = _make_orm_node(name="n1")
-        n2 = _make_orm_node(name="n2")
+        n1 = make_orm_node(name="n1")
+        n2 = make_orm_node(name="n2")
         # No overlap between ids and tags
         repo.get_by_ids.return_value = [n1]
         repo.get_by_tags.return_value = [n2]
