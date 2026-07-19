@@ -22,6 +22,7 @@ from app.schemas.script import (
     ScriptResponse,
     ScriptUpdate,
 )
+from app.schemas.script_execution import ScriptExecutionResponse
 from app.services.script_service import ScriptService
 
 audit = structlog.get_logger("audit")
@@ -143,7 +144,7 @@ async def get_executions(
     page: int = Query(1, ge=1),
     size: int = Query(20, ge=1, le=100),
     _key: str = Security(get_current_api_key),
-) -> PaginatedResponse[dict]:
+) -> PaginatedResponse[ScriptExecutionResponse]:
     """Get execution history for a script."""
     audit.info("api.scripts.executions", script_id=str(script_id))
     try:
