@@ -9,6 +9,8 @@ from fastapi import APIRouter, HTTPException, Query, Security
 from app.api.deps import get_current_api_key
 from app.core.exceptions import ConnectionFailedError, NodeNotFoundError
 from app.schemas.node import (
+    BulkCommandRequest,
+    BulkCommandResult,
     CommandRequest,
     CommandResult,
     NodeCreate,
@@ -31,13 +33,29 @@ async def get_nodes(
     service: FromDishka[NodeService],
     page: int = Query(1, ge=1),
     size: int = Query(20, ge=1, le=100),
+    tags: str | None = Query(None, description="Comma-separated tags (AND)"),
+    search: str | None = Query(None, description="Search by name or host"),
     _key: str = Security(get_current_api_key),
 ) -> PaginatedResponse[NodeResponse]:
-    """Get all nodes with pagination."""
-    audit.info("api.nodes.list", page=page, size=size)
+    """Get all nodes with pagination, optional tag filtering and search."""
+    tag_list = [t.strip() for t in tags.split(",")] if tags else None
+    audit.info("api.nodes.list", page=page, size=size, tags=tag_list, search=search)
     skip = (page - 1) * size
-    nodes, total = await service.get_all_nodes(skip=skip, limit=size)
+    nodes, total = await service.get_all_nodes(
+        skip=skip, limit=size, tags=tag_list, search=search
+    )
     return PaginatedResponse(items=nodes, total=total, page=page, size=size)
+
+
+@router.get("/tags")
+@inject
+async def get_all_tags(
+    service: FromDishka[NodeService],
+    _key: str = Security(get_current_api_key),
+) -> list[str]:
+    """Get all unique tags across all nodes."""
+    audit.info("api.nodes.tags.list")
+    return await service.get_all_tags()
 
 
 @router.get("/{node_id}", response_model=NodeResponse)
@@ -101,6 +119,27 @@ async def delete_node(
         raise HTTPException(status_code=404, detail="Node not found")
 
 
+@router.post("/execute", response_model=BulkCommandResult)
+@inject
+async def bulk_execute_command(
+    data: BulkCommandRequest,
+    service: FromDishka[NodeService],
+    _key: str = Security(get_current_api_key),
+) -> BulkCommandResult:
+    """Execute a command on multiple nodes by IDs and/or tags."""
+    audit.info(
+        "api.nodes.bulk_execute",
+        command=data.command,
+        node_ids=[str(n) for n in (data.node_ids or [])],
+        tags=data.tags,
+    )
+    try:
+        return await service.bulk_execute_command(data)
+    except NodeNotFoundError as exc:
+        audit.warning("api.nodes.bulk_execute.no_nodes", error=str(exc))
+        raise HTTPException(status_code=404, detail=str(exc))
+
+
 @router.post(
     "/{node_id}/check",
     response_model=NodeResponse,
@@ -152,17 +191,6 @@ async def execute_command(
             error=str(exc),
         )
         raise HTTPException(status_code=503, detail=str(exc))
-
-
-@router.get("/tags")
-@inject
-async def get_all_tags(
-    service: FromDishka[NodeService],
-    _key: str = Security(get_current_api_key),
-) -> list[str]:
-    """Get all unique tags across all nodes."""
-    audit.info("api.nodes.tags.list")
-    return await service.get_all_tags()
 
 
 @router.post("/{node_id}/tags", response_model=NodeResponse)

@@ -10,7 +10,7 @@ import pytest
 from app.core.exceptions import NodeNotFoundError
 from app.core.security import decrypt, encrypt
 from app.repositories.node_repo import NodeRepository
-from app.schemas.node import NodeCreate, NodeUpdate
+from app.schemas.node import BulkCommandRequest, NodeCreate, NodeUpdate
 from app.services.node_service import NodeService
 
 
@@ -203,3 +203,213 @@ class TestExecuteCommandEdgeCases:
             from app.schemas.node import CommandRequest
 
             await service.execute_command(orm_node.id, CommandRequest(command="ls"))
+
+
+class TestGetAllNodesFiltering:
+    @pytest.mark.asyncio
+    async def test_delegates_to_filtered_with_tags(
+        self, service: NodeService, repo: AsyncMock
+    ) -> None:
+        nodes = [_make_orm_node(name="n1")]
+        repo.get_filtered.return_value = nodes
+        repo.count_filtered.return_value = 1
+        result_nodes, total = await service.get_all_nodes(tags=["prod"])
+        assert len(result_nodes) == 1
+        assert total == 1
+        repo.get_filtered.assert_called_once_with(
+            tags=["prod"], search=None, skip=0, limit=100
+        )
+
+    @pytest.mark.asyncio
+    async def test_delegates_to_filtered_with_search(
+        self, service: NodeService, repo: AsyncMock
+    ) -> None:
+        repo.get_filtered.return_value = []
+        repo.count_filtered.return_value = 0
+        result_nodes, total = await service.get_all_nodes(search="web")
+        assert result_nodes == []
+        assert total == 0
+        repo.get_filtered.assert_called_once_with(
+            tags=None, search="web", skip=0, limit=100
+        )
+
+    @pytest.mark.asyncio
+    async def test_falls_back_to_get_all_without_filters(
+        self, service: NodeService, repo: AsyncMock
+    ) -> None:
+        nodes = [_make_orm_node()]
+        repo.get_all.return_value = nodes
+        repo.count.return_value = 1
+        result_nodes, total = await service.get_all_nodes()
+        assert len(result_nodes) == 1
+        repo.get_all.assert_called_once()
+        repo.get_filtered.assert_not_called()
+
+
+class TestBulkExecuteCommand:
+    @pytest.mark.asyncio
+    async def test_all_nodes_succeed(
+        self, service: NodeService, repo: AsyncMock
+    ) -> None:
+        from unittest.mock import AsyncMock, MagicMock
+
+        n1 = _make_orm_node(name="n1")
+        n2 = _make_orm_node(name="n2")
+        repo.get_by_ids.return_value = [n1, n2]
+
+        connector = AsyncMock()
+        connector.execute_command.return_value = ("ok", "", 0)
+        connector.__aenter__ = AsyncMock(return_value=connector)
+        connector.__aexit__ = AsyncMock(return_value=False)
+
+        factory = MagicMock()
+        factory.create_ssh.return_value = connector
+        service._connector_factory = factory
+
+        result = await service.bulk_execute_command(
+            BulkCommandRequest(command="uptime", node_ids=[n1.id, n2.id])
+        )
+        assert result.total == 2
+        assert result.succeeded == 2
+        assert result.failed == 0
+        assert all(r.exit_code == 0 for r in result.results)
+
+    @pytest.mark.asyncio
+    async def test_partial_failure(self, service: NodeService, repo: AsyncMock) -> None:
+        from unittest.mock import AsyncMock, MagicMock
+
+        n1 = _make_orm_node(name="n1")
+        n2 = _make_orm_node(name="n2")
+        repo.get_by_ids.return_value = [n1, n2]
+
+        call_count = 0
+
+        async def fake_execute(command: str) -> tuple[str, str, int]:
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                return ("ok", "", 0)
+            return ("", "connection refused", 1)
+
+        connector = AsyncMock()
+        connector.execute_command = fake_execute
+        connector.__aenter__ = AsyncMock(return_value=connector)
+        connector.__aexit__ = AsyncMock(return_value=False)
+
+        factory = MagicMock()
+        factory.create_ssh.return_value = connector
+        service._connector_factory = factory
+
+        result = await service.bulk_execute_command(
+            BulkCommandRequest(command="uptime", node_ids=[n1.id, n2.id])
+        )
+        assert result.total == 2
+        assert result.succeeded == 1
+        assert result.failed == 1
+
+    @pytest.mark.asyncio
+    async def test_no_nodes_raises(self, service: NodeService, repo: AsyncMock) -> None:
+        repo.get_by_ids.return_value = []
+        with pytest.raises(NodeNotFoundError):
+            await service.bulk_execute_command(
+                BulkCommandRequest(command="ls", node_ids=[uuid.uuid4()])
+            )
+
+    @pytest.mark.asyncio
+    async def test_connection_error_returns_error_result(
+        self, service: NodeService, repo: AsyncMock
+    ) -> None:
+        from unittest.mock import AsyncMock, MagicMock
+
+        n1 = _make_orm_node(name="n1")
+        repo.get_by_ids.return_value = [n1]
+
+        connector = AsyncMock()
+        connector.execute_command.side_effect = OSError("Connection refused")
+        connector.__aenter__ = AsyncMock(return_value=connector)
+        connector.__aexit__ = AsyncMock(return_value=False)
+
+        factory = MagicMock()
+        factory.create_ssh.return_value = connector
+        service._connector_factory = factory
+
+        result = await service.bulk_execute_command(
+            BulkCommandRequest(command="uptime", node_ids=[n1.id])
+        )
+        assert result.total == 1
+        assert result.failed == 1
+        assert "Connection refused" in result.results[0].stderr
+
+    @pytest.mark.asyncio
+    async def test_resolve_by_tags(self, service: NodeService, repo: AsyncMock) -> None:
+        from unittest.mock import AsyncMock, MagicMock
+
+        n1 = _make_orm_node(name="n1")
+        repo.get_by_tags.return_value = [n1]
+
+        connector = AsyncMock()
+        connector.execute_command.return_value = ("ok", "", 0)
+        connector.__aenter__ = AsyncMock(return_value=connector)
+        connector.__aexit__ = AsyncMock(return_value=False)
+
+        factory = MagicMock()
+        factory.create_ssh.return_value = connector
+        service._connector_factory = factory
+
+        result = await service.bulk_execute_command(
+            BulkCommandRequest(command="uptime", tags=["prod"])
+        )
+        assert result.total == 1
+        repo.get_by_tags.assert_called_once_with(["prod"])
+
+    @pytest.mark.asyncio
+    async def test_resolve_by_both_ids_and_tags(
+        self, service: NodeService, repo: AsyncMock
+    ) -> None:
+        from unittest.mock import AsyncMock, MagicMock
+
+        n1 = _make_orm_node(name="n1")
+        n2 = _make_orm_node(name="n2")
+        n3 = _make_orm_node(name="n3")
+        # node_ids returns n1, n2; tags returns n1, n3 → intersection = n1
+        repo.get_by_ids.return_value = [n1, n2]
+        repo.get_by_tags.return_value = [n1, n3]
+
+        connector = AsyncMock()
+        connector.execute_command.return_value = ("ok", "", 0)
+        connector.__aenter__ = AsyncMock(return_value=connector)
+        connector.__aexit__ = AsyncMock(return_value=False)
+
+        factory = MagicMock()
+        factory.create_ssh.return_value = connector
+        service._connector_factory = factory
+
+        result = await service.bulk_execute_command(
+            BulkCommandRequest(command="uptime", node_ids=[n1.id, n2.id], tags=["prod"])
+        )
+        assert result.total == 1
+        assert result.results[0].node_id == n1.id
+
+    @pytest.mark.asyncio
+    async def test_resolve_by_tags_empty(
+        self, service: NodeService, repo: AsyncMock
+    ) -> None:
+        repo.get_by_tags.return_value = []
+        with pytest.raises(NodeNotFoundError):
+            await service.bulk_execute_command(
+                BulkCommandRequest(command="ls", tags=["nonexistent"])
+            )
+
+    @pytest.mark.asyncio
+    async def test_resolve_by_both_empty_intersection(
+        self, service: NodeService, repo: AsyncMock
+    ) -> None:
+        n1 = _make_orm_node(name="n1")
+        n2 = _make_orm_node(name="n2")
+        # No overlap between ids and tags
+        repo.get_by_ids.return_value = [n1]
+        repo.get_by_tags.return_value = [n2]
+        with pytest.raises(NodeNotFoundError):
+            await service.bulk_execute_command(
+                BulkCommandRequest(command="ls", node_ids=[n1.id], tags=["prod"])
+            )

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
@@ -15,6 +16,9 @@ from app.core.exceptions import ConnectionFailedError, NodeNotFoundError
 from app.core.security import decrypt, encrypt
 from app.repositories.node_repo import NodeRepository
 from app.schemas.node import (
+    BulkCommandRequest,
+    BulkCommandResult,
+    BulkNodeResult,
     CommandRequest,
     CommandResult,
     NodeCreate,
@@ -59,11 +63,21 @@ class NodeService:
         return NodeResponse.model_validate(node)
 
     async def get_all_nodes(
-        self, skip: int = 0, limit: int = 100
+        self,
+        skip: int = 0,
+        limit: int = 100,
+        tags: list[str] | None = None,
+        search: str | None = None,
     ) -> tuple[list[NodeResponse], int]:
-        """Get all nodes with total count."""
-        nodes = await self._repository.get_all(skip=skip, limit=limit)
-        total = await self._repository.count()
+        """Get all nodes with total count, optionally filtered by tags and/or search."""
+        if tags or search:
+            nodes = await self._repository.get_filtered(
+                tags=tags, search=search, skip=skip, limit=limit
+            )
+            total = await self._repository.count_filtered(tags=tags, search=search)
+        else:
+            nodes = await self._repository.get_all(skip=skip, limit=limit)
+            total = await self._repository.count()
         return [NodeResponse.model_validate(node) for node in nodes], total
 
     async def create_node(self, data: NodeCreate) -> NodeResponse:
@@ -252,3 +266,95 @@ class NodeService:
             raise ConnectionFailedError(
                 f"Failed to execute command on node {node_id}: {exc}"
             ) from exc
+
+    async def bulk_execute_command(self, data: BulkCommandRequest) -> BulkCommandResult:
+        """Execute a command on multiple nodes in parallel."""
+        # Resolve target nodes
+        target_nodes = await self._resolve_targets(data)
+
+        if not target_nodes:
+            raise NodeNotFoundError("No nodes matched the given criteria")
+
+        # Execute on all nodes in parallel
+        tasks = [
+            self._execute_on_single_node(node, data.command) for node in target_nodes
+        ]
+        results = await asyncio.gather(*tasks)
+
+        succeeded = sum(1 for r in results if r.exit_code == 0)
+        return BulkCommandResult(
+            command=data.command,
+            results=results,
+            total=len(results),
+            succeeded=succeeded,
+            failed=len(results) - succeeded,
+        )
+
+    async def _resolve_targets(self, data: BulkCommandRequest) -> list[Any]:
+        """Resolve target nodes from IDs and/or tags."""
+        nodes_by_ids = None
+        if data.node_ids:
+            nodes_by_ids = await self._repository.get_by_ids(data.node_ids)
+
+        nodes_by_tags = None
+        if data.tags:
+            nodes_by_tags = await self._repository.get_by_tags(data.tags)
+
+        if nodes_by_ids is not None and nodes_by_tags is not None:
+            tag_ids = {n.id for n in nodes_by_tags}
+            return [n for n in nodes_by_ids if n.id in tag_ids]
+        if nodes_by_ids is not None:
+            return nodes_by_ids
+        return nodes_by_tags or []
+
+    async def _execute_on_single_node(self, node: Any, command: str) -> BulkNodeResult:
+        """Execute a command on a single node, returning result (never raises)."""
+        password = self._decrypt_value(node.password)
+        ssh_key = self._decrypt_value(node.ssh_key)
+        connector = self._get_connector_factory().create_ssh(
+            host=node.host,
+            port=node.port,
+            username=node.username,
+            password=password,
+            ssh_key=ssh_key,
+        )
+
+        try:
+            async with connector:
+                stdout, stderr, exit_code = await connector.execute_command(command)
+            audit.info(
+                "node.bulk.executed",
+                node_id=str(node.id),
+                command=command,
+            )
+            await self._log(
+                "bulk_execute",
+                node_id=node.id,
+                details={"command": command, "exit_code": exit_code},
+            )
+            return BulkNodeResult(
+                node_id=node.id,
+                node_name=node.name,
+                stdout=stdout,
+                stderr=stderr,
+                exit_code=exit_code,
+            )
+        except Exception as exc:
+            audit.error(
+                "node.bulk.execute.failed",
+                node_id=str(node.id),
+                command=command,
+                error=str(exc),
+            )
+            await self._log(
+                "bulk_execute_failed",
+                node_id=node.id,
+                details={"command": command, "error": str(exc)},
+            )
+            return BulkNodeResult(
+                node_id=node.id,
+                node_name=node.name,
+                stdout="",
+                stderr=str(exc),
+                exit_code=1,
+            )

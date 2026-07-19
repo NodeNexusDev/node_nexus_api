@@ -1088,3 +1088,275 @@ def test_create_node_duplicate_name(e2e_client: httpx.Client) -> None:
         },
     )
     assert resp.status_code == 201
+
+
+# ---------------------------------------------------------------------------
+# Node tags CRUD
+# ---------------------------------------------------------------------------
+
+
+def test_node_create_with_tags(e2e_client: httpx.Client) -> None:
+    resp = e2e_client.post(
+        "/api/v1/nodes/",
+        json={
+            "name": "tagged-node",
+            "host": "10.0.0.1",
+            "port": 22,
+            "connection_type": "ssh",
+            "tags": ["prod", "web"],
+        },
+    )
+    assert resp.status_code == 201
+    node = resp.json()
+    assert sorted(node["tags"]) == ["prod", "web"]
+
+    # Read back
+    resp = e2e_client.get(f"/api/v1/nodes/{node['id']}")
+    assert resp.status_code == 200
+    assert sorted(resp.json()["tags"]) == ["prod", "web"]
+
+
+def test_node_get_all_tags(e2e_client: httpx.Client) -> None:
+    _create_node(e2e_client, name="tag-a", tags=["alpha", "beta"])
+    _create_node(e2e_client, name="tag-b", tags=["beta", "gamma"])
+
+    resp = e2e_client.get("/api/v1/nodes/tags")
+    assert resp.status_code == 200
+    tags = resp.json()
+    assert "alpha" in tags
+    assert "beta" in tags
+    assert "gamma" in tags
+
+
+def test_node_add_tag(e2e_client: httpx.Client) -> None:
+    node = _create_node(e2e_client, name="add-tag-node", tags=["existing"])
+
+    resp = e2e_client.post(
+        f"/api/v1/nodes/{node['id']}/tags",
+        json={"tag": "new-tag"},
+    )
+    assert resp.status_code == 200
+    assert "new-tag" in resp.json()["tags"]
+    assert "existing" in resp.json()["tags"]
+
+
+def test_node_add_tag_not_found(e2e_client: httpx.Client) -> None:
+    import uuid
+
+    resp = e2e_client.post(
+        f"/api/v1/nodes/{uuid.uuid4()}/tags",
+        json={"tag": "x"},
+    )
+    assert resp.status_code == 404
+
+
+def test_node_remove_tag(e2e_client: httpx.Client) -> None:
+    node = _create_node(e2e_client, name="rm-tag-node", tags=["keep", "remove"])
+
+    resp = e2e_client.request(
+        "DELETE",
+        f"/api/v1/nodes/{node['id']}/tags",
+        json={"tag": "remove"},
+    )
+    assert resp.status_code == 200
+    assert "keep" in resp.json()["tags"]
+    assert "remove" not in resp.json()["tags"]
+
+
+def test_node_remove_tag_not_found(e2e_client: httpx.Client) -> None:
+    import uuid
+
+    resp = e2e_client.request(
+        "DELETE",
+        f"/api/v1/nodes/{uuid.uuid4()}/tags",
+        json={"tag": "x"},
+    )
+    assert resp.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# Node filtering and search
+# ---------------------------------------------------------------------------
+
+
+def test_node_filter_by_tags(e2e_client: httpx.Client) -> None:
+    _create_node(e2e_client, name="filter-prod-web", tags=["prod", "web"])
+    _create_node(e2e_client, name="filter-prod-db", tags=["prod", "db"])
+    _create_node(e2e_client, name="filter-staging", tags=["staging"])
+
+    resp = e2e_client.get("/api/v1/nodes/?tags=prod")
+    assert resp.status_code == 200
+    data = resp.json()
+    names = {n["name"] for n in data["items"]}
+    assert "filter-prod-web" in names
+    assert "filter-prod-db" in names
+    assert "filter-staging" not in names
+
+
+def test_node_filter_by_multiple_tags(e2e_client: httpx.Client) -> None:
+    _create_node(e2e_client, name="multi-tag-1", tags=["prod", "web"])
+    _create_node(e2e_client, name="multi-tag-2", tags=["prod", "db"])
+    _create_node(e2e_client, name="multi-tag-3", tags=["prod"])
+
+    resp = e2e_client.get("/api/v1/nodes/?tags=prod,web")
+    assert resp.status_code == 200
+    data = resp.json()
+    names = {n["name"] for n in data["items"]}
+    assert "multi-tag-1" in names
+    assert "multi-tag-2" not in names  # has prod but not web
+
+
+def test_node_search_by_name(e2e_client: httpx.Client) -> None:
+    _create_node(e2e_client, name="search-web-1", host="10.0.0.1")
+    _create_node(e2e_client, name="search-db-1", host="10.0.0.2")
+
+    resp = e2e_client.get("/api/v1/nodes/?search=web")
+    assert resp.status_code == 200
+    data = resp.json()
+    names = {n["name"] for n in data["items"]}
+    assert "search-web-1" in names
+    assert "search-db-1" not in names
+
+
+def test_node_search_by_host(e2e_client: httpx.Client) -> None:
+    _create_node(e2e_client, name="host-alpha", host="prod.example.com")
+    _create_node(e2e_client, name="host-beta", host="staging.example.com")
+
+    resp = e2e_client.get("/api/v1/nodes/?search=prod")
+    assert resp.status_code == 200
+    data = resp.json()
+    names = {n["name"] for n in data["items"]}
+    assert "host-alpha" in names
+    assert "host-beta" not in names
+
+
+def test_node_filter_by_tags_and_search(e2e_client: httpx.Client) -> None:
+    _create_node(
+        e2e_client, name="combo-web-prod", host="10.0.0.1", tags=["prod", "web"]
+    )
+    _create_node(e2e_client, name="combo-db-prod", host="10.0.0.2", tags=["prod", "db"])
+    _create_node(
+        e2e_client,
+        name="combo-web-staging",
+        host="10.0.0.3",
+        tags=["staging", "web"],
+    )
+
+    resp = e2e_client.get("/api/v1/nodes/?tags=prod&search=web")
+    assert resp.status_code == 200
+    data = resp.json()
+    names = {n["name"] for n in data["items"]}
+    assert "combo-web-prod" in names
+    assert "combo-db-prod" not in names  # has prod but not web in name
+    assert "combo-web-staging" not in names  # has web but not prod tag
+
+
+def test_node_filter_empty_result(e2e_client: httpx.Client) -> None:
+    _create_node(e2e_client, name="no-match", tags=["dev"])
+
+    resp = e2e_client.get("/api/v1/nodes/?search=nonexistent")
+    assert resp.status_code == 200
+    assert resp.json()["total"] == 0
+
+
+# ---------------------------------------------------------------------------
+# Node bulk execute
+# ---------------------------------------------------------------------------
+
+
+def test_bulk_execute_by_ids(e2e_client: httpx.Client) -> None:
+    node1 = _create_ssh_node(e2e_client, name="bulk-1")
+    node2 = _create_ssh_node(e2e_client, name="bulk-2")
+
+    resp = e2e_client.post(
+        "/api/v1/nodes/execute",
+        json={
+            "command": "echo bulk-ok",
+            "node_ids": [node1["id"], node2["id"]],
+        },
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["command"] == "echo bulk-ok"
+    assert data["total"] == 2
+    assert data["succeeded"] == 2
+    assert data["failed"] == 0
+
+    node_ids = {r["node_id"] for r in data["results"]}
+    assert node1["id"] in node_ids
+    assert node2["id"] in node_ids
+
+    for r in data["results"]:
+        assert r["stdout"].strip() == "bulk-ok"
+        assert r["exit_code"] == 0
+
+
+def test_bulk_execute_by_tags(e2e_client: httpx.Client) -> None:
+    node1 = _create_ssh_node(e2e_client, name="bulk-tag-1", tags=["bulk-test"])
+    node2 = _create_ssh_node(e2e_client, name="bulk-tag-2", tags=["bulk-test"])
+    _create_ssh_node(e2e_client, name="bulk-tag-other", tags=["other"])
+
+    resp = e2e_client.post(
+        "/api/v1/nodes/execute",
+        json={"command": "echo tagged", "tags": ["bulk-test"]},
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["total"] == 2
+    node_ids = {r["node_id"] for r in data["results"]}
+    assert node1["id"] in node_ids
+    assert node2["id"] in node_ids
+
+
+def test_bulk_execute_no_nodes(e2e_client: httpx.Client) -> None:
+    import uuid
+
+    resp = e2e_client.post(
+        "/api/v1/nodes/execute",
+        json={"command": "ls", "node_ids": [str(uuid.uuid4())]},
+    )
+    assert resp.status_code == 404
+
+
+def test_bulk_execute_partial_failure(e2e_client: httpx.Client) -> None:
+    """One good node + one unreachable node = partial success."""
+    good_node = _create_ssh_node(e2e_client, name="bulk-good")
+    bad_node = _create_node(
+        e2e_client,
+        name="bulk-bad",
+        host="192.0.2.1",  # TEST-NET — unreachable
+        port=22,
+    )
+
+    resp = e2e_client.post(
+        "/api/v1/nodes/execute",
+        json={
+            "command": "echo partial",
+            "node_ids": [good_node["id"], bad_node["id"]],
+        },
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["total"] == 2
+    assert data["succeeded"] == 1
+    assert data["failed"] == 1
+
+    results_by_id = {r["node_id"]: r for r in data["results"]}
+    assert results_by_id[good_node["id"]]["exit_code"] == 0
+    assert results_by_id[bad_node["id"]]["exit_code"] != 0
+
+
+def test_bulk_execute_validation_no_targets(e2e_client: httpx.Client) -> None:
+    resp = e2e_client.post(
+        "/api/v1/nodes/execute",
+        json={"command": "ls"},
+    )
+    assert resp.status_code == 422
+
+
+def test_bulk_execute_validation_empty_command(e2e_client: httpx.Client) -> None:
+    resp = e2e_client.post(
+        "/api/v1/nodes/execute",
+        json={"command": "", "node_ids": ["00000000-0000-0000-0000-000000000001"]},
+    )
+    assert resp.status_code == 422
