@@ -142,3 +142,90 @@ async def test_count_after_delete(repo: NodeRepository) -> None:
     assert await repo.count() == 1
     await repo.delete(node.id)
     assert await repo.count() == 0
+
+
+# --- get_by_ids ---
+
+
+@pytest.mark.asyncio
+async def test_get_by_ids_returns_matching(repo: NodeRepository) -> None:
+    n1 = await repo.create(_node_data(name="n1"))
+    n2 = await repo.create(_node_data(name="n2"))
+    await repo.create(_node_data(name="n3"))
+    result = await repo.get_by_ids([n1.id, n2.id])
+    assert len(result) == 2
+    names = {n.name for n in result}
+    assert names == {"n1", "n2"}
+
+
+@pytest.mark.asyncio
+async def test_get_by_ids_empty_list(repo: NodeRepository) -> None:
+    await repo.create(_node_data())
+    result = await repo.get_by_ids([])
+    assert result == []
+
+
+@pytest.mark.asyncio
+async def test_get_by_ids_no_match(repo: NodeRepository) -> None:
+    await repo.create(_node_data())
+    result = await repo.get_by_ids([uuid.uuid4()])
+    assert result == []
+
+
+# --- get_filtered / count_filtered ---
+
+
+@pytest.mark.asyncio
+async def test_get_filtered_by_search(repo: NodeRepository) -> None:
+    await repo.create(_node_data(name="web-1", host="10.0.0.1"))
+    await repo.create(_node_data(name="db-1", host="10.0.0.2"))
+    await repo.create(_node_data(name="web-2", host="10.0.0.3"))
+    result = await repo.get_filtered(search="web")
+    assert len(result) == 2
+
+
+@pytest.mark.asyncio
+async def test_get_filtered_by_search_host(repo: NodeRepository) -> None:
+    await repo.create(_node_data(name="node-a", host="prod.example.com"))
+    await repo.create(_node_data(name="node-b", host="staging.example.com"))
+    result = await repo.get_filtered(search="prod")
+    assert len(result) == 1
+    assert result[0].name == "node-a"
+
+
+@pytest.mark.asyncio
+@pytest.mark.skip(reason="SQLite does not support ARRAY.contains()")
+async def test_get_filtered_by_tags(repo: NodeRepository) -> None:
+    await repo.create(_node_data(name="n1", tags=["prod", "web"]))
+    await repo.create(_node_data(name="n2", tags=["prod", "db"]))
+    await repo.create(_node_data(name="n3", tags=["staging", "web"]))
+    result = await repo.get_filtered(tags=["prod"])
+    assert len(result) == 2
+
+
+@pytest.mark.asyncio
+@pytest.mark.skip(reason="SQLite does not support ARRAY.contains()")
+async def test_get_filtered_by_tags_and_search(repo: NodeRepository) -> None:
+    await repo.create(_node_data(name="web-1", tags=["prod"]))
+    await repo.create(_node_data(name="web-2", tags=["staging"]))
+    await repo.create(_node_data(name="db-1", tags=["prod"]))
+    result = await repo.get_filtered(tags=["prod"], search="web")
+    assert len(result) == 1
+    assert result[0].name == "web-1"
+
+
+@pytest.mark.asyncio
+async def test_get_filtered_empty_result(repo: NodeRepository) -> None:
+    await repo.create(_node_data(name="n1"))
+    result = await repo.get_filtered(search="nonexistent")
+    assert result == []
+
+
+@pytest.mark.asyncio
+@pytest.mark.skip(reason="SQLite does not support ARRAY.contains()")
+async def test_count_filtered_matches(repo: NodeRepository) -> None:
+    await repo.create(_node_data(name="web-1", tags=["prod"]))
+    await repo.create(_node_data(name="db-1", tags=["prod"]))
+    await repo.create(_node_data(name="web-2", tags=["staging"]))
+    count = await repo.count_filtered(tags=["prod"], search="web")
+    assert count == 1

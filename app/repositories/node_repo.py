@@ -3,7 +3,7 @@
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.node import NodeModel
@@ -41,7 +41,7 @@ class NodeRepository(IRepository[NodeModel]):
         """Get nodes that have ALL specified tags."""
         query = select(NodeModel)
         for tag in tags:
-            query = query.where(NodeModel.tags.contains([tag]))
+            query = query.where(NodeModel.tags.op("@>")([tag]))
         result = await self._session.execute(query.offset(skip).limit(limit))
         return list(result.scalars().all())
 
@@ -49,7 +49,7 @@ class NodeRepository(IRepository[NodeModel]):
         """Count nodes that have ALL specified tags."""
         query = select(func.count(NodeModel.id))
         for tag in tags:
-            query = query.where(NodeModel.tags.contains([tag]))
+            query = query.where(NodeModel.tags.op("@>")([tag]))
         result = await self._session.execute(query)
         return result.scalar_one()
 
@@ -59,6 +59,59 @@ class NodeRepository(IRepository[NodeModel]):
             select(func.unnest(NodeModel.tags)).distinct()
         )
         return sorted(row[0] for row in result.all() if row[0])
+
+    async def get_by_ids(self, ids: list[UUID]) -> list[NodeModel]:
+        """Get nodes by a list of IDs."""
+        if not ids:
+            return []
+        result = await self._session.execute(
+            select(NodeModel).where(NodeModel.id.in_(ids))
+        )
+        return list(result.scalars().all())
+
+    async def get_filtered(
+        self,
+        tags: list[str] | None = None,
+        search: str | None = None,
+        skip: int = 0,
+        limit: int = 100,
+    ) -> list[NodeModel]:
+        """Get nodes filtered by tags and/or search (ILIKE on name/host)."""
+        query = select(NodeModel)
+        if tags:
+            for tag in tags:
+                query = query.where(NodeModel.tags.op("@>")([tag]))
+        if search:
+            pattern = f"%{search}%"
+            query = query.where(
+                or_(
+                    NodeModel.name.ilike(pattern),
+                    NodeModel.host.ilike(pattern),
+                )
+            )
+        result = await self._session.execute(query.offset(skip).limit(limit))
+        return list(result.scalars().all())
+
+    async def count_filtered(
+        self,
+        tags: list[str] | None = None,
+        search: str | None = None,
+    ) -> int:
+        """Count nodes matching filters."""
+        query = select(func.count(NodeModel.id))
+        if tags:
+            for tag in tags:
+                query = query.where(NodeModel.tags.op("@>")([tag]))
+        if search:
+            pattern = f"%{search}%"
+            query = query.where(
+                or_(
+                    NodeModel.name.ilike(pattern),
+                    NodeModel.host.ilike(pattern),
+                )
+            )
+        result = await self._session.execute(query)
+        return result.scalar_one()
 
     async def create(self, data: dict[str, Any]) -> NodeModel:
         """Create a new node."""
