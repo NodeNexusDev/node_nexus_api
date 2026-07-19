@@ -1,8 +1,13 @@
 """E2E tests for the full application stack."""
 
+from uuid import uuid4
+
 import httpx
+import pytest
 
 from tests.e2e.conftest import ServicePorts
+
+pytestmark = pytest.mark.docker
 
 _NODE_PAYLOAD = {
     "name": "e2e-node",
@@ -21,7 +26,12 @@ def _create_node(e2e_client: httpx.Client, **overrides) -> dict:
 
 
 def _create_ssh_node(e2e_client: httpx.Client, **overrides) -> dict:
-    """Helper to create an SSH node for tests."""
+    """Helper to create an SSH node for tests.
+
+    Uses Docker compose service name "ssh-server" as host — the API
+    resolves it via Docker's internal DNS.  For tests that need to
+    connect via mapped ports, pass host/port via **overrides.
+    """
     data = {
         "name": "ssh-node",
         "host": "ssh-server",
@@ -125,9 +135,7 @@ def test_validation_error(e2e_client: httpx.Client) -> None:
 
 
 def test_not_found_errors(e2e_client: httpx.Client) -> None:
-    import uuid
-
-    fake_id = str(uuid.uuid4())
+    fake_id = str(uuid4())
 
     resp = e2e_client.get(f"/api/v1/nodes/{fake_id}")
     assert resp.status_code == 404
@@ -186,25 +194,22 @@ def test_ssh_execute_command_stderr(e2e_client: httpx.Client) -> None:
 
 
 def test_ssh_check_not_found(e2e_client: httpx.Client) -> None:
-    import uuid
-
-    resp = e2e_client.post(f"/api/v1/nodes/{uuid.uuid4()}/check")
+    resp = e2e_client.post(f"/api/v1/nodes/{uuid4()}/check")
     assert resp.status_code == 404
 
 
 def test_ssh_execute_not_found(e2e_client: httpx.Client) -> None:
-    import uuid
-
     resp = e2e_client.post(
-        f"/api/v1/nodes/{uuid.uuid4()}/execute",
+        f"/api/v1/nodes/{uuid4()}/execute",
         json={"command": "ls"},
     )
     assert resp.status_code == 404
 
 
 def test_pagination_page2(e2e_client: httpx.Client) -> None:
+    created: list[str] = []
     for i in range(3):
-        e2e_client.post(
+        resp = e2e_client.post(
             "/api/v1/nodes/",
             json={
                 "name": f"page-test-{i}",
@@ -213,6 +218,7 @@ def test_pagination_page2(e2e_client: httpx.Client) -> None:
                 "connection_type": "ssh",
             },
         )
+        created.append(resp.json()["id"])
 
     resp = e2e_client.get("/api/v1/nodes/?page=1&size=2")
     assert resp.status_code == 200
@@ -221,6 +227,9 @@ def test_pagination_page2(e2e_client: httpx.Client) -> None:
     assert data["total"] >= 3
     assert data["page"] == 1
     assert data["size"] == 2
+
+    for node_id in created:
+        e2e_client.delete(f"/api/v1/nodes/{node_id}")
 
 
 # ---------------------------------------------------------------------------
@@ -294,13 +303,15 @@ def test_delete_creates_audit_log_and_removes_node(
 
 
 def test_audit_log_filter_by_action(e2e_client: httpx.Client) -> None:
-    _create_node(e2e_client, name="audit-filter")
+    node = _create_node(e2e_client, name="audit-filter")
 
     resp = e2e_client.get("/api/v1/audit/?action=create")
     assert resp.status_code == 200
     assert resp.json()["total"] >= 1
     for log in resp.json()["items"]:
         assert log["action"] == "create"
+
+    e2e_client.delete(f"/api/v1/nodes/{node['id']}")
 
 
 # ---------------------------------------------------------------------------
@@ -309,12 +320,19 @@ def test_audit_log_filter_by_action(e2e_client: httpx.Client) -> None:
 
 
 def test_ssh_check_wrong_credentials(e2e_client: httpx.Client) -> None:
+    """Wrong credentials return 200 with status="unreachable".
+
+    The /check endpoint always returns 200 — it reports connectivity
+    status via the response body, not HTTP status codes.
+    """
     node = _create_ssh_node(
         e2e_client, name="ssh-bad", username="testuser", password="wrongpass"
     )
     resp = e2e_client.post(f"/api/v1/nodes/{node['id']}/check")
     assert resp.status_code == 200
     assert resp.json()["status"] == "unreachable"
+
+    e2e_client.delete(f"/api/v1/nodes/{node['id']}")
 
 
 # ---------------------------------------------------------------------------
@@ -373,6 +391,13 @@ def test_cors_preflight(e2e_client: httpx.Client) -> None:
     assert resp.headers.get("access-control-allow-origin") == "http://localhost:3000"
     allow_methods = resp.headers.get("access-control-allow-methods", "")
     assert "POST" in allow_methods
+
+    # Also verify that a regular GET response includes CORS headers
+    resp = e2e_client.get(
+        "/api/v1/nodes/",
+        headers={"Origin": "http://localhost:3000"},
+    )
+    assert resp.headers.get("access-control-allow-origin") == "http://localhost:3000"
 
 
 # ---------------------------------------------------------------------------
@@ -451,9 +476,7 @@ def test_command_validation_error(e2e_client: httpx.Client) -> None:
 
 
 def test_command_not_found(e2e_client: httpx.Client) -> None:
-    import uuid
-
-    fake_id = str(uuid.uuid4())
+    fake_id = str(uuid4())
     resp = e2e_client.get(f"/api/v1/commands/{fake_id}")
     assert resp.status_code == 404
 
@@ -555,9 +578,7 @@ def test_script_validation_error(e2e_client: httpx.Client) -> None:
 
 
 def test_script_not_found(e2e_client: httpx.Client) -> None:
-    import uuid
-
-    fake_id = str(uuid.uuid4())
+    fake_id = str(uuid4())
     resp = e2e_client.get(f"/api/v1/scripts/{fake_id}")
     assert resp.status_code == 404
 
@@ -593,22 +614,18 @@ def test_script_execute_on_ssh_node(e2e_client: httpx.Client) -> None:
 
 
 def test_script_execute_not_found(e2e_client: httpx.Client) -> None:
-    import uuid
-
     resp = e2e_client.post(
-        f"/api/v1/scripts/{uuid.uuid4()}/execute",
-        json={"node_ids": [str(uuid.uuid4())], "params": {}},
+        f"/api/v1/scripts/{uuid4()}/execute",
+        json={"node_ids": [str(uuid4())], "params": {}},
     )
     assert resp.status_code == 404
 
 
 def test_script_execute_node_not_found(e2e_client: httpx.Client) -> None:
-    import uuid
-
     script = _create_script(e2e_client, name="no-node-script")
     resp = e2e_client.post(
         f"/api/v1/scripts/{script['id']}/execute",
-        json={"node_ids": [str(uuid.uuid4())], "params": {}},
+        json={"node_ids": [str(uuid4())], "params": {}},
     )
     # Script execution returns 200 with per-node failure status
     assert resp.status_code == 200
@@ -638,9 +655,7 @@ def test_script_executions_history(e2e_client: httpx.Client) -> None:
 
 
 def test_script_executions_not_found(e2e_client: httpx.Client) -> None:
-    import uuid
-
-    resp = e2e_client.get(f"/api/v1/scripts/{uuid.uuid4()}/executions")
+    resp = e2e_client.get(f"/api/v1/scripts/{uuid4()}/executions")
     assert resp.status_code == 404
 
 
@@ -698,23 +713,19 @@ def test_command_execute_on_node(e2e_client: httpx.Client) -> None:
 
 
 def test_command_execute_not_found(e2e_client: httpx.Client) -> None:
-    import uuid
-
     node = _create_ssh_node(e2e_client, name="cmd-nf-node")
     resp = e2e_client.post(
-        f"/api/v1/commands/{uuid.uuid4()}/execute",
+        f"/api/v1/commands/{uuid4()}/execute",
         json={"node_id": node["id"], "params": {}},
     )
     assert resp.status_code == 404
 
 
 def test_command_execute_node_not_found(e2e_client: httpx.Client) -> None:
-    import uuid
-
     cmd = _create_command(e2e_client, name="cmd-no-node")
     resp = e2e_client.post(
         f"/api/v1/commands/{cmd['id']}/execute",
-        json={"node_id": str(uuid.uuid4()), "params": {}},
+        json={"node_id": str(uuid4()), "params": {}},
     )
     assert resp.status_code == 404
 
@@ -835,11 +846,9 @@ def test_api_key_revoke(e2e_client: httpx.Client) -> None:
 
 
 def test_api_key_revoke_not_found(e2e_client: httpx.Client) -> None:
-    import uuid
-
     master_key = _get_master_key()
     resp = e2e_client.delete(
-        f"/api/v1/api-keys/{uuid.uuid4()}",
+        f"/api/v1/api-keys/{uuid4()}",
         headers={"X-API-Key": master_key},
     )
     assert resp.status_code == 404
@@ -893,8 +902,10 @@ def test_api_key_create_validation_error(e2e_client: httpx.Client) -> None:
 
 def test_audit_log_pagination(e2e_client: httpx.Client) -> None:
     # Create multiple nodes to generate audit entries
+    created: list[str] = []
     for i in range(3):
-        _create_node(e2e_client, name=f"audit-page-{i}")
+        node = _create_node(e2e_client, name=f"audit-page-{i}")
+        created.append(node["id"])
 
     resp = e2e_client.get("/api/v1/audit/?page=1&size=2")
     assert resp.status_code == 200
@@ -903,6 +914,9 @@ def test_audit_log_pagination(e2e_client: httpx.Client) -> None:
     assert data["total"] >= 3
     assert data["page"] == 1
     assert data["size"] == 2
+
+    for node_id in created:
+        e2e_client.delete(f"/api/v1/nodes/{node_id}")
 
 
 def test_audit_log_combined_filters(e2e_client: httpx.Client) -> None:
@@ -919,6 +933,8 @@ def test_audit_log_combined_filters(e2e_client: httpx.Client) -> None:
         if log["node_id"] is not None:
             assert log["node_id"] == node_id
 
+    e2e_client.delete(f"/api/v1/nodes/{node_id}")
+
 
 # ---------------------------------------------------------------------------
 # Command and script pagination
@@ -926,8 +942,10 @@ def test_audit_log_combined_filters(e2e_client: httpx.Client) -> None:
 
 
 def test_command_pagination(e2e_client: httpx.Client) -> None:
+    created: list[str] = []
     for i in range(3):
-        _create_command(e2e_client, name=f"page-cmd-{i}")
+        cmd = _create_command(e2e_client, name=f"page-cmd-{i}")
+        created.append(cmd["id"])
 
     resp = e2e_client.get("/api/v1/commands/?page=1&size=2")
     assert resp.status_code == 200
@@ -937,10 +955,15 @@ def test_command_pagination(e2e_client: httpx.Client) -> None:
     assert data["page"] == 1
     assert data["size"] == 2
 
+    for cmd_id in created:
+        e2e_client.delete(f"/api/v1/commands/{cmd_id}")
+
 
 def test_script_pagination(e2e_client: httpx.Client) -> None:
+    created: list[str] = []
     for i in range(3):
-        _create_script(e2e_client, name=f"page-script-{i}")
+        script = _create_script(e2e_client, name=f"page-script-{i}")
+        created.append(script["id"])
 
     resp = e2e_client.get("/api/v1/scripts/?page=1&size=2")
     assert resp.status_code == 200
@@ -949,6 +972,9 @@ def test_script_pagination(e2e_client: httpx.Client) -> None:
     assert data["total"] >= 3
     assert data["page"] == 1
     assert data["size"] == 2
+
+    for script_id in created:
+        e2e_client.delete(f"/api/v1/scripts/{script_id}")
 
 
 # ---------------------------------------------------------------------------
@@ -1077,7 +1103,7 @@ def test_create_node_port_zero(e2e_client: httpx.Client) -> None:
 
 def test_create_node_duplicate_name(e2e_client: httpx.Client) -> None:
     """Nodes with same name should be allowed (no unique constraint on name)."""
-    _create_node(e2e_client, name="dup-name")
+    n1 = _create_node(e2e_client, name="dup-name")
     resp = e2e_client.post(
         "/api/v1/nodes/",
         json={
@@ -1088,6 +1114,10 @@ def test_create_node_duplicate_name(e2e_client: httpx.Client) -> None:
         },
     )
     assert resp.status_code == 201
+    n2 = resp.json()
+
+    for n in (n1, n2):
+        e2e_client.delete(f"/api/v1/nodes/{n['id']}")
 
 
 # ---------------------------------------------------------------------------
@@ -1115,10 +1145,12 @@ def test_node_create_with_tags(e2e_client: httpx.Client) -> None:
     assert resp.status_code == 200
     assert sorted(resp.json()["tags"]) == ["prod", "web"]
 
+    e2e_client.delete(f"/api/v1/nodes/{node['id']}")
+
 
 def test_node_get_all_tags(e2e_client: httpx.Client) -> None:
-    _create_node(e2e_client, name="tag-a", tags=["alpha", "beta"])
-    _create_node(e2e_client, name="tag-b", tags=["beta", "gamma"])
+    n1 = _create_node(e2e_client, name="tag-a", tags=["alpha", "beta"])
+    n2 = _create_node(e2e_client, name="tag-b", tags=["beta", "gamma"])
 
     resp = e2e_client.get("/api/v1/nodes/tags")
     assert resp.status_code == 200
@@ -1126,6 +1158,9 @@ def test_node_get_all_tags(e2e_client: httpx.Client) -> None:
     assert "alpha" in tags
     assert "beta" in tags
     assert "gamma" in tags
+
+    for n in (n1, n2):
+        e2e_client.delete(f"/api/v1/nodes/{n['id']}")
 
 
 def test_node_add_tag(e2e_client: httpx.Client) -> None:
@@ -1139,12 +1174,12 @@ def test_node_add_tag(e2e_client: httpx.Client) -> None:
     assert "new-tag" in resp.json()["tags"]
     assert "existing" in resp.json()["tags"]
 
+    e2e_client.delete(f"/api/v1/nodes/{node['id']}")
+
 
 def test_node_add_tag_not_found(e2e_client: httpx.Client) -> None:
-    import uuid
-
     resp = e2e_client.post(
-        f"/api/v1/nodes/{uuid.uuid4()}/tags",
+        f"/api/v1/nodes/{uuid4()}/tags",
         json={"tag": "x"},
     )
     assert resp.status_code == 404
@@ -1162,13 +1197,13 @@ def test_node_remove_tag(e2e_client: httpx.Client) -> None:
     assert "keep" in resp.json()["tags"]
     assert "remove" not in resp.json()["tags"]
 
+    e2e_client.delete(f"/api/v1/nodes/{node['id']}")
+
 
 def test_node_remove_tag_not_found(e2e_client: httpx.Client) -> None:
-    import uuid
-
     resp = e2e_client.request(
         "DELETE",
-        f"/api/v1/nodes/{uuid.uuid4()}/tags",
+        f"/api/v1/nodes/{uuid4()}/tags",
         json={"tag": "x"},
     )
     assert resp.status_code == 404
@@ -1180,9 +1215,9 @@ def test_node_remove_tag_not_found(e2e_client: httpx.Client) -> None:
 
 
 def test_node_filter_by_tags(e2e_client: httpx.Client) -> None:
-    _create_node(e2e_client, name="filter-prod-web", tags=["prod", "web"])
-    _create_node(e2e_client, name="filter-prod-db", tags=["prod", "db"])
-    _create_node(e2e_client, name="filter-staging", tags=["staging"])
+    n1 = _create_node(e2e_client, name="filter-prod-web", tags=["prod", "web"])
+    n2 = _create_node(e2e_client, name="filter-prod-db", tags=["prod", "db"])
+    n3 = _create_node(e2e_client, name="filter-staging", tags=["staging"])
 
     resp = e2e_client.get("/api/v1/nodes/?tags=prod")
     assert resp.status_code == 200
@@ -1192,11 +1227,14 @@ def test_node_filter_by_tags(e2e_client: httpx.Client) -> None:
     assert "filter-prod-db" in names
     assert "filter-staging" not in names
 
+    for n in (n1, n2, n3):
+        e2e_client.delete(f"/api/v1/nodes/{n['id']}")
+
 
 def test_node_filter_by_multiple_tags(e2e_client: httpx.Client) -> None:
-    _create_node(e2e_client, name="multi-tag-1", tags=["prod", "web"])
-    _create_node(e2e_client, name="multi-tag-2", tags=["prod", "db"])
-    _create_node(e2e_client, name="multi-tag-3", tags=["prod"])
+    n1 = _create_node(e2e_client, name="multi-tag-1", tags=["prod", "web"])
+    n2 = _create_node(e2e_client, name="multi-tag-2", tags=["prod", "db"])
+    n3 = _create_node(e2e_client, name="multi-tag-3", tags=["prod"])
 
     resp = e2e_client.get("/api/v1/nodes/?tags=prod,web")
     assert resp.status_code == 200
@@ -1205,10 +1243,13 @@ def test_node_filter_by_multiple_tags(e2e_client: httpx.Client) -> None:
     assert "multi-tag-1" in names
     assert "multi-tag-2" not in names  # has prod but not web
 
+    for n in (n1, n2, n3):
+        e2e_client.delete(f"/api/v1/nodes/{n['id']}")
+
 
 def test_node_search_by_name(e2e_client: httpx.Client) -> None:
-    _create_node(e2e_client, name="search-web-1", host="10.0.0.1")
-    _create_node(e2e_client, name="search-db-1", host="10.0.0.2")
+    n1 = _create_node(e2e_client, name="search-web-1", host="10.0.0.1")
+    n2 = _create_node(e2e_client, name="search-db-1", host="10.0.0.2")
 
     resp = e2e_client.get("/api/v1/nodes/?search=web")
     assert resp.status_code == 200
@@ -1217,10 +1258,13 @@ def test_node_search_by_name(e2e_client: httpx.Client) -> None:
     assert "search-web-1" in names
     assert "search-db-1" not in names
 
+    for n in (n1, n2):
+        e2e_client.delete(f"/api/v1/nodes/{n['id']}")
+
 
 def test_node_search_by_host(e2e_client: httpx.Client) -> None:
-    _create_node(e2e_client, name="host-alpha", host="prod.example.com")
-    _create_node(e2e_client, name="host-beta", host="staging.example.com")
+    n1 = _create_node(e2e_client, name="host-alpha", host="prod.example.com")
+    n2 = _create_node(e2e_client, name="host-beta", host="staging.example.com")
 
     resp = e2e_client.get("/api/v1/nodes/?search=prod")
     assert resp.status_code == 200
@@ -1229,13 +1273,18 @@ def test_node_search_by_host(e2e_client: httpx.Client) -> None:
     assert "host-alpha" in names
     assert "host-beta" not in names
 
+    for n in (n1, n2):
+        e2e_client.delete(f"/api/v1/nodes/{n['id']}")
+
 
 def test_node_filter_by_tags_and_search(e2e_client: httpx.Client) -> None:
-    _create_node(
+    n1 = _create_node(
         e2e_client, name="combo-web-prod", host="10.0.0.1", tags=["prod", "web"]
     )
-    _create_node(e2e_client, name="combo-db-prod", host="10.0.0.2", tags=["prod", "db"])
-    _create_node(
+    n2 = _create_node(
+        e2e_client, name="combo-db-prod", host="10.0.0.2", tags=["prod", "db"]
+    )
+    n3 = _create_node(
         e2e_client,
         name="combo-web-staging",
         host="10.0.0.3",
@@ -1250,13 +1299,18 @@ def test_node_filter_by_tags_and_search(e2e_client: httpx.Client) -> None:
     assert "combo-db-prod" not in names  # has prod but not web in name
     assert "combo-web-staging" not in names  # has web but not prod tag
 
+    for n in (n1, n2, n3):
+        e2e_client.delete(f"/api/v1/nodes/{n['id']}")
+
 
 def test_node_filter_empty_result(e2e_client: httpx.Client) -> None:
-    _create_node(e2e_client, name="no-match", tags=["dev"])
+    node = _create_node(e2e_client, name="no-match", tags=["dev"])
 
     resp = e2e_client.get("/api/v1/nodes/?search=nonexistent")
     assert resp.status_code == 200
     assert resp.json()["total"] == 0
+
+    e2e_client.delete(f"/api/v1/nodes/{node['id']}")
 
 
 # ---------------------------------------------------------------------------
@@ -1309,11 +1363,9 @@ def test_bulk_execute_by_tags(e2e_client: httpx.Client) -> None:
 
 
 def test_bulk_execute_no_nodes(e2e_client: httpx.Client) -> None:
-    import uuid
-
     resp = e2e_client.post(
         "/api/v1/nodes/bulk/execute",
-        json={"command": "ls", "node_ids": [str(uuid.uuid4())]},
+        json={"command": "ls", "node_ids": [str(uuid4())]},
     )
     assert resp.status_code == 404
 
