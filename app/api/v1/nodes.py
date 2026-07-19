@@ -119,7 +119,7 @@ async def delete_node(
         raise HTTPException(status_code=404, detail="Node not found")
 
 
-@router.post("/execute", response_model=BulkCommandResult)
+@router.post("/bulk/execute", response_model=BulkCommandResult)
 @inject
 async def bulk_execute_command(
     data: BulkCommandRequest,

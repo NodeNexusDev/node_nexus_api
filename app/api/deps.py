@@ -1,6 +1,5 @@
 """Shared FastAPI dependencies."""
 
-import hashlib
 import hmac
 
 import structlog
@@ -10,6 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.core.config import get_settings
+from app.core.security import hash_api_key
 from app.models.api_key import APIKeyModel
 
 audit = structlog.get_logger("audit")
@@ -40,7 +40,7 @@ async def get_current_api_key(
     sessionmaker: async_sessionmaker[AsyncSession] = request.app.state.sessionmaker
     async with sessionmaker() as session:
         async with session.begin():
-            key_hash = hashlib.sha256(api_key.encode()).hexdigest()
+            key_hash = hash_api_key(api_key)
             result = await session.execute(
                 select(APIKeyModel).where(APIKeyModel.key_hash == key_hash)
             )

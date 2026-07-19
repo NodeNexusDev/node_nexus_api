@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
@@ -74,7 +73,6 @@ class CommandService:
     async def create_command(self, data: CommandCreate) -> CommandResponse:
         """Create a new command template."""
         raw = data.model_dump()
-        raw["parameters"] = json.dumps(raw["parameters"])
         command = await self._repository.create(raw)
         audit.info("command.create.ok", command_id=str(command.id), name=data.name)
         await self._log("create", details={"entity": "command", "name": data.name})
@@ -85,8 +83,6 @@ class CommandService:
     ) -> CommandResponse:
         """Update an existing command template."""
         update_data = data.model_dump(exclude_unset=True)
-        if "parameters" in update_data and update_data["parameters"] is not None:
-            update_data["parameters"] = json.dumps(update_data["parameters"])
         command = await self._repository.update(command_id, update_data)
         if command is None:
             raise CommandNotFoundError(f"Command {command_id} not found")
@@ -112,7 +108,7 @@ class CommandService:
         if command is None:
             raise CommandNotFoundError(f"Command {command_id} not found")
 
-        parameters = json.loads(command.parameters) if command.parameters else []
+        parameters = command.parameters if command.parameters else []
         rendered = render_command(command.command, parameters, data.params)
 
         node = await self._node_repository.get_by_id(data.node_id)
@@ -180,7 +176,7 @@ class CommandService:
 
     @staticmethod
     def _to_response(command: Any) -> CommandResponse:
-        parameters = json.loads(command.parameters) if command.parameters else []
+        parameters = command.parameters if command.parameters else []
         return CommandResponse(
             id=command.id,
             name=command.name,

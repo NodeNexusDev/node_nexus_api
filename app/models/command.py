@@ -3,7 +3,7 @@
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import DateTime, Index, String, Text
+from sqlalchemy import JSON, DateTime, Index, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base
@@ -24,7 +24,9 @@ class CommandModel(Base):
     name: Mapped[str] = mapped_column(String(255))
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     command: Mapped[str] = mapped_column(Text)
-    parameters: Mapped[str | None] = mapped_column(Text, nullable=True)
+    parameters: Mapped[list[dict] | None] = mapped_column(
+        JSON, nullable=True, default=list
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_utcnow
     )
