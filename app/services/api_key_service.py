@@ -1,10 +1,10 @@
 """API key service."""
 
-import hashlib
 import secrets
 import uuid
 
 from app.core.exceptions import APIKeyNotFoundError, APIKeyRevokedError
+from app.core.security import hash_api_key
 from app.repositories.api_key_repo import APIKeyRepository
 from app.schemas.api_key import APIKeyCreated, APIKeyList
 
@@ -22,7 +22,7 @@ def generate_api_key() -> tuple[str, str, str]:
     """
     random_part = secrets.token_urlsafe(KEY_RANDOM_LENGTH)[:KEY_RANDOM_LENGTH]
     plain_key = f"{KEY_FORMAT}{random_part}"
-    key_hash = hashlib.sha256(plain_key.encode()).hexdigest()
+    key_hash = hash_api_key(plain_key)
     key_prefix = plain_key[:KEY_PREFIX_LENGTH]
     return plain_key, key_hash, key_prefix
 
@@ -50,7 +50,7 @@ class APIKeyService:
 
     async def validate_api_key(self, plain_key: str) -> None:
         """Validate an API key. Raises if invalid or revoked."""
-        key_hash = hashlib.sha256(plain_key.encode()).hexdigest()
+        key_hash = hash_api_key(plain_key)
         model = await self._repo.get_by_key_hash(key_hash)
         if model is None:
             raise APIKeyNotFoundError("Invalid API key")

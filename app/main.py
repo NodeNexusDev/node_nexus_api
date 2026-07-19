@@ -21,7 +21,18 @@ from app.api.v1.health import router as health_router
 from app.api.v1.nodes import router as nodes_router
 from app.api.v1.scripts import router as scripts_router
 from app.core.config import get_settings
-from app.core.exceptions import DomainError
+from app.core.exceptions import (
+    APIKeyNotFoundError,
+    APIKeyRevokedError,
+    AuthenticationError,
+    CommandNotFoundError,
+    ConnectionFailedError,
+    DomainError,
+    NodeNotFoundError,
+    ScriptNotFoundError,
+    TagNotFoundError,
+    TemplateRenderError,
+)
 from app.core.logging import configure_logging
 from app.di.providers import AppProvider
 
@@ -85,7 +96,7 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title="Node Nexus API",
         description="REST API для управления серверными нодами с SSH-подключениями",
-        version="0.1.0",
+        version="0.2.0",
         lifespan=lifespan,
         openapi_tags=[
             {"name": "nodes", "description": "CRUD-операции и SSH-команды для нод"},
@@ -119,8 +130,20 @@ def create_app() -> FastAPI:
     @app.exception_handler(DomainError)
     async def _domain_error_handler(request: Request, exc: DomainError):  # noqa: ANN001
         audit.error("app.exception", error_type=type(exc).__name__, detail=str(exc))
+        _error_status_map: dict[type[DomainError], int] = {
+            NodeNotFoundError: 404,
+            CommandNotFoundError: 404,
+            ScriptNotFoundError: 404,
+            APIKeyNotFoundError: 401,
+            APIKeyRevokedError: 401,
+            AuthenticationError: 401,
+            TagNotFoundError: 404,
+            ConnectionFailedError: 503,
+            TemplateRenderError: 422,
+        }
+        status_code = _error_status_map.get(type(exc), 422)
         return JSONResponse(
-            status_code=422,
+            status_code=status_code,
             content={"detail": str(exc)},
         )
 
