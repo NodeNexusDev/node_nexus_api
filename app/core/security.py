@@ -1,6 +1,7 @@
 """Encryption utilities for sensitive data at rest."""
 
 import base64
+import hashlib
 import os
 from functools import lru_cache
 
@@ -9,6 +10,11 @@ from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 
 from app.core.config import get_settings
+
+
+def hash_api_key(plain_key: str) -> str:
+    """Hash an API key with SHA-256 for storage and lookup."""
+    return hashlib.sha256(plain_key.encode()).hexdigest()
 
 
 @lru_cache

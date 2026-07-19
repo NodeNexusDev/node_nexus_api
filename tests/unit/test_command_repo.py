@@ -13,6 +13,10 @@ from sqlalchemy.ext.asyncio import (
 )
 
 from app.models.base import Base
+from app.models.command import CommandModel  # noqa: F401
+from app.models.node import NodeModel  # noqa: F401
+from app.models.script import ScriptModel  # noqa: F401
+from app.models.script_execution import ScriptExecutionModel  # noqa: F401
 from app.repositories.command_repo import CommandRepository
 
 
@@ -94,9 +98,7 @@ async def test_create(repo: CommandRepository) -> None:
 
 @pytest.mark.asyncio
 async def test_create_with_parameters(repo: CommandRepository) -> None:
-    import json
-
-    params = json.dumps([{"name": "service", "type": "string", "required": True}])
+    params = [{"name": "service", "type": "string", "required": True}]
     cmd = await repo.create(_command_data(parameters=params))
     assert cmd.parameters == params
 

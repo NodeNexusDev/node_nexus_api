@@ -1,6 +1,5 @@
 """Unit tests for ScriptExecutionRepository with in-memory SQLite."""
 
-import json
 import uuid
 from collections.abc import AsyncGenerator
 
@@ -14,6 +13,9 @@ from sqlalchemy.ext.asyncio import (
 )
 
 from app.models.base import Base
+from app.models.node import NodeModel  # noqa: F401
+from app.models.script import ScriptModel  # noqa: F401
+from app.models.script_execution import ScriptExecutionModel  # noqa: F401
 from app.repositories.script_execution_repo import ScriptExecutionRepository
 from app.repositories.script_repo import ScriptRepository
 
@@ -48,16 +50,14 @@ def repo(session: AsyncSession) -> ScriptExecutionRepository:
 async def _create_script(
     script_repo: ScriptRepository, name: str | None = None
 ) -> uuid.UUID:
-    steps = json.dumps(
-        [
-            {
-                "label": "Step 1",
-                "type": "inline",
-                "command": "echo ok",
-                "on_failure": "stop",
-            }
-        ]
-    )
+    steps = [
+        {
+            "label": "Step 1",
+            "type": "inline",
+            "command": "echo ok",
+            "on_failure": "stop",
+        }
+    ]
     script = await script_repo.create(
         {
             "name": name or f"test_script_{uuid.uuid4().hex[:8]}",
@@ -78,8 +78,8 @@ async def test_create(
             "script_id": script_id,
             "node_id": node_id,
             "status": "running",
-            "params": json.dumps({"key": "value"}),
-            "steps": json.dumps([]),
+            "params": {"key": "value"},
+            "steps": [],
         }
     )
     assert execution.id is not None
@@ -183,7 +183,7 @@ async def test_update(
         execution.id,
         {
             "status": "completed",
-            "steps": json.dumps([{"step_index": 0, "exit_code": 0}]),
+            "steps": [{"step_index": 0, "exit_code": 0}],
         },
     )
     assert updated is not None

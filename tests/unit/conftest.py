@@ -48,6 +48,74 @@ class MockSessionmaker:
         return MockSessionContext(MockSession())
 
 
+def make_orm_node(**overrides: Any) -> Any:
+    """Create a NodeModel with defaults for testing."""
+    import uuid
+    from datetime import UTC, datetime
+
+    from app.models.node import NodeModel
+
+    defaults: dict[str, Any] = {
+        "id": uuid.uuid4(),
+        "name": "server-1",
+        "host": "10.0.0.1",
+        "port": 22,
+        "connection_type": "ssh",
+        "status": "active",
+        "username": "root",
+        "password": None,
+        "ssh_key": None,
+        "tags": [],
+        "created_at": datetime.now(UTC),
+        "updated_at": datetime.now(UTC),
+    }
+    defaults.update(overrides)
+    return NodeModel(**defaults)
+
+
+def make_orm_command(**overrides: Any) -> Any:
+    """Create a CommandModel with defaults for testing."""
+    import uuid
+    from datetime import UTC, datetime
+
+    from app.models.command import CommandModel
+
+    defaults: dict[str, Any] = {
+        "id": uuid.uuid4(),
+        "name": "check_disk",
+        "description": "Check disk usage",
+        "command": "df -h",
+        "parameters": None,
+        "created_at": datetime.now(UTC),
+        "updated_at": datetime.now(UTC),
+    }
+    defaults.update(overrides)
+    return CommandModel(**defaults)
+
+
+def make_response(**overrides: Any) -> Any:
+    """Create a NodeResponse with defaults for testing."""
+    import uuid
+    from datetime import UTC, datetime
+
+    from app.schemas.node import NodeResponse
+
+    defaults: dict[str, Any] = {
+        "id": uuid.uuid4(),
+        "name": "server-1",
+        "host": "10.0.0.1",
+        "port": 22,
+        "connection_type": "ssh",
+        "status": "active",
+        "username": "root",
+        "tags": [],
+        "created_at": datetime.now(UTC),
+        "updated_at": datetime.now(UTC),
+    }
+    defaults.update(overrides)
+    return NodeResponse(**defaults)
+
+
 def setup_test_app_auth(app: Any) -> None:
     """Set up auth mocks on a test app."""
     app.state.sessionmaker = MockSessionmaker()

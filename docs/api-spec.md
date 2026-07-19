@@ -23,13 +23,17 @@ Base URL: `/api/v1`
 
 | Метод | Endpoint | Описание |
 |-------|----------|----------|
-| GET | [`/api/v1/nodes/`](#get-apiv1nodes) | Список нод |
+| GET | [`/api/v1/nodes/`](#get-apiv1nodes) | Список нод (фильтрация, поиск) |
+| GET | [`/api/v1/nodes/tags`](#get-apiv1nodestags) | Все уникальные теги |
 | GET | [`/api/v1/nodes/{node_id}`](#get-apiv1nodesnode_id) | Нода по ID |
 | POST | [`/api/v1/nodes/`](#post-apiv1nodes) | Создать ноду |
 | PUT | [`/api/v1/nodes/{node_id}`](#put-apiv1nodesnode_id) | Обновить ноду |
 | DELETE | [`/api/v1/nodes/{node_id}`](#delete-apiv1nodesnode_id) | Удалить ноду |
+| POST | [`/api/v1/nodes/execute`](#post-apiv1nodesexecute) | Bulk-выполнение команд |
 | POST | [`/api/v1/nodes/{node_id}/check`](#post-apiv1nodesnode_idcheck) | Проверить SSH |
 | POST | [`/api/v1/nodes/{node_id}/execute`](#post-apiv1nodesnode_idexecute) | Выполнить команду |
+| POST | [`/api/v1/nodes/{node_id}/tags`](#post-apiv1nodesnode_idtags) | Добавить тег |
+| DELETE | [`/api/v1/nodes/{node_id}/tags`](#delete-apiv1nodesnode_idtags) | Удалить тег |
 
 ### Commands
 
@@ -74,6 +78,11 @@ Base URL: `/api/v1`
 | [CommandResponse](#commandresponse) | Ответ с данными команды |
 | [CommandExecuteRequest](#commandexecuterequest) | Запрос выполнения команды |
 | [CommandResult](#commandresult) | Результат выполнения |
+| [TagAdd](#tagadd) | Добавление тега |
+| [TagRemove](#tagremove) | Удаление тега |
+| [BulkCommandRequest](#bulkcommandrequest) | Bulk-запрос выполнения команд |
+| [BulkNodeResult](#bulknoderesult) | Результат по одной ноде |
+| [BulkCommandResult](#bulkcommandresult) | Результат bulk-выполнения |
 | [ScriptStep](#scriptstep) | Шаг скрипта |
 | [ScriptCreate](#scriptcreate) | Создание скрипта |
 | [ScriptUpdate](#scriptupdate) | Обновление скрипта |
@@ -130,7 +139,7 @@ X-API-Key: nnk_abc123def456...
 
 ### GET /api/v1/nodes/
 
-Список нод с пагинацией.
+Список нод с пагинацией, фильтрацией по тегам и поиском.
 
 **Query Parameters:**
 
@@ -138,6 +147,16 @@ X-API-Key: nnk_abc123def456...
 |----------|-----|--------------|----------|
 | `page` | int | 1 | Номер страницы (≥1) |
 | `size` | int | 20 | Размер страницы (1–100) |
+| `tags` | string \| null | null | Теги через запятую (AND-фильтр) |
+| `search` | string \| null | null | Поиск по name или host (ILIKE) |
+
+**Примеры:**
+
+```
+GET /api/v1/nodes/?tags=production,web
+GET /api/v1/nodes/?search=web-server
+GET /api/v1/nodes/?tags=production&search=web&page=1&size=10
+```
 
 **Response 200:**
 
@@ -152,6 +171,7 @@ X-API-Key: nnk_abc123def456...
       "connection_type": "ssh",
       "status": "active",
       "username": "admin",
+      "tags": ["production", "web"],
       "created_at": "2025-07-10T12:00:00Z",
       "updated_at": "2025-07-10T12:00:00Z"
     }
@@ -160,6 +180,18 @@ X-API-Key: nnk_abc123def456...
   "page": 1,
   "size": 20
 }
+```
+
+---
+
+### GET /api/v1/nodes/tags
+
+Получение всех уникальных тегов среди всех нод.
+
+**Response 200:**
+
+```json
+["database", "production", "web", "staging"]
 ```
 
 ---
@@ -198,7 +230,8 @@ X-API-Key: nnk_abc123def456...
   "connection_type": "ssh",
   "username": "admin",
   "password": "secret",
-  "ssh_key": "-----BEGIN OPENSSH PRIVATE KEY-----\n..."
+  "ssh_key": "-----BEGIN OPENSSH PRIVATE KEY-----\n...",
+  "tags": ["production", "web"]
 }
 ```
 
@@ -211,6 +244,7 @@ X-API-Key: nnk_abc123def456...
 | `username` | string \| null | нет | Имя пользователя |
 | `password` | string \| null | нет | Пароль (шифруется при сохранении) |
 | `ssh_key` | string \| null | нет | Приватный SSH-ключ (шифруется при сохранении) |
+| `tags` | list[string] | нет (`[]`) | Теги ноды |
 
 **Response 201:** Объект `NodeResponse`.
 
@@ -232,7 +266,7 @@ X-API-Key: nnk_abc123def456...
 {
   "name": "new-name",
   "host": "10.0.0.1",
-  "status": "inactive"
+  "status": "unreachable"
 }
 ```
 
@@ -242,10 +276,11 @@ X-API-Key: nnk_abc123def456...
 | `host` | string \| null | нет | IP или hostname |
 | `port` | int \| null | нет | SSH-порт |
 | `connection_type` | string \| null | нет | Тип подключения |
-| `status` | string \| null | нет | Статус: `active`, `inactive`, `error` |
+| `status` | string \| null | нет | Статус: `active`, `unreachable`, `error` |
 | `username` | string \| null | нет | Имя пользователя |
 | `password` | string \| null | нет | Пароль |
 | `ssh_key` | string \| null | нет | Приватный SSH-ключ |
+| `tags` | list[string] \| null | нет | Теги ноды |
 
 **Response 200:** Объект `NodeResponse`.
 
@@ -277,9 +312,67 @@ X-API-Key: nnk_abc123def456...
 
 ---
 
+### POST /api/v1/nodes/execute
+
+Bulk-выполнение команды на нескольких нодах по ID и/или тегам. Выполнение параллельное.
+
+**Request Body:**
+
+```json
+{
+  "command": "uptime",
+  "node_ids": [
+    "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+  ],
+  "tags": ["production", "web"]
+}
+```
+
+| Поле | Тип | Обязательно | Описание |
+|------|-----|-------------|----------|
+| `command` | string | да | Команда для выполнения (макс. 4096 символов) |
+| `node_ids` | list[UUID] \| null | нет | ID нод (мин. 1) |
+| `tags` | list[string] \| null | нет | Теги для фильтрации нод (мин. 1) |
+
+> Обязательно одно из: `node_ids` или `tags`. Если указаны оба — выполняется пересечение (ноды с указанными ID, у которых есть все указанные теги).
+
+**Response 200:**
+
+```json
+{
+  "command": "uptime",
+  "results": [
+    {
+      "node_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "node_name": "web-server-01",
+      "stdout": " 12:00:00 up 10 days, 3:45, 1 user, load average: 0.00, 0.01, 0.05",
+      "stderr": "",
+      "exit_code": 0
+    }
+  ],
+  "total": 1,
+  "succeeded": 1,
+  "failed": 0
+}
+```
+
+**Response 404:**
+
+```json
+{ "detail": "No nodes matched the given criteria" }
+```
+
+**Response 503:**
+
+```json
+{ "detail": "Connection failed: <error message>" }
+```
+
+---
+
 ### POST /api/v1/nodes/{node_id}/check
 
-Проверка SSH-доступности ноды. Устанавливает статус `active` или `error`.
+Проверка SSH-доступности ноды. Устанавливает статус `active` или `unreachable`.
 
 **Path Parameters:**
 
@@ -345,6 +438,70 @@ X-API-Key: nnk_abc123def456...
 
 ```json
 { "detail": "Connection failed: <error message>" }
+```
+
+---
+
+### POST /api/v1/nodes/{node_id}/tags
+
+Добавление тега к ноде.
+
+**Path Parameters:**
+
+| Параметр | Тип | Описание |
+|----------|-----|----------|
+| `node_id` | UUID | ID ноды |
+
+**Request Body:**
+
+```json
+{
+  "tag": "production"
+}
+```
+
+| Поле | Тип | Обязательно | Описание |
+|------|-----|-------------|----------|
+| `tag` | string | да | Тег (1–100 символов) |
+
+**Response 200:** Объект `NodeResponse` с обновлённым списком тегов.
+
+**Response 404:**
+
+```json
+{ "detail": "Node not found" }
+```
+
+---
+
+### DELETE /api/v1/nodes/{node_id}/tags
+
+Удаление тега у ноды.
+
+**Path Parameters:**
+
+| Параметр | Тип | Описание |
+|----------|-----|----------|
+| `node_id` | UUID | ID ноды |
+
+**Request Body:**
+
+```json
+{
+  "tag": "production"
+}
+```
+
+| Поле | Тип | Обязательно | Описание |
+|------|-----|-------------|----------|
+| `tag` | string | да | Тег для удаления |
+
+**Response 200:** Объект `NodeResponse` с обновлённым списком тегов.
+
+**Response 404:**
+
+```json
+{ "detail": "Node not found" }
 ```
 
 ---
@@ -1028,8 +1185,9 @@ Healthcheck.
 | `host` | string | IP или hostname |
 | `port` | int | Порт |
 | `connection_type` | string | Тип подключения |
-| `status` | string | Статус: `active`, `inactive`, `error` |
+| `status` | string | Статус: `active`, `unreachable`, `error` |
 | `username` | string \| null | Имя пользователя |
+| `tags` | list[string] | Теги ноды |
 | `created_at` | datetime | Время создания |
 | `updated_at` | datetime | Время обновления |
 
@@ -1098,6 +1256,48 @@ Healthcheck.
 | `stdout` | string | Стандартный вывод |
 | `stderr` | string | Стандартный вывод ошибок |
 | `exit_code` | int | Код возврата |
+
+### TagAdd
+
+| Поле | Тип | Обязательно | Описание |
+|------|-----|-------------|----------|
+| `tag` | string | да | Тег (1–100 символов) |
+
+### TagRemove
+
+| Поле | Тип | Обязательно | Описание |
+|------|-----|-------------|----------|
+| `tag` | string | да | Тег для удаления |
+
+### BulkCommandRequest
+
+| Поле | Тип | Обязательно | Описание |
+|------|-----|-------------|----------|
+| `command` | string | да | Команда для выполнения (макс. 4096 символов) |
+| `node_ids` | list[UUID] \| null | нет | ID нод (мин. 1) |
+| `tags` | list[string] \| null | нет | Теги для фильтрации нод (мин. 1) |
+
+> Обязательно одно из: `node_ids` или `tags`.
+
+### BulkNodeResult
+
+| Поле | Тип | Описание |
+|------|-----|----------|
+| `node_id` | UUID | ID ноды |
+| `node_name` | string | Имя ноды |
+| `stdout` | string | Стандартный вывод |
+| `stderr` | string | Стандартный вывод ошибок |
+| `exit_code` | int | Код возврата |
+
+### BulkCommandResult
+
+| Поле | Тип | Описание |
+|------|-----|----------|
+| `command` | string | Выполненная команда |
+| `results` | list[BulkNodeResult] | Результаты по нодам |
+| `total` | int | Общее количество нод |
+| `succeeded` | int | Успешных выполнений |
+| `failed` | int | Неудачных выполнений |
 
 ### ScriptStep
 

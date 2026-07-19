@@ -1,6 +1,5 @@
 """Unit tests for ScriptRepository with in-memory SQLite."""
 
-import json
 import uuid
 from collections.abc import AsyncGenerator
 
@@ -14,6 +13,9 @@ from sqlalchemy.ext.asyncio import (
 )
 
 from app.models.base import Base
+from app.models.node import NodeModel  # noqa: F401
+from app.models.script import ScriptModel  # noqa: F401
+from app.models.script_execution import ScriptExecutionModel  # noqa: F401
 from app.repositories.script_repo import ScriptRepository
 
 
@@ -39,17 +41,15 @@ def repo(session: AsyncSession) -> ScriptRepository:
     return ScriptRepository(session)
 
 
-def _default_steps() -> str:
-    return json.dumps(
-        [
-            {
-                "label": "Check disk",
-                "type": "inline",
-                "command": "df -h",
-                "on_failure": "stop",
-            }
-        ]
-    )
+def _default_steps() -> list[dict]:
+    return [
+        {
+            "label": "Check disk",
+            "type": "inline",
+            "command": "df -h",
+            "on_failure": "stop",
+        }
+    ]
 
 
 def _script_data(**overrides) -> dict:
@@ -103,32 +103,28 @@ async def test_create(repo: ScriptRepository) -> None:
     script = await repo.create(_script_data())
     assert script.id is not None
     assert script.name == "deploy_check"
-    parsed = json.loads(script.steps)
-    assert len(parsed) == 1
-    assert parsed[0]["label"] == "Check disk"
+    assert len(script.steps) == 1
+    assert script.steps[0]["label"] == "Check disk"
 
 
 @pytest.mark.asyncio
 async def test_create_with_multiple_steps(repo: ScriptRepository) -> None:
-    steps = json.dumps(
-        [
-            {
-                "label": "Step 1",
-                "type": "inline",
-                "command": "echo 1",
-                "on_failure": "stop",
-            },
-            {
-                "label": "Step 2",
-                "type": "inline",
-                "command": "echo 2",
-                "on_failure": "continue",
-            },
-        ]
-    )
+    steps = [
+        {
+            "label": "Step 1",
+            "type": "inline",
+            "command": "echo 1",
+            "on_failure": "stop",
+        },
+        {
+            "label": "Step 2",
+            "type": "inline",
+            "command": "echo 2",
+            "on_failure": "continue",
+        },
+    ]
     script = await repo.create(_script_data(steps=steps))
-    parsed = json.loads(script.steps)
-    assert len(parsed) == 2
+    assert len(script.steps) == 2
 
 
 @pytest.mark.asyncio

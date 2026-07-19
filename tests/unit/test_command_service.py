@@ -1,9 +1,6 @@
 """Unit tests for CommandService."""
 
-import json
 import uuid
-from datetime import UTC, datetime
-from typing import Any
 from unittest.mock import AsyncMock, Mock
 
 import pytest
@@ -17,42 +14,7 @@ from app.repositories.command_repo import CommandRepository
 from app.repositories.node_repo import NodeRepository
 from app.schemas.command import CommandCreate, CommandExecuteRequest, CommandUpdate
 from app.services.command_service import CommandService
-
-
-def _make_orm_command(**overrides: Any) -> Any:
-    from app.models.command import CommandModel
-
-    defaults: dict[str, Any] = {
-        "id": uuid.uuid4(),
-        "name": "check_disk",
-        "description": "Check disk usage",
-        "command": "df -h",
-        "parameters": None,
-        "created_at": datetime.now(UTC),
-        "updated_at": datetime.now(UTC),
-    }
-    defaults.update(overrides)
-    return CommandModel(**defaults)
-
-
-def _make_orm_node(**overrides: Any) -> Any:
-    from app.models.node import NodeModel
-
-    defaults: dict[str, Any] = {
-        "id": uuid.uuid4(),
-        "name": "server-1",
-        "host": "10.0.0.1",
-        "port": 22,
-        "connection_type": "ssh",
-        "status": "active",
-        "username": "root",
-        "password": None,
-        "ssh_key": None,
-        "created_at": datetime.now(UTC),
-        "updated_at": datetime.now(UTC),
-    }
-    defaults.update(overrides)
-    return NodeModel(**defaults)
+from tests.unit.conftest import make_orm_command, make_orm_node
 
 
 @pytest.fixture
@@ -73,7 +35,7 @@ def service(cmd_repo: AsyncMock, node_repo: AsyncMock) -> CommandService:
 class TestGetCommand:
     @pytest.mark.asyncio
     async def test_found(self, service: CommandService, cmd_repo: AsyncMock) -> None:
-        orm_cmd = _make_orm_command()
+        orm_cmd = make_orm_command()
         cmd_repo.get_by_id.return_value = orm_cmd
         result = await service.get_command(orm_cmd.id)
         assert result.name == "check_disk"
@@ -90,7 +52,7 @@ class TestGetCommand:
 class TestCreateCommand:
     @pytest.mark.asyncio
     async def test_create(self, service: CommandService, cmd_repo: AsyncMock) -> None:
-        orm_cmd = _make_orm_command()
+        orm_cmd = make_orm_command()
         cmd_repo.create.return_value = orm_cmd
         data = CommandCreate(name="check_disk", command="df -h")
         result = await service.create_command(data)
@@ -101,7 +63,7 @@ class TestCreateCommand:
 class TestDeleteCommand:
     @pytest.mark.asyncio
     async def test_delete(self, service: CommandService, cmd_repo: AsyncMock) -> None:
-        orm_cmd = _make_orm_command()
+        orm_cmd = make_orm_command()
         cmd_repo.get_by_id.return_value = orm_cmd
         cmd_repo.delete.return_value = True
         result = await service.delete_command(orm_cmd.id)
@@ -121,7 +83,7 @@ class TestGetAllCommands:
     async def test_returns_list(
         self, service: CommandService, cmd_repo: AsyncMock
     ) -> None:
-        orm_cmds = [_make_orm_command(), _make_orm_command()]
+        orm_cmds = [make_orm_command(), make_orm_command()]
         cmd_repo.get_all.return_value = orm_cmds
         cmd_repo.count.return_value = 2
         commands, total = await service.get_all_commands()
@@ -144,7 +106,7 @@ class TestUpdateCommand:
     async def test_update_name(
         self, service: CommandService, cmd_repo: AsyncMock
     ) -> None:
-        orm_cmd = _make_orm_command()
+        orm_cmd = make_orm_command()
         cmd_repo.update.return_value = orm_cmd
         data = CommandUpdate(name="new-name")
         result = await service.update_command(orm_cmd.id, data)
@@ -155,7 +117,7 @@ class TestUpdateCommand:
         self, service: CommandService, cmd_repo: AsyncMock
     ) -> None:
         params = [{"name": "mount_point", "type": "string", "required": True}]
-        orm_cmd = _make_orm_command(parameters=json.dumps(params))
+        orm_cmd = make_orm_command(parameters=params)
         cmd_repo.update.return_value = orm_cmd
         data = CommandUpdate(parameters=params)
         result = await service.update_command(orm_cmd.id, data)
@@ -178,10 +140,10 @@ class TestExecuteCommand:
         cmd_repo: AsyncMock,
         node_repo: AsyncMock,
     ) -> None:
-        orm_cmd = _make_orm_command()
+        orm_cmd = make_orm_command()
         cmd_repo.get_by_id.return_value = orm_cmd
 
-        orm_node = _make_orm_node()
+        orm_node = make_orm_node()
         node_repo.get_by_id.return_value = orm_node
 
         connector = AsyncMock()
@@ -223,7 +185,7 @@ class TestExecuteCommand:
         cmd_repo: AsyncMock,
         node_repo: AsyncMock,
     ) -> None:
-        orm_cmd = _make_orm_command()
+        orm_cmd = make_orm_command()
         cmd_repo.get_by_id.return_value = orm_cmd
         node_repo.get_by_id.return_value = None
 
@@ -243,10 +205,10 @@ class TestExecuteCommand:
         cmd_repo: AsyncMock,
         node_repo: AsyncMock,
     ) -> None:
-        orm_cmd = _make_orm_command()
+        orm_cmd = make_orm_command()
         cmd_repo.get_by_id.return_value = orm_cmd
 
-        orm_node = _make_orm_node()
+        orm_node = make_orm_node()
         node_repo.get_by_id.return_value = orm_node
 
         connector = AsyncMock()
@@ -272,13 +234,13 @@ class TestExecuteCommand:
         node_repo: AsyncMock,
     ) -> None:
         params = [{"name": "service", "type": "string", "required": True}]
-        orm_cmd = _make_orm_command(
+        orm_cmd = make_orm_command(
             command="systemctl restart {service}",
-            parameters=json.dumps(params),
+            parameters=params,
         )
         cmd_repo.get_by_id.return_value = orm_cmd
 
-        orm_node = _make_orm_node()
+        orm_node = make_orm_node()
         node_repo.get_by_id.return_value = orm_node
 
         connector = AsyncMock()

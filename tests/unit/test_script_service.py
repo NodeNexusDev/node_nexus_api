@@ -1,6 +1,5 @@
 """Unit tests for ScriptService."""
 
-import json
 import uuid
 from datetime import UTC, datetime
 from typing import Any
@@ -24,6 +23,7 @@ from app.schemas.script import (
     ScriptUpdate,
 )
 from app.services.script_service import ScriptService
+from tests.unit.conftest import make_orm_command, make_orm_node
 
 
 def _make_orm_script(**overrides: Any) -> Any:
@@ -41,32 +41,12 @@ def _make_orm_script(**overrides: Any) -> Any:
         "id": uuid.uuid4(),
         "name": "deploy_check",
         "description": "Pre-deploy check",
-        "steps": json.dumps(steps),
+        "steps": steps,
         "created_at": datetime.now(UTC),
         "updated_at": datetime.now(UTC),
     }
     defaults.update(overrides)
     return ScriptModel(**defaults)
-
-
-def _make_orm_node(**overrides: Any) -> Any:
-    from app.models.node import NodeModel
-
-    defaults: dict[str, Any] = {
-        "id": uuid.uuid4(),
-        "name": "server-1",
-        "host": "10.0.0.1",
-        "port": 22,
-        "connection_type": "ssh",
-        "status": "active",
-        "username": "root",
-        "password": None,
-        "ssh_key": None,
-        "created_at": datetime.now(UTC),
-        "updated_at": datetime.now(UTC),
-    }
-    defaults.update(overrides)
-    return NodeModel(**defaults)
 
 
 def _make_orm_execution(**overrides: Any) -> Any:
@@ -76,42 +56,22 @@ def _make_orm_execution(**overrides: Any) -> Any:
         "id": uuid.uuid4(),
         "script_id": uuid.uuid4(),
         "node_id": uuid.uuid4(),
-        "params": json.dumps({"key": "value"}),
+        "params": {"key": "value"},
         "status": "completed",
-        "steps": json.dumps(
-            [
-                {
-                    "step_index": 0,
-                    "label": "Step 1",
-                    "stdout": "ok",
-                    "stderr": "",
-                    "exit_code": 0,
-                }
-            ]
-        ),
+        "steps": [
+            {
+                "step_index": 0,
+                "label": "Step 1",
+                "stdout": "ok",
+                "stderr": "",
+                "exit_code": 0,
+            }
+        ],
         "started_at": datetime.now(UTC),
         "finished_at": datetime.now(UTC),
     }
     defaults.update(overrides)
     return ScriptExecutionModel(**defaults)
-
-
-def _make_orm_command(**overrides: Any) -> Any:
-    from app.models.command import CommandModel
-
-    defaults: dict[str, Any] = {
-        "id": uuid.uuid4(),
-        "name": "check_disk",
-        "description": "Check disk",
-        "command": "df -h {mount_point}",
-        "parameters": json.dumps(
-            [{"name": "mount_point", "type": "string", "required": True}]
-        ),
-        "created_at": datetime.now(UTC),
-        "updated_at": datetime.now(UTC),
-    }
-    defaults.update(overrides)
-    return CommandModel(**defaults)
 
 
 @pytest.fixture
@@ -239,7 +199,7 @@ class TestUpdateScript:
     ) -> None:
         new_steps = [ScriptStep(label="New step", type="inline", command="echo 1")]
         orm_script = _make_orm_script(
-            steps=json.dumps([s.model_dump(mode="json") for s in new_steps])
+            steps=[s.model_dump(mode="json") for s in new_steps]
         )
         script_repo.update.return_value = orm_script
         data = ScriptUpdate(steps=new_steps)
@@ -271,7 +231,7 @@ class TestGetExecutions:
         exec_repo.count_by_script_id.return_value = 1
         executions, total = await service.get_executions(orm_script.id)
         assert total == 1
-        assert executions[0]["status"] == "completed"
+        assert executions[0].status == "completed"
 
     @pytest.mark.asyncio
     async def test_script_not_found(
@@ -294,7 +254,7 @@ class TestExecuteScript:
         orm_script = _make_orm_script()
         script_repo.get_by_id.return_value = orm_script
 
-        orm_node = _make_orm_node()
+        orm_node = make_orm_node()
         node_repo.get_by_id.return_value = orm_node
 
         execution = _make_orm_execution(script_id=orm_script.id, node_id=orm_node.id)
@@ -369,7 +329,7 @@ class TestExecuteScript:
         orm_script = _make_orm_script()
         script_repo.get_by_id.return_value = orm_script
 
-        orm_node = _make_orm_node()
+        orm_node = make_orm_node()
         node_repo.get_by_id.return_value = orm_node
 
         execution = _make_orm_execution(script_id=orm_script.id, node_id=orm_node.id)
@@ -415,10 +375,10 @@ class TestExecuteScript:
                 "on_failure": "stop",
             },
         ]
-        orm_script = _make_orm_script(steps=json.dumps(steps))
+        orm_script = _make_orm_script(steps=steps)
         script_repo.get_by_id.return_value = orm_script
 
-        orm_node = _make_orm_node()
+        orm_node = make_orm_node()
         node_repo.get_by_id.return_value = orm_node
 
         execution = _make_orm_execution(script_id=orm_script.id, node_id=orm_node.id)
@@ -465,10 +425,10 @@ class TestExecuteScript:
                 "on_failure": "stop",
             },
         ]
-        orm_script = _make_orm_script(steps=json.dumps(steps))
+        orm_script = _make_orm_script(steps=steps)
         script_repo.get_by_id.return_value = orm_script
 
-        orm_node = _make_orm_node()
+        orm_node = make_orm_node()
         node_repo.get_by_id.return_value = orm_node
 
         execution = _make_orm_execution(script_id=orm_script.id, node_id=orm_node.id)
@@ -507,8 +467,8 @@ class TestExecuteScript:
         orm_script = _make_orm_script()
         script_repo.get_by_id.return_value = orm_script
 
-        node1 = _make_orm_node(name="node-1")
-        node2 = _make_orm_node(name="node-2")
+        node1 = make_orm_node(name="node-1")
+        node2 = make_orm_node(name="node-2")
         node_repo.get_by_id.side_effect = [node1, node2]
 
         exec_repo.create.return_value = _make_orm_execution(
@@ -558,7 +518,10 @@ class TestResolveCommand:
     async def test_command_reference(
         self, service: ScriptService, cmd_repo: AsyncMock
     ) -> None:
-        orm_cmd = _make_orm_command()
+        orm_cmd = make_orm_command(
+            command="df -h {mount_point}",
+            parameters=[{"name": "mount_point", "type": "string", "required": True}],
+        )
         cmd_repo.get_by_id.return_value = orm_cmd
         step = ScriptStep(
             label="Step",
