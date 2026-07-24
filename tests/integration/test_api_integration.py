@@ -21,7 +21,9 @@ from sqlalchemy.ext.asyncio import (
 from app.api.v1.health import router as health_router
 from app.api.v1.nodes import router as nodes_router
 from app.models.base import Base
+from app.repositories.api_key_repo import APIKeyRepository
 from app.repositories.node_repo import NodeRepository
+from app.services.api_key_service import APIKeyService
 from app.services.node_service import NodeService
 
 MASTER_KEY = "test-master-key"
@@ -61,8 +63,16 @@ class IntegrationDbProvider(Provider):
         return NodeRepository(session)
 
     @provide(scope=Scope.REQUEST)
+    def get_api_key_repo(self, session: AsyncSession) -> APIKeyRepository:
+        return APIKeyRepository(session)
+
+    @provide(scope=Scope.REQUEST)
     def get_service(self, repo: NodeRepository) -> NodeService:
         return NodeService(repository=repo)
+
+    @provide(scope=Scope.REQUEST)
+    def get_api_key_service(self, repo: APIKeyRepository) -> APIKeyService:
+        return APIKeyService(repository=repo)
 
 
 def _mock_settings(master_key: str = "") -> MagicMock:
@@ -82,7 +92,6 @@ async def integration_client(
     app.include_router(health_router)
     app.include_router(nodes_router, prefix="/api/v1")
     setup_dishka(container, app)
-    app.state.sessionmaker = sessionmaker
 
     with patch("app.api.deps.get_settings", return_value=_mock_settings(MASTER_KEY)):
         async with AsyncClient(

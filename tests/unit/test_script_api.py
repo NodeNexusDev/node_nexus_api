@@ -27,7 +27,7 @@ from app.schemas.script import (
     ScriptStepResult,
 )
 from app.services.script_service import ScriptService
-from tests.unit.conftest import MockSessionmaker, _mock_settings
+from tests.unit.conftest import MockAuthServiceProvider, _mock_settings
 
 
 def _make_step_result(**overrides: Any) -> ScriptStepResult:
@@ -76,14 +76,13 @@ def _create_test_app(service: ScriptService | AsyncMock) -> FastAPI:
     app = FastAPI()
     app.include_router(health_router)
     app.include_router(scripts_router, prefix="/api/v1")
-    app.state.sessionmaker = MockSessionmaker()
 
     class MockServiceProvider(Provider):
         @provide(scope=Scope.REQUEST)
         def get_service(self) -> ScriptService:
             return service
 
-    container = make_async_container(MockServiceProvider())
+    container = make_async_container(MockServiceProvider(), MockAuthServiceProvider())
     setup_dishka(container, app)
     return app
 

@@ -72,18 +72,6 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     await _run_migrations()
     logger.info("migrations.applied")
 
-    # Store sessionmaker in app state for auth dependency
-    from sqlalchemy.ext.asyncio import (
-        AsyncSession,
-        async_sessionmaker,
-        create_async_engine,
-    )
-
-    engine = create_async_engine(settings.DATABASE_URL)
-    app.state.sessionmaker = async_sessionmaker(
-        engine, class_=AsyncSession, expire_on_commit=False
-    )
-
     yield
 
     await container.close()

@@ -21,10 +21,12 @@ from sqlalchemy.ext.asyncio import (
 from app.api.v1.health import router as health_router
 from app.api.v1.scripts import router as scripts_router
 from app.models.base import Base
+from app.repositories.api_key_repo import APIKeyRepository
 from app.repositories.command_repo import CommandRepository
 from app.repositories.node_repo import NodeRepository
 from app.repositories.script_execution_repo import ScriptExecutionRepository
 from app.repositories.script_repo import ScriptRepository
+from app.services.api_key_service import APIKeyService
 from app.services.script_service import ScriptService
 
 MASTER_KEY = "test-master-key"
@@ -76,6 +78,10 @@ class IntegrationDbProvider(Provider):
         return ScriptExecutionRepository(session)
 
     @provide(scope=Scope.REQUEST)
+    def get_api_key_repo(self, session: AsyncSession) -> APIKeyRepository:
+        return APIKeyRepository(session)
+
+    @provide(scope=Scope.REQUEST)
     def get_service(
         self,
         script_repo: ScriptRepository,
@@ -89,6 +95,10 @@ class IntegrationDbProvider(Provider):
             node_repository=node_repo,
             execution_repository=exec_repo,
         )
+
+    @provide(scope=Scope.REQUEST)
+    def get_api_key_service(self, repo: APIKeyRepository) -> APIKeyService:
+        return APIKeyService(repository=repo)
 
 
 def _mock_settings(master_key: str = "") -> MagicMock:
@@ -108,7 +118,6 @@ async def integration_client(
     app.include_router(health_router)
     app.include_router(scripts_router, prefix="/api/v1")
     setup_dishka(container, app)
-    app.state.sessionmaker = sessionmaker
 
     with patch("app.api.deps.get_settings", return_value=_mock_settings(MASTER_KEY)):
         async with AsyncClient(

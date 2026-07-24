@@ -3,22 +3,21 @@
 import hmac
 
 import structlog
-from fastapi import HTTPException, Request, Security
+from dishka.integrations.fastapi import FromDishka, inject
+from fastapi import HTTPException, Security
 from fastapi.security import APIKeyHeader
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.core.config import get_settings
-from app.core.security import hash_api_key
-from app.models.api_key import APIKeyModel
+from app.services.api_key_service import APIKeyService
 
 audit = structlog.get_logger("audit")
 
 API_KEY_HEADER = APIKeyHeader(name="X-API-Key", auto_error=False)
 
 
+@inject
 async def get_current_api_key(
-    request: Request,
+    api_key_service: FromDishka[APIKeyService],
     api_key: str | None = Security(API_KEY_HEADER),
 ) -> str:
     """Validate API key from X-API-Key header.
@@ -36,21 +35,5 @@ async def get_current_api_key(
         audit.info("auth.master_key_used")
         return "master"
 
-    # Get sessionmaker from app state (set up by dishka)
-    sessionmaker: async_sessionmaker[AsyncSession] = request.app.state.sessionmaker
-    async with sessionmaker() as session:
-        async with session.begin():
-            key_hash = hash_api_key(api_key)
-            result = await session.execute(
-                select(APIKeyModel).where(APIKeyModel.key_hash == key_hash)
-            )
-            model = result.scalar_one_or_none()
-            if model is None:
-                raise HTTPException(status_code=401, detail="Invalid API key")
-            if not model.is_active:
-                raise HTTPException(status_code=401, detail="API key has been revoked")
-            from datetime import UTC, datetime
-
-            model.last_used_at = datetime.now(UTC)
-            await session.flush()
-            return api_key[:12]
+    await api_key_service.validate_api_key(api_key)
+    return api_key[:12]

@@ -1,6 +1,7 @@
 """Integration tests for API key authentication with in-memory SQLite."""
 
 from collections.abc import AsyncGenerator
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -79,6 +80,14 @@ def _mock_settings(master_key: str = "") -> MagicMock:
 
 
 def _create_app(sessionmaker: async_sessionmaker[AsyncSession]) -> FastAPI:
+    from fastapi.responses import JSONResponse
+
+    from app.core.exceptions import (
+        APIKeyNotFoundError,
+        APIKeyRevokedError,
+        DomainError,
+    )
+
     provider = IntegrationAuthProvider(sessionmaker)
     container = make_async_container(provider)
 
@@ -87,7 +96,16 @@ def _create_app(sessionmaker: async_sessionmaker[AsyncSession]) -> FastAPI:
     app.include_router(nodes_router, prefix="/api/v1")
     app.include_router(api_keys_router, prefix="/api/v1")
     setup_dishka(container, app)
-    app.state.sessionmaker = sessionmaker
+
+    @app.exception_handler(DomainError)
+    async def _domain_error_handler(request: Any, exc: DomainError) -> JSONResponse:
+        _error_status_map: dict[type[DomainError], int] = {
+            APIKeyNotFoundError: 401,
+            APIKeyRevokedError: 401,
+        }
+        status_code = _error_status_map.get(type(exc), 422)
+        return JSONResponse(status_code=status_code, content={"detail": str(exc)})
+
     app.state._container = container
     return app
 
