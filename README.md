@@ -57,6 +57,7 @@ docker compose up -d --build
 | `DEBUG` | Режим отладки | false |
 | `PORT` | Порт сервера | 8000 |
 | `CORS_ORIGINS` | Разрешённые origins | `["http://localhost:3000"]` |
+| `ENCRYPTION_SALT` | Соль для HKDF (шифрование) | `node-nexus-ssh-v1` |
 
 ## Тесты
 
@@ -107,6 +108,7 @@ app/
 │   ├── config.py           # Конфигурация (Pydantic Settings)
 │   ├── exceptions.py       # Доменные исключения
 │   ├── security.py         # AES-256-GCM шифрование
+│   ├── ssh_utils.py        # Общие SSH-утилиты
 │   ├── logging.py          # Structured logging (structlog)
 │   ├── template.py         # Рендер команд с параметрами
 │   └── connectors/

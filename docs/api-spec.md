@@ -29,7 +29,7 @@ Base URL: `/api/v1`
 | POST | [`/api/v1/nodes/`](#post-apiv1nodes) | Создать ноду |
 | PUT | [`/api/v1/nodes/{node_id}`](#put-apiv1nodesnode_id) | Обновить ноду |
 | DELETE | [`/api/v1/nodes/{node_id}`](#delete-apiv1nodesnode_id) | Удалить ноду |
-| POST | [`/api/v1/nodes/execute`](#post-apiv1nodesexecute) | Bulk-выполнение команд |
+| POST | [`/api/v1/nodes/bulk/execute`](#post-apiv1nodesbulkexecute) | Bulk-выполнение команд |
 | POST | [`/api/v1/nodes/{node_id}/check`](#post-apiv1nodesnode_idcheck) | Проверить SSH |
 | POST | [`/api/v1/nodes/{node_id}/execute`](#post-apiv1nodesnode_idexecute) | Выполнить команду |
 | POST | [`/api/v1/nodes/{node_id}/tags`](#post-apiv1nodesnode_idtags) | Добавить тег |
@@ -312,7 +312,7 @@ GET /api/v1/nodes/?tags=production&search=web&page=1&size=10
 
 ---
 
-### POST /api/v1/nodes/execute
+### POST /api/v1/nodes/bulk/execute
 
 Bulk-выполнение команды на нескольких нодах по ID и/или тегам. Выполнение параллельное.
 
