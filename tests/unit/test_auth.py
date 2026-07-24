@@ -143,4 +143,4 @@ class TestAuthValidKey:
         client = TestClient(app, raise_server_exceptions=False)
         response = client.get("/test", headers={"X-API-Key": "nnk_validkey123456"})
         assert response.status_code == 200
-        assert response.json()["key"] == "nnk_validkey"
+        assert response.json()["key"] == "nnk_vali"

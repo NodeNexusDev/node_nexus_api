@@ -3,7 +3,7 @@
 import uuid
 
 import structlog
-from dishka.integrations.fastapi import FromDishka, inject
+from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
 from fastapi import APIRouter, HTTPException, Query, Security
 
 from app.api.deps import get_current_api_key
@@ -24,7 +24,7 @@ from app.services.node_service import NodeService
 
 audit = structlog.get_logger("audit")
 
-router = APIRouter(prefix="/nodes", tags=["nodes"])
+router = APIRouter(prefix="/nodes", tags=["nodes"], route_class=DishkaRoute)
 
 
 @router.get("/", response_model=PaginatedResponse[NodeResponse])
@@ -40,9 +40,8 @@ async def get_nodes(
     """Get all nodes with pagination, optional tag filtering and search."""
     tag_list = [t.strip() for t in tags.split(",")] if tags else None
     audit.info("api.nodes.list", page=page, size=size, tags=tag_list, search=search)
-    skip = (page - 1) * size
     nodes, total = await service.get_all_nodes(
-        skip=skip, limit=size, tags=tag_list, search=search
+        page=page, size=size, tags=tag_list, search=search
     )
     return PaginatedResponse(items=nodes, total=total, page=page, size=size)
 

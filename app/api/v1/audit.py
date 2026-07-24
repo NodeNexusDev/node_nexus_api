@@ -3,7 +3,7 @@
 import uuid
 
 import structlog
-from dishka.integrations.fastapi import FromDishka, inject
+from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
 from fastapi import APIRouter, Query, Security
 
 from app.api.deps import get_current_api_key
@@ -13,7 +13,7 @@ from app.services.audit_service import AuditService
 
 audit = structlog.get_logger("audit")
 
-router = APIRouter(prefix="/audit", tags=["audit"])
+router = APIRouter(prefix="/audit", tags=["audit"], route_class=DishkaRoute)
 
 
 @router.get("/", response_model=PaginatedResponse[AuditLogResponse])

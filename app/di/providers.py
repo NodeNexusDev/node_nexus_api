@@ -5,7 +5,7 @@ from collections.abc import AsyncIterable
 from dishka import Provider, Scope, provide
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from app.core.config import Settings
+from app.core.config import Settings, get_settings
 from app.core.connectors.ssh import SSHConnectorFactory
 from app.repositories.api_key_repo import APIKeyRepository
 from app.repositories.audit_repo import AuditLogRepository
@@ -154,7 +154,7 @@ class ConfigProvider(Provider):
     @provide(scope=Scope.APP)
     def get_settings(self) -> Settings:
         """Get application settings."""
-        return Settings()  # type: ignore[call-arg]
+        return get_settings()
 
 
 class AppProvider(

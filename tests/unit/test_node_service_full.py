@@ -144,17 +144,25 @@ class TestDeleteNode:
 
 class TestDecryptValue:
     def test_none_returns_none(self) -> None:
-        assert NodeService._decrypt_value(None) is None
+        from app.core.ssh_utils import decrypt_value
+
+        assert decrypt_value(None) is None
 
     def test_empty_string_returns_empty(self) -> None:
-        assert NodeService._decrypt_value("") == ""
+        from app.core.ssh_utils import decrypt_value
+
+        assert decrypt_value("") == ""
 
     def test_encrypted_value_decrypts(self) -> None:
+        from app.core.ssh_utils import decrypt_value
+
         token = encrypt("secret")
-        assert NodeService._decrypt_value(token) == "secret"
+        assert decrypt_value(token) == "secret"
 
     def test_non_encrypted_value_returns_as_is(self) -> None:
-        assert NodeService._decrypt_value("plain-text") == "plain-text"
+        from app.core.ssh_utils import decrypt_value
+
+        assert decrypt_value("plain-text") == "plain-text"
 
 
 class TestCheckConnectivityEdgeCases:
@@ -195,7 +203,7 @@ class TestGetAllNodesFiltering:
         assert len(result_nodes) == 1
         assert total == 1
         repo.get_filtered.assert_called_once_with(
-            tags=["prod"], search=None, skip=0, limit=100
+            tags=["prod"], search=None, skip=0, limit=20
         )
 
     @pytest.mark.asyncio
@@ -208,7 +216,7 @@ class TestGetAllNodesFiltering:
         assert result_nodes == []
         assert total == 0
         repo.get_filtered.assert_called_once_with(
-            tags=None, search="web", skip=0, limit=100
+            tags=None, search="web", skip=0, limit=20
         )
 
     @pytest.mark.asyncio

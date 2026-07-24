@@ -2,12 +2,12 @@
 
 from typing import Annotated
 
-from dishka.integrations.fastapi import inject
+from dishka.integrations.fastapi import DishkaRoute, inject
 from fastapi import APIRouter, Security
 
 from app.api.deps import get_current_api_key
 
-router = APIRouter()
+router = APIRouter(route_class=DishkaRoute)
 
 
 @router.get("/health")

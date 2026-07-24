@@ -20,7 +20,7 @@ from app.core.exceptions import (
     ScriptNotFoundError,
     TemplateRenderError,
 )
-from app.core.security import decrypt
+from app.core.ssh_utils import decrypt_value, get_connector_factory
 from app.core.template import render_command
 from app.repositories.script_execution_repo import ScriptExecutionRepository
 from app.repositories.script_repo import ScriptRepository
@@ -75,10 +75,11 @@ class ScriptService:
         return self._to_response(script)
 
     async def get_all_scripts(
-        self, skip: int = 0, limit: int = 100
+        self, page: int = 1, size: int = 20
     ) -> tuple[list[ScriptResponse], int]:
         """Get all scripts with total count."""
-        scripts = await self._repository.get_all(skip=skip, limit=limit)
+        skip = (page - 1) * size
+        scripts = await self._repository.get_all(skip=skip, limit=size)
         total = await self._repository.count()
         return [self._to_response(s) for s in scripts], total
 
@@ -113,15 +114,16 @@ class ScriptService:
         return True
 
     async def get_executions(
-        self, script_id: UUID, skip: int = 0, limit: int = 50
+        self, script_id: UUID, page: int = 1, size: int = 20
     ) -> tuple[list[ScriptExecutionResponse], int]:
         """Get execution history for a script."""
         script = await self._repository.get_by_id(script_id)
         if script is None:
             raise ScriptNotFoundError(f"Script {script_id} not found")
 
+        skip = (page - 1) * size
         executions = await self._execution_repository.get_by_script_id(
-            script_id, skip=skip, limit=limit
+            script_id, skip=skip, limit=size
         )
         total = await self._execution_repository.count_by_script_id(script_id)
         return [ScriptExecutionResponse.model_validate(e) for e in executions], total
@@ -143,7 +145,14 @@ class ScriptService:
                     script_id, steps, node_id, data.params
                 )
                 node_results.append(result)
-            except Exception:
+            except Exception as exc:
+                audit.error(
+                    "script.execute.node_failed",
+                    script_id=str(script_id),
+                    node_id=str(node_id),
+                    error_type=type(exc).__name__,
+                    error=str(exc),
+                )
                 node_results.append(
                     ScriptNodeResult(
                         execution_id=UUID(int=0),
@@ -186,9 +195,9 @@ class ScriptService:
         final_status = "completed"
 
         try:
-            password = self._decrypt_value(node.password)
-            ssh_key = self._decrypt_value(node.ssh_key)
-            connector = self._get_connector_factory().create_ssh(
+            password = decrypt_value(node.password)
+            ssh_key = decrypt_value(node.ssh_key)
+            connector = get_connector_factory(self._connector_factory).create_ssh(
                 host=node.host,
                 port=node.port,
                 username=node.username,
@@ -275,20 +284,6 @@ class ScriptService:
             return render_command(command.command, parameters, merged_params)
 
         raise TemplateRenderError(f"Unknown step type: {step.type}")
-
-    @staticmethod
-    def _decrypt_value(value: str | None) -> str | None:
-        if not value:
-            return value
-        try:
-            return decrypt(value)
-        except Exception:
-            return value
-
-    def _get_connector_factory(self) -> ConnectorFactory:
-        if self._connector_factory is None:
-            raise RuntimeError("ConnectorFactory not configured")
-        return self._connector_factory
 
     @staticmethod
     def _to_response(script: Any) -> ScriptResponse:

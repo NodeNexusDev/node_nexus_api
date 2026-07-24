@@ -109,7 +109,7 @@ class TestGetNodes:
         mock_service.get_all_nodes.return_value = ([], 0)
         await client.get("/api/v1/nodes?page=2&size=10")
         mock_service.get_all_nodes.assert_called_once_with(
-            skip=10, limit=10, tags=None, search=None
+            page=2, size=10, tags=None, search=None
         )
 
     async def test_filter_by_tags(
@@ -118,7 +118,7 @@ class TestGetNodes:
         mock_service.get_all_nodes.return_value = ([], 0)
         await client.get("/api/v1/nodes?tags=prod,web")
         mock_service.get_all_nodes.assert_called_once_with(
-            skip=0, limit=20, tags=["prod", "web"], search=None
+            page=1, size=20, tags=["prod", "web"], search=None
         )
 
     async def test_filter_by_search(
@@ -127,7 +127,7 @@ class TestGetNodes:
         mock_service.get_all_nodes.return_value = ([], 0)
         await client.get("/api/v1/nodes?search=web")
         mock_service.get_all_nodes.assert_called_once_with(
-            skip=0, limit=20, tags=None, search="web"
+            page=1, size=20, tags=None, search="web"
         )
 
     async def test_filter_by_tags_and_search(
@@ -136,7 +136,7 @@ class TestGetNodes:
         mock_service.get_all_nodes.return_value = ([], 0)
         await client.get("/api/v1/nodes?tags=prod&search=web")
         mock_service.get_all_nodes.assert_called_once_with(
-            skip=0, limit=20, tags=["prod"], search="web"
+            page=1, size=20, tags=["prod"], search="web"
         )
 
 

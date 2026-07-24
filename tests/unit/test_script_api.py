@@ -135,7 +135,7 @@ class TestGetScripts:
     ) -> None:
         mock_service.get_all_scripts.return_value = ([], 0)
         await client.get("/api/v1/scripts?page=2&size=10")
-        mock_service.get_all_scripts.assert_called_once_with(skip=10, limit=10)
+        mock_service.get_all_scripts.assert_called_once_with(page=2, size=10)
 
 
 # --- GET /scripts/{id} ---
@@ -324,6 +324,4 @@ class TestGetExecutions:
         mock_service.get_executions.return_value = ([], 0)
         script_id = uuid.uuid4()
         await client.get(f"/api/v1/scripts/{script_id}/executions?page=2&size=10")
-        mock_service.get_executions.assert_called_once_with(
-            script_id, skip=10, limit=10
-        )
+        mock_service.get_executions.assert_called_once_with(script_id, page=2, size=10)

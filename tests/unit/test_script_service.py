@@ -550,12 +550,7 @@ class TestResolveCommand:
 
 class TestConnectorFactoryNotConfigured:
     def test_raises_runtime_error(self) -> None:
-        service = ScriptService(
-            repository=AsyncMock(),
-            command_repository=AsyncMock(),
-            node_repository=AsyncMock(),
-            execution_repository=AsyncMock(),
-            connector_factory=None,
-        )
+        from app.core.ssh_utils import get_connector_factory
+
         with pytest.raises(RuntimeError, match="ConnectorFactory not configured"):
-            service._get_connector_factory()
+            get_connector_factory(None)

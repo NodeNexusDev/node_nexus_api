@@ -36,4 +36,4 @@ async def get_current_api_key(
         return "master"
 
     await api_key_service.validate_api_key(api_key)
-    return api_key[:12]
+    return api_key[:8]
