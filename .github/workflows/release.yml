@@ -1,8 +1,7 @@
 name: Release
 
 on:
-  pull_request:
-    types: [closed]
+  push:
     branches: [main]
 
 permissions:
@@ -13,26 +12,27 @@ env:
 
 jobs:
   release:
-    if: github.event.pull_request.merged == true
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
-      - name: Find tag on merged commit
+      - name: Find version tag in pushed commits
         id: find_tag
         run: |
-          HEAD_SHA="${{ github.event.pull_request.merge_commit_sha }}"
-          TAG=$(git tag --points-at "$HEAD_SHA" | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1)
-          if [ -z "$TAG" ]; then
-            echo "No version tag found on merge commit, skipping release"
-            echo "skip=true" >> $GITHUB_OUTPUT
-          else
-            echo "Found tag: $TAG"
-            echo "tag=$TAG" >> $GITHUB_OUTPUT
-            echo "skip=false" >> $GITHUB_OUTPUT
-          fi
+          # Check each commit in the push for a version tag
+          for SHA in $(git rev-list ${{ github.event.before }}..${{ github.sha }}); do
+            TAG=$(git tag --points-at "$SHA" 2>/dev/null | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1)
+            if [ -n "$TAG" ]; then
+              echo "Found tag: $TAG on commit $SHA"
+              echo "tag=$TAG" >> $GITHUB_OUTPUT
+              echo "skip=false" >> $GITHUB_OUTPUT
+              exit 0
+            fi
+          done
+          echo "No version tag found in pushed commits, skipping release"
+          echo "skip=true" >> $GITHUB_OUTPUT
 
       - name: Set image tag
         if: steps.find_tag.outputs.skip == 'false'
