@@ -11,7 +11,7 @@ dependencies = [
     "cryptography>=49.0.0",
     "dishka>=1.10.1",
     "fastapi>=0.139.0",
-    "httpx>=0.28.1",
+    "httpx2>=2.9.1",
     "pydantic>=2.13.4",
     "pydantic-settings>=2.14.2",
     "sqlalchemy>=2.0.51",
@@ -22,6 +22,8 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "aiosqlite>=0.22.1",
+    "bandit>=1.8.0",
+    "pip-audit>=2.7.0",
     "pre-commit>=4.0.0",
     "ty>=0.0.59",
     "pytest>=9.1.1",
@@ -50,6 +52,9 @@ addopts = '-m "not docker"'
 markers = [
     "docker: tests requiring running Docker infrastructure (PostgreSQL, SSH)",
 ]
+filterwarnings = [
+    "ignore::DeprecationWarning:starlette",
+]
 
 [tool.coverage.run]
 source = ["app"]
@@ -61,9 +66,4 @@ exclude_lines = [
     "pragma: no cover",
     "if TYPE_CHECKING:",
     "if __name__ == .__main__.",
-]
-
-[dependency-groups]
-dev = [
-    "ty>=0.0.59",
 ]

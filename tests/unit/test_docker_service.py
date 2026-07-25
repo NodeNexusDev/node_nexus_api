@@ -439,6 +439,24 @@ class TestListNetworks:
         assert len(result) == 1
         assert result[0].name == "bridge"
 
+    async def test_non_docker_node_raises(
+        self, service: DockerService, repo: AsyncMock, ssh_node: Any
+    ) -> None:
+        with pytest.raises(DockerError, match="is not a Docker node"):
+            await service.list_networks(ssh_node.id)
+
+    async def test_empty_output(
+        self,
+        service: DockerService,
+        repo: AsyncMock,
+        mock_factory: MagicMock,
+        docker_node: Any,
+    ) -> None:
+        mock_connector = mock_factory.create_ssh.return_value
+        mock_connector.execute_command.return_value = ("", "", 0)
+        result = await service.list_networks(docker_node.id)
+        assert result == []
+
 
 class TestListVolumes:
     async def test_returns_volumes(
@@ -458,6 +476,84 @@ class TestListVolumes:
         result = await service.list_volumes(docker_node.id)
         assert len(result) == 1
         assert result[0].name == "myvolume"
+
+    async def test_non_docker_node_raises(
+        self, service: DockerService, repo: AsyncMock, ssh_node: Any
+    ) -> None:
+        with pytest.raises(DockerError, match="is not a Docker node"):
+            await service.list_volumes(ssh_node.id)
+
+    async def test_empty_output(
+        self,
+        service: DockerService,
+        repo: AsyncMock,
+        mock_factory: MagicMock,
+        docker_node: Any,
+    ) -> None:
+        mock_connector = mock_factory.create_ssh.return_value
+        mock_connector.execute_command.return_value = ("", "", 0)
+        result = await service.list_volumes(docker_node.id)
+        assert result == []
+
+
+class TestListImages:
+    async def test_returns_images(
+        self,
+        service: DockerService,
+        repo: AsyncMock,
+        mock_factory: MagicMock,
+        docker_node: Any,
+    ) -> None:
+        image_data = {
+            "Repository": "nginx",
+            "Tag": "latest",
+            "ID": "abc123def456",
+            "Size": "187MB",
+            "CreatedAt": "2025-07-01 00:00:00 +0000 UTC",
+        }
+        mock_connector = mock_factory.create_ssh.return_value
+        mock_connector.execute_command.return_value = (
+            json.dumps(image_data),
+            "",
+            0,
+        )
+        result = await service.list_images(docker_node.id)
+        assert len(result) == 1
+        assert result[0].repository == "nginx"
+
+    async def test_non_docker_node_raises(
+        self, service: DockerService, repo: AsyncMock, ssh_node: Any
+    ) -> None:
+        with pytest.raises(DockerError, match="is not a Docker node"):
+            await service.list_images(ssh_node.id)
+
+    async def test_empty_output(
+        self,
+        service: DockerService,
+        repo: AsyncMock,
+        mock_factory: MagicMock,
+        docker_node: Any,
+    ) -> None:
+        mock_connector = mock_factory.create_ssh.return_value
+        mock_connector.execute_command.return_value = ("", "", 0)
+        result = await service.list_images(docker_node.id)
+        assert result == []
+
+    async def test_docker_error(
+        self,
+        service: DockerService,
+        repo: AsyncMock,
+        mock_factory: MagicMock,
+        docker_node: Any,
+    ) -> None:
+        mock_connector = mock_factory.create_ssh.return_value
+        mock_connector.execute_command.return_value = (
+            "",
+            "Cannot connect to the Docker daemon",
+            1,
+        )
+        with pytest.raises(DockerDaemonError):
+            await service.list_images(docker_node.id)
 
 
 class TestRestartContainer:

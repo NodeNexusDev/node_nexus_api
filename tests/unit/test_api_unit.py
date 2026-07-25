@@ -10,7 +10,7 @@ import pytest
 from dishka import Provider, Scope, make_async_container, provide
 from dishka.integrations.fastapi import setup_dishka
 from fastapi import FastAPI
-from httpx import ASGITransport, AsyncClient
+from httpx2 import ASGITransport, AsyncClient
 
 from app.api.v1.health import router as health_router
 from app.api.v1.nodes import router as nodes_router

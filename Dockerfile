@@ -38,6 +38,6 @@ USER appuser
 EXPOSE 8000
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=5)" || exit 1
+    CMD python -c "import urllib.request, os; req = urllib.request.Request('http://localhost:8000/health', headers={'X-API-Key': os.environ.get('MASTER_API_KEY','')}); urllib.request.urlopen(req, timeout=5)" || exit 1
 
 CMD ["python", "main.py"]

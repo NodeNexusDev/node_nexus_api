@@ -6,7 +6,7 @@ They do NOT require a real Docker daemon - they test the API layer only.
 
 import uuid
 
-import httpx
+import httpx2 as httpx
 import pytest
 
 from tests.e2e.conftest import ServicePorts
