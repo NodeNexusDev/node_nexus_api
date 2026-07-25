@@ -37,6 +37,10 @@ class APIKeyRevokedError(DomainError):
     """Raised when an API key has been revoked."""
 
 
+class APIKeyExpiredError(DomainError):
+    """Raised when an API key has expired."""
+
+
 class TagNotFoundError(DomainError):
     """Raised when a tag is not found on a node."""
 
@@ -59,3 +63,7 @@ class DockerDaemonError(DockerError):
 
 class DockerValidationError(DockerError):
     """Raised when Docker command parameters are invalid."""
+
+
+class RequestTimeoutError(DomainError):
+    """Raised when a request exceeds the configured timeout."""

@@ -149,3 +149,32 @@ class DockerVolume(BaseModel):
     name: str = Field(alias="Name")
 
     model_config = {"populate_by_name": True}
+
+
+class BulkDockerRequest(BaseModel):
+    """Request for bulk Docker operations on multiple nodes."""
+
+    node_ids: list[str] = Field(min_length=1)
+    container_id: str = Field(min_length=1, max_length=255)
+    timeout: int | None = Field(default=None, ge=1, le=300)
+    command: str | None = Field(default=None, min_length=1, max_length=4096)
+
+
+class BulkDockerNodeResult(BaseModel):
+    """Result of a Docker operation on a single node."""
+
+    node_id: str
+    node_name: str
+    status: str  # "success" or "error"
+    output: str = ""
+    error: str = ""
+
+
+class BulkDockerResponse(BaseModel):
+    """Response for bulk Docker operations."""
+
+    action: str
+    results: list[BulkDockerNodeResult]
+    total: int
+    succeeded: int
+    failed: int

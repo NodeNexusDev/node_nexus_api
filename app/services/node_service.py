@@ -22,7 +22,11 @@ from app.schemas.node import (
     BulkNodeResult,
     CommandRequest,
     CommandResult,
+    CpuMetrics,
+    DiskMetrics,
+    MemoryMetrics,
     NodeCreate,
+    NodeMetrics,
     NodeResponse,
     NodeUpdate,
     TagAdd,
@@ -219,12 +223,19 @@ class NodeService:
 
         password = decrypt_value(node.password)
         ssh_key = decrypt_value(node.ssh_key)
+
+        connector_kwargs = {
+            "host": node_response.host,
+            "port": node_response.port,
+            "username": node_response.username,
+            "password": password,
+            "ssh_key": ssh_key,
+        }
+        if data.timeout is not None:
+            connector_kwargs["timeout"] = data.timeout
+
         connector = get_connector_factory(self._connector_factory).create_ssh(
-            host=node_response.host,
-            port=node_response.port,
-            username=node_response.username,
-            password=password,
-            ssh_key=ssh_key,
+            **connector_kwargs,
         )
 
         try:
@@ -275,6 +286,105 @@ class NodeService:
             )
             raise ConnectionFailedError(
                 f"Failed to execute command on node {node_id}: {exc}"
+            ) from exc
+
+    async def get_node_metrics(self, node_id: UUID) -> NodeMetrics:
+        """Get system metrics from a node via SSH."""
+        node_response = await self.get_node(node_id)
+        node = await self._repository.get_by_id(node_id)
+        if node is None:
+            raise NodeNotFoundError(f"Node {node_id} not found")
+
+        password = decrypt_value(node.password)
+        ssh_key = decrypt_value(node.ssh_key)
+        connector = get_connector_factory(self._connector_factory).create_ssh(
+            host=node_response.host,
+            port=node_response.port,
+            username=node_response.username,
+            password=password,
+            ssh_key=ssh_key,
+        )
+
+        try:
+            async with connector:
+                # Get CPU info
+                cpu_cmd = "top -bn1 | grep 'Cpu(s)' | awk '{print $2}'"
+                cpu_stdout, _, _ = await connector.execute_command(cpu_cmd)
+                cpu_usage = float(cpu_stdout.strip()) if cpu_stdout.strip() else 0.0
+
+                cores_cmd = "nproc"
+                cores_stdout, _, _ = await connector.execute_command(cores_cmd)
+                cores = int(cores_stdout.strip()) if cores_stdout.strip() else 1
+
+                # Get memory info
+                mem_cmd = "free -b | awk '/Mem:/ {print $2, $3, $4}'"
+                mem_stdout, _, _ = await connector.execute_command(mem_cmd)
+                mem_parts = mem_stdout.strip().split()
+                if len(mem_parts) >= 3:
+                    mem_total = int(mem_parts[0])
+                    mem_used = int(mem_parts[1])
+                    mem_percent = (mem_used / mem_total * 100) if mem_total > 0 else 0.0
+                else:
+                    mem_total = 0
+                    mem_used = 0
+                    mem_percent = 0.0
+
+                # Get disk info
+                disk_cmd = "df -B1 / | awk 'NR==2 {print $2, $3, $4}'"
+                disk_stdout, _, _ = await connector.execute_command(disk_cmd)
+                disk_parts = disk_stdout.strip().split()
+                if len(disk_parts) >= 3:
+                    disk_total = int(disk_parts[0])
+                    disk_used = int(disk_parts[1])
+                    disk_percent = (
+                        (disk_used / disk_total * 100) if disk_total > 0 else 0.0
+                    )
+                else:
+                    disk_total = 0
+                    disk_used = 0
+                    disk_percent = 0.0
+
+                # Get uptime
+                uptime_cmd = "uptime -s"
+                uptime_stdout, _, _ = await connector.execute_command(uptime_cmd)
+                uptime_since = (
+                    uptime_stdout.strip() if uptime_stdout.strip() else "unknown"
+                )
+
+            audit.info(
+                "node.metrics.collected",
+                node_id=str(node_id),
+            )
+            return NodeMetrics(
+                cpu=CpuMetrics(usage_percent=cpu_usage, cores=cores),
+                memory=MemoryMetrics(
+                    total_bytes=mem_total,
+                    used_bytes=mem_used,
+                    percent=round(mem_percent, 2),
+                ),
+                disk=DiskMetrics(
+                    total_bytes=disk_total,
+                    used_bytes=disk_used,
+                    percent=round(disk_percent, 2),
+                ),
+                uptime_since=uptime_since,
+            )
+        except ConnectionFailedError as exc:
+            audit.error(
+                "node.metrics.failed",
+                node_id=str(node_id),
+                error=str(exc),
+            )
+            raise
+        except Exception as exc:
+            audit.error(
+                "node.metrics.unexpected_error",
+                node_id=str(node_id),
+                error_type=type(exc).__name__,
+                error=str(exc),
+            )
+            raise ConnectionFailedError(
+                f"Failed to collect metrics from node {node_id}: {exc}"
             ) from exc
 
     async def bulk_execute_command(self, data: BulkCommandRequest) -> BulkCommandResult:

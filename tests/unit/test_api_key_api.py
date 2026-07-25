@@ -23,8 +23,10 @@ def _make_api_key_response(**overrides: Any) -> APIKeyResponse:
         "name": "test-key",
         "key_prefix": "nnk_abcd",
         "is_active": True,
+        "scope": "read-write",
         "created_at": datetime.now(UTC),
         "last_used_at": None,
+        "expires_at": None,
     }
     defaults.update(overrides)
     return APIKeyResponse(**defaults)

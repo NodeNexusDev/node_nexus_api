@@ -115,3 +115,59 @@ class TestGetAuditLogs:
         mock_service.get_logs.assert_called_once_with(
             node_id=None, action=None, page=3, size=10
         )
+
+
+# --- DELETE /api/v1/audit tests ---
+
+
+class TestDeleteAuditLogs:
+    async def test_delete_requires_master_key(self, mock_service: AsyncMock) -> None:
+        """DELETE /audit requires master key."""
+        app = _create_test_app(mock_service)
+        with patch(
+            "app.api.deps.get_settings", return_value=_mock_settings("test-master")
+        ):
+            async with AsyncClient(
+                transport=ASGITransport(app=app),
+                base_url="http://test",
+                headers={"X-API-Key": "nnk_not_master_key"},
+            ) as client:
+                resp = await client.delete("/api/v1/audit/?confirm=yes")
+        assert resp.status_code == 403
+        assert "master key" in resp.json()["detail"].lower()
+
+    async def test_delete_requires_confirm(self, mock_service: AsyncMock) -> None:
+        """DELETE /audit without confirm=yes returns 422."""
+        app = _create_test_app(mock_service)
+        with patch(
+            "app.api.deps.get_settings", return_value=_mock_settings("test-master")
+        ):
+            async with AsyncClient(
+                transport=ASGITransport(app=app),
+                base_url="http://test",
+                headers={"X-API-Key": "test-master"},
+            ) as client:
+                resp = await client.delete("/api/v1/audit/")
+        assert resp.status_code == 422
+        assert "confirm=yes" in resp.json()["detail"]
+
+    async def test_delete_with_master_key_and_confirm(
+        self, mock_service: AsyncMock
+    ) -> None:
+        """DELETE /audit with master key and confirm=yes succeeds."""
+        mock_service.delete_all_logs.return_value = 10
+
+        app = _create_test_app(mock_service)
+        with patch(
+            "app.api.deps.get_settings", return_value=_mock_settings("test-master")
+        ):
+            async with AsyncClient(
+                transport=ASGITransport(app=app),
+                base_url="http://test",
+                headers={"X-API-Key": "test-master"},
+            ) as client:
+                resp = await client.delete("/api/v1/audit/?confirm=yes")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["deleted_count"] == 10
+        mock_service.delete_all_logs.assert_called_once()

@@ -75,12 +75,12 @@ class ScriptService:
         return self._to_response(script)
 
     async def get_all_scripts(
-        self, page: int = 1, size: int = 20
+        self, page: int = 1, size: int = 20, tags: list[str] | None = None
     ) -> tuple[list[ScriptResponse], int]:
         """Get all scripts with total count."""
         skip = (page - 1) * size
-        scripts = await self._repository.get_all(skip=skip, limit=size)
-        total = await self._repository.count()
+        scripts = await self._repository.get_all(skip=skip, limit=size, tags=tags)
+        total = await self._repository.count(tags=tags)
         return [self._to_response(s) for s in scripts], total
 
     async def create_script(self, data: ScriptCreate) -> ScriptResponse:
@@ -293,6 +293,7 @@ class ScriptService:
             name=script.name,
             description=script.description,
             steps=steps,
+            tags=script.tags or [],
             created_at=script.created_at,
             updated_at=script.updated_at,
         )

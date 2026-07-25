@@ -32,6 +32,7 @@ def _make_command(**overrides: Any) -> CommandResponse:
         "description": "Check disk usage",
         "command": "df -h",
         "parameters": None,
+        "tags": [],
         "created_at": datetime.now(UTC),
         "updated_at": datetime.now(UTC),
     }
@@ -102,7 +103,9 @@ class TestGetCommands:
     ) -> None:
         mock_service.get_all_commands.return_value = ([], 0)
         await client.get("/api/v1/commands?page=2&size=10")
-        mock_service.get_all_commands.assert_called_once_with(page=2, size=10)
+        mock_service.get_all_commands.assert_called_once_with(
+            page=2, size=10, tags=None
+        )
 
 
 # --- GET /commands/{id} ---

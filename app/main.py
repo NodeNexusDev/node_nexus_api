@@ -15,7 +15,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from alembic import command as alembic_command
-from app.api.middleware import RequestLoggingMiddleware
+from app.api.middleware import (
+    RateLimitMiddleware,
+    RequestLoggingMiddleware,
+    TimeoutMiddleware,
+)
 from app.api.v1.api_keys import router as api_keys_router
 from app.api.v1.audit import router as audit_router
 from app.api.v1.commands import router as commands_router
@@ -25,6 +29,7 @@ from app.api.v1.nodes import router as nodes_router
 from app.api.v1.scripts import router as scripts_router
 from app.core.config import get_settings
 from app.core.exceptions import (
+    APIKeyExpiredError,
     APIKeyNotFoundError,
     APIKeyRevokedError,
     AuthenticationError,
@@ -37,6 +42,7 @@ from app.core.exceptions import (
     DomainError,
     ImageNotFoundError,
     NodeNotFoundError,
+    RequestTimeoutError,
     ScriptNotFoundError,
     TagNotFoundError,
     TemplateRenderError,
@@ -71,6 +77,30 @@ async def _run_migrations() -> None:
     await asyncio.to_thread(_run_migrations_sync)
 
 
+async def _cleanup_audit_logs() -> None:
+    """Cleanup old audit logs on startup."""
+    settings = get_settings()
+    if settings.AUDIT_LOG_RETENTION_DAYS <= 0:
+        return
+
+    try:
+        async with container() as request_container:
+            from app.services.audit_service import AuditService
+
+            audit_service = await request_container.get(AuditService)
+            deleted = await audit_service.cleanup_old_logs(
+                settings.AUDIT_LOG_RETENTION_DAYS
+            )
+            if deleted > 0:
+                logger.info(
+                    "audit.cleanup.startup",
+                    deleted=deleted,
+                    retention_days=settings.AUDIT_LOG_RETENTION_DAYS,
+                )
+    except Exception:
+        logger.warning("audit.cleanup.startup.failed")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Application lifespan manager."""
@@ -79,6 +109,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     logger.info("app.startup")
     await _run_migrations()
     logger.info("migrations.applied")
+    await _cleanup_audit_logs()
 
     yield
 
@@ -118,6 +149,12 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
     app.add_middleware(RequestLoggingMiddleware)
+    app.add_middleware(TimeoutMiddleware, timeout=settings.REQUEST_TIMEOUT)
+    app.add_middleware(
+        RateLimitMiddleware,
+        requests=settings.RATE_LIMIT_REQUESTS,
+        window=settings.RATE_LIMIT_WINDOW,
+    )
 
     @app.middleware("http")
     async def _security_headers(request: Request, call_next):  # noqa: ANN001
@@ -140,6 +177,7 @@ def create_app() -> FastAPI:
             ScriptNotFoundError: 404,
             APIKeyNotFoundError: 401,
             APIKeyRevokedError: 401,
+            APIKeyExpiredError: 401,
             AuthenticationError: 401,
             TagNotFoundError: 404,
             ConnectionFailedError: 503,
@@ -149,6 +187,7 @@ def create_app() -> FastAPI:
             ImageNotFoundError: 404,
             DockerDaemonError: 503,
             DockerValidationError: 422,
+            RequestTimeoutError: 504,
         }
         status_code = _error_status_map.get(type(exc), 422)
         return JSONResponse(

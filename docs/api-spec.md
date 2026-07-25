@@ -35,6 +35,7 @@ Base URL: `/api/v1`
 | POST | [`/api/v1/nodes/bulk/execute`](#post-apiv1nodesbulkexecute) | Bulk-выполнение команд |
 | POST | [`/api/v1/nodes/{node_id}/check`](#post-apiv1nodesnode_idcheck) | Проверить SSH |
 | POST | [`/api/v1/nodes/{node_id}/execute`](#post-apiv1nodesnode_idexecute) | Выполнить команду |
+| GET | [`/api/v1/nodes/{node_id}/metrics`](#get-apiv1nodesnode_idmetrics) | Системные метрики |
 | POST | [`/api/v1/nodes/{node_id}/tags`](#post-apiv1nodesnode_idtags) | Добавить тег |
 | DELETE | [`/api/v1/nodes/{node_id}/tags`](#delete-apiv1nodesnode_idtags) | Удалить тег |
 
@@ -67,6 +68,7 @@ Base URL: `/api/v1`
 |-------|----------|----------|
 | POST | [`/api/v1/api-keys/`](#post-apiv1api-keys) | Создать API ключ |
 | GET | [`/api/v1/api-keys/`](#get-apiv1api-keys) | Список API ключей |
+| PATCH | [`/api/v1/api-keys/{key_id}`](#patch-apiv1api-keyskey_id) | Обновить API ключ |
 | DELETE | [`/api/v1/api-keys/{key_id}`](#delete-apiv1api-keyskey_id) | Отозвать API ключ |
 
 ### Docker
@@ -86,6 +88,10 @@ Base URL: `/api/v1`
 | POST | [`/api/v1/nodes/{node_id}/docker/images/pull`](#post-apiv1nodesnode_iddockerimagespull) | Скачать образ |
 | GET | [`/api/v1/nodes/{node_id}/docker/networks`](#get-apiv1nodesnode_iddockernetworks) | Список сетей |
 | GET | [`/api/v1/nodes/{node_id}/docker/volumes`](#get-apiv1nodesnode_iddockervolumes) | Список томов |
+| POST | `/api/v1/nodes/{node_id}/docker/bulk/start` | Bulk-запуск контейнеров |
+| POST | `/api/v1/nodes/{node_id}/docker/bulk/stop` | Bulk-остановка контейнеров |
+| POST | `/api/v1/nodes/{node_id}/docker/bulk/restart` | Bulk-перезапуск контейнеров |
+| POST | `/api/v1/nodes/{node_id}/docker/bulk/exec` | Bulk-выполнение команд |
 
 ### Схемы
 
@@ -474,6 +480,64 @@ Bulk-выполнение команды на нескольких нодах п
 
 ---
 
+### GET /api/v1/nodes/{node_id}/metrics
+
+Получение системных метрик ноды (CPU, память, диск) через SSH.
+
+**Path Parameters:**
+
+| Параметр | Тип | Описание |
+|----------|-----|----------|
+| `node_id` | UUID | ID ноды |
+
+**Response 200:**
+
+```json
+{
+  "cpu": {
+    "usage_percent": 23.4,
+    "cores": 4
+  },
+  "memory": {
+    "total_bytes": 8589934592,
+    "used_bytes": 4294967296,
+    "percent": 50.0
+  },
+  "disk": {
+    "total_bytes": 107374182400,
+    "used_bytes": 53687091200,
+    "percent": 50.0
+  },
+  "uptime_since": "2026-01-15 10:30:00"
+}
+```
+
+| Поле | Тип | Описание |
+|------|-----|----------|
+| `cpu.usage_percent` | float | Использование CPU (0–100) |
+| `cpu.cores` | int | Количество ядер |
+| `memory.total_bytes` | int | Общий объём памяти (байты) |
+| `memory.used_bytes` | int | Используемая память (байты) |
+| `memory.percent` | float | Процент использования памяти |
+| `disk.total_bytes` | int | Общий объём диска (байты) |
+| `disk.used_bytes` | int | Используемый объём диска (байты) |
+| `disk.percent` | float | Процент использования диска |
+| `uptime_since` | string | Время запуска системы (ISO 8601) |
+
+**Response 404:**
+
+```json
+{ "detail": "Node not found" }
+```
+
+**Response 503:**
+
+```json
+{ "detail": "Connection failed: <error message>" }
+```
+
+---
+
 ### POST /api/v1/nodes/{node_id}/tags
 
 Добавление тега к ноде.
@@ -589,6 +653,7 @@ Bulk-выполнение команды на нескольких нодах п
 |----------|-----|--------------|----------|
 | `page` | int | 1 | Номер страницы (≥1) |
 | `size` | int | 20 | Размер страницы (1–100) |
+| `tag` | string \| null | null | Фильтр по тегу (AND) |
 
 **Response 200:**
 
@@ -802,6 +867,7 @@ Bulk-выполнение команды на нескольких нодах п
 |----------|-----|--------------|----------|
 | `page` | int | 1 | Номер страницы (≥1) |
 | `size` | int | 20 | Размер страницы (1–100) |
+| `tag` | string \| null | null | Фильтр по тегу (AND) |
 
 **Response 200:**
 
@@ -1168,6 +1234,59 @@ Bulk-выполнение команды на нескольких нодах п
   ],
   "total": 3
 }
+```
+
+---
+
+### PATCH /api/v1/api-keys/{key_id}
+
+Обновление API ключа (имя, активность, scope, срок действия).
+
+**Path Parameters:**
+
+| Параметр | Тип | Описание |
+|----------|-----|----------|
+| `key_id` | UUID | ID ключа |
+
+**Request Body:**
+
+```json
+{
+  "name": "new-name",
+  "is_active": false,
+  "scope": "read-only",
+  "expires_at": "2026-12-31T23:59:59Z"
+}
+```
+
+| Поле | Тип | Обязательно | Описание |
+|------|-----|-------------|----------|
+| `name` | string \| null | нет | Имя ключа (1–255 символов) |
+| `is_active` | bool \| null | нет | Активен ли ключ |
+| `scope` | string \| null | нет | Scope: `read-only` или `read-write` |
+| `expires_at` | datetime \| null | нет | Дата и время истечения ключа |
+
+> Все поля опциональны. Обновляются только переданные поля.
+
+**Response 200:**
+
+```json
+{
+  "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "name": "new-name",
+  "key_prefix": "nnk_dYU4",
+  "is_active": false,
+  "scope": "read-only",
+  "created_at": "2025-07-10T12:00:00Z",
+  "last_used_at": null,
+  "expires_at": "2026-12-31T23:59:59Z"
+}
+```
+
+**Response 404:**
+
+```json
+{ "detail": "API key not found" }
 ```
 
 ---
@@ -1573,13 +1692,42 @@ Base URL для Docker: `/api/v1/nodes/{node_id}/docker`
 
 ### GET /health
 
-Healthcheck.
+Liveness probe — проверяет, что процесс работает. Не требует аутентификации (для Kubernetes liveness probes).
 
 **Response 200:**
 
 ```json
-{ "status": "healthy" }
+{ "status": "healthy", "version": "0.4.0" }
 ```
+
+| Поле | Тип | Описание |
+|------|-----|----------|
+| `status` | string | Статус: `healthy` |
+| `version` | string | Версия приложения |
+
+---
+
+### GET /ready
+
+Readiness probe — проверяет доступность базы данных. Не требует аутентификации (для Kubernetes readiness probes).
+
+**Response 200:**
+
+```json
+{ "status": "ready", "checks": { "database": "ok" } }
+```
+
+**Response 503:**
+
+```json
+{ "status": "not_ready", "checks": { "database": "error" } }
+```
+
+| Поле | Тип | Описание |
+|------|-----|----------|
+| `status` | string | Статус: `ready` или `not_ready` |
+| `checks` | object | Результаты проверок |
+| `checks.database` | string | `ok` или `error` |
 
 ---
 
@@ -1629,6 +1777,7 @@ Healthcheck.
 | `description` | string \| null | нет | Описание |
 | `command` | string | да | Шаблон команды с `{placeholder}` |
 | `parameters` | list[CommandParameter] | нет | Параметры шаблона |
+| `tags` | list[string] | нет | Теги команды |
 
 ### CommandUpdate
 
@@ -1638,6 +1787,7 @@ Healthcheck.
 | `description` | string \| null | нет | Описание |
 | `command` | string \| null | нет | Шаблон команды |
 | `parameters` | list[CommandParameter] \| null | нет | Параметры |
+| `tags` | list[string] \| null | нет | Теги команды |
 
 ### CommandResponse
 
@@ -1648,6 +1798,7 @@ Healthcheck.
 | `description` | string \| null | Описание |
 | `command` | string | Шаблон команды |
 | `parameters` | list[CommandParameter] \| null | Параметры |
+| `tags` | list[string] | Теги команды |
 | `created_at` | datetime | Время создания |
 | `updated_at` | datetime | Время обновления |
 
@@ -1726,6 +1877,7 @@ Healthcheck.
 | `name` | string | да | Имя скрипта |
 | `description` | string \| null | нет | Описание |
 | `steps` | list[ScriptStep] | да | Шаги скрипта (мин. 1) |
+| `tags` | list[string] | нет | Теги скрипта |
 
 ### ScriptUpdate
 
@@ -1734,6 +1886,7 @@ Healthcheck.
 | `name` | string \| null | нет | Имя скрипта |
 | `description` | string \| null | нет | Описание |
 | `steps` | list[ScriptStep] | нет | Шаги скрипта |
+| `tags` | list[string] \| null | нет | Теги скрипта |
 
 ### ScriptResponse
 
@@ -1743,6 +1896,7 @@ Healthcheck.
 | `name` | string | Имя скрипта |
 | `description` | string \| null | Описание |
 | `steps` | list[ScriptStep] | Шаги скрипта |
+| `tags` | list[string] | Теги скрипта |
 | `created_at` | datetime | Время создания |
 | `updated_at` | datetime | Время обновления |
 

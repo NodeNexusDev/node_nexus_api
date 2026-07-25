@@ -56,6 +56,7 @@ def _make_script(**overrides: Any) -> ScriptResponse:
                 "on_failure": "stop",
             }
         ],
+        "tags": [],
         "created_at": datetime.now(UTC),
         "updated_at": datetime.now(UTC),
     }
@@ -135,7 +136,7 @@ class TestGetScripts:
     ) -> None:
         mock_service.get_all_scripts.return_value = ([], 0)
         await client.get("/api/v1/scripts?page=2&size=10")
-        mock_service.get_all_scripts.assert_called_once_with(page=2, size=10)
+        mock_service.get_all_scripts.assert_called_once_with(page=2, size=10, tags=None)
 
 
 # --- GET /scripts/{id} ---

@@ -22,14 +22,23 @@ class CommandRepository(IRepository[CommandModel]):
         )
         return result.scalar_one_or_none()
 
-    async def get_all(self, skip: int = 0, limit: int = 100) -> list[CommandModel]:
-        result = await self._session.execute(
-            select(CommandModel).offset(skip).limit(limit)
-        )
+    async def get_all(
+        self, skip: int = 0, limit: int = 100, tags: list[str] | None = None
+    ) -> list[CommandModel]:
+        query = select(CommandModel)
+        if tags:
+            for tag in tags:
+                query = query.where(CommandModel.tags.op("@>")([tag]))
+        query = query.offset(skip).limit(limit)
+        result = await self._session.execute(query)
         return list(result.scalars().all())
 
-    async def count(self) -> int:
-        result = await self._session.execute(select(func.count(CommandModel.id)))
+    async def count(self, tags: list[str] | None = None) -> int:
+        query = select(func.count(CommandModel.id))
+        if tags:
+            for tag in tags:
+                query = query.where(CommandModel.tags.op("@>")([tag]))
+        result = await self._session.execute(query)
         return result.scalar_one()
 
     async def create(self, data: dict[str, Any]) -> CommandModel:

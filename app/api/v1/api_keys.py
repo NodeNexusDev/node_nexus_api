@@ -8,7 +8,13 @@ from fastapi import APIRouter, HTTPException, Query, Security
 
 from app.api.deps import get_current_api_key
 from app.core.exceptions import APIKeyNotFoundError
-from app.schemas.api_key import APIKeyCreate, APIKeyCreated, APIKeyList
+from app.schemas.api_key import (
+    APIKeyCreate,
+    APIKeyCreated,
+    APIKeyList,
+    APIKeyResponse,
+    APIKeyUpdate,
+)
 from app.services.api_key_service import APIKeyService
 
 audit = structlog.get_logger("audit")
@@ -39,6 +45,22 @@ async def list_api_keys(
     """List all API keys."""
     audit.info("api.api_keys.list", page=page, size=size)
     return await service.list_api_keys(page=page, size=size)
+
+
+@router.patch("/{key_id}", response_model=APIKeyResponse)
+@inject
+async def update_api_key(
+    key_id: uuid.UUID,
+    data: APIKeyUpdate,
+    service: FromDishka[APIKeyService],
+    _key: str = Security(get_current_api_key),
+) -> APIKeyResponse:
+    """Update an API key (name, is_active, scope, expires_at)."""
+    audit.info("api.api_keys.update", key_id=str(key_id))
+    try:
+        return await service.update_api_key(key_id, data)
+    except APIKeyNotFoundError:
+        raise HTTPException(status_code=404, detail="API key not found")
 
 
 @router.delete("/{key_id}", status_code=204)
