@@ -3,6 +3,8 @@
 import asyncio
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from importlib.metadata import PackageNotFoundError
+from importlib.metadata import version as pkg_version
 
 import structlog
 from alembic.config import Config as AlembicConfig
@@ -87,10 +89,14 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 def create_app() -> FastAPI:
     """Create and configure the FastAPI application."""
     settings = get_settings()
+    try:
+        app_version = pkg_version("node-nexus-api")
+    except PackageNotFoundError:
+        app_version = "0.3.0"
     app = FastAPI(
         title="Node Nexus API",
         description="REST API для управления серверными нодами с SSH-подключениями",
-        version="0.2.1",
+        version=app_version,
         lifespan=lifespan,
         openapi_tags=[
             {"name": "nodes", "description": "CRUD-операции и SSH-команды для нод"},

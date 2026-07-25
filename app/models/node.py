@@ -1,12 +1,12 @@
 """Node database model."""
 
 import uuid
-from datetime import UTC, datetime
+from datetime import datetime
 
 from sqlalchemy import ARRAY, JSON, DateTime, Index, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.models.base import Base
+from app.models.base import Base, _utcnow
 
 
 def _default_port() -> int:
@@ -15,10 +15,6 @@ def _default_port() -> int:
 
 def _default_status() -> str:
     return "active"
-
-
-def _utcnow() -> datetime:
-    return datetime.now(UTC)
 
 
 class NodeModel(Base):

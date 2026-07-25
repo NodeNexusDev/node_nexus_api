@@ -9,7 +9,7 @@ import pytest
 from dishka import Provider, Scope, make_async_container, provide
 from dishka.integrations.fastapi import setup_dishka
 from fastapi import FastAPI
-from httpx import ASGITransport, AsyncClient
+from httpx2 import ASGITransport, AsyncClient
 
 from app.api.v1.api_keys import router as api_keys_router
 from app.core.exceptions import APIKeyNotFoundError

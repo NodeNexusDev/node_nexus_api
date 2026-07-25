@@ -25,7 +25,7 @@
 
 ```bash
 # 1. Клонировать
-git clone <repo-url>
+git clone https://github.com/NodeNexusDev/node_nexus_api.git
 cd node_nexus_api
 
 # 2. Создать .env
@@ -78,6 +78,8 @@ uv run uvicorn app.main:app --reload
 Multi-stage сборка на базе `python:3.13-slim`, пользователь `appuser`.
 
 В образ **не попадают**: `.env`, `.git`, `tests/`, credentials.
+
+Healthcheck использует `MASTER_API_KEY` из переменных окружения для аутентификации запроса к `/health`. При запуске через `docker compose` ключ передаётся автоматически из `.env`.
 
 ---
 

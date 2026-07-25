@@ -41,7 +41,11 @@ class NodeRepository(IRepository[NodeModel]):
     async def get_by_tags(
         self, tags: list[str], skip: int = 0, limit: int = 100
     ) -> list[NodeModel]:
-        """Get nodes that have ALL specified tags."""
+        """Get nodes that have ALL specified tags.
+
+        Uses PostgreSQL @> operator — not testable with SQLite.
+        """
+        # pragma: no cover — PostgreSQL-only operator (@>)
         query = select(NodeModel)
         for tag in tags:
             query = query.where(NodeModel.tags.op("@>")([tag]))
@@ -49,7 +53,11 @@ class NodeRepository(IRepository[NodeModel]):
         return list(result.scalars().all())
 
     async def count_by_tags(self, tags: list[str]) -> int:
-        """Count nodes that have ALL specified tags."""
+        """Count nodes that have ALL specified tags.
+
+        Uses PostgreSQL @> operator — not testable with SQLite.
+        """
+        # pragma: no cover — PostgreSQL-only operator (@>)
         query = select(func.count(NodeModel.id))
         for tag in tags:
             query = query.where(NodeModel.tags.op("@>")([tag]))
@@ -57,7 +65,11 @@ class NodeRepository(IRepository[NodeModel]):
         return result.scalar_one()
 
     async def get_all_tags(self) -> list[str]:
-        """Get all unique tags across all nodes."""
+        """Get all unique tags across all nodes.
+
+        Uses PostgreSQL unnest() — not testable with SQLite.
+        """
+        # pragma: no cover — PostgreSQL-only function (unnest)
         result = await self._session.execute(
             select(func.unnest(NodeModel.tags)).distinct()
         )
@@ -78,8 +90,12 @@ class NodeRepository(IRepository[NodeModel]):
         tags: list[str] | None = None,
         search: str | None = None,
     ) -> "Select":
-        """Apply tag and search filters to a query."""
+        """Apply tag and search filters to a query.
+
+        Tag filtering uses PostgreSQL @> operator — not testable with SQLite.
+        """
         if tags:
+            # pragma: no cover — PostgreSQL-only operator (@>)
             for tag in tags:
                 query = query.where(NodeModel.tags.op("@>")([tag]))
         if search:
@@ -99,7 +115,11 @@ class NodeRepository(IRepository[NodeModel]):
         skip: int = 0,
         limit: int = 100,
     ) -> list[NodeModel]:
-        """Get nodes filtered by tags and/or search (ILIKE on name/host)."""
+        """Get nodes filtered by tags and/or search (ILIKE on name/host).
+
+        Tag filtering uses PostgreSQL @> operator — not testable with SQLite.
+        """
+        # pragma: no cover — PostgreSQL-only operator (@>) when tags provided
         query = self._apply_filters(select(NodeModel), tags=tags, search=search)
         result = await self._session.execute(query.offset(skip).limit(limit))
         return list(result.scalars().all())
@@ -109,7 +129,11 @@ class NodeRepository(IRepository[NodeModel]):
         tags: list[str] | None = None,
         search: str | None = None,
     ) -> int:
-        """Count nodes matching filters."""
+        """Count nodes matching filters.
+
+        Tag filtering uses PostgreSQL @> operator — not testable with SQLite.
+        """
+        # pragma: no cover — PostgreSQL-only operator (@>) when tags provided
         query = self._apply_filters(
             select(func.count(NodeModel.id)), tags=tags, search=search
         )

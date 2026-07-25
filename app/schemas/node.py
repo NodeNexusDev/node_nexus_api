@@ -4,6 +4,7 @@ import uuid
 from datetime import datetime
 from typing import Literal, TypeVar
 
+import structlog
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 T = TypeVar("T")
@@ -33,6 +34,16 @@ class NodeCreate(BaseModel):
     ssh_key: str | None = None
     docker_host: str | None = None
     tags: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def check_docker_host(self) -> "NodeCreate":
+        if self.connection_type == "docker" and not self.docker_host:
+            structlog.get_logger("validation").warning(
+                "docker_host_not_set",
+                connection_type=self.connection_type,
+                host=self.host,
+            )
+        return self
 
 
 class NodeUpdate(BaseModel):
