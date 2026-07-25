@@ -3,7 +3,7 @@
 from collections.abc import Generator
 from dataclasses import dataclass
 
-import httpx
+import httpx2 as httpx
 import pytest
 from pytest_docker.plugin import Services
 

@@ -16,7 +16,7 @@ REST API для управления серверными нодами с SSH-п
 ## Быстрый старт
 
 ```bash
-git clone <repo-url> && cd node_nexus_api
+git clone https://github.com/NodeNexusDev/node_nexus_api.git && cd node_nexus_api
 
 # Настроить окружение
 cp .env.example .env

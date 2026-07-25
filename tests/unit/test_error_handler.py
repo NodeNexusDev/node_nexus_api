@@ -3,7 +3,7 @@
 import structlog
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
-from httpx import ASGITransport, AsyncClient
+from httpx2 import ASGITransport, AsyncClient
 
 from app.core.exceptions import (
     APIKeyNotFoundError,

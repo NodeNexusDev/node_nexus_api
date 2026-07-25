@@ -2,7 +2,7 @@
 
 from uuid import uuid4
 
-import httpx
+import httpx2 as httpx
 import pytest
 
 from tests.e2e.conftest import ServicePorts
