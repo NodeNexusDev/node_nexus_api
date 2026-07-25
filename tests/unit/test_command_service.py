@@ -33,14 +33,12 @@ def service(cmd_repo: AsyncMock, node_repo: AsyncMock) -> CommandService:
 
 
 class TestGetCommand:
-    @pytest.mark.asyncio
     async def test_found(self, service: CommandService, cmd_repo: AsyncMock) -> None:
         orm_cmd = make_orm_command()
         cmd_repo.get_by_id.return_value = orm_cmd
         result = await service.get_command(orm_cmd.id)
         assert result.name == "check_disk"
 
-    @pytest.mark.asyncio
     async def test_not_found(
         self, service: CommandService, cmd_repo: AsyncMock
     ) -> None:
@@ -50,7 +48,6 @@ class TestGetCommand:
 
 
 class TestCreateCommand:
-    @pytest.mark.asyncio
     async def test_create(self, service: CommandService, cmd_repo: AsyncMock) -> None:
         orm_cmd = make_orm_command()
         cmd_repo.create.return_value = orm_cmd
@@ -61,7 +58,6 @@ class TestCreateCommand:
 
 
 class TestDeleteCommand:
-    @pytest.mark.asyncio
     async def test_delete(self, service: CommandService, cmd_repo: AsyncMock) -> None:
         orm_cmd = make_orm_command()
         cmd_repo.get_by_id.return_value = orm_cmd
@@ -69,7 +65,6 @@ class TestDeleteCommand:
         result = await service.delete_command(orm_cmd.id)
         assert result is True
 
-    @pytest.mark.asyncio
     async def test_not_found(
         self, service: CommandService, cmd_repo: AsyncMock
     ) -> None:
@@ -79,7 +74,6 @@ class TestDeleteCommand:
 
 
 class TestGetAllCommands:
-    @pytest.mark.asyncio
     async def test_returns_list(
         self, service: CommandService, cmd_repo: AsyncMock
     ) -> None:
@@ -90,7 +84,6 @@ class TestGetAllCommands:
         assert len(commands) == 2
         assert total == 2
 
-    @pytest.mark.asyncio
     async def test_empty_list(
         self, service: CommandService, cmd_repo: AsyncMock
     ) -> None:
@@ -102,7 +95,6 @@ class TestGetAllCommands:
 
 
 class TestUpdateCommand:
-    @pytest.mark.asyncio
     async def test_update_name(
         self, service: CommandService, cmd_repo: AsyncMock
     ) -> None:
@@ -112,7 +104,6 @@ class TestUpdateCommand:
         result = await service.update_command(orm_cmd.id, data)
         assert result.name == "check_disk"
 
-    @pytest.mark.asyncio
     async def test_update_with_parameters(
         self, service: CommandService, cmd_repo: AsyncMock
     ) -> None:
@@ -123,7 +114,6 @@ class TestUpdateCommand:
         result = await service.update_command(orm_cmd.id, data)
         assert result.parameters is not None
 
-    @pytest.mark.asyncio
     async def test_not_found(
         self, service: CommandService, cmd_repo: AsyncMock
     ) -> None:
@@ -134,7 +124,6 @@ class TestUpdateCommand:
 
 
 class TestExecuteCommand:
-    @pytest.mark.asyncio
     async def test_success(
         self,
         cmd_repo: AsyncMock,
@@ -163,7 +152,6 @@ class TestExecuteCommand:
         assert result.stdout == "ok"
         assert result.exit_code == 0
 
-    @pytest.mark.asyncio
     async def test_command_not_found(
         self,
         cmd_repo: AsyncMock,
@@ -179,7 +167,6 @@ class TestExecuteCommand:
         with pytest.raises(CommandNotFoundError):
             await service.execute_command(uuid.uuid4(), data)
 
-    @pytest.mark.asyncio
     async def test_node_not_found(
         self,
         cmd_repo: AsyncMock,
@@ -199,7 +186,6 @@ class TestExecuteCommand:
         with pytest.raises(NodeNotFoundError):
             await service.execute_command(orm_cmd.id, data)
 
-    @pytest.mark.asyncio
     async def test_connector_error(
         self,
         cmd_repo: AsyncMock,
@@ -227,7 +213,6 @@ class TestExecuteCommand:
         with pytest.raises(ConnectionFailedError):
             await service.execute_command(orm_cmd.id, data)
 
-    @pytest.mark.asyncio
     async def test_with_params(
         self,
         cmd_repo: AsyncMock,
@@ -267,3 +252,21 @@ class TestConnectorFactoryNotConfigured:
 
         with pytest.raises(RuntimeError, match="ConnectorFactory not configured"):
             get_connector_factory(None)
+
+
+class TestLogWithAudit:
+    async def test_calls_audit(self) -> None:
+        from unittest.mock import AsyncMock
+
+        from app.repositories.command_repo import CommandRepository
+        from app.services.command_service import CommandService
+
+        audit_mock = AsyncMock()
+        repo = AsyncMock(spec=CommandRepository)
+        svc = CommandService(
+            repository=repo,
+            node_repository=AsyncMock(),
+            audit_service=audit_mock,
+        )
+        await svc._log("test_action", node_id=uuid.uuid4(), details={"k": "v"})
+        audit_mock.log.assert_awaited_once()

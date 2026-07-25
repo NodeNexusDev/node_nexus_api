@@ -48,7 +48,6 @@ class TestEncryption:
 
 
 class TestCheckConnectivity:
-    @pytest.mark.asyncio
     async def test_sets_active_on_success(
         self, service: NodeService, repo: AsyncMock, mock_factory: MagicMock
     ) -> None:
@@ -69,7 +68,6 @@ class TestCheckConnectivity:
             ssh_key=None,
         )
 
-    @pytest.mark.asyncio
     async def test_sets_unreachable_on_failure(
         self, service: NodeService, repo: AsyncMock, mock_factory: MagicMock
     ) -> None:
@@ -86,7 +84,6 @@ class TestCheckConnectivity:
 
         assert result.status == "unreachable"
 
-    @pytest.mark.asyncio
     async def test_node_not_found(self, service: NodeService, repo: AsyncMock) -> None:
         repo.get_by_id.return_value = None
         with pytest.raises(NodeNotFoundError):
@@ -94,7 +91,6 @@ class TestCheckConnectivity:
 
 
 class TestExecuteCommand:
-    @pytest.mark.asyncio
     async def test_returns_result(
         self, service: NodeService, repo: AsyncMock, mock_factory: MagicMock
     ) -> None:
@@ -114,7 +110,6 @@ class TestExecuteCommand:
         assert result.exit_code == 0
         mock_connector.execute_command.assert_called_once_with("uptime")
 
-    @pytest.mark.asyncio
     async def test_raises_on_connection_error(
         self, service: NodeService, repo: AsyncMock, mock_factory: MagicMock
     ) -> None:
@@ -130,8 +125,66 @@ class TestExecuteCommand:
                 node_response.id, CommandRequest(command="ls")
             )
 
-    @pytest.mark.asyncio
     async def test_node_not_found(self, service: NodeService, repo: AsyncMock) -> None:
         repo.get_by_id.return_value = None
         with pytest.raises(NodeNotFoundError):
             await service.execute_command(uuid.uuid4(), CommandRequest(command="ls"))
+
+
+class TestCheckConnectivityConnectionFailed:
+    async def test_sets_unreachable_on_connection_failed(
+        self, service: NodeService, repo: AsyncMock, mock_factory: MagicMock
+    ) -> None:
+        node_response = make_response()
+        orm_node = make_orm_node(id=node_response.id)
+        unreachable_node = make_orm_node(id=node_response.id, status="unreachable")
+        repo.get_by_id.return_value = orm_node
+        repo.update.return_value = unreachable_node
+
+        mock_connector = mock_factory.create_ssh.return_value
+        mock_connector.__aenter__ = AsyncMock(
+            side_effect=ConnectionFailedError("Connection refused")
+        )
+
+        result = await service.check_connectivity(node_response.id)
+
+        assert result.status == "unreachable"
+        repo.update.assert_called_once_with(node_response.id, {"status": "unreachable"})
+
+
+class TestExecuteCommandConnectionFailed:
+    async def test_raises_connection_failed(
+        self, service: NodeService, repo: AsyncMock, mock_factory: MagicMock
+    ) -> None:
+        node_response = make_response()
+        orm_node = make_orm_node(id=node_response.id)
+        repo.get_by_id.return_value = orm_node
+
+        mock_connector = mock_factory.create_ssh.return_value
+        mock_connector.__aenter__ = AsyncMock(
+            side_effect=ConnectionFailedError("Connection refused")
+        )
+
+        with pytest.raises(ConnectionFailedError):
+            await service.execute_command(
+                node_response.id, CommandRequest(command="ls")
+            )
+
+
+class TestBulkExecuteConnectionFailed:
+    async def test_returns_error_result(
+        self, service: NodeService, repo: AsyncMock, mock_factory: MagicMock
+    ) -> None:
+        orm_node = make_orm_node()
+        repo.get_by_id.return_value = orm_node
+
+        mock_connector = mock_factory.create_ssh.return_value
+        mock_connector.__aenter__ = AsyncMock(
+            side_effect=ConnectionFailedError("Connection refused")
+        )
+
+        result = await service._execute_on_single_node(orm_node, "echo hi")
+
+        assert result.exit_code == 1
+        assert result.stdout == ""
+        assert "Connection refused" in result.stderr

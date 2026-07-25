@@ -5,7 +5,6 @@ from collections.abc import AsyncGenerator, AsyncIterable
 from typing import Any
 from unittest.mock import MagicMock, patch
 
-import pytest
 import pytest_asyncio
 from dishka import Provider, Scope, make_async_container, provide
 from dishka.integrations.fastapi import setup_dishka
@@ -153,7 +152,6 @@ async def _create_script(client: AsyncClient, **overrides: Any) -> dict[str, Any
 # --- GET /scripts/ ---
 
 
-@pytest.mark.asyncio
 async def test_get_scripts_empty(integration_client: AsyncClient) -> None:
     resp = await integration_client.get(SCRIPTS_URL)
     assert resp.status_code == 200
@@ -162,7 +160,6 @@ async def test_get_scripts_empty(integration_client: AsyncClient) -> None:
     assert data["total"] == 0
 
 
-@pytest.mark.asyncio
 async def test_get_scripts_with_data(integration_client: AsyncClient) -> None:
     await _create_script(integration_client, name="s1")
     await _create_script(integration_client, name="s2")
@@ -176,7 +173,6 @@ async def test_get_scripts_with_data(integration_client: AsyncClient) -> None:
     assert names == {"s1", "s2"}
 
 
-@pytest.mark.asyncio
 async def test_get_scripts_pagination(integration_client: AsyncClient) -> None:
     for i in range(5):
         await _create_script(integration_client, name=f"script-{i}")
@@ -188,7 +184,6 @@ async def test_get_scripts_pagination(integration_client: AsyncClient) -> None:
     assert data["total"] == 5
 
 
-@pytest.mark.asyncio
 async def test_get_scripts_pagination_invalid_params(
     integration_client: AsyncClient,
 ) -> None:
@@ -202,7 +197,6 @@ async def test_get_scripts_pagination_invalid_params(
 # --- GET /scripts/{id} ---
 
 
-@pytest.mark.asyncio
 async def test_get_script_found(integration_client: AsyncClient) -> None:
     script = await _create_script(integration_client)
     resp = await integration_client.get(f"/api/v1/scripts/{script['id']}")
@@ -211,7 +205,6 @@ async def test_get_script_found(integration_client: AsyncClient) -> None:
     assert len(resp.json()["steps"]) == 1
 
 
-@pytest.mark.asyncio
 async def test_get_script_not_found(integration_client: AsyncClient) -> None:
     resp = await integration_client.get(f"/api/v1/scripts/{uuid.uuid4()}")
     assert resp.status_code == 404
@@ -220,7 +213,6 @@ async def test_get_script_not_found(integration_client: AsyncClient) -> None:
 # --- POST /scripts/ ---
 
 
-@pytest.mark.asyncio
 async def test_create_script(integration_client: AsyncClient) -> None:
     resp = await integration_client.post(
         SCRIPTS_URL,
@@ -236,7 +228,6 @@ async def test_create_script(integration_client: AsyncClient) -> None:
     assert "id" in data
 
 
-@pytest.mark.asyncio
 async def test_create_script_multiple_steps(
     integration_client: AsyncClient,
 ) -> None:
@@ -261,7 +252,6 @@ async def test_create_script_multiple_steps(
     assert data["steps"][1]["on_failure"] == "continue"
 
 
-@pytest.mark.asyncio
 async def test_create_script_validation_error(
     integration_client: AsyncClient,
 ) -> None:
@@ -272,7 +262,6 @@ async def test_create_script_validation_error(
 # --- PUT /scripts/{id} ---
 
 
-@pytest.mark.asyncio
 async def test_update_script_found(integration_client: AsyncClient) -> None:
     script = await _create_script(integration_client)
     resp = await integration_client.put(
@@ -284,7 +273,6 @@ async def test_update_script_found(integration_client: AsyncClient) -> None:
     assert resp.json()["id"] == script["id"]
 
 
-@pytest.mark.asyncio
 async def test_update_script_not_found(integration_client: AsyncClient) -> None:
     resp = await integration_client.put(
         f"/api/v1/scripts/{uuid.uuid4()}",
@@ -296,7 +284,6 @@ async def test_update_script_not_found(integration_client: AsyncClient) -> None:
 # --- DELETE /scripts/{id} ---
 
 
-@pytest.mark.asyncio
 async def test_delete_script_found(integration_client: AsyncClient) -> None:
     script = await _create_script(integration_client)
     resp = await integration_client.delete(f"/api/v1/scripts/{script['id']}")
@@ -306,7 +293,6 @@ async def test_delete_script_found(integration_client: AsyncClient) -> None:
     assert resp.status_code == 404
 
 
-@pytest.mark.asyncio
 async def test_delete_script_not_found(integration_client: AsyncClient) -> None:
     resp = await integration_client.delete(f"/api/v1/scripts/{uuid.uuid4()}")
     assert resp.status_code == 404
@@ -315,7 +301,6 @@ async def test_delete_script_not_found(integration_client: AsyncClient) -> None:
 # --- POST /scripts/{id}/execute ---
 
 
-@pytest.mark.asyncio
 async def test_execute_script_not_found(integration_client: AsyncClient) -> None:
     resp = await integration_client.post(
         f"/api/v1/scripts/{uuid.uuid4()}/execute",
@@ -324,7 +309,6 @@ async def test_execute_script_not_found(integration_client: AsyncClient) -> None
     assert resp.status_code == 404
 
 
-@pytest.mark.asyncio
 async def test_execute_script_node_not_found(
     integration_client: AsyncClient,
 ) -> None:
@@ -341,7 +325,6 @@ async def test_execute_script_node_not_found(
     assert batch["results"][0]["status"] == "failed"
 
 
-@pytest.mark.asyncio
 async def test_execute_script_validation_error(
     integration_client: AsyncClient,
 ) -> None:
@@ -356,7 +339,6 @@ async def test_execute_script_validation_error(
 # --- GET /scripts/{id}/executions ---
 
 
-@pytest.mark.asyncio
 async def test_get_executions_empty(integration_client: AsyncClient) -> None:
     script = await _create_script(integration_client)
     resp = await integration_client.get(f"/api/v1/scripts/{script['id']}/executions")
@@ -366,7 +348,6 @@ async def test_get_executions_empty(integration_client: AsyncClient) -> None:
     assert data["total"] == 0
 
 
-@pytest.mark.asyncio
 async def test_get_executions_not_found(integration_client: AsyncClient) -> None:
     resp = await integration_client.get(f"/api/v1/scripts/{uuid.uuid4()}/executions")
     assert resp.status_code == 404

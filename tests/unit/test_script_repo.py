@@ -62,7 +62,6 @@ def _script_data(**overrides) -> dict:
     return defaults
 
 
-@pytest.mark.asyncio
 async def test_get_by_id_found(repo: ScriptRepository) -> None:
     script = await repo.create(_script_data())
     result = await repo.get_by_id(script.id)
@@ -70,19 +69,16 @@ async def test_get_by_id_found(repo: ScriptRepository) -> None:
     assert result.name == "deploy_check"
 
 
-@pytest.mark.asyncio
 async def test_get_by_id_not_found(repo: ScriptRepository) -> None:
     result = await repo.get_by_id(uuid.uuid4())
     assert result is None
 
 
-@pytest.mark.asyncio
 async def test_get_all_empty(repo: ScriptRepository) -> None:
     result = await repo.get_all()
     assert result == []
 
 
-@pytest.mark.asyncio
 async def test_get_all_with_data(repo: ScriptRepository) -> None:
     await repo.create(_script_data(name="s1"))
     await repo.create(_script_data(name="s2"))
@@ -90,7 +86,6 @@ async def test_get_all_with_data(repo: ScriptRepository) -> None:
     assert len(scripts) == 2
 
 
-@pytest.mark.asyncio
 async def test_get_all_pagination(repo: ScriptRepository) -> None:
     for i in range(5):
         await repo.create(_script_data(name=f"script-{i}"))
@@ -98,7 +93,6 @@ async def test_get_all_pagination(repo: ScriptRepository) -> None:
     assert len(scripts) == 2
 
 
-@pytest.mark.asyncio
 async def test_create(repo: ScriptRepository) -> None:
     script = await repo.create(_script_data())
     assert script.id is not None
@@ -107,7 +101,6 @@ async def test_create(repo: ScriptRepository) -> None:
     assert script.steps[0]["label"] == "Check disk"
 
 
-@pytest.mark.asyncio
 async def test_create_with_multiple_steps(repo: ScriptRepository) -> None:
     steps = [
         {
@@ -127,7 +120,6 @@ async def test_create_with_multiple_steps(repo: ScriptRepository) -> None:
     assert len(script.steps) == 2
 
 
-@pytest.mark.asyncio
 async def test_update_found(repo: ScriptRepository) -> None:
     script = await repo.create(_script_data())
     updated = await repo.update(script.id, {"name": "updated_script"})
@@ -135,13 +127,11 @@ async def test_update_found(repo: ScriptRepository) -> None:
     assert updated.name == "updated_script"
 
 
-@pytest.mark.asyncio
 async def test_update_not_found(repo: ScriptRepository) -> None:
     result = await repo.update(uuid.uuid4(), {"name": "x"})
     assert result is None
 
 
-@pytest.mark.asyncio
 async def test_delete_found(repo: ScriptRepository) -> None:
     script = await repo.create(_script_data())
     result = await repo.delete(script.id)
@@ -149,19 +139,16 @@ async def test_delete_found(repo: ScriptRepository) -> None:
     assert await repo.get_by_id(script.id) is None
 
 
-@pytest.mark.asyncio
 async def test_delete_not_found(repo: ScriptRepository) -> None:
     result = await repo.delete(uuid.uuid4())
     assert result is False
 
 
-@pytest.mark.asyncio
 async def test_count_empty(repo: ScriptRepository) -> None:
     count = await repo.count()
     assert count == 0
 
 
-@pytest.mark.asyncio
 async def test_count_with_data(repo: ScriptRepository) -> None:
     await repo.create(_script_data(name="s1"))
     await repo.create(_script_data(name="s2"))
@@ -170,7 +157,6 @@ async def test_count_with_data(repo: ScriptRepository) -> None:
     assert count == 3
 
 
-@pytest.mark.asyncio
 async def test_count_after_delete(repo: ScriptRepository) -> None:
     script = await repo.create(_script_data())
     assert await repo.count() == 1

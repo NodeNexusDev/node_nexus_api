@@ -5,7 +5,6 @@ from collections.abc import AsyncGenerator, AsyncIterable
 from typing import Any
 from unittest.mock import MagicMock, patch
 
-import pytest
 import pytest_asyncio
 from dishka import Provider, Scope, make_async_container, provide
 from dishka.integrations.fastapi import setup_dishka
@@ -131,7 +130,6 @@ async def _create_command(client: AsyncClient, **overrides: Any) -> dict[str, An
 # --- GET /commands/ ---
 
 
-@pytest.mark.asyncio
 async def test_get_commands_empty(integration_client: AsyncClient) -> None:
     resp = await integration_client.get(COMMANDS_URL)
     assert resp.status_code == 200
@@ -140,7 +138,6 @@ async def test_get_commands_empty(integration_client: AsyncClient) -> None:
     assert data["total"] == 0
 
 
-@pytest.mark.asyncio
 async def test_get_commands_with_data(integration_client: AsyncClient) -> None:
     await _create_command(integration_client, name="c1")
     await _create_command(integration_client, name="c2")
@@ -154,7 +151,6 @@ async def test_get_commands_with_data(integration_client: AsyncClient) -> None:
     assert names == {"c1", "c2"}
 
 
-@pytest.mark.asyncio
 async def test_get_commands_pagination(integration_client: AsyncClient) -> None:
     for i in range(5):
         await _create_command(integration_client, name=f"cmd-{i}")
@@ -166,7 +162,6 @@ async def test_get_commands_pagination(integration_client: AsyncClient) -> None:
     assert data["total"] == 5
 
 
-@pytest.mark.asyncio
 async def test_get_commands_pagination_invalid_params(
     integration_client: AsyncClient,
 ) -> None:
@@ -180,7 +175,6 @@ async def test_get_commands_pagination_invalid_params(
 # --- GET /commands/{id} ---
 
 
-@pytest.mark.asyncio
 async def test_get_command_found(integration_client: AsyncClient) -> None:
     cmd = await _create_command(integration_client)
     resp = await integration_client.get(f"/api/v1/commands/{cmd['id']}")
@@ -188,7 +182,6 @@ async def test_get_command_found(integration_client: AsyncClient) -> None:
     assert resp.json()["name"] == "check_disk"
 
 
-@pytest.mark.asyncio
 async def test_get_command_not_found(integration_client: AsyncClient) -> None:
     resp = await integration_client.get(f"/api/v1/commands/{uuid.uuid4()}")
     assert resp.status_code == 404
@@ -197,7 +190,6 @@ async def test_get_command_not_found(integration_client: AsyncClient) -> None:
 # --- POST /commands/ ---
 
 
-@pytest.mark.asyncio
 async def test_create_command(integration_client: AsyncClient) -> None:
     resp = await integration_client.post(
         COMMANDS_URL,
@@ -210,7 +202,6 @@ async def test_create_command(integration_client: AsyncClient) -> None:
     assert "id" in data
 
 
-@pytest.mark.asyncio
 async def test_create_command_with_parameters(integration_client: AsyncClient) -> None:
     resp = await integration_client.post(
         COMMANDS_URL,
@@ -227,7 +218,6 @@ async def test_create_command_with_parameters(integration_client: AsyncClient) -
     assert data["parameters"][0]["name"] == "service"
 
 
-@pytest.mark.asyncio
 async def test_create_command_validation_error(
     integration_client: AsyncClient,
 ) -> None:
@@ -238,7 +228,6 @@ async def test_create_command_validation_error(
 # --- PUT /commands/{id} ---
 
 
-@pytest.mark.asyncio
 async def test_update_command_found(integration_client: AsyncClient) -> None:
     cmd = await _create_command(integration_client)
     resp = await integration_client.put(
@@ -250,7 +239,6 @@ async def test_update_command_found(integration_client: AsyncClient) -> None:
     assert resp.json()["id"] == cmd["id"]
 
 
-@pytest.mark.asyncio
 async def test_update_command_not_found(integration_client: AsyncClient) -> None:
     resp = await integration_client.put(
         f"/api/v1/commands/{uuid.uuid4()}",
@@ -262,7 +250,6 @@ async def test_update_command_not_found(integration_client: AsyncClient) -> None
 # --- DELETE /commands/{id} ---
 
 
-@pytest.mark.asyncio
 async def test_delete_command_found(integration_client: AsyncClient) -> None:
     cmd = await _create_command(integration_client)
     resp = await integration_client.delete(f"/api/v1/commands/{cmd['id']}")
@@ -272,7 +259,6 @@ async def test_delete_command_found(integration_client: AsyncClient) -> None:
     assert resp.status_code == 404
 
 
-@pytest.mark.asyncio
 async def test_delete_command_not_found(integration_client: AsyncClient) -> None:
     resp = await integration_client.delete(f"/api/v1/commands/{uuid.uuid4()}")
     assert resp.status_code == 404
@@ -281,7 +267,6 @@ async def test_delete_command_not_found(integration_client: AsyncClient) -> None
 # --- POST /commands/{id}/execute ---
 
 
-@pytest.mark.asyncio
 async def test_execute_command_not_found(integration_client: AsyncClient) -> None:
     resp = await integration_client.post(
         f"/api/v1/commands/{uuid.uuid4()}/execute",
@@ -290,7 +275,6 @@ async def test_execute_command_not_found(integration_client: AsyncClient) -> Non
     assert resp.status_code == 404
 
 
-@pytest.mark.asyncio
 async def test_execute_command_node_not_found(
     integration_client: AsyncClient,
 ) -> None:
@@ -302,7 +286,6 @@ async def test_execute_command_node_not_found(
     assert resp.status_code == 404
 
 
-@pytest.mark.asyncio
 async def test_execute_command_validation_error(
     integration_client: AsyncClient,
 ) -> None:

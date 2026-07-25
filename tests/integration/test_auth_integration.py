@@ -4,7 +4,6 @@ from collections.abc import AsyncGenerator
 from typing import Any
 from unittest.mock import MagicMock, patch
 
-import pytest
 import pytest_asyncio
 from dishka import Provider, Scope, make_async_container, provide
 from dishka.integrations.fastapi import setup_dishka
@@ -113,7 +112,6 @@ def _create_app(sessionmaker: async_sessionmaker[AsyncSession]) -> FastAPI:
 # --- Unauthenticated access ---
 
 
-@pytest.mark.asyncio
 async def test_unauthenticated_returns_401(
     sessionmaker: async_sessionmaker[AsyncSession],
 ) -> None:
@@ -128,7 +126,6 @@ async def test_unauthenticated_returns_401(
     await app.state._container.close()
 
 
-@pytest.mark.asyncio
 async def test_invalid_key_returns_401(
     sessionmaker: async_sessionmaker[AsyncSession],
 ) -> None:
@@ -148,7 +145,6 @@ async def test_invalid_key_returns_401(
 # --- Master key auth ---
 
 
-@pytest.mark.asyncio
 async def test_master_key_auth(
     sessionmaker: async_sessionmaker[AsyncSession],
 ) -> None:
@@ -163,7 +159,6 @@ async def test_master_key_auth(
     await app.state._container.close()
 
 
-@pytest.mark.asyncio
 async def test_health_requires_auth(
     sessionmaker: async_sessionmaker[AsyncSession],
 ) -> None:
@@ -177,7 +172,6 @@ async def test_health_requires_auth(
     await app.state._container.close()
 
 
-@pytest.mark.asyncio
 async def test_health_with_master_key(
     sessionmaker: async_sessionmaker[AsyncSession],
 ) -> None:
@@ -195,7 +189,6 @@ async def test_health_with_master_key(
 # --- Create and use API key ---
 
 
-@pytest.mark.asyncio
 async def test_create_and_use_api_key(
     sessionmaker: async_sessionmaker[AsyncSession],
 ) -> None:
@@ -220,7 +213,6 @@ async def test_create_and_use_api_key(
     await app.state._container.close()
 
 
-@pytest.mark.asyncio
 async def test_revoke_and_fail(
     sessionmaker: async_sessionmaker[AsyncSession],
 ) -> None:
@@ -255,7 +247,6 @@ async def test_revoke_and_fail(
     await app.state._container.close()
 
 
-@pytest.mark.asyncio
 async def test_last_used_at_updated(
     sessionmaker: async_sessionmaker[AsyncSession],
 ) -> None:
@@ -292,7 +283,6 @@ async def test_last_used_at_updated(
     await app.state._container.close()
 
 
-@pytest.mark.asyncio
 async def test_list_keys_with_master_key(
     sessionmaker: async_sessionmaker[AsyncSession],
 ) -> None:
@@ -319,7 +309,6 @@ async def test_list_keys_with_master_key(
     await app.state._container.close()
 
 
-@pytest.mark.asyncio
 async def test_master_wrong_key_returns_401(
     sessionmaker: async_sessionmaker[AsyncSession],
 ) -> None:

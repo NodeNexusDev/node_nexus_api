@@ -67,7 +67,6 @@ async def _create_script(
     return script.id
 
 
-@pytest.mark.asyncio
 async def test_create(
     repo: ScriptExecutionRepository, script_repo: ScriptRepository
 ) -> None:
@@ -88,7 +87,6 @@ async def test_create(
     assert execution.node_id == node_id
 
 
-@pytest.mark.asyncio
 async def test_get_by_id_found(
     repo: ScriptExecutionRepository, script_repo: ScriptRepository
 ) -> None:
@@ -104,13 +102,11 @@ async def test_get_by_id_found(
     assert result.status == "completed"
 
 
-@pytest.mark.asyncio
 async def test_get_by_id_not_found(repo: ScriptExecutionRepository) -> None:
     result = await repo.get_by_id(uuid.uuid4())
     assert result is None
 
 
-@pytest.mark.asyncio
 async def test_get_by_script_id_empty(
     repo: ScriptExecutionRepository, script_repo: ScriptRepository
 ) -> None:
@@ -119,7 +115,6 @@ async def test_get_by_script_id_empty(
     assert result == []
 
 
-@pytest.mark.asyncio
 async def test_get_by_script_id_with_data(
     repo: ScriptExecutionRepository, script_repo: ScriptRepository
 ) -> None:
@@ -134,7 +129,6 @@ async def test_get_by_script_id_with_data(
     assert len(results) == 3
 
 
-@pytest.mark.asyncio
 async def test_get_by_script_id_pagination(
     repo: ScriptExecutionRepository, script_repo: ScriptRepository
 ) -> None:
@@ -146,7 +140,6 @@ async def test_get_by_script_id_pagination(
     assert len(results) == 2
 
 
-@pytest.mark.asyncio
 async def test_get_by_script_id_ordered_by_started_at_desc(
     repo: ScriptExecutionRepository, script_repo: ScriptRepository
 ) -> None:
@@ -159,7 +152,6 @@ async def test_get_by_script_id_ordered_by_started_at_desc(
     assert results[1].id == e1.id
 
 
-@pytest.mark.asyncio
 async def test_count_by_script_id(
     repo: ScriptExecutionRepository, script_repo: ScriptRepository
 ) -> None:
@@ -173,7 +165,6 @@ async def test_count_by_script_id(
     assert count == 2
 
 
-@pytest.mark.asyncio
 async def test_update(
     repo: ScriptExecutionRepository, script_repo: ScriptRepository
 ) -> None:
@@ -190,7 +181,6 @@ async def test_update(
     assert updated.status == "completed"
 
 
-@pytest.mark.asyncio
 async def test_update_not_found(repo: ScriptExecutionRepository) -> None:
     result = await repo.update(uuid.uuid4(), {"status": "completed"})
     assert result is None

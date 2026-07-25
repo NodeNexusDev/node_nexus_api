@@ -58,3 +58,8 @@ class TestRenderCommand:
         params = [{"name": "extra", "type": "string", "required": False}]
         result = render_command("echo test", params, {})
         assert result == "echo test"
+
+    def test_optional_placeholder_left_intact(self) -> None:
+        params = [{"name": "optional", "type": "string", "required": False}]
+        result = render_command("echo {optional}", params, {})
+        assert result == "echo {optional}"

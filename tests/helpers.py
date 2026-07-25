@@ -1,4 +1,4 @@
-"""Shared test fixtures."""
+"""Shared test helpers."""
 
 import socket
 from unittest.mock import MagicMock
