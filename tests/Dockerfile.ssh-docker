@@ -1,0 +1,9 @@
+FROM lscr.io/linuxserver/openssh-server:latest
+
+USER root
+
+RUN apk add --no-cache docker-cli
+
+# Add abc user to docker group (GID 990 matches host Docker socket)
+RUN groupadd -g 990 docker 2>/dev/null || true \
+    && usermod -aG docker abc
