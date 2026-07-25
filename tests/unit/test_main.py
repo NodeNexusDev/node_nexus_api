@@ -12,7 +12,10 @@ class TestRunMigrationsSync:
     @patch("app.main.AlembicConfig")
     @patch("app.main.get_settings")
     def test_success(
-        self, mock_get_settings: MagicMock, mock_config_cls: MagicMock, mock_cmd: MagicMock
+        self,
+        mock_get_settings: MagicMock,
+        mock_config_cls: MagicMock,
+        mock_cmd: MagicMock,
     ) -> None:
         mock_get_settings.return_value = MagicMock(DATABASE_URL="sqlite:///test.db")
         _run_migrations_sync()
@@ -22,7 +25,10 @@ class TestRunMigrationsSync:
     @patch("app.main.AlembicConfig")
     @patch("app.main.get_settings")
     def test_failure_raises_runtime_error(
-        self, mock_get_settings: MagicMock, mock_config_cls: MagicMock, mock_cmd: MagicMock
+        self,
+        mock_get_settings: MagicMock,
+        mock_config_cls: MagicMock,
+        mock_cmd: MagicMock,
     ) -> None:
         mock_get_settings.return_value = MagicMock(DATABASE_URL="sqlite:///test.db")
         mock_cmd.upgrade.side_effect = Exception("connection refused")

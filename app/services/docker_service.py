@@ -189,7 +189,7 @@ class DockerService:
             node_id=node_id,
             details={"container_id": validated_id},
         )
-        return DockerContainerInspect(
+        return DockerContainerInspect(  # ty: ignore[missing-argument]
             id=data.get("Id", ""),
             name=data.get("Name", ""),
             state=DockerContainerState(

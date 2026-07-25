@@ -255,9 +255,7 @@ class TestDockerContainerLifecycle:
         )
         assert resp.status_code == 404
 
-    async def test_start_docker_node_no_daemon(
-        self, client: httpx.AsyncClient
-    ) -> None:
+    async def test_start_docker_node_no_daemon(self, client: httpx.AsyncClient) -> None:
         node_data = _make_docker_node_data()
         node_id = (await client.post("/api/v1/nodes/", json=node_data)).json()["id"]
         try:
@@ -358,9 +356,7 @@ class TestDockerContainerLifecycle:
 
     # --- DELETE .../ ---
 
-    async def test_remove_invalid_container_id(
-        self, client: httpx.AsyncClient
-    ) -> None:
+    async def test_remove_invalid_container_id(self, client: httpx.AsyncClient) -> None:
         node_data = _make_docker_node_data()
         node_id = (await client.post("/api/v1/nodes/", json=node_data)).json()["id"]
         try:
@@ -422,9 +418,7 @@ class TestDockerContainerLifecycle:
         )
         assert resp.status_code == 404
 
-    async def test_logs_docker_node_no_daemon(
-        self, client: httpx.AsyncClient
-    ) -> None:
+    async def test_logs_docker_node_no_daemon(self, client: httpx.AsyncClient) -> None:
         node_data = _make_docker_node_data()
         node_id = (await client.post("/api/v1/nodes/", json=node_data)).json()["id"]
         try:
@@ -448,9 +442,7 @@ class TestDockerContainerLifecycle:
 
     # --- GET .../stats ---
 
-    async def test_stats_invalid_container_id(
-        self, client: httpx.AsyncClient
-    ) -> None:
+    async def test_stats_invalid_container_id(self, client: httpx.AsyncClient) -> None:
         node_data = _make_docker_node_data()
         node_id = (await client.post("/api/v1/nodes/", json=node_data)).json()["id"]
         try:
@@ -468,9 +460,7 @@ class TestDockerContainerLifecycle:
         )
         assert resp.status_code == 404
 
-    async def test_stats_docker_node_no_daemon(
-        self, client: httpx.AsyncClient
-    ) -> None:
+    async def test_stats_docker_node_no_daemon(self, client: httpx.AsyncClient) -> None:
         node_data = _make_docker_node_data()
         node_id = (await client.post("/api/v1/nodes/", json=node_data)).json()["id"]
         try:

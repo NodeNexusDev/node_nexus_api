@@ -2,10 +2,7 @@
 
 from unittest.mock import MagicMock
 
-from dishka import make_async_container
-
 from app.di.providers import (
-    AppProvider,
     ConnectorProvider,
     RepositoryProvider,
     ServiceProvider,

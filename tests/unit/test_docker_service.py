@@ -546,7 +546,7 @@ class TestGetStats:
             await service.get_stats(docker_node.id, "abc123")
 
 
-class TestParseJsonLines:
+class TestParseJsonLinesExtra:
     def test_skips_broken_json(self, service: DockerService) -> None:
         stdout = '{"a": 1}\nbroken json\n{"b": 2}\n'
         result = service._parse_json_lines(stdout)
@@ -555,7 +555,7 @@ class TestParseJsonLines:
         assert result[1] == {"b": 2}
 
     def test_skips_non_json_lines(self, service: DockerService) -> None:
-        stdout = "pulling image...\n{\"status\": \"done\"}\n"
+        stdout = 'pulling image...\n{"status": "done"}\n'
         result = service._parse_json_lines(stdout)
         assert len(result) == 1
 

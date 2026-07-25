@@ -533,9 +533,6 @@ class TestConnectorFactoryNotConfigured:
 
 class TestResolveCommandUnknownType:
     async def test_raises_on_unknown_type(self, service: ScriptService) -> None:
-        # The schema validates type, so we test the guard by bypassing validation
-        step = ScriptStep(label="Step", type="inline", command="echo hi")
-        # Directly test the method's fallback by calling with a mock step
         from unittest.mock import MagicMock
 
         mock_step = MagicMock()
@@ -557,7 +554,13 @@ class TestExecuteScriptCommandNotFound:
         cmd_repo.get_by_id.return_value = None
 
         orm_script = _make_orm_script(
-            steps=[{"label": "Step 1", "type": "command", "command_id": str(uuid.uuid4())}]
+            steps=[
+                {
+                    "label": "Step 1",
+                    "type": "command",
+                    "command_id": str(uuid.uuid4()),
+                }
+            ]
         )
         script_repo.get_by_id.return_value = orm_script
 

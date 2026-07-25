@@ -1,8 +1,5 @@
 """Tests for domain error handler status code mapping."""
 
-import os
-
-import pytest
 import structlog
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
