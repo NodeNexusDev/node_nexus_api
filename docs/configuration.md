@@ -25,7 +25,7 @@
 
 ```bash
 # 1. Клонировать
-git clone <repo-url>
+git clone https://github.com/NodeNexusDev/node_nexus_api.git
 cd node_nexus_api
 
 # 2. Создать .env
