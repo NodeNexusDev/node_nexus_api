@@ -1,5 +1,7 @@
 # API Specification
 
+> [README](../README.md) · **API Specification** · [Architecture](architecture.md) · [Configuration](configuration.md) · [Development](development.md)
+
 Версия API: **v1**
 Base URL: `/api/v1`
 
@@ -17,6 +19,7 @@ Base URL: `/api/v1`
 | [Commands](#commands) | Шаблоны команд с параметрами |
 | [Scripts](#scripts) | Пайплайны команд (скрипты) |
 | [API Keys](#api-keys) | Управление API ключами |
+| [Docker](#docker) | Управление Docker контейнерами на нодах |
 | [Health](#health) | Healthcheck |
 
 ### Nodes
@@ -66,6 +69,24 @@ Base URL: `/api/v1`
 | GET | [`/api/v1/api-keys/`](#get-apiv1api-keys) | Список API ключей |
 | DELETE | [`/api/v1/api-keys/{key_id}`](#delete-apiv1api-keyskey_id) | Отозвать API ключ |
 
+### Docker
+
+| Метод | Endpoint | Описание |
+|-------|----------|----------|
+| GET | [`/api/v1/nodes/{node_id}/docker/containers`](#get-apiv1nodesnode_iddockercontainers) | Список контейнеров |
+| GET | [`/api/v1/nodes/{node_id}/docker/containers/{container_id}`](#get-apiv1nodesnode_iddockercontainerscontainer_id) | Детали контейнера |
+| POST | [`/api/v1/nodes/{node_id}/docker/containers/{container_id}/start`](#post-apiv1nodesnode_iddockercontainerscontainer_idstart) | Запустить контейнер |
+| POST | [`/api/v1/nodes/{node_id}/docker/containers/{container_id}/stop`](#post-apiv1nodesnode_iddockercontainerscontainer_idstop) | Остановить контейнер |
+| POST | [`/api/v1/nodes/{node_id}/docker/containers/{container_id}/restart`](#post-apiv1nodesnode_iddockercontainerscontainer_idrestart) | Перезапустить контейнер |
+| DELETE | [`/api/v1/nodes/{node_id}/docker/containers/{container_id}`](#delete-apiv1nodesnode_iddockercontainerscontainer_id) | Удалить контейнер |
+| GET | [`/api/v1/nodes/{node_id}/docker/containers/{container_id}/logs`](#get-apiv1nodesnode_iddockercontainerscontainer_idlogs) | Логи контейнера |
+| POST | [`/api/v1/nodes/{node_id}/docker/containers/{container_id}/exec`](#post-apiv1nodesnode_iddockercontainerscontainer_idexec) | Выполнить команду в контейнере |
+| GET | [`/api/v1/nodes/{node_id}/docker/containers/{container_id}/stats`](#get-apiv1nodesnode_iddockercontainerscontainer_idstats) | Статистика контейнера |
+| GET | [`/api/v1/nodes/{node_id}/docker/images`](#get-apiv1nodesnode_iddockerimages) | Список образов |
+| POST | [`/api/v1/nodes/{node_id}/docker/images/pull`](#post-apiv1nodesnode_iddockerimagespull) | Скачать образ |
+| GET | [`/api/v1/nodes/{node_id}/docker/networks`](#get-apiv1nodesnode_iddockernetworks) | Список сетей |
+| GET | [`/api/v1/nodes/{node_id}/docker/volumes`](#get-apiv1nodesnode_iddockervolumes) | Список томов |
+
 ### Схемы
 
 | Схема | Описание |
@@ -97,6 +118,16 @@ Base URL: `/api/v1`
 | [APIKeyCreated](#apikeycreated) | Ответ при создании ключа |
 | [APIKeyResponse](#apikeyresponse) | Метаданные ключа |
 | [APIKeyList](#apikeylist) | Список ключей |
+| [DockerContainer](#dockercontainer) | Информация о контейнере |
+| [DockerContainerInspect](#dockercontainerinspect) | Детали контейнера (inspect) |
+| [DockerExecRequest](#dockerexecrequest) | Запрос exec в контейнере |
+| [DockerExecResult](#dockerexecresult) | Результат exec |
+| [DockerImage](#dockerimage) | Информация об образе |
+| [DockerImagePullRequest](#dockerimagepullrequest) | Запрос скачивания образа |
+| [DockerPullResult](#dockerpullresult) | Результат скачивания |
+| [DockerStats](#dockerstats) | Статистика контейнера |
+| [DockerNetwork](#dockernetwork) | Информация о сети |
+| [DockerVolume](#dockervolume) | Информация о томе |
 
 ### Ошибки
 
@@ -104,8 +135,9 @@ Base URL: `/api/v1`
 |------|----------|
 | [401](#коды-ошибок) | Не авторизован / невалидный API ключ |
 | [404](#коды-ошибок) | Ресурс не найден |
-| [422](#коды-ошибок) | Ошибка валидации / TemplateRenderError |
-| [503](#коды-ошибок) | Ошибка подключения к ноде |
+| [422](#коды-ошибок) | Ошибка валидации / TemplateRenderError / DockerValidationError |
+| [502](#коды-ошибок) | Ошибка Docker-операции на удалённой ноде |
+| [503](#коды-ошибок) | Ошибка подключения к ноде / Docker daemon недоступен |
 
 ---
 
@@ -1160,6 +1192,383 @@ Bulk-выполнение команды на нескольких нодах п
 
 ---
 
+## Docker
+
+Управление Docker контейнерами, образами, сетями и томами на нодах. Все Docker операции выполняются через SSH на удалённой ноде.
+
+Base URL для Docker: `/api/v1/nodes/{node_id}/docker`
+
+### GET /api/v1/nodes/{node_id}/docker/containers
+
+Список контейнеров на ноде.
+
+**Path Parameters:**
+
+| Параметр | Тип | Описание |
+|----------|-----|----------|
+| `node_id` | UUID | ID ноды |
+
+**Query Parameters:**
+
+| Параметр | Тип | По умолчанию | Описание |
+|----------|-----|--------------|----------|
+| `all` | bool | false | Показывать остановленные контейнеры |
+
+**Response 200:**
+
+```json
+[
+  {
+    "ID": "abc123def456",
+    "Names": "/my-container",
+    "Image": "nginx:latest",
+    "Command": "/docker-entrypoint.sh",
+    "CreatedAt": "2025-07-10 12:00:00 +0000 UTC",
+    "State": "running",
+    "Status": "Up 2 days",
+    "Ports": "0.0.0.0:8080->80/tcp",
+    "Networks": "bridge"
+  }
+]
+```
+
+**Response 404:**
+
+```json
+{ "detail": "Node not found" }
+```
+
+**Response 502:**
+
+```json
+{ "detail": "Docker error: <message>" }
+```
+
+---
+
+### GET /api/v1/nodes/{node_id}/docker/containers/{container_id}
+
+Детали контейнера (аналог `docker inspect`).
+
+**Path Parameters:**
+
+| Параметр | Тип | Описание |
+|----------|-----|----------|
+| `node_id` | UUID | ID ноды |
+| `container_id` | string | ID контейнера (hex + дефисы) |
+
+**Response 200:**
+
+```json
+{
+  "Id": "abc123def456...",
+  "Name": "/my-container",
+  "State": {
+    "status": "running",
+    "running": true,
+    "exit_code": 0,
+    "started_at": "2025-07-10T12:00:00Z",
+    "finished_at": null,
+    "oom_killed": null
+  },
+  "Config": {
+    "image": "nginx:latest",
+    "cmd": ["/docker-entrypoint.sh"],
+    "env": ["PATH=/usr/local/sbin:/usr/local/bin"],
+    "hostname": "abc123def456"
+  },
+  "NetworkSettings": {}
+}
+```
+
+**Response 404:**
+
+```json
+{ "detail": "Container not found" }
+```
+
+**Response 422 (DockerValidationError):**
+
+```json
+{ "detail": "Invalid container ID format: ..." }
+```
+
+---
+
+### POST /api/v1/nodes/{node_id}/docker/containers/{container_id}/start
+
+Запуск контейнера.
+
+**Path Parameters:**
+
+| Параметр | Тип | Описание |
+|----------|-----|----------|
+| `node_id` | UUID | ID ноды |
+| `container_id` | string | ID контейнера |
+
+**Response 204:** Нет тела.
+
+---
+
+### POST /api/v1/nodes/{node_id}/docker/containers/{container_id}/stop
+
+Остановка контейнера.
+
+**Path Parameters:**
+
+| Параметр | Тип | Описание |
+|----------|-----|----------|
+| `node_id` | UUID | ID ноды |
+| `container_id` | string | ID контейнера |
+
+**Query Parameters:**
+
+| Параметр | Тип | По умолчанию | Описание |
+|----------|-----|--------------|----------|
+| `timeout` | int | 10 | Таймаут остановки (1–300 сек) |
+
+**Response 204:** Нет тела.
+
+---
+
+### POST /api/v1/nodes/{node_id}/docker/containers/{container_id}/restart
+
+Перезапуск контейнера.
+
+**Path Parameters:**
+
+| Параметр | Тип | Описание |
+|----------|-----|----------|
+| `node_id` | UUID | ID ноды |
+| `container_id` | string | ID контейнера |
+
+**Query Parameters:**
+
+| Параметр | Тип | По умолчанию | Описание |
+|----------|-----|--------------|----------|
+| `timeout` | int | 10 | Таймаут остановки перед перезапуском (1–300 сек) |
+
+**Response 204:** Нет тела.
+
+---
+
+### DELETE /api/v1/nodes/{node_id}/docker/containers/{container_id}
+
+Удаление контейнера.
+
+**Path Parameters:**
+
+| Параметр | Тип | Описание |
+|----------|-----|----------|
+| `node_id` | UUID | ID ноды |
+| `container_id` | string | ID контейнера |
+
+**Query Parameters:**
+
+| Параметр | Тип | По умолчанию | Описание |
+|----------|-----|--------------|----------|
+| `force` | bool | false | Принудительное удаление |
+
+**Response 204:** Нет тела.
+
+---
+
+### GET /api/v1/nodes/{node_id}/docker/containers/{container_id}/logs
+
+Получение логов контейнера.
+
+**Path Parameters:**
+
+| Параметр | Тип | Описание |
+|----------|-----|----------|
+| `node_id` | UUID | ID ноды |
+| `container_id` | string | ID контейнера |
+
+**Query Parameters:**
+
+| Параметр | Тип | По умолчанию | Описание |
+|----------|-----|--------------|----------|
+| `tail` | int | 100 | Количество строк с конца (1–10000) |
+| `since` | string \| null | null | Время начала (unix timestamp или Go duration) |
+
+**Response 200:** Текст логов (plain text string).
+
+---
+
+### POST /api/v1/nodes/{node_id}/docker/containers/{container_id}/exec
+
+Выполнение команды в контейнере (аналог `docker exec`).
+
+**Path Parameters:**
+
+| Параметр | Тип | Описание |
+|----------|-----|----------|
+| `node_id` | UUID | ID ноды |
+| `container_id` | string | ID контейнера |
+
+**Request Body:**
+
+```json
+{
+  "command": "ls -la /app",
+  "timeout": 30
+}
+```
+
+| Поле | Тип | Обязательно | Описание |
+|------|-----|-------------|----------|
+| `command` | string | да | Команда (1–4096 символов) |
+| `timeout` | int | нет (30) | Таймаут (1–600 сек) |
+
+**Response 200:**
+
+```json
+{
+  "stdout": "total 64\ndrwxr-xr-x 12 root root 4096 ...",
+  "stderr": "",
+  "exit_code": 0
+}
+```
+
+---
+
+### GET /api/v1/nodes/{node_id}/docker/containers/{container_id}/stats
+
+Статистика контейнера (аналог `docker stats --no-stream`).
+
+**Path Parameters:**
+
+| Параметр | Тип | Описание |
+|----------|-----|----------|
+| `node_id` | UUID | ID ноды |
+| `container_id` | string | ID контейнера |
+
+**Response 200:**
+
+```json
+{
+  "Container": "abc123def456",
+  "Name": "my-container",
+  "CPUPerc": "0.15%",
+  "MemUsage": "12.3MiB / 256MiB",
+  "MemLimit": "256MiB",
+  "MemPerc": "4.80%",
+  "NetIO": "1.2MB / 500kB",
+  "BlockIO": "10MB / 0B",
+  "PIDs": "5"
+}
+```
+
+---
+
+### GET /api/v1/nodes/{node_id}/docker/images
+
+Список Docker образов на ноде.
+
+**Path Parameters:**
+
+| Параметр | Тип | Описание |
+|----------|-----|----------|
+| `node_id` | UUID | ID ноды |
+
+**Response 200:**
+
+```json
+[
+  {
+    "Repository": "nginx",
+    "Tag": "latest",
+    "ID": "abc123def456",
+    "Size": "187MB",
+    "CreatedAt": "2025-07-01 00:00:00 +0000 UTC"
+  }
+]
+```
+
+---
+
+### POST /api/v1/nodes/{node_id}/docker/images/pull
+
+Скачивание Docker образа на ноду.
+
+**Path Parameters:**
+
+| Параметр | Тип | Описание |
+|----------|-----|----------|
+| `node_id` | UUID | ID ноды |
+
+**Request Body:**
+
+```json
+{
+  "image": "nginx:1.25",
+  "timeout": 300
+}
+```
+
+| Поле | Тип | Обязательно | Описание |
+|------|-----|-------------|----------|
+| `image` | string | да | Имя образа (1–255 символов) |
+| `timeout` | int | нет (300) | Таймаут (1–3600 сек) |
+
+**Response 200:**
+
+```json
+{
+  "image": "nginx:1.25",
+  "output": "Status: Downloaded newer image for nginx:1.25",
+  "success": true
+}
+```
+
+---
+
+### GET /api/v1/nodes/{node_id}/docker/networks
+
+Список Docker сетей на ноде.
+
+**Path Parameters:**
+
+| Параметр | Тип | Описание |
+|----------|-----|----------|
+| `node_id` | UUID | ID ноды |
+
+**Response 200:**
+
+```json
+[
+  {
+    "ID": "abc123def456",
+    "Name": "bridge",
+    "Driver": "bridge",
+    "Scope": "local"
+  }
+]
+```
+
+---
+
+### GET /api/v1/nodes/{node_id}/docker/volumes
+
+Список Docker томов на ноде.
+
+**Path Parameters:**
+
+| Параметр | Тип | Описание |
+|----------|-----|----------|
+| `node_id` | UUID | ID ноды |
+
+**Response 200:**
+
+```json
+[
+  {
+    "Driver": "local",
+    "Name": "my-volume"
+  }
+]
+```
+
 ## Health
 
 ### GET /health
@@ -1444,6 +1853,120 @@ Healthcheck.
 | `items` | list[APIKeyResponse] | Список ключей |
 | `total` | int | Общее количество |
 
+### DockerContainer
+
+| Поле | Тип | Описание |
+|------|-----|----------|
+| `ID` | string | ID контейнера |
+| `Names` | string | Имя контейнера |
+| `Image` | string | Образ |
+| `Command` | string | Команда запуска |
+| `CreatedAt` | string | Время создания |
+| `State` | string | Состояние: `running`, `exited`, etc. |
+| `Status` | string | Статус (человекочитаемый) |
+| `Ports` | string \| null | порты |
+| `Networks` | string \| null | Сети |
+
+### DockerContainerInspect
+
+| Поле | Тип | Описание |
+|------|-----|----------|
+| `Id` | string | ID контейнера |
+| `Name` | string | Имя |
+| `State` | DockerContainerState | Состояние |
+| `Config` | DockerContainerConfig | Конфигурация |
+| `NetworkSettings` | dict \| null | Сетевые настройки |
+
+### DockerContainerState
+
+| Поле | Тип | Описание |
+|------|-----|----------|
+| `status` | string | Статус |
+| `running` | bool | Запущен |
+| `exit_code` | int | Код выхода |
+| `started_at` | string \| null | Время запуска |
+| `finished_at` | string \| null | Время остановки |
+| `oom_killed` | bool \| null | Убит OOM |
+
+### DockerContainerConfig
+
+| Поле | Тип | Описание |
+|------|-----|----------|
+| `image` | string \| null | Образ |
+| `cmd` | list[string] \| null | Команда |
+| `env` | list[string] \| null | Переменные окружения |
+| `hostname` | string \| null | Хостнейм |
+
+### DockerExecRequest
+
+| Поле | Тип | Обязательно | Описание |
+|------|-----|-------------|----------|
+| `command` | string | да | Команда (1–4096 символов) |
+| `timeout` | int | нет (30) | Таймаут (1–600 сек) |
+
+### DockerExecResult
+
+| Поле | Тип | Описание |
+|------|-----|----------|
+| `stdout` | string | Стандартный вывод |
+| `stderr` | string | Стандартный вывод ошибок |
+| `exit_code` | int | Код возврата |
+
+### DockerImage
+
+| Поле | Тип | Описание |
+|------|-----|----------|
+| `Repository` | string | Репозиторий |
+| `Tag` | string | Тег |
+| `ID` | string | ID образа |
+| `Size` | string | Размер |
+| `CreatedAt` | string | Время создания |
+
+### DockerImagePullRequest
+
+| Поле | Тип | Обязательно | Описание |
+|------|-----|-------------|----------|
+| `image` | string | да | Имя образа (1–255 символов) |
+| `timeout` | int | нет (300) | Таймаут (1–3600 сек) |
+
+### DockerPullResult
+
+| Поле | Тип | Описание |
+|------|-----|----------|
+| `image` | string | Имя образа |
+| `output` | string | Вывод операции |
+| `success` | bool | Успешно |
+
+### DockerStats
+
+| Поле | Тип | Описание |
+|------|-----|----------|
+| `Container` | string | ID контейнера |
+| `Name` | string | Имя |
+| `CPUPerc` | string | Процент CPU |
+| `MemUsage` | string | Использование памяти |
+| `MemLimit` | string \| null | Лимит памяти |
+| `MemPerc` | string | Процент памяти |
+| `NetIO` | string | сетевой I/O |
+| `BlockIO` | string | блочный I/O |
+| `PIDs` | string \| null | Количество процессов |
+
+### DockerNetwork
+
+| Поле | Тип | Описание |
+|------|-----|----------|
+| `ID` | string | ID сети |
+| `Name` | string | Имя |
+| `Driver` | string | Драйвер |
+| `Scope` | string | Область |
+
+### DockerVolume
+
+| Поле | Тип | Описание |
+|------|-----|----------|
+| `Driver` | string | Драйвер |
+| `Name` | string | Имя |
+
 ---
 
 ## Коды ошибок
@@ -1453,6 +1976,7 @@ Healthcheck.
 | 201 | Создано успешно |
 | 204 | Удалено успешно |
 | 401 | Не авторизован / невалидный API ключ |
-| 404 | Ресурс не найден (Node, Command, Script, API Key) |
-| 422 | Ошибка валидации запроса / TemplateRenderError |
-| 503 | Ошибка подключения к ноде (ConnectionFailedError) |
+| 404 | Ресурс не найден (Node, Command, Script, API Key, Container) |
+| 422 | Ошибка валидации запроса / TemplateRenderError / DockerValidationError |
+| 502 | Ошибка Docker-операции на удалённой ноде (DockerError) |
+| 503 | Ошибка подключения к ноде (ConnectionFailedError, DockerDaemonError) |

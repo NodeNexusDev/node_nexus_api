@@ -1,139 +1,49 @@
 # Node Nexus API
 
-REST API для управления серверными нодами с SSH-подключениями.
+REST API для управления серверными нодами с SSH-подключениями. Централизованное управление инфраструктурой: ноды, SSH-команды, шаблоны, скрипты, Docker-контейнеры — всё через один API.
 
-## Стек
+## Возможности
 
-- **Python 3.13**, **FastAPI**, **SQLAlchemy 2.0** (async), **Alembic**
-- **dishka** (DI), **asyncssh**, **cryptography** (AES-256-GCM)
-- **structlog** (структурное логирование), **httpx** (async HTTP)
-- **PostgreSQL**, **Docker**
+- **Ноды** — CRUD, фильтрация по тегам, поиск, проверка SSH-связности
+- **SSH-команды** — выполнение команд на нодах, bulk-выполнение по ID и тегам
+- **Шаблоны команд** — сохранение часто используемых команд с параметрами
+- **Скрипты** — пайплайны команд (inline + шаблоны) с поддержкой `on_failure: stop|continue`
+- **Docker** — управление контейнерами, образами, сетями и томами на удалённых нодах через SSH
+- **Аудит-лог** — запись всех операций с фильтрацией по нодам и типу действия
+- **API ключи** — аутентификация через `X-API-Key`, master key, хеширование ключей (SHA-256)
+- **Безопасность** — шифрование SSH-ключей и паролей (AES-256-GCM), секреты не возвращаются в ответах
 
 ## Быстрый старт
 
 ```bash
-# Установка зависимостей
-uv sync
+git clone <repo-url> && cd node_nexus_api
 
-# Запуск (требуется PostgreSQL)
-docker compose up -d db
-uv run alembic upgrade head
-uv run uvicorn app.main:app --reload
+# Настроить окружение
+cp .env.example .env
 
-# Или всё через Docker
+# Запустить (Docker)
 docker compose up -d --build
 ```
 
-## API
-
-Полная спецификация: [docs/api-spec.md](docs/api-spec.md)
-
-### Эндпоинты
-
-| Ресурс | Описание |
-|--------|----------|
-| `/api/v1/nodes` | CRUD нод, теги, фильтрация/поиск, SSH-команды, bulk execute |
-| `/api/v1/commands` | Шаблоны команд с параметрами + выполнение |
-| `/api/v1/scripts` | Пайплайны команд (скрипты) + выполнение на нодах |
-| `/api/v1/audit` | Просмотр аудит-лога |
-| `/api/v1/api-keys` | Управление API ключами |
-| `/health` | Healthcheck |
-
-## Безопасность
-
-- **SSH-ключи и пароли** шифруются AES-256-GCM перед записью в БД
-- Секреты **не возвращаются** в API-ответах
-- **API Key аутентификация** — все эндпоинты защищены заголовком `X-API-Key`
-- API ключи хранятся в БД в виде SHA-256 хешей
-
-## Конфигурация
-
-| Переменная | Описание | По умолчанию |
-|------------|----------|--------------|
-| `DATABASE_URL` | URL PostgreSQL | — |
-| `SECRET_KEY` | Ключ шифрования | — |
-| `MASTER_API_KEY` | Master API ключ для аутентификации | — |
-| `LOG_LEVEL` | Уровень логирования | INFO |
-| `DEBUG` | Режим отладки | false |
-| `PORT` | Порт сервера | 8000 |
-| `CORS_ORIGINS` | Разрешённые origins | `["http://localhost:3000"]` |
-| `ENCRYPTION_SALT` | Соль для HKDF (шифрование) | `node-nexus-ssh-v1` |
-
-## Тесты
+Или локально:
 
 ```bash
-# Все тесты
-uv run pytest tests/unit/ tests/integration/ -v
-
-# С покрытием
-uv run pytest tests/unit/ tests/integration/ --cov=app --cov-report=term-missing
-
-# E2E (требует Docker)
-uv run pytest tests/e2e/ -v
+uv sync
+docker compose up -d db
+uv run alembic upgrade head
+uv run python -m app.main
 ```
 
-## Архитектура
+## Стек
 
-```
-API (FastAPI routers)
-    ↓
-Service (бизнес-логика)
-    ↓
-Repository (SQLAlchemy)
-    ↓
-Model (ORM)
+[Python](https://www.python.org/) 3.13 · [FastAPI](https://fastapi.tiangolo.com/) · [SQLAlchemy](https://www.sqlalchemy.org/) 2.0 (async) · [Alembic](https://alembic.sqlalchemy.org/) · [Pydantic](https://docs.pydantic.dev/) · [dishka](https://dishka.dev/) · [asyncssh](https://asyncssh.readthedocs.io/) · [cryptography](https://cryptography.io/) · [structlog](https://www.structlog.org/) · [PostgreSQL](https://www.postgresql.org/)
 
-Connectors (SSH) ← Service
-Security (AES-256-GCM) ← Service
-Template (рендер команд) ← Service
-Audit Log ← Service
-Middleware (request logging) → API
-```
+## Документация
 
-## Структура проекта
-
-```
-app/
-├── api/
-│   ├── deps.py              # Auth dependency (X-API-Key)
-│   ├── v1/
-│   │   ├── nodes.py        # CRUD + теги + SSH-команды + bulk execute
-│   │   ├── commands.py     # Шаблоны команд с параметрами
-│   │   ├── scripts.py      # Пайплайны команд (скрипты)
-│   │   ├── audit.py        # Аудит-лог
-│   │   ├── api_keys.py     # Управление API ключами
-│   │   └── health.py       # Healthcheck
-│   └── middleware.py        # Request logging middleware
-├── core/
-│   ├── config.py           # Конфигурация (Pydantic Settings)
-│   ├── exceptions.py       # Доменные исключения
-│   ├── security.py         # AES-256-GCM шифрование
-│   ├── ssh_utils.py        # Общие SSH-утилиты
-│   ├── logging.py          # Structured logging (structlog)
-│   ├── template.py         # Рендер команд с параметрами
-│   └── connectors/
-│       ├── base.py         # BaseConnector + ConnectorFactory
-│       └── ssh.py          # SSH коннектор + фабрика
-├── di/
-│   └── providers.py        # DI провайдеры (dishka)
-├── models/
-│   ├── node.py             # Нода
-│   ├── command.py          # Шаблон команды
-│   ├── script.py           # Скрипт
-│   ├── script_execution.py # Результат выполнения скрипта
-│   ├── audit_log.py        # Аудит-лог
-│   └── api_key.py          # API ключ
-├── repositories/           # Доступ к данным (CRUD)
-├── schemas/                # Pydantic-схемы (Request/Response)
-│   ├── api_key.py          # Схемы API ключей
-│   └── ...
-└── services/
-    ├── node_service.py     # Бизнес-логика нод
-    ├── command_service.py  # Бизнес-логика команд
-    ├── script_service.py   # Бизнес-логика скриптов
-    ├── audit_service.py    # Сервис аудит-лога
-    └── api_key_service.py  # Сервис API ключей
-```
+- [API спецификация](docs/api-spec.md) — все эндпоинты, схемы, ошибки
+- [Архитектура](docs/architecture.md) — слои, структура проекта, DI, коннекторы
+- [Конфигурация](docs/configuration.md) — переменные окружения, Docker, аутентификация
+- [Разработка](docs/development.md) — workflow, тестирование, команды
 
 ## Лицензия
 
