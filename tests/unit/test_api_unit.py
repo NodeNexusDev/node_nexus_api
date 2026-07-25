@@ -34,6 +34,7 @@ def _make_node(**overrides: Any) -> NodeResponse:
         "connection_type": "ssh",
         "status": "active",
         "username": "root",
+        "docker_host": None,
         "tags": [],
         "created_at": datetime.now(UTC),
         "updated_at": datetime.now(UTC),

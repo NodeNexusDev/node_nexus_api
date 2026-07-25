@@ -16,6 +16,7 @@ from app.repositories.script_repo import ScriptRepository
 from app.services.api_key_service import APIKeyService
 from app.services.audit_service import AuditService
 from app.services.command_service import CommandService
+from app.services.docker_service import DockerService
 from app.services.node_service import NodeService
 from app.services.script_service import ScriptService
 
@@ -146,6 +147,20 @@ class ServiceProvider(Provider):
     def get_api_key_service(self, repository: APIKeyRepository) -> APIKeyService:
         """Get API key service."""
         return APIKeyService(repository=repository)
+
+    @provide(scope=Scope.REQUEST)
+    def get_docker_service(
+        self,
+        repository: NodeRepository,
+        audit_service: AuditService,
+        connector_factory: SSHConnectorFactory,
+    ) -> DockerService:
+        """Get Docker service."""
+        return DockerService(
+            repository=repository,
+            audit_service=audit_service,
+            connector_factory=connector_factory,
+        )
 
 
 class ConfigProvider(Provider):
