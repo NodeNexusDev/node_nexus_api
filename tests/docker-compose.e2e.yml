@@ -1,7 +1,7 @@
 services:
   db:
     image: postgres:16
-    env_file: .env.e2e
+    env_file: ../.env.e2e
     ports:
       - "5433:5432"
     healthcheck:
@@ -38,10 +38,10 @@ services:
         max-file: "3"
 
   api:
-    build: .
+    build: ..
     ports:
       - "${HOST_PORT_E2E:-8001}:${PORT:-8000}"
-    env_file: .env.e2e
+    env_file: ../.env.e2e
     depends_on:
       db:
         condition: service_healthy

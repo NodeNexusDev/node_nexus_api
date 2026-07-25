@@ -3,7 +3,7 @@
 import uuid
 
 import structlog
-from dishka.integrations.fastapi import FromDishka, inject
+from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
 from fastapi import APIRouter, HTTPException, Query, Security
 
 from app.api.deps import get_current_api_key
@@ -25,7 +25,7 @@ from app.services.command_service import CommandService
 
 audit = structlog.get_logger("audit")
 
-router = APIRouter(prefix="/commands", tags=["commands"])
+router = APIRouter(prefix="/commands", tags=["commands"], route_class=DishkaRoute)
 
 
 @router.get("/", response_model=PaginatedResponse[CommandResponse])
@@ -38,8 +38,7 @@ async def get_commands(
 ) -> PaginatedResponse[CommandResponse]:
     """Get all commands with pagination."""
     audit.info("api.commands.list", page=page, size=size)
-    skip = (page - 1) * size
-    commands, total = await service.get_all_commands(skip=skip, limit=size)
+    commands, total = await service.get_all_commands(page=page, size=size)
     return PaginatedResponse(items=commands, total=total, page=page, size=size)
 
 

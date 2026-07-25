@@ -39,3 +39,23 @@ class APIKeyRevokedError(DomainError):
 
 class TagNotFoundError(DomainError):
     """Raised when a tag is not found on a node."""
+
+
+class DockerError(DomainError):
+    """Raised when a Docker operation fails."""
+
+
+class ContainerNotFoundError(DockerError):
+    """Raised when a Docker container is not found."""
+
+
+class ImageNotFoundError(DockerError):
+    """Raised when a Docker image is not found."""
+
+
+class DockerDaemonError(DockerError):
+    """Raised when Docker daemon is unreachable."""
+
+
+class DockerValidationError(DockerError):
+    """Raised when Docker command parameters are invalid."""

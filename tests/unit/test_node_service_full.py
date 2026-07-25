@@ -24,14 +24,12 @@ def service(repo: AsyncMock) -> NodeService:
 
 
 class TestGetNode:
-    @pytest.mark.asyncio
     async def test_found(self, service: NodeService, repo: AsyncMock) -> None:
         orm_node = make_orm_node()
         repo.get_by_id.return_value = orm_node
         result = await service.get_node(orm_node.id)
         assert result.name == "server-1"
 
-    @pytest.mark.asyncio
     async def test_not_found(self, service: NodeService, repo: AsyncMock) -> None:
         repo.get_by_id.return_value = None
         with pytest.raises(NodeNotFoundError):
@@ -39,7 +37,6 @@ class TestGetNode:
 
 
 class TestGetAllNodes:
-    @pytest.mark.asyncio
     async def test_empty(self, service: NodeService, repo: AsyncMock) -> None:
         repo.get_all.return_value = []
         repo.count.return_value = 0
@@ -47,7 +44,6 @@ class TestGetAllNodes:
         assert nodes == []
         assert total == 0
 
-    @pytest.mark.asyncio
     async def test_with_data(self, service: NodeService, repo: AsyncMock) -> None:
         nodes = [make_orm_node(name="n1"), make_orm_node(name="n2")]
         repo.get_all.return_value = nodes
@@ -58,7 +54,6 @@ class TestGetAllNodes:
 
 
 class TestCreateNode:
-    @pytest.mark.asyncio
     async def test_creates_node(self, service: NodeService, repo: AsyncMock) -> None:
         orm_node = make_orm_node()
         repo.create.return_value = orm_node
@@ -67,7 +62,6 @@ class TestCreateNode:
         assert result.name == "server-1"
         repo.create.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_encrypts_password(
         self, service: NodeService, repo: AsyncMock
     ) -> None:
@@ -84,7 +78,6 @@ class TestCreateNode:
         assert call_data["password"] != "secret123"
         assert decrypt(call_data["password"]) == "secret123"
 
-    @pytest.mark.asyncio
     async def test_encrypts_ssh_key(
         self, service: NodeService, repo: AsyncMock
     ) -> None:
@@ -103,7 +96,6 @@ class TestCreateNode:
 
 
 class TestUpdateNode:
-    @pytest.mark.asyncio
     async def test_found(self, service: NodeService, repo: AsyncMock) -> None:
         orm_node = make_orm_node()
         repo.update.return_value = orm_node
@@ -111,13 +103,11 @@ class TestUpdateNode:
         result = await service.update_node(orm_node.id, data)
         assert result.name == "server-1"
 
-    @pytest.mark.asyncio
     async def test_not_found(self, service: NodeService, repo: AsyncMock) -> None:
         repo.update.return_value = None
         with pytest.raises(NodeNotFoundError):
             await service.update_node(uuid.uuid4(), NodeUpdate(name="x"))
 
-    @pytest.mark.asyncio
     async def test_encrypts_fields(self, service: NodeService, repo: AsyncMock) -> None:
         orm_node = make_orm_node()
         repo.update.return_value = orm_node
@@ -128,14 +118,12 @@ class TestUpdateNode:
 
 
 class TestDeleteNode:
-    @pytest.mark.asyncio
     async def test_found(self, service: NodeService, repo: AsyncMock) -> None:
         repo.get_by_id.return_value = make_orm_node()
         result = await service.delete_node(uuid.uuid4())
         assert result is True
         repo.delete.assert_awaited_once()
 
-    @pytest.mark.asyncio
     async def test_not_found(self, service: NodeService, repo: AsyncMock) -> None:
         repo.get_by_id.return_value = None
         with pytest.raises(NodeNotFoundError):
@@ -144,21 +132,28 @@ class TestDeleteNode:
 
 class TestDecryptValue:
     def test_none_returns_none(self) -> None:
-        assert NodeService._decrypt_value(None) is None
+        from app.core.ssh_utils import decrypt_value
+
+        assert decrypt_value(None) is None
 
     def test_empty_string_returns_empty(self) -> None:
-        assert NodeService._decrypt_value("") == ""
+        from app.core.ssh_utils import decrypt_value
+
+        assert decrypt_value("") == ""
 
     def test_encrypted_value_decrypts(self) -> None:
+        from app.core.ssh_utils import decrypt_value
+
         token = encrypt("secret")
-        assert NodeService._decrypt_value(token) == "secret"
+        assert decrypt_value(token) == "secret"
 
     def test_non_encrypted_value_returns_as_is(self) -> None:
-        assert NodeService._decrypt_value("plain-text") == "plain-text"
+        from app.core.ssh_utils import decrypt_value
+
+        assert decrypt_value("plain-text") == "plain-text"
 
 
 class TestCheckConnectivityEdgeCases:
-    @pytest.mark.asyncio
     async def test_orm_node_not_found_after_get_node(
         self, service: NodeService, repo: AsyncMock
     ) -> None:
@@ -170,7 +165,6 @@ class TestCheckConnectivityEdgeCases:
 
 
 class TestExecuteCommandEdgeCases:
-    @pytest.mark.asyncio
     async def test_orm_node_not_found_after_get_node(
         self, service: NodeService, repo: AsyncMock
     ) -> None:
@@ -184,7 +178,6 @@ class TestExecuteCommandEdgeCases:
 
 
 class TestGetAllNodesFiltering:
-    @pytest.mark.asyncio
     async def test_delegates_to_filtered_with_tags(
         self, service: NodeService, repo: AsyncMock
     ) -> None:
@@ -195,10 +188,9 @@ class TestGetAllNodesFiltering:
         assert len(result_nodes) == 1
         assert total == 1
         repo.get_filtered.assert_called_once_with(
-            tags=["prod"], search=None, skip=0, limit=100
+            tags=["prod"], search=None, skip=0, limit=20
         )
 
-    @pytest.mark.asyncio
     async def test_delegates_to_filtered_with_search(
         self, service: NodeService, repo: AsyncMock
     ) -> None:
@@ -208,10 +200,9 @@ class TestGetAllNodesFiltering:
         assert result_nodes == []
         assert total == 0
         repo.get_filtered.assert_called_once_with(
-            tags=None, search="web", skip=0, limit=100
+            tags=None, search="web", skip=0, limit=20
         )
 
-    @pytest.mark.asyncio
     async def test_falls_back_to_get_all_without_filters(
         self, service: NodeService, repo: AsyncMock
     ) -> None:
@@ -225,7 +216,6 @@ class TestGetAllNodesFiltering:
 
 
 class TestBulkExecuteCommand:
-    @pytest.mark.asyncio
     async def test_all_nodes_succeed(
         self, service: NodeService, repo: AsyncMock
     ) -> None:
@@ -252,7 +242,6 @@ class TestBulkExecuteCommand:
         assert result.failed == 0
         assert all(r.exit_code == 0 for r in result.results)
 
-    @pytest.mark.asyncio
     async def test_partial_failure(self, service: NodeService, repo: AsyncMock) -> None:
         from unittest.mock import AsyncMock, MagicMock
 
@@ -285,7 +274,6 @@ class TestBulkExecuteCommand:
         assert result.succeeded == 1
         assert result.failed == 1
 
-    @pytest.mark.asyncio
     async def test_no_nodes_raises(self, service: NodeService, repo: AsyncMock) -> None:
         repo.get_by_ids.return_value = []
         with pytest.raises(NodeNotFoundError):
@@ -293,7 +281,6 @@ class TestBulkExecuteCommand:
                 BulkCommandRequest(command="ls", node_ids=[uuid.uuid4()])
             )
 
-    @pytest.mark.asyncio
     async def test_connection_error_returns_error_result(
         self, service: NodeService, repo: AsyncMock
     ) -> None:
@@ -318,7 +305,6 @@ class TestBulkExecuteCommand:
         assert result.failed == 1
         assert "Connection refused" in result.results[0].stderr
 
-    @pytest.mark.asyncio
     async def test_resolve_by_tags(self, service: NodeService, repo: AsyncMock) -> None:
         from unittest.mock import AsyncMock, MagicMock
 
@@ -340,7 +326,6 @@ class TestBulkExecuteCommand:
         assert result.total == 1
         repo.get_by_tags.assert_called_once_with(["prod"])
 
-    @pytest.mark.asyncio
     async def test_resolve_by_both_ids_and_tags(
         self, service: NodeService, repo: AsyncMock
     ) -> None:
@@ -368,7 +353,6 @@ class TestBulkExecuteCommand:
         assert result.total == 1
         assert result.results[0].node_id == n1.id
 
-    @pytest.mark.asyncio
     async def test_resolve_by_tags_empty(
         self, service: NodeService, repo: AsyncMock
     ) -> None:
@@ -378,7 +362,6 @@ class TestBulkExecuteCommand:
                 BulkCommandRequest(command="ls", tags=["nonexistent"])
             )
 
-    @pytest.mark.asyncio
     async def test_resolve_by_both_empty_intersection(
         self, service: NodeService, repo: AsyncMock
     ) -> None:
@@ -391,3 +374,19 @@ class TestBulkExecuteCommand:
             await service.bulk_execute_command(
                 BulkCommandRequest(command="ls", node_ids=[n1.id], tags=["prod"])
             )
+
+
+class TestLogWithAudit:
+    async def test_calls_audit(self, repo: AsyncMock) -> None:
+        from unittest.mock import AsyncMock
+
+        from app.services.node_service import NodeService
+
+        audit_mock = AsyncMock()
+        svc = NodeService(
+            repository=repo,
+            audit_service=audit_mock,
+            connector_factory=AsyncMock(),
+        )
+        await svc._log("test_action", node_id=uuid.uuid4(), details={"k": "v"})
+        audit_mock.log.assert_awaited_once()

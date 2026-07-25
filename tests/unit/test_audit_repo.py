@@ -38,7 +38,6 @@ def repo(session: AsyncSession) -> AuditLogRepository:
     return AuditLogRepository(session)
 
 
-@pytest.mark.asyncio
 async def test_create(repo: AuditLogRepository) -> None:
     log = await repo.create(
         {"action": "create", "node_id": uuid.uuid4(), "details": '{"name": "test"}'}
@@ -47,13 +46,11 @@ async def test_create(repo: AuditLogRepository) -> None:
     assert log.action == "create"
 
 
-@pytest.mark.asyncio
 async def test_get_all_empty(repo: AuditLogRepository) -> None:
     logs = await repo.get_all()
     assert logs == []
 
 
-@pytest.mark.asyncio
 async def test_get_all_with_data(repo: AuditLogRepository) -> None:
     node_id = uuid.uuid4()
     await repo.create({"action": "create", "node_id": node_id})
@@ -64,7 +61,6 @@ async def test_get_all_with_data(repo: AuditLogRepository) -> None:
     assert len(logs) == 2
 
 
-@pytest.mark.asyncio
 async def test_get_all_filter_action(repo: AuditLogRepository) -> None:
     await repo.create({"action": "create"})
     await repo.create({"action": "update"})
@@ -74,7 +70,6 @@ async def test_get_all_filter_action(repo: AuditLogRepository) -> None:
     assert len(logs) == 2
 
 
-@pytest.mark.asyncio
 async def test_get_all_pagination(repo: AuditLogRepository) -> None:
     for _ in range(5):
         await repo.create({"action": "test"})
@@ -83,19 +78,16 @@ async def test_get_all_pagination(repo: AuditLogRepository) -> None:
     assert len(logs) == 2
 
 
-@pytest.mark.asyncio
 async def test_count_empty(repo: AuditLogRepository) -> None:
     assert await repo.count() == 0
 
 
-@pytest.mark.asyncio
 async def test_count_with_data(repo: AuditLogRepository) -> None:
     await repo.create({"action": "a"})
     await repo.create({"action": "b"})
     assert await repo.count() == 2
 
 
-@pytest.mark.asyncio
 async def test_count_filter_node_id(repo: AuditLogRepository) -> None:
     node_id = uuid.uuid4()
     await repo.create({"action": "a", "node_id": node_id})
@@ -103,7 +95,6 @@ async def test_count_filter_node_id(repo: AuditLogRepository) -> None:
     assert await repo.count(node_id=node_id) == 1
 
 
-@pytest.mark.asyncio
 async def test_count_filter_action(repo: AuditLogRepository) -> None:
     await repo.create({"action": "create"})
     await repo.create({"action": "update"})

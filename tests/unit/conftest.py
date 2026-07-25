@@ -1,7 +1,11 @@
 """Shared test fixtures for unit tests."""
 
 from typing import Any
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
+
+from dishka import Provider, Scope, provide
+
+from app.services.api_key_service import APIKeyService
 
 
 def _mock_settings(master_key: str = "") -> MagicMock:
@@ -10,42 +14,14 @@ def _mock_settings(master_key: str = "") -> MagicMock:
     return settings
 
 
-class MockSessionContext:
-    """Mock async context manager."""
+class MockAuthServiceProvider(Provider):
+    """Provider that returns a mock APIKeyService for auth tests."""
 
-    def __init__(self, return_value: Any) -> None:
-        self._return_value = return_value
-
-    async def __aenter__(self) -> Any:
-        return self._return_value
-
-    async def __aexit__(self, *args: Any) -> None:
-        pass
-
-
-class MockSession:
-    """Mock session for auth dependency."""
-
-    def __init__(self) -> None:
-        pass
-
-    async def execute(self, *args: Any) -> MagicMock:
-        mock_result = MagicMock()
-        mock_result.scalar_one_or_none.return_value = None
-        return mock_result
-
-    async def flush(self) -> None:
-        pass
-
-    def begin(self) -> MockSessionContext:
-        return MockSessionContext(self)
-
-
-class MockSessionmaker:
-    """Mock sessionmaker for auth dependency."""
-
-    def __call__(self) -> MockSessionContext:
-        return MockSessionContext(MockSession())
+    @provide(scope=Scope.REQUEST)
+    def get_api_key_service(self) -> APIKeyService:
+        mock = AsyncMock(spec=APIKeyService)
+        mock.validate_api_key.return_value = None
+        return mock
 
 
 def make_orm_node(**overrides: Any) -> Any:
@@ -65,6 +41,7 @@ def make_orm_node(**overrides: Any) -> Any:
         "username": "root",
         "password": None,
         "ssh_key": None,
+        "docker_host": None,
         "tags": [],
         "created_at": datetime.now(UTC),
         "updated_at": datetime.now(UTC),
@@ -108,14 +85,10 @@ def make_response(**overrides: Any) -> Any:
         "connection_type": "ssh",
         "status": "active",
         "username": "root",
+        "docker_host": None,
         "tags": [],
         "created_at": datetime.now(UTC),
         "updated_at": datetime.now(UTC),
     }
     defaults.update(overrides)
     return NodeResponse(**defaults)
-
-
-def setup_test_app_auth(app: Any) -> None:
-    """Set up auth mocks on a test app."""
-    app.state.sessionmaker = MockSessionmaker()

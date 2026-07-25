@@ -110,7 +110,6 @@ def service(
 
 
 class TestGetScript:
-    @pytest.mark.asyncio
     async def test_found(self, service: ScriptService, script_repo: AsyncMock) -> None:
         orm_script = _make_orm_script()
         script_repo.get_by_id.return_value = orm_script
@@ -118,7 +117,6 @@ class TestGetScript:
         assert result.name == "deploy_check"
         assert len(result.steps) == 1
 
-    @pytest.mark.asyncio
     async def test_not_found(
         self, service: ScriptService, script_repo: AsyncMock
     ) -> None:
@@ -128,7 +126,6 @@ class TestGetScript:
 
 
 class TestCreateScript:
-    @pytest.mark.asyncio
     async def test_create(self, service: ScriptService, script_repo: AsyncMock) -> None:
         orm_script = _make_orm_script()
         script_repo.create.return_value = orm_script
@@ -142,7 +139,6 @@ class TestCreateScript:
 
 
 class TestDeleteScript:
-    @pytest.mark.asyncio
     async def test_delete(self, service: ScriptService, script_repo: AsyncMock) -> None:
         orm_script = _make_orm_script()
         script_repo.get_by_id.return_value = orm_script
@@ -150,7 +146,6 @@ class TestDeleteScript:
         result = await service.delete_script(orm_script.id)
         assert result is True
 
-    @pytest.mark.asyncio
     async def test_not_found(
         self, service: ScriptService, script_repo: AsyncMock
     ) -> None:
@@ -160,7 +155,6 @@ class TestDeleteScript:
 
 
 class TestGetAllScripts:
-    @pytest.mark.asyncio
     async def test_returns_list(
         self, service: ScriptService, script_repo: AsyncMock
     ) -> None:
@@ -171,7 +165,6 @@ class TestGetAllScripts:
         assert len(scripts) == 2
         assert total == 2
 
-    @pytest.mark.asyncio
     async def test_empty_list(
         self, service: ScriptService, script_repo: AsyncMock
     ) -> None:
@@ -183,7 +176,6 @@ class TestGetAllScripts:
 
 
 class TestUpdateScript:
-    @pytest.mark.asyncio
     async def test_update_name(
         self, service: ScriptService, script_repo: AsyncMock
     ) -> None:
@@ -193,7 +185,6 @@ class TestUpdateScript:
         result = await service.update_script(orm_script.id, data)
         assert result.name == "deploy_check"
 
-    @pytest.mark.asyncio
     async def test_update_with_steps(
         self, service: ScriptService, script_repo: AsyncMock
     ) -> None:
@@ -206,7 +197,6 @@ class TestUpdateScript:
         result = await service.update_script(orm_script.id, data)
         assert len(result.steps) == 1
 
-    @pytest.mark.asyncio
     async def test_not_found(
         self, service: ScriptService, script_repo: AsyncMock
     ) -> None:
@@ -217,7 +207,6 @@ class TestUpdateScript:
 
 
 class TestGetExecutions:
-    @pytest.mark.asyncio
     async def test_success(
         self,
         service: ScriptService,
@@ -233,7 +222,6 @@ class TestGetExecutions:
         assert total == 1
         assert executions[0].status == "completed"
 
-    @pytest.mark.asyncio
     async def test_script_not_found(
         self, service: ScriptService, script_repo: AsyncMock
     ) -> None:
@@ -243,7 +231,6 @@ class TestGetExecutions:
 
 
 class TestExecuteScript:
-    @pytest.mark.asyncio
     async def test_success(
         self,
         service: ScriptService,
@@ -281,7 +268,6 @@ class TestExecuteScript:
         assert len(result.results) == 1
         assert result.results[0].status == "completed"
 
-    @pytest.mark.asyncio
     async def test_script_not_found(
         self, service: ScriptService, script_repo: AsyncMock
     ) -> None:
@@ -290,7 +276,6 @@ class TestExecuteScript:
         with pytest.raises(ScriptNotFoundError):
             await service.execute_script(uuid.uuid4(), data)
 
-    @pytest.mark.asyncio
     async def test_node_not_found(
         self,
         service: ScriptService,
@@ -319,7 +304,6 @@ class TestExecuteScript:
         result = await service_with_factory.execute_script(orm_script.id, data)
         assert result.results[0].status == "failed"
 
-    @pytest.mark.asyncio
     async def test_connector_error(
         self,
         script_repo: AsyncMock,
@@ -354,7 +338,6 @@ class TestExecuteScript:
         result = await service.execute_script(orm_script.id, data)
         assert result.results[0].status == "failed"
 
-    @pytest.mark.asyncio
     async def test_step_failure_stop(
         self,
         script_repo: AsyncMock,
@@ -404,7 +387,6 @@ class TestExecuteScript:
         assert result.results[0].status == "failed"
         assert len(result.results[0].steps) == 1
 
-    @pytest.mark.asyncio
     async def test_step_failure_continue(
         self,
         script_repo: AsyncMock,
@@ -457,7 +439,6 @@ class TestExecuteScript:
         assert result.results[0].status == "completed"
         assert len(result.results[0].steps) == 2
 
-    @pytest.mark.asyncio
     async def test_multi_node(
         self,
         script_repo: AsyncMock,
@@ -496,25 +477,21 @@ class TestExecuteScript:
 
 
 class TestResolveCommand:
-    @pytest.mark.asyncio
     async def test_inline(self, service: ScriptService, cmd_repo: AsyncMock) -> None:
         step = ScriptStep(label="Step", type="inline", command="echo hello")
         result = await service._resolve_command(step, {})
         assert result == "echo hello"
 
-    @pytest.mark.asyncio
     async def test_inline_with_global_params(self, service: ScriptService) -> None:
         step = ScriptStep(label="Step", type="inline", command="echo hello", params={})
         result = await service._resolve_command(step, {"unused": "value"})
         assert result == "echo hello"
 
-    @pytest.mark.asyncio
     async def test_inline_no_command(self, service: ScriptService) -> None:
         step = ScriptStep(label="Step", type="inline")
         with pytest.raises(TemplateRenderError, match="no command"):
             await service._resolve_command(step, {})
 
-    @pytest.mark.asyncio
     async def test_command_reference(
         self, service: ScriptService, cmd_repo: AsyncMock
     ) -> None:
@@ -532,7 +509,6 @@ class TestResolveCommand:
         result = await service._resolve_command(step, {})
         assert "df -h /" == result
 
-    @pytest.mark.asyncio
     async def test_command_not_found(
         self, service: ScriptService, cmd_repo: AsyncMock
     ) -> None:
@@ -541,7 +517,6 @@ class TestResolveCommand:
         with pytest.raises(CommandNotFoundError):
             await service._resolve_command(step, {})
 
-    @pytest.mark.asyncio
     async def test_command_no_id(self, service: ScriptService) -> None:
         step = ScriptStep(label="Step", type="command")
         with pytest.raises(TemplateRenderError, match="no command_id"):
@@ -550,12 +525,81 @@ class TestResolveCommand:
 
 class TestConnectorFactoryNotConfigured:
     def test_raises_runtime_error(self) -> None:
-        service = ScriptService(
-            repository=AsyncMock(),
+        from app.core.ssh_utils import get_connector_factory
+
+        with pytest.raises(RuntimeError, match="ConnectorFactory not configured"):
+            get_connector_factory(None)
+
+
+class TestResolveCommandUnknownType:
+    async def test_raises_on_unknown_type(self, service: ScriptService) -> None:
+        from unittest.mock import MagicMock
+
+        mock_step = MagicMock()
+        mock_step.type = "unknown_type"
+        with pytest.raises(TemplateRenderError, match="Unknown step type"):
+            await service._resolve_command(mock_step, {})
+
+
+class TestExecuteScriptCommandNotFound:
+    async def test_step_fails_on_command_not_found(
+        self,
+        script_repo: AsyncMock,
+        node_repo: AsyncMock,
+        exec_repo: AsyncMock,
+    ) -> None:
+        from app.schemas.script import ScriptExecuteRequest
+
+        cmd_repo = AsyncMock()
+        cmd_repo.get_by_id.return_value = None
+
+        orm_script = _make_orm_script(
+            steps=[
+                {
+                    "label": "Step 1",
+                    "type": "command",
+                    "command_id": str(uuid.uuid4()),
+                }
+            ]
+        )
+        script_repo.get_by_id.return_value = orm_script
+
+        orm_node = make_orm_node()
+        node_repo.get_by_id.return_value = orm_node
+
+        execution = _make_orm_execution(script_id=orm_script.id, node_id=orm_node.id)
+        exec_repo.create.return_value = execution
+        exec_repo.update.return_value = execution
+
+        connector = AsyncMock()
+        connector.execute_command.return_value = ("ok", "", 0)
+
+        factory = Mock()
+        factory.create_ssh.return_value = connector
+
+        svc = ScriptService(
+            repository=script_repo,
+            command_repository=cmd_repo,
+            node_repository=node_repo,
+            execution_repository=exec_repo,
+            connector_factory=factory,
+        )
+
+        data = ScriptExecuteRequest(node_ids=[orm_node.id], params={})
+        result = await svc.execute_script(orm_script.id, data)
+        assert result.results[0].status == "failed"
+        assert "not found" in result.results[0].steps[0].stderr.lower()
+
+
+class TestLogWithAudit:
+    async def test_calls_audit(self, script_repo: AsyncMock) -> None:
+        audit_mock = AsyncMock()
+        svc = ScriptService(
+            repository=script_repo,
             command_repository=AsyncMock(),
             node_repository=AsyncMock(),
             execution_repository=AsyncMock(),
-            connector_factory=None,
+            audit_service=audit_mock,
         )
-        with pytest.raises(RuntimeError, match="ConnectorFactory not configured"):
-            service._get_connector_factory()
+        await svc._log("test_action", node_id=uuid.uuid4(), details={"k": "v"})
+        audit_mock.log.assert_awaited_once()

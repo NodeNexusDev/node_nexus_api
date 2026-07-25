@@ -1,12 +1,13 @@
 """Fixtures for E2E tests with full Docker stack."""
 
-import socket
 from collections.abc import Generator
 from dataclasses import dataclass
 
 import httpx
 import pytest
 from pytest_docker.plugin import Services
+
+from tests.helpers import is_port_open
 
 
 @dataclass
@@ -17,17 +18,9 @@ class ServicePorts:
     ssh_port: int
 
 
-def _is_port_open(host: str, port: int) -> bool:
-    try:
-        with socket.create_connection((host, port), timeout=1):
-            return True
-    except OSError:
-        return False
-
-
 @pytest.fixture(scope="session")
 def docker_compose_file() -> str:
-    return "docker-compose.e2e.yml"
+    return "tests/docker-compose.e2e.yml"
 
 
 @pytest.fixture(scope="session")
@@ -35,7 +28,7 @@ def service_ports(docker_ip: str, docker_services: Services) -> ServicePorts:
     api_port = docker_services.port_for("api", 8000)
     ssh_port = docker_services.port_for("ssh-server", 2222)
     docker_services.wait_until_responsive(
-        check=lambda: _is_port_open(docker_ip, api_port),
+        check=lambda: is_port_open(docker_ip, api_port),
         timeout=120.0,
         pause=1.0,
     )

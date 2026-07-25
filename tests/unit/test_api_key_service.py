@@ -65,7 +65,6 @@ class TestGenerateApiKey:
 
 
 class TestCreateApiKey:
-    @pytest.mark.asyncio
     async def test_success(self, service: APIKeyService, repo: AsyncMock) -> None:
         # Use side_effect to capture what the service passes
         async def fake_create(**kwargs: Any) -> APIKeyModel:
@@ -81,7 +80,6 @@ class TestCreateApiKey:
         assert result.key.startswith("nnk_")
         assert len(result.key) == 52
 
-    @pytest.mark.asyncio
     async def test_repo_called(self, service: APIKeyService, repo: AsyncMock) -> None:
         async def fake_create(**kwargs: Any) -> APIKeyModel:
             return _make_api_key_model(
@@ -103,20 +101,17 @@ class TestCreateApiKey:
 
 
 class TestValidateApiKey:
-    @pytest.mark.asyncio
     async def test_valid(self, service: APIKeyService, repo: AsyncMock) -> None:
         orm_model = _make_api_key_model()
         repo.get_by_key_hash.return_value = orm_model
         await service.validate_api_key("nnk_validkey123")
         repo.update_last_used.assert_called_once_with(orm_model.id)
 
-    @pytest.mark.asyncio
     async def test_invalid(self, service: APIKeyService, repo: AsyncMock) -> None:
         repo.get_by_key_hash.return_value = None
         with pytest.raises(APIKeyNotFoundError):
             await service.validate_api_key("nnk_unknown")
 
-    @pytest.mark.asyncio
     async def test_revoked(self, service: APIKeyService, repo: AsyncMock) -> None:
         orm_model = _make_api_key_model(is_active=False)
         repo.get_by_key_hash.return_value = orm_model
@@ -128,14 +123,12 @@ class TestValidateApiKey:
 
 
 class TestRevokeApiKey:
-    @pytest.mark.asyncio
     async def test_success(self, service: APIKeyService, repo: AsyncMock) -> None:
         orm_model = _make_api_key_model()
         repo.get_by_id.return_value = orm_model
         await service.revoke_api_key(orm_model.id)
         repo.revoke.assert_called_once_with(orm_model.id)
 
-    @pytest.mark.asyncio
     async def test_not_found(self, service: APIKeyService, repo: AsyncMock) -> None:
         repo.get_by_id.return_value = None
         with pytest.raises(APIKeyNotFoundError):
@@ -146,7 +139,6 @@ class TestRevokeApiKey:
 
 
 class TestListApiKeys:
-    @pytest.mark.asyncio
     async def test_pagination(self, service: APIKeyService, repo: AsyncMock) -> None:
         repo.list_all.return_value = ([], 0)
         result = await service.list_api_keys(page=2, size=10)

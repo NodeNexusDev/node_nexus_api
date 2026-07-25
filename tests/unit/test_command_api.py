@@ -22,7 +22,7 @@ from app.core.exceptions import (
 )
 from app.schemas.command import CommandResponse, CommandResult
 from app.services.command_service import CommandService
-from tests.unit.conftest import MockSessionmaker, _mock_settings
+from tests.unit.conftest import MockAuthServiceProvider, _mock_settings
 
 
 def _make_command(**overrides: Any) -> CommandResponse:
@@ -43,14 +43,13 @@ def _create_test_app(service: CommandService | AsyncMock) -> FastAPI:
     app = FastAPI()
     app.include_router(health_router)
     app.include_router(commands_router, prefix="/api/v1")
-    app.state.sessionmaker = MockSessionmaker()
 
     class MockServiceProvider(Provider):
         @provide(scope=Scope.REQUEST)
         def get_service(self) -> CommandService:
             return service
 
-    container = make_async_container(MockServiceProvider())
+    container = make_async_container(MockServiceProvider(), MockAuthServiceProvider())
     setup_dishka(container, app)
     return app
 
@@ -103,7 +102,7 @@ class TestGetCommands:
     ) -> None:
         mock_service.get_all_commands.return_value = ([], 0)
         await client.get("/api/v1/commands?page=2&size=10")
-        mock_service.get_all_commands.assert_called_once_with(skip=10, limit=10)
+        mock_service.get_all_commands.assert_called_once_with(page=2, size=10)
 
 
 # --- GET /commands/{id} ---

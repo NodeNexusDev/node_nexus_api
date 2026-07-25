@@ -52,7 +52,6 @@ def _command_data(**overrides) -> dict:
     return defaults
 
 
-@pytest.mark.asyncio
 async def test_get_by_id_found(repo: CommandRepository) -> None:
     cmd = await repo.create(_command_data())
     result = await repo.get_by_id(cmd.id)
@@ -60,19 +59,16 @@ async def test_get_by_id_found(repo: CommandRepository) -> None:
     assert result.name == "check_disk"
 
 
-@pytest.mark.asyncio
 async def test_get_by_id_not_found(repo: CommandRepository) -> None:
     result = await repo.get_by_id(uuid.uuid4())
     assert result is None
 
 
-@pytest.mark.asyncio
 async def test_get_all_empty(repo: CommandRepository) -> None:
     result = await repo.get_all()
     assert result == []
 
 
-@pytest.mark.asyncio
 async def test_get_all_with_data(repo: CommandRepository) -> None:
     await repo.create(_command_data(name="cmd1"))
     await repo.create(_command_data(name="cmd2"))
@@ -80,7 +76,6 @@ async def test_get_all_with_data(repo: CommandRepository) -> None:
     assert len(cmds) == 2
 
 
-@pytest.mark.asyncio
 async def test_get_all_pagination(repo: CommandRepository) -> None:
     for i in range(5):
         await repo.create(_command_data(name=f"cmd-{i}"))
@@ -88,7 +83,6 @@ async def test_get_all_pagination(repo: CommandRepository) -> None:
     assert len(cmds) == 2
 
 
-@pytest.mark.asyncio
 async def test_create(repo: CommandRepository) -> None:
     cmd = await repo.create(_command_data())
     assert cmd.id is not None
@@ -96,14 +90,12 @@ async def test_create(repo: CommandRepository) -> None:
     assert cmd.command == "df -h"
 
 
-@pytest.mark.asyncio
 async def test_create_with_parameters(repo: CommandRepository) -> None:
     params = [{"name": "service", "type": "string", "required": True}]
     cmd = await repo.create(_command_data(parameters=params))
     assert cmd.parameters == params
 
 
-@pytest.mark.asyncio
 async def test_update_found(repo: CommandRepository) -> None:
     cmd = await repo.create(_command_data())
     updated = await repo.update(cmd.id, {"name": "updated_cmd"})
@@ -111,13 +103,11 @@ async def test_update_found(repo: CommandRepository) -> None:
     assert updated.name == "updated_cmd"
 
 
-@pytest.mark.asyncio
 async def test_update_not_found(repo: CommandRepository) -> None:
     result = await repo.update(uuid.uuid4(), {"name": "x"})
     assert result is None
 
 
-@pytest.mark.asyncio
 async def test_delete_found(repo: CommandRepository) -> None:
     cmd = await repo.create(_command_data())
     result = await repo.delete(cmd.id)
@@ -125,19 +115,16 @@ async def test_delete_found(repo: CommandRepository) -> None:
     assert await repo.get_by_id(cmd.id) is None
 
 
-@pytest.mark.asyncio
 async def test_delete_not_found(repo: CommandRepository) -> None:
     result = await repo.delete(uuid.uuid4())
     assert result is False
 
 
-@pytest.mark.asyncio
 async def test_count_empty(repo: CommandRepository) -> None:
     count = await repo.count()
     assert count == 0
 
 
-@pytest.mark.asyncio
 async def test_count_with_data(repo: CommandRepository) -> None:
     await repo.create(_command_data(name="c1"))
     await repo.create(_command_data(name="c2"))
@@ -146,7 +133,6 @@ async def test_count_with_data(repo: CommandRepository) -> None:
     assert count == 3
 
 
-@pytest.mark.asyncio
 async def test_count_after_delete(repo: CommandRepository) -> None:
     cmd = await repo.create(_command_data())
     assert await repo.count() == 1

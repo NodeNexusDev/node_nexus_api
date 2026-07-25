@@ -50,7 +50,6 @@ def _node_data(**overrides) -> dict:
     return defaults
 
 
-@pytest.mark.asyncio
 async def test_get_by_id_found(repo: NodeRepository) -> None:
     node = await repo.create(_node_data())
     result = await repo.get_by_id(node.id)
@@ -58,19 +57,16 @@ async def test_get_by_id_found(repo: NodeRepository) -> None:
     assert result.name == "test-node"
 
 
-@pytest.mark.asyncio
 async def test_get_by_id_not_found(repo: NodeRepository) -> None:
     result = await repo.get_by_id(uuid.uuid4())
     assert result is None
 
 
-@pytest.mark.asyncio
 async def test_get_all_empty(repo: NodeRepository) -> None:
     result = await repo.get_all()
     assert result == []
 
 
-@pytest.mark.asyncio
 async def test_get_all_with_data(repo: NodeRepository) -> None:
     await repo.create(_node_data(name="n1"))
     await repo.create(_node_data(name="n2"))
@@ -78,7 +74,6 @@ async def test_get_all_with_data(repo: NodeRepository) -> None:
     assert len(nodes) == 2
 
 
-@pytest.mark.asyncio
 async def test_get_all_pagination(repo: NodeRepository) -> None:
     for i in range(5):
         await repo.create(_node_data(name=f"node-{i}"))
@@ -86,14 +81,12 @@ async def test_get_all_pagination(repo: NodeRepository) -> None:
     assert len(nodes) == 2
 
 
-@pytest.mark.asyncio
 async def test_create(repo: NodeRepository) -> None:
     node = await repo.create(_node_data())
     assert node.id is not None
     assert node.name == "test-node"
 
 
-@pytest.mark.asyncio
 async def test_update_found(repo: NodeRepository) -> None:
     node = await repo.create(_node_data())
     updated = await repo.update(node.id, {"name": "updated"})
@@ -101,13 +94,11 @@ async def test_update_found(repo: NodeRepository) -> None:
     assert updated.name == "updated"
 
 
-@pytest.mark.asyncio
 async def test_update_not_found(repo: NodeRepository) -> None:
     result = await repo.update(uuid.uuid4(), {"name": "x"})
     assert result is None
 
 
-@pytest.mark.asyncio
 async def test_delete_found(repo: NodeRepository) -> None:
     node = await repo.create(_node_data())
     result = await repo.delete(node.id)
@@ -115,19 +106,16 @@ async def test_delete_found(repo: NodeRepository) -> None:
     assert await repo.get_by_id(node.id) is None
 
 
-@pytest.mark.asyncio
 async def test_delete_not_found(repo: NodeRepository) -> None:
     result = await repo.delete(uuid.uuid4())
     assert result is False
 
 
-@pytest.mark.asyncio
 async def test_count_empty(repo: NodeRepository) -> None:
     count = await repo.count()
     assert count == 0
 
 
-@pytest.mark.asyncio
 async def test_count_with_data(repo: NodeRepository) -> None:
     await repo.create(_node_data(name="n1"))
     await repo.create(_node_data(name="n2"))
@@ -136,7 +124,6 @@ async def test_count_with_data(repo: NodeRepository) -> None:
     assert count == 3
 
 
-@pytest.mark.asyncio
 async def test_count_after_delete(repo: NodeRepository) -> None:
     node = await repo.create(_node_data())
     assert await repo.count() == 1
@@ -147,7 +134,6 @@ async def test_count_after_delete(repo: NodeRepository) -> None:
 # --- get_by_ids ---
 
 
-@pytest.mark.asyncio
 async def test_get_by_ids_returns_matching(repo: NodeRepository) -> None:
     n1 = await repo.create(_node_data(name="n1"))
     n2 = await repo.create(_node_data(name="n2"))
@@ -158,14 +144,12 @@ async def test_get_by_ids_returns_matching(repo: NodeRepository) -> None:
     assert names == {"n1", "n2"}
 
 
-@pytest.mark.asyncio
 async def test_get_by_ids_empty_list(repo: NodeRepository) -> None:
     await repo.create(_node_data())
     result = await repo.get_by_ids([])
     assert result == []
 
 
-@pytest.mark.asyncio
 async def test_get_by_ids_no_match(repo: NodeRepository) -> None:
     await repo.create(_node_data())
     result = await repo.get_by_ids([uuid.uuid4()])
@@ -175,7 +159,6 @@ async def test_get_by_ids_no_match(repo: NodeRepository) -> None:
 # --- get_filtered / count_filtered ---
 
 
-@pytest.mark.asyncio
 async def test_get_filtered_by_search(repo: NodeRepository) -> None:
     await repo.create(_node_data(name="web-1", host="10.0.0.1"))
     await repo.create(_node_data(name="db-1", host="10.0.0.2"))
@@ -184,7 +167,6 @@ async def test_get_filtered_by_search(repo: NodeRepository) -> None:
     assert len(result) == 2
 
 
-@pytest.mark.asyncio
 async def test_get_filtered_by_search_host(repo: NodeRepository) -> None:
     await repo.create(_node_data(name="node-a", host="prod.example.com"))
     await repo.create(_node_data(name="node-b", host="staging.example.com"))
@@ -193,7 +175,6 @@ async def test_get_filtered_by_search_host(repo: NodeRepository) -> None:
     assert result[0].name == "node-a"
 
 
-@pytest.mark.asyncio
 @pytest.mark.skip(reason="SQLite does not support ARRAY.contains()")
 async def test_get_filtered_by_tags(repo: NodeRepository) -> None:
     await repo.create(_node_data(name="n1", tags=["prod", "web"]))
@@ -203,7 +184,6 @@ async def test_get_filtered_by_tags(repo: NodeRepository) -> None:
     assert len(result) == 2
 
 
-@pytest.mark.asyncio
 @pytest.mark.skip(reason="SQLite does not support ARRAY.contains()")
 async def test_get_filtered_by_tags_and_search(repo: NodeRepository) -> None:
     await repo.create(_node_data(name="web-1", tags=["prod"]))
@@ -214,14 +194,12 @@ async def test_get_filtered_by_tags_and_search(repo: NodeRepository) -> None:
     assert result[0].name == "web-1"
 
 
-@pytest.mark.asyncio
 async def test_get_filtered_empty_result(repo: NodeRepository) -> None:
     await repo.create(_node_data(name="n1"))
     result = await repo.get_filtered(search="nonexistent")
     assert result == []
 
 
-@pytest.mark.asyncio
 @pytest.mark.skip(reason="SQLite does not support ARRAY.contains()")
 async def test_count_filtered_matches(repo: NodeRepository) -> None:
     await repo.create(_node_data(name="web-1", tags=["prod"]))

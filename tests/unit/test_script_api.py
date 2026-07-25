@@ -27,7 +27,7 @@ from app.schemas.script import (
     ScriptStepResult,
 )
 from app.services.script_service import ScriptService
-from tests.unit.conftest import MockSessionmaker, _mock_settings
+from tests.unit.conftest import MockAuthServiceProvider, _mock_settings
 
 
 def _make_step_result(**overrides: Any) -> ScriptStepResult:
@@ -76,14 +76,13 @@ def _create_test_app(service: ScriptService | AsyncMock) -> FastAPI:
     app = FastAPI()
     app.include_router(health_router)
     app.include_router(scripts_router, prefix="/api/v1")
-    app.state.sessionmaker = MockSessionmaker()
 
     class MockServiceProvider(Provider):
         @provide(scope=Scope.REQUEST)
         def get_service(self) -> ScriptService:
             return service
 
-    container = make_async_container(MockServiceProvider())
+    container = make_async_container(MockServiceProvider(), MockAuthServiceProvider())
     setup_dishka(container, app)
     return app
 
@@ -136,7 +135,7 @@ class TestGetScripts:
     ) -> None:
         mock_service.get_all_scripts.return_value = ([], 0)
         await client.get("/api/v1/scripts?page=2&size=10")
-        mock_service.get_all_scripts.assert_called_once_with(skip=10, limit=10)
+        mock_service.get_all_scripts.assert_called_once_with(page=2, size=10)
 
 
 # --- GET /scripts/{id} ---
@@ -325,6 +324,4 @@ class TestGetExecutions:
         mock_service.get_executions.return_value = ([], 0)
         script_id = uuid.uuid4()
         await client.get(f"/api/v1/scripts/{script_id}/executions?page=2&size=10")
-        mock_service.get_executions.assert_called_once_with(
-            script_id, skip=10, limit=10
-        )
+        mock_service.get_executions.assert_called_once_with(script_id, page=2, size=10)

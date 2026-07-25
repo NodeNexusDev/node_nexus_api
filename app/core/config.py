@@ -25,6 +25,9 @@ class Settings(BaseSettings):
     # API Key Authentication
     MASTER_API_KEY: str = ""
 
+    # Encryption
+    ENCRYPTION_SALT: str = "node-nexus-ssh-v1"
+
 
 @lru_cache
 def get_settings() -> Settings:

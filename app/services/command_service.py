@@ -17,7 +17,7 @@ from app.core.exceptions import (
     ConnectionFailedError,
     NodeNotFoundError,
 )
-from app.core.security import decrypt
+from app.core.ssh_utils import decrypt_value, get_connector_factory
 from app.core.template import render_command
 from app.repositories.command_repo import CommandRepository
 from app.schemas.command import (
@@ -63,10 +63,11 @@ class CommandService:
         return self._to_response(command)
 
     async def get_all_commands(
-        self, skip: int = 0, limit: int = 100
+        self, page: int = 1, size: int = 20
     ) -> tuple[list[CommandResponse], int]:
         """Get all commands with total count."""
-        commands = await self._repository.get_all(skip=skip, limit=limit)
+        skip = (page - 1) * size
+        commands = await self._repository.get_all(skip=skip, limit=size)
         total = await self._repository.count()
         return [self._to_response(c) for c in commands], total
 
@@ -115,9 +116,9 @@ class CommandService:
         if node is None:
             raise NodeNotFoundError(f"Node {data.node_id} not found")
 
-        password = self._decrypt_value(node.password)
-        ssh_key = self._decrypt_value(node.ssh_key)
-        connector = self._get_connector_factory().create_ssh(
+        password = decrypt_value(node.password)
+        ssh_key = decrypt_value(node.ssh_key)
+        connector = get_connector_factory(self._connector_factory).create_ssh(
             host=node.host,
             port=node.port,
             username=node.username,
@@ -159,20 +160,6 @@ class CommandService:
             raise ConnectionFailedError(
                 f"Failed to execute command on node {data.node_id}: {exc}"
             ) from exc
-
-    @staticmethod
-    def _decrypt_value(value: str | None) -> str | None:
-        if not value:
-            return value
-        try:
-            return decrypt(value)
-        except Exception:
-            return value
-
-    def _get_connector_factory(self) -> ConnectorFactory:
-        if self._connector_factory is None:
-            raise RuntimeError("ConnectorFactory not configured")
-        return self._connector_factory
 
     @staticmethod
     def _to_response(command: Any) -> CommandResponse:

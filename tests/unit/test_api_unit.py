@@ -22,7 +22,7 @@ from app.schemas.node import (
     NodeResponse,
 )
 from app.services.node_service import NodeService
-from tests.unit.conftest import MockSessionmaker, _mock_settings
+from tests.unit.conftest import MockAuthServiceProvider, _mock_settings
 
 
 def _make_node(**overrides: Any) -> NodeResponse:
@@ -34,6 +34,7 @@ def _make_node(**overrides: Any) -> NodeResponse:
         "connection_type": "ssh",
         "status": "active",
         "username": "root",
+        "docker_host": None,
         "tags": [],
         "created_at": datetime.now(UTC),
         "updated_at": datetime.now(UTC),
@@ -46,14 +47,13 @@ def _create_test_app(service: NodeService | AsyncMock) -> FastAPI:
     app = FastAPI()
     app.include_router(health_router)
     app.include_router(nodes_router, prefix="/api/v1")
-    app.state.sessionmaker = MockSessionmaker()
 
     class MockServiceProvider(Provider):
         @provide(scope=Scope.REQUEST)
         def get_service(self) -> NodeService:
             return service
 
-    container = make_async_container(MockServiceProvider())
+    container = make_async_container(MockServiceProvider(), MockAuthServiceProvider())
     setup_dishka(container, app)
     return app
 
@@ -110,7 +110,7 @@ class TestGetNodes:
         mock_service.get_all_nodes.return_value = ([], 0)
         await client.get("/api/v1/nodes?page=2&size=10")
         mock_service.get_all_nodes.assert_called_once_with(
-            skip=10, limit=10, tags=None, search=None
+            page=2, size=10, tags=None, search=None
         )
 
     async def test_filter_by_tags(
@@ -119,7 +119,7 @@ class TestGetNodes:
         mock_service.get_all_nodes.return_value = ([], 0)
         await client.get("/api/v1/nodes?tags=prod,web")
         mock_service.get_all_nodes.assert_called_once_with(
-            skip=0, limit=20, tags=["prod", "web"], search=None
+            page=1, size=20, tags=["prod", "web"], search=None
         )
 
     async def test_filter_by_search(
@@ -128,7 +128,7 @@ class TestGetNodes:
         mock_service.get_all_nodes.return_value = ([], 0)
         await client.get("/api/v1/nodes?search=web")
         mock_service.get_all_nodes.assert_called_once_with(
-            skip=0, limit=20, tags=None, search="web"
+            page=1, size=20, tags=None, search="web"
         )
 
     async def test_filter_by_tags_and_search(
@@ -137,7 +137,7 @@ class TestGetNodes:
         mock_service.get_all_nodes.return_value = ([], 0)
         await client.get("/api/v1/nodes?tags=prod&search=web")
         mock_service.get_all_nodes.assert_called_once_with(
-            skip=0, limit=20, tags=["prod"], search="web"
+            page=1, size=20, tags=["prod"], search="web"
         )
 
 

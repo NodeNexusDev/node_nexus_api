@@ -42,7 +42,6 @@ def repo(session: AsyncSession) -> APIKeyRepository:
 # --- create ---
 
 
-@pytest.mark.asyncio
 async def test_create(repo: APIKeyRepository) -> None:
     model = await repo.create(
         name="test-key",
@@ -59,7 +58,6 @@ async def test_create(repo: APIKeyRepository) -> None:
 # --- get_by_key_hash ---
 
 
-@pytest.mark.asyncio
 async def test_get_by_key_hash_found(repo: APIKeyRepository) -> None:
     await repo.create(name="k1", key_hash="hash1", key_prefix="nnk_aaaa")
     result = await repo.get_by_key_hash("hash1")
@@ -67,7 +65,6 @@ async def test_get_by_key_hash_found(repo: APIKeyRepository) -> None:
     assert result.name == "k1"
 
 
-@pytest.mark.asyncio
 async def test_get_by_key_hash_not_found(repo: APIKeyRepository) -> None:
     result = await repo.get_by_key_hash("nonexistent")
     assert result is None
@@ -76,7 +73,6 @@ async def test_get_by_key_hash_not_found(repo: APIKeyRepository) -> None:
 # --- list_all ---
 
 
-@pytest.mark.asyncio
 async def test_list_all(repo: APIKeyRepository) -> None:
     await repo.create(name="k1", key_hash="h1", key_prefix="nnk_1111")
     await repo.create(name="k2", key_hash="h2", key_prefix="nnk_2222")
@@ -85,7 +81,6 @@ async def test_list_all(repo: APIKeyRepository) -> None:
     assert len(items) == 2
 
 
-@pytest.mark.asyncio
 async def test_list_all_pagination(repo: APIKeyRepository) -> None:
     for i in range(5):
         await repo.create(name=f"k{i}", key_hash=f"h{i}", key_prefix=f"nnk_{i:04d}")
@@ -97,7 +92,6 @@ async def test_list_all_pagination(repo: APIKeyRepository) -> None:
 # --- revoke ---
 
 
-@pytest.mark.asyncio
 async def test_revoke(repo: APIKeyRepository) -> None:
     model = await repo.create(name="k1", key_hash="h1", key_prefix="nnk_1111")
     assert model.is_active is True
@@ -110,7 +104,6 @@ async def test_revoke(repo: APIKeyRepository) -> None:
 # --- update_last_used ---
 
 
-@pytest.mark.asyncio
 async def test_update_last_used(repo: APIKeyRepository) -> None:
     model = await repo.create(name="k1", key_hash="h1", key_prefix="nnk_1111")
     assert model.last_used_at is None

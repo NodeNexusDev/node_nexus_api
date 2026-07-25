@@ -8,19 +8,16 @@ from app.core.connectors.ssh import SSHConnector, SSHConnectorFactory
 
 
 class TestSSHConnector:
-    @pytest.mark.asyncio
     async def test_not_connected_raises(self) -> None:
         connector = SSHConnector(host="127.0.0.1")
         with pytest.raises(RuntimeError, match="Not connected"):
             await connector.execute_command("echo hi")
 
-    @pytest.mark.asyncio
     async def test_disconnect_without_connection(self) -> None:
         connector = SSHConnector(host="127.0.0.1")
         await connector.disconnect()
         assert connector._connection is None
 
-    @pytest.mark.asyncio
     async def test_disconnect_with_connection(self) -> None:
         connector = SSHConnector(host="127.0.0.1")
         mock_conn = AsyncMock()
@@ -32,7 +29,6 @@ class TestSSHConnector:
         mock_conn.wait_closed.assert_called_once()
         assert connector._connection is None
 
-    @pytest.mark.asyncio
     async def test_key_auth_branch(self) -> None:
         key = (
             "-----BEGIN OPENSSH PRIVATE KEY-----\nfake\n"
@@ -53,7 +49,6 @@ class TestSSHConnector:
             assert "client_keys" in call_kwargs[1]
             assert connector._connection is mock_conn
 
-    @pytest.mark.asyncio
     async def test_password_auth_branch(self) -> None:
         connector = SSHConnector(
             host="127.0.0.1",
@@ -69,7 +64,6 @@ class TestSSHConnector:
             assert "password" in call_kwargs[1]
             assert call_kwargs[1]["password"] == "secret"
 
-    @pytest.mark.asyncio
     async def test_execute_command_returns_tuple(self) -> None:
         connector = SSHConnector(host="127.0.0.1")
         mock_conn = AsyncMock()
@@ -85,7 +79,6 @@ class TestSSHConnector:
         assert stderr == ""
         assert exit_code == 0
 
-    @pytest.mark.asyncio
     async def test_execute_command_non_zero_exit(self) -> None:
         connector = SSHConnector(host="127.0.0.1")
         mock_conn = AsyncMock()
@@ -100,7 +93,6 @@ class TestSSHConnector:
         assert exit_code == 127
         assert "not found" in stderr
 
-    @pytest.mark.asyncio
     async def test_context_manager_calls_connect_disconnect(self) -> None:
         connector = SSHConnector(host="127.0.0.1", known_hosts=None)
         mock_conn = AsyncMock()
@@ -114,7 +106,6 @@ class TestSSHConnector:
             mock_conn.wait_closed.assert_called_once()
             assert connector._connection is None
 
-    @pytest.mark.asyncio
     async def test_context_manager_disconnects_on_exception(self) -> None:
         connector = SSHConnector(host="127.0.0.1", known_hosts=None)
         mock_conn = AsyncMock()
@@ -127,7 +118,6 @@ class TestSSHConnector:
                     raise ValueError("boom")
             mock_conn.close.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_no_auth_when_no_credentials(self) -> None:
         connector = SSHConnector(host="127.0.0.1", known_hosts=None)
         mock_conn = AsyncMock()
@@ -139,7 +129,6 @@ class TestSSHConnector:
             assert "password" not in call_kwargs
             assert "client_keys" not in call_kwargs
 
-    @pytest.mark.asyncio
     async def test_connect_error(self) -> None:
         import asyncssh
 
@@ -150,7 +139,6 @@ class TestSSHConnector:
             with pytest.raises(asyncssh.Error):
                 await connector.connect()
 
-    @pytest.mark.asyncio
     async def test_execute_command_error(self) -> None:
         import asyncssh
 
@@ -162,7 +150,6 @@ class TestSSHConnector:
         with pytest.raises(asyncssh.Error):
             await connector.execute_command("echo hi")
 
-    @pytest.mark.asyncio
     async def test_execute_command_exit_status_none(self) -> None:
         connector = SSHConnector(host="127.0.0.1")
         mock_conn = AsyncMock()

@@ -31,6 +31,7 @@ class NodeCreate(BaseModel):
     username: str | None = None
     password: str | None = None
     ssh_key: str | None = None
+    docker_host: str | None = None
     tags: list[str] = Field(default_factory=list)
 
 
@@ -45,6 +46,7 @@ class NodeUpdate(BaseModel):
     username: str | None = None
     password: str | None = None
     ssh_key: str | None = None
+    docker_host: str | None = None
     tags: list[str] | None = None
 
 
@@ -60,6 +62,7 @@ class NodeResponse(BaseModel):
     connection_type: str
     status: str
     username: str | None
+    docker_host: str | None
     tags: list[str]
     created_at: datetime
     updated_at: datetime
