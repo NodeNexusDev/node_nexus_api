@@ -49,7 +49,26 @@ def _create_ssh_node(e2e_client: httpx.Client, **overrides) -> dict:
 def test_health(e2e_client: httpx.Client) -> None:
     resp = e2e_client.get("/health")
     assert resp.status_code == 200
-    assert resp.json() == {"status": "healthy"}
+    data = resp.json()
+    assert data["status"] == "healthy"
+    assert "version" in data
+
+
+def test_readiness(e2e_client: httpx.Client) -> None:
+    """Readiness probe checks database connectivity."""
+    resp = e2e_client.get("/ready")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["status"] == "ready"
+    assert data["checks"]["database"] == "ok"
+
+
+def test_readiness_no_auth(e2e_client_no_auth: httpx.Client) -> None:
+    """Readiness probe does not require authentication."""
+    resp = e2e_client_no_auth.get("/ready")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["status"] == "ready"
 
 
 def test_crud_full_cycle(e2e_client: httpx.Client) -> None:
@@ -1412,3 +1431,257 @@ def test_bulk_execute_validation_empty_command(e2e_client: httpx.Client) -> None
         json={"command": "", "node_ids": ["00000000-0000-0000-0000-000000000001"]},
     )
     assert resp.status_code == 422
+
+
+# ---------------------------------------------------------------------------
+# Readiness probe
+# ---------------------------------------------------------------------------
+
+
+def test_readiness_probe(e2e_client: httpx.Client) -> None:
+    """GET /ready checks database connectivity."""
+    resp = e2e_client.get("/ready")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["status"] == "ready"
+    assert data["checks"]["database"] == "ok"
+
+
+# ---------------------------------------------------------------------------
+# API Key PATCH and scope
+# ---------------------------------------------------------------------------
+
+
+def test_api_key_patch_name(e2e_client: httpx.Client) -> None:
+    """PATCH /api-keys/{id} can update name."""
+    master_key = _get_master_key()
+    # Create
+    resp = e2e_client.post(
+        "/api/v1/api-keys/",
+        json={"name": "patch-test"},
+        headers={"X-API-Key": master_key},
+    )
+    assert resp.status_code == 201
+    key_id = resp.json()["id"]
+
+    # Patch
+    resp = e2e_client.patch(
+        f"/api/v1/api-keys/{key_id}",
+        json={"name": "patched-name"},
+        headers={"X-API-Key": master_key},
+    )
+    assert resp.status_code == 200
+    assert resp.json()["name"] == "patched-name"
+
+    # Cleanup
+    e2e_client.delete(
+        f"/api/v1/api-keys/{key_id}",
+        headers={"X-API-Key": master_key},
+    )
+
+
+def test_api_key_patch_scope(e2e_client: httpx.Client) -> None:
+    """PATCH /api-keys/{id} can update scope."""
+    master_key = _get_master_key()
+    # Create
+    resp = e2e_client.post(
+        "/api/v1/api-keys/",
+        json={"name": "scope-test"},
+        headers={"X-API-Key": master_key},
+    )
+    assert resp.status_code == 201
+    key_id = resp.json()["id"]
+
+    # Patch scope to read-only
+    resp = e2e_client.patch(
+        f"/api/v1/api-keys/{key_id}",
+        json={"scope": "read-only"},
+        headers={"X-API-Key": master_key},
+    )
+    assert resp.status_code == 200
+    assert resp.json()["scope"] == "read-only"
+
+    # Cleanup
+    e2e_client.delete(
+        f"/api/v1/api-keys/{key_id}",
+        headers={"X-API-Key": master_key},
+    )
+
+
+def test_api_key_patch_expires_at(e2e_client: httpx.Client) -> None:
+    """PATCH /api-keys/{id} can set expires_at."""
+    master_key = _get_master_key()
+    # Create
+    resp = e2e_client.post(
+        "/api/v1/api-keys/",
+        json={"name": "expires-test"},
+        headers={"X-API-Key": master_key},
+    )
+    assert resp.status_code == 201
+    key_id = resp.json()["id"]
+
+    # Patch expires_at
+    resp = e2e_client.patch(
+        f"/api/v1/api-keys/{key_id}",
+        json={"expires_at": "2099-12-31T23:59:59Z"},
+        headers={"X-API-Key": master_key},
+    )
+    assert resp.status_code == 200
+    assert resp.json()["expires_at"] is not None
+
+    # Cleanup
+    e2e_client.delete(
+        f"/api/v1/api-keys/{key_id}",
+        headers={"X-API-Key": master_key},
+    )
+
+
+# ---------------------------------------------------------------------------
+# Command and Script tags
+# ---------------------------------------------------------------------------
+
+
+def test_command_with_tags(e2e_client: httpx.Client) -> None:
+    """Commands can be created with tags and filtered by tag."""
+    # Create command with tags
+    resp = e2e_client.post(
+        "/api/v1/commands/",
+        json={
+            "name": "tagged-cmd",
+            "command": "echo tagged",
+            "tags": ["deploy", "prod"],
+        },
+    )
+    assert resp.status_code == 201
+    cmd = resp.json()
+    assert sorted(cmd["tags"]) == ["deploy", "prod"]
+    cmd_id = cmd["id"]
+
+    # Filter by tag
+    resp = e2e_client.get("/api/v1/commands/?tag=deploy")
+    assert resp.status_code == 200
+    data = resp.json()
+    names = {c["name"] for c in data["items"]}
+    assert "tagged-cmd" in names
+
+    # Cleanup
+    e2e_client.delete(f"/api/v1/commands/{cmd_id}")
+
+
+def test_script_with_tags(e2e_client: httpx.Client) -> None:
+    """Scripts can be created with tags and filtered by tag."""
+    # Create script with tags
+    resp = e2e_client.post(
+        "/api/v1/scripts/",
+        json={
+            "name": "tagged-script",
+            "steps": [{"label": "Step 1", "type": "inline", "command": "echo ok"}],
+            "tags": ["deploy", "staging"],
+        },
+    )
+    assert resp.status_code == 201
+    script = resp.json()
+    assert sorted(script["tags"]) == ["deploy", "staging"]
+    script_id = script["id"]
+
+    # Filter by tag
+    resp = e2e_client.get("/api/v1/scripts/?tag=deploy")
+    assert resp.status_code == 200
+    data = resp.json()
+    names = {s["name"] for s in data["items"]}
+    assert "tagged-script" in names
+
+    # Cleanup
+    e2e_client.delete(f"/api/v1/scripts/{script_id}")
+
+
+# ---------------------------------------------------------------------------
+# Audit log cleanup
+# ---------------------------------------------------------------------------
+
+
+def test_audit_delete_requires_master_key(e2e_client: httpx.Client) -> None:
+    """DELETE /audit requires master key."""
+    # Create a non-master key
+    master_key = _get_master_key()
+    resp = e2e_client.post(
+        "/api/v1/api-keys/",
+        json={"name": "non-master-key"},
+        headers={"X-API-Key": master_key},
+    )
+    assert resp.status_code == 201
+    generated_key = resp.json()["key"]
+    key_id = resp.json()["id"]
+
+    # Try to delete audit logs with non-master key
+    resp = e2e_client.delete(
+        "/api/v1/audit/?confirm=yes",
+        headers={"X-API-Key": generated_key},
+    )
+    assert resp.status_code == 403
+
+    # Cleanup
+    e2e_client.delete(
+        f"/api/v1/api-keys/{key_id}",
+        headers={"X-API-Key": master_key},
+    )
+
+
+def test_audit_delete_requires_confirm(e2e_client: httpx.Client) -> None:
+    """DELETE /audit without confirm=yes returns 422."""
+    master_key = _get_master_key()
+    resp = e2e_client.delete(
+        "/api/v1/audit/",
+        headers={"X-API-Key": master_key},
+    )
+    assert resp.status_code == 422
+
+
+def test_audit_delete_with_master_key(e2e_client: httpx.Client) -> None:
+    """DELETE /audit with master key and confirm=yes succeeds."""
+    master_key = _get_master_key()
+    resp = e2e_client.delete(
+        "/api/v1/audit/?confirm=yes",
+        headers={"X-API-Key": master_key},
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "deleted_count" in data
+
+
+# ---------------------------------------------------------------------------
+# Node metrics
+# ---------------------------------------------------------------------------
+
+
+def test_node_metrics(e2e_client: httpx.Client) -> None:
+    """GET /nodes/{id}/metrics returns system metrics."""
+    node = _create_ssh_node(e2e_client, name="metrics-node")
+    resp = e2e_client.get(f"/api/v1/nodes/{node['id']}/metrics")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "cpu" in data
+    assert "memory" in data
+    assert "disk" in data
+    assert "uptime_since" in data
+    assert data["cpu"]["usage_percent"] >= 0
+    assert data["cpu"]["cores"] >= 1
+
+
+def test_node_metrics_not_found(e2e_client: httpx.Client) -> None:
+    """GET /nodes/{id}/metrics returns 404 for nonexistent node."""
+    resp = e2e_client.get(f"/api/v1/nodes/{uuid4()}/metrics")
+    assert resp.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# Rate limiting
+# ---------------------------------------------------------------------------
+
+
+def test_rate_limit_headers(e2e_client: httpx.Client) -> None:
+    """Responses include rate limit headers."""
+    resp = e2e_client.get("/api/v1/nodes/")
+    assert resp.status_code == 200
+    assert "X-RateLimit-Limit" in resp.headers
+    assert "X-RateLimit-Remaining" in resp.headers

@@ -16,6 +16,8 @@ from app.core.exceptions import (
     NodeNotFoundError,
 )
 from app.schemas.docker import (
+    BulkDockerRequest,
+    BulkDockerResponse,
     DockerContainer,
     DockerContainerInspect,
     DockerExecRequest,
@@ -336,3 +338,75 @@ async def list_volumes(
         raise HTTPException(status_code=404, detail="Node not found")
     except DockerError as exc:
         raise HTTPException(status_code=502, detail=str(exc))
+
+
+# --- Bulk Docker operations ---
+
+
+@router.post("/bulk/start")
+@inject
+async def bulk_start_containers(
+    data: BulkDockerRequest,
+    service: FromDishka[DockerService],
+    _key: str = Security(get_current_api_key),
+) -> BulkDockerResponse:
+    """Start containers on multiple nodes."""
+    audit.info("api.docker.bulk.start", node_count=len(data.node_ids))
+    return await service.bulk_container_action(
+        node_ids=data.node_ids,
+        container_id=data.container_id,
+        action="start",
+    )
+
+
+@router.post("/bulk/stop")
+@inject
+async def bulk_stop_containers(
+    data: BulkDockerRequest,
+    service: FromDishka[DockerService],
+    _key: str = Security(get_current_api_key),
+) -> BulkDockerResponse:
+    """Stop containers on multiple nodes."""
+    audit.info("api.docker.bulk.stop", node_count=len(data.node_ids))
+    return await service.bulk_container_action(
+        node_ids=data.node_ids,
+        container_id=data.container_id,
+        action="stop",
+        timeout=data.timeout,
+    )
+
+
+@router.post("/bulk/restart")
+@inject
+async def bulk_restart_containers(
+    data: BulkDockerRequest,
+    service: FromDishka[DockerService],
+    _key: str = Security(get_current_api_key),
+) -> BulkDockerResponse:
+    """Restart containers on multiple nodes."""
+    audit.info("api.docker.bulk.restart", node_count=len(data.node_ids))
+    return await service.bulk_container_action(
+        node_ids=data.node_ids,
+        container_id=data.container_id,
+        action="restart",
+        timeout=data.timeout,
+    )
+
+
+@router.post("/bulk/exec")
+@inject
+async def bulk_exec_in_containers(
+    data: BulkDockerRequest,
+    service: FromDishka[DockerService],
+    _key: str = Security(get_current_api_key),
+) -> BulkDockerResponse:
+    """Execute a command in containers on multiple nodes."""
+    if not data.command:
+        raise HTTPException(status_code=422, detail="command is required for exec")
+    audit.info("api.docker.bulk.exec", node_count=len(data.node_ids))
+    return await service.bulk_exec(
+        node_ids=data.node_ids,
+        container_id=data.container_id,
+        command=data.command,
+        timeout=data.timeout or 30,
+    )

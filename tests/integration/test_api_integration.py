@@ -331,4 +331,6 @@ async def test_execute_command_validation_error(
 async def test_health_check(integration_client: AsyncClient) -> None:
     resp = await integration_client.get("/health")
     assert resp.status_code == 200
-    assert resp.json() == {"status": "healthy"}
+    data = resp.json()
+    assert data["status"] == "healthy"
+    assert "version" in data

@@ -144,3 +144,96 @@ class TestAuthValidKey:
         response = client.get("/test", headers={"X-API-Key": "nnk_validkey123456"})
         assert response.status_code == 200
         assert response.json()["key"] == "nnk_vali"
+
+
+# --- Scope enforcement tests ---
+
+
+def _create_app_with_write_scope(
+    mock_service: APIKeyService | AsyncMock | None = None,
+) -> FastAPI:
+    """Create app with require_write_scope dependency."""
+    import fastapi
+    from fastapi.responses import JSONResponse
+
+    from app.api.deps import require_write_scope
+
+    app = FastAPI()
+
+    @app.get("/test-write")
+    async def test_write_endpoint(
+        _key: str = fastapi.Security(require_write_scope),
+    ) -> dict[str, str]:
+        return {"key": _key}
+
+    @app.exception_handler(DomainError)
+    async def _domain_error_handler(request: Any, exc: DomainError) -> JSONResponse:
+        _error_status_map: dict[type[DomainError], int] = {
+            APIKeyNotFoundError: 401,
+            APIKeyRevokedError: 401,
+        }
+        status_code = _error_status_map.get(type(exc), 422)
+        return JSONResponse(status_code=status_code, content={"detail": str(exc)})
+
+    if mock_service is None:
+        mock_service = AsyncMock(spec=APIKeyService)
+        mock_service.validate_api_key.return_value = None
+        mock_service.get_api_key_scope.return_value = "read-write"
+
+    class MockServiceProvider(Provider):
+        @provide(scope=Scope.REQUEST)
+        def get_service(self) -> APIKeyService:
+            return mock_service
+
+    container = make_async_container(MockServiceProvider())
+    setup_dishka(container, app)
+
+    return app
+
+
+class TestScopeEnforcement:
+    @patch("app.api.deps.get_settings")
+    def test_master_key_has_write_scope(self, mock_get_settings: Any) -> None:
+        mock_get_settings.return_value = _mock_settings("test-master-123")
+
+        app = _create_app_with_write_scope()
+        client = TestClient(app, raise_server_exceptions=False)
+        response = client.get("/test-write", headers={"X-API-Key": "test-master-123"})
+        assert response.status_code == 200
+        assert response.json()["key"] == "master"
+
+    @patch("app.api.deps.get_settings")
+    def test_read_write_key_has_write_scope(self, mock_get_settings: Any) -> None:
+        mock_get_settings.return_value = _mock_settings("")
+
+        mock_service = AsyncMock()
+        mock_service.validate_api_key.return_value = None
+        mock_service.get_api_key_scope.return_value = "read-write"
+
+        app = _create_app_with_write_scope(mock_service)
+        client = TestClient(app, raise_server_exceptions=False)
+        response = client.get("/test-write", headers={"X-API-Key": "nnk_validkey123"})
+        assert response.status_code == 200
+
+    @patch("app.api.deps.get_settings")
+    def test_read_only_key_denied(self, mock_get_settings: Any) -> None:
+        mock_get_settings.return_value = _mock_settings("")
+
+        mock_service = AsyncMock()
+        mock_service.validate_api_key.return_value = None
+        mock_service.get_api_key_scope.return_value = "read-only"
+
+        app = _create_app_with_write_scope(mock_service)
+        client = TestClient(app, raise_server_exceptions=False)
+        response = client.get("/test-write", headers={"X-API-Key": "nnk_readonly1"})
+        assert response.status_code == 403
+        assert "read-only" in response.json()["detail"].lower()
+
+    @patch("app.api.deps.get_settings")
+    def test_missing_key_returns_401(self, mock_get_settings: Any) -> None:
+        mock_get_settings.return_value = _mock_settings("")
+
+        app = _create_app_with_write_scope()
+        client = TestClient(app, raise_server_exceptions=False)
+        response = client.get("/test-write")
+        assert response.status_code == 401

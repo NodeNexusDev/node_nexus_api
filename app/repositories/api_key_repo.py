@@ -21,11 +21,13 @@ class APIKeyRepository:
         name: str,
         key_hash: str,
         key_prefix: str,
+        scope: str = "read-write",
     ) -> APIKeyModel:
         model = APIKeyModel(
             name=name,
             key_hash=key_hash,
             key_prefix=key_prefix,
+            scope=scope,
         )
         self._session.add(model)
         await self._session.flush()
@@ -59,6 +61,18 @@ class APIKeyRepository:
         )
         items = [APIKeyResponse.model_validate(m) for m in result.scalars().all()]
         return items, total
+
+    async def update(self, key_id: uuid.UUID, data: dict) -> APIKeyModel | None:
+        result = await self._session.execute(
+            select(APIKeyModel).where(APIKeyModel.id == key_id)
+        )
+        model = result.scalar_one_or_none()
+        if model is None:
+            return None
+        for field, value in data.items():
+            setattr(model, field, value)
+        await self._session.flush()
+        return model
 
     async def revoke(self, key_id: uuid.UUID) -> None:
         result = await self._session.execute(

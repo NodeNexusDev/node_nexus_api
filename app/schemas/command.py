@@ -24,6 +24,7 @@ class CommandCreate(BaseModel):
     description: str | None = Field(default=None, max_length=1000)
     command: str = Field(..., min_length=1, max_length=4096)
     parameters: list[CommandParameter] = Field(default_factory=list)
+    tags: list[str] = Field(default_factory=list)
 
 
 class CommandUpdate(BaseModel):
@@ -33,6 +34,7 @@ class CommandUpdate(BaseModel):
     description: str | None = Field(default=None, max_length=1000)
     command: str | None = Field(default=None, min_length=1, max_length=4096)
     parameters: list[CommandParameter] | None = None
+    tags: list[str] | None = None
 
 
 class CommandResponse(BaseModel):
@@ -45,6 +47,7 @@ class CommandResponse(BaseModel):
     description: str | None
     command: str
     parameters: list[CommandParameter] | None
+    tags: list[str]
     created_at: datetime
     updated_at: datetime
 

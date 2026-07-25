@@ -55,7 +55,9 @@ class TestLifespan:
         mock_migrations: AsyncMock,
         mock_container: MagicMock,
     ) -> None:
-        mock_get_settings.return_value = MagicMock(LOG_LEVEL="info", DEBUG=False)
+        mock_get_settings.return_value = MagicMock(
+            LOG_LEVEL="info", DEBUG=False, AUDIT_LOG_RETENTION_DAYS=0
+        )
         mock_container.close = AsyncMock()
 
         from fastapi import FastAPI

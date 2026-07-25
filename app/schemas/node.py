@@ -83,6 +83,7 @@ class CommandRequest(BaseModel):
     """Schema for executing a command on a node."""
 
     command: str = Field(min_length=1, max_length=4096)
+    timeout: int | None = Field(default=None, ge=1, le=600)
 
 
 class CommandResult(BaseModel):
@@ -137,3 +138,35 @@ class BulkCommandResult(BaseModel):
     total: int
     succeeded: int
     failed: int
+
+
+class CpuMetrics(BaseModel):
+    """CPU metrics from a node."""
+
+    usage_percent: float = Field(ge=0, le=100)
+    cores: int = Field(ge=1)
+
+
+class MemoryMetrics(BaseModel):
+    """Memory metrics from a node."""
+
+    total_bytes: int = Field(ge=0)
+    used_bytes: int = Field(ge=0)
+    percent: float = Field(ge=0, le=100)
+
+
+class DiskMetrics(BaseModel):
+    """Disk metrics from a node."""
+
+    total_bytes: int = Field(ge=0)
+    used_bytes: int = Field(ge=0)
+    percent: float = Field(ge=0, le=100)
+
+
+class NodeMetrics(BaseModel):
+    """System metrics from a node."""
+
+    cpu: CpuMetrics
+    memory: MemoryMetrics
+    disk: DiskMetrics
+    uptime_since: str

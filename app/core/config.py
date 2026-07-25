@@ -28,6 +28,16 @@ class Settings(BaseSettings):
     # Encryption
     ENCRYPTION_SALT: str = "node-nexus-ssh-v1"
 
+    # Request timeout
+    REQUEST_TIMEOUT: int = 300  # seconds
+
+    # Rate limiting
+    RATE_LIMIT_REQUESTS: int = 100  # max requests per window
+    RATE_LIMIT_WINDOW: int = 60  # window in seconds
+
+    # Audit log retention
+    AUDIT_LOG_RETENTION_DAYS: int = 90  # 0 = disabled
+
 
 @lru_cache
 def get_settings() -> Settings:

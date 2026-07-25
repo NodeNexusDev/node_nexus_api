@@ -23,9 +23,13 @@ class APIKeyModel(Base):
     key_hash: Mapped[str] = mapped_column(String(64), unique=True)
     key_prefix: Mapped[str] = mapped_column(String(12))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    scope: Mapped[str] = mapped_column(String(20), default="read-write")
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_utcnow
     )
     last_used_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    expires_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )

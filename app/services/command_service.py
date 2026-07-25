@@ -63,12 +63,12 @@ class CommandService:
         return self._to_response(command)
 
     async def get_all_commands(
-        self, page: int = 1, size: int = 20
+        self, page: int = 1, size: int = 20, tags: list[str] | None = None
     ) -> tuple[list[CommandResponse], int]:
         """Get all commands with total count."""
         skip = (page - 1) * size
-        commands = await self._repository.get_all(skip=skip, limit=size)
-        total = await self._repository.count()
+        commands = await self._repository.get_all(skip=skip, limit=size, tags=tags)
+        total = await self._repository.count(tags=tags)
         return [self._to_response(c) for c in commands], total
 
     async def create_command(self, data: CommandCreate) -> CommandResponse:
@@ -170,6 +170,7 @@ class CommandService:
             description=command.description,
             command=command.command,
             parameters=parameters,
+            tags=command.tags or [],
             created_at=command.created_at,
             updated_at=command.updated_at,
         )

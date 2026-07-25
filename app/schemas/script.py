@@ -24,6 +24,7 @@ class ScriptCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=255)
     description: str | None = Field(default=None, max_length=1000)
     steps: list[ScriptStep] = Field(..., min_length=1)
+    tags: list[str] = Field(default_factory=list)
 
 
 class ScriptUpdate(BaseModel):
@@ -32,6 +33,7 @@ class ScriptUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=255)
     description: str | None = Field(default=None, max_length=1000)
     steps: list[ScriptStep] | None = Field(default=None, min_length=1)
+    tags: list[str] | None = None
 
 
 class ScriptResponse(BaseModel):
@@ -43,6 +45,7 @@ class ScriptResponse(BaseModel):
     name: str
     description: str | None
     steps: list[ScriptStep]
+    tags: list[str]
     created_at: datetime
     updated_at: datetime
 
