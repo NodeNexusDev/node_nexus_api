@@ -54,7 +54,7 @@ class SSHConnector(BaseConnector):
         try:
             self._connection = await asyncssh.connect(self._host, **kwargs)
             audit.info("ssh.connect.ok", host=self._host, port=self._port)
-        except Exception as exc:
+        except asyncssh.Error as exc:
             audit.warning(
                 "ssh.connect.failed",
                 host=self._host,
@@ -95,7 +95,7 @@ class SSHConnector(BaseConnector):
                 str(result.stderr),
                 exit_code,
             )
-        except Exception as exc:
+        except asyncssh.Error as exc:
             audit.error(
                 "ssh.command.failed",
                 host=self._host,

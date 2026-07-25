@@ -24,7 +24,7 @@ def _derive_key() -> bytes:
     hkdf = HKDF(
         algorithm=hashes.SHA256(),
         length=32,
-        salt=b"node-nexus-ssh-v1",
+        salt=settings.ENCRYPTION_SALT.encode(),
         info=b"aes-256-gcm",
     )
     return hkdf.derive(settings.SECRET_KEY.encode())

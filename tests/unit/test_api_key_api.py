@@ -112,7 +112,6 @@ class TestCreateApiKey:
     ) -> None:
         mock_get_settings.return_value = _mock_settings("test-master-key")
         app = _create_test_app(mock_service)
-        app.state.sessionmaker = MockSessionmaker()
 
         mock_service.create_api_key.side_effect = lambda name: _make_api_key_created(
             name=name
@@ -140,7 +139,6 @@ class TestCreateApiKey:
     ) -> None:
         mock_get_settings.return_value = _mock_settings("test-master-key")
         app = _create_test_app(mock_service)
-        app.state.sessionmaker = MockSessionmaker()
 
         async with AsyncClient(
             transport=ASGITransport(app=app),
@@ -163,7 +161,6 @@ class TestListApiKeys:
     async def test_empty(self, mock_get_settings: Any, mock_service: AsyncMock) -> None:
         mock_get_settings.return_value = _mock_settings("test-master-key")
         app = _create_test_app(mock_service)
-        app.state.sessionmaker = MockSessionmaker()
         mock_service.list_api_keys.return_value = APIKeyList(items=[], total=0)
 
         async with AsyncClient(
@@ -186,7 +183,6 @@ class TestListApiKeys:
     ) -> None:
         mock_get_settings.return_value = _mock_settings("test-master-key")
         app = _create_test_app(mock_service)
-        app.state.sessionmaker = MockSessionmaker()
         keys = [_make_api_key_response(name="k1"), _make_api_key_response(name="k2")]
         mock_service.list_api_keys.return_value = APIKeyList(items=keys, total=2)
 
@@ -210,7 +206,6 @@ class TestListApiKeys:
     ) -> None:
         mock_get_settings.return_value = _mock_settings("test-master-key")
         app = _create_test_app(mock_service)
-        app.state.sessionmaker = MockSessionmaker()
         mock_service.list_api_keys.return_value = APIKeyList(items=[], total=0)
 
         async with AsyncClient(
@@ -235,7 +230,6 @@ class TestRevokeApiKey:
     ) -> None:
         mock_get_settings.return_value = _mock_settings("test-master-key")
         app = _create_test_app(mock_service)
-        app.state.sessionmaker = MockSessionmaker()
         mock_service.revoke_api_key.return_value = None
         key_id = uuid.uuid4()
 
@@ -257,7 +251,6 @@ class TestRevokeApiKey:
     ) -> None:
         mock_get_settings.return_value = _mock_settings("test-master-key")
         app = _create_test_app(mock_service)
-        app.state.sessionmaker = MockSessionmaker()
         mock_service.revoke_api_key.side_effect = APIKeyNotFoundError("not found")
 
         async with AsyncClient(

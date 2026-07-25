@@ -5,8 +5,6 @@ from datetime import UTC, datetime
 from typing import Any
 from unittest.mock import AsyncMock, Mock
 
-import pytest
-
 from app.core.connectors.ssh import SSHConnector
 from app.models.node import NodeModel
 from app.schemas.node import CommandRequest
@@ -41,6 +39,8 @@ def _make_orm_node(ssh_server: SSHServer, **overrides: Any) -> NodeModel:
         "username": ssh_server.username,
         "password": None,
         "ssh_key": None,
+        "docker_host": None,
+        "tags": [],
         "created_at": datetime.now(UTC),
         "updated_at": datetime.now(UTC),
     }
@@ -48,7 +48,6 @@ def _make_orm_node(ssh_server: SSHServer, **overrides: Any) -> NodeModel:
     return NodeModel(**defaults)
 
 
-@pytest.mark.asyncio
 async def test_connect_and_disconnect(ssh_server: SSHServer) -> None:
     connector = _connector(ssh_server)
     async with connector:
@@ -56,7 +55,6 @@ async def test_connect_and_disconnect(ssh_server: SSHServer) -> None:
     assert connector._connection is None
 
 
-@pytest.mark.asyncio
 async def test_execute_simple_command(ssh_server: SSHServer) -> None:
     connector = _connector(ssh_server)
     async with connector:
@@ -66,7 +64,6 @@ async def test_execute_simple_command(ssh_server: SSHServer) -> None:
     assert exit_code == 0
 
 
-@pytest.mark.asyncio
 async def test_execute_command_with_exit_code(ssh_server: SSHServer) -> None:
     connector = _connector(ssh_server)
     async with connector:
@@ -75,7 +72,6 @@ async def test_execute_command_with_exit_code(ssh_server: SSHServer) -> None:
     assert exit_code != 0
 
 
-@pytest.mark.asyncio
 async def test_execute_multiple_commands(ssh_server: SSHServer) -> None:
     connector = _connector(ssh_server)
     async with connector:
@@ -85,7 +81,6 @@ async def test_execute_multiple_commands(ssh_server: SSHServer) -> None:
     assert r2.strip() == "second"
 
 
-@pytest.mark.asyncio
 async def test_service_check_connectivity(ssh_server: SSHServer) -> None:
     orm_node = _make_orm_node(ssh_server)
     repo = AsyncMock()
@@ -101,7 +96,6 @@ async def test_service_check_connectivity(ssh_server: SSHServer) -> None:
     repo.update.assert_called_once_with(orm_node.id, {"status": "active"})
 
 
-@pytest.mark.asyncio
 async def test_service_execute_command(ssh_server: SSHServer) -> None:
     orm_node = _make_orm_node(ssh_server)
     repo = AsyncMock()

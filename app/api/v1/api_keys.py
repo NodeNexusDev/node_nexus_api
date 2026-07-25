@@ -3,7 +3,7 @@
 import uuid
 
 import structlog
-from dishka.integrations.fastapi import FromDishka, inject
+from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
 from fastapi import APIRouter, HTTPException, Query, Security
 
 from app.api.deps import get_current_api_key
@@ -13,7 +13,7 @@ from app.services.api_key_service import APIKeyService
 
 audit = structlog.get_logger("audit")
 
-router = APIRouter(prefix="/api-keys", tags=["api-keys"])
+router = APIRouter(prefix="/api-keys", tags=["api-keys"], route_class=DishkaRoute)
 
 
 @router.post("/", response_model=APIKeyCreated, status_code=201)

@@ -5,7 +5,7 @@ from collections.abc import AsyncIterable
 from dishka import Provider, Scope, provide
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from app.core.config import Settings
+from app.core.config import Settings, get_settings
 from app.core.connectors.ssh import SSHConnectorFactory
 from app.repositories.api_key_repo import APIKeyRepository
 from app.repositories.audit_repo import AuditLogRepository
@@ -16,6 +16,7 @@ from app.repositories.script_repo import ScriptRepository
 from app.services.api_key_service import APIKeyService
 from app.services.audit_service import AuditService
 from app.services.command_service import CommandService
+from app.services.docker_service import DockerService
 from app.services.node_service import NodeService
 from app.services.script_service import ScriptService
 
@@ -147,6 +148,20 @@ class ServiceProvider(Provider):
         """Get API key service."""
         return APIKeyService(repository=repository)
 
+    @provide(scope=Scope.REQUEST)
+    def get_docker_service(
+        self,
+        repository: NodeRepository,
+        audit_service: AuditService,
+        connector_factory: SSHConnectorFactory,
+    ) -> DockerService:
+        """Get Docker service."""
+        return DockerService(
+            repository=repository,
+            audit_service=audit_service,
+            connector_factory=connector_factory,
+        )
+
 
 class ConfigProvider(Provider):
     """Configuration provider."""
@@ -154,7 +169,7 @@ class ConfigProvider(Provider):
     @provide(scope=Scope.APP)
     def get_settings(self) -> Settings:
         """Get application settings."""
-        return Settings()  # type: ignore[call-arg]
+        return get_settings()
 
 
 class AppProvider(

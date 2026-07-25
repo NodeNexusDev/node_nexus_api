@@ -1,6 +1,9 @@
 """Node repository implementation."""
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from sqlalchemy import Select
 from uuid import UUID
 
 from sqlalchemy import func, or_, select
@@ -69,15 +72,13 @@ class NodeRepository(IRepository[NodeModel]):
         )
         return list(result.scalars().all())
 
-    async def get_filtered(
+    def _apply_filters(
         self,
+        query: "Select",
         tags: list[str] | None = None,
         search: str | None = None,
-        skip: int = 0,
-        limit: int = 100,
-    ) -> list[NodeModel]:
-        """Get nodes filtered by tags and/or search (ILIKE on name/host)."""
-        query = select(NodeModel)
+    ) -> "Select":
+        """Apply tag and search filters to a query."""
         if tags:
             for tag in tags:
                 query = query.where(NodeModel.tags.op("@>")([tag]))
@@ -89,6 +90,17 @@ class NodeRepository(IRepository[NodeModel]):
                     NodeModel.host.ilike(pattern),
                 )
             )
+        return query
+
+    async def get_filtered(
+        self,
+        tags: list[str] | None = None,
+        search: str | None = None,
+        skip: int = 0,
+        limit: int = 100,
+    ) -> list[NodeModel]:
+        """Get nodes filtered by tags and/or search (ILIKE on name/host)."""
+        query = self._apply_filters(select(NodeModel), tags=tags, search=search)
         result = await self._session.execute(query.offset(skip).limit(limit))
         return list(result.scalars().all())
 
@@ -98,18 +110,9 @@ class NodeRepository(IRepository[NodeModel]):
         search: str | None = None,
     ) -> int:
         """Count nodes matching filters."""
-        query = select(func.count(NodeModel.id))
-        if tags:
-            for tag in tags:
-                query = query.where(NodeModel.tags.op("@>")([tag]))
-        if search:
-            pattern = f"%{search}%"
-            query = query.where(
-                or_(
-                    NodeModel.name.ilike(pattern),
-                    NodeModel.host.ilike(pattern),
-                )
-            )
+        query = self._apply_filters(
+            select(func.count(NodeModel.id)), tags=tags, search=search
+        )
         result = await self._session.execute(query)
         return result.scalar_one()
 

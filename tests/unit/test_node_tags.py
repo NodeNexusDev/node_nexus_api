@@ -25,6 +25,7 @@ def _make_orm_node(**overrides: Any) -> NodeModel:
         "username": "root",
         "password": None,
         "ssh_key": None,
+        "docker_host": None,
         "tags": [],
         "created_at": datetime.now(UTC),
         "updated_at": datetime.now(UTC),
@@ -44,7 +45,6 @@ def service(repo: AsyncMock) -> NodeService:
 
 
 class TestGetNodesByTags:
-    @pytest.mark.asyncio
     async def test_filters_by_tags(self, service: NodeService, repo: AsyncMock) -> None:
         nodes = [_make_orm_node(tags=["prod", "web"])]
         repo.get_by_tags.return_value = nodes
@@ -53,7 +53,6 @@ class TestGetNodesByTags:
         assert len(result_nodes) == 1
         assert total == 1
 
-    @pytest.mark.asyncio
     async def test_empty_result(self, service: NodeService, repo: AsyncMock) -> None:
         repo.get_by_tags.return_value = []
         repo.count_by_tags.return_value = 0
@@ -63,7 +62,6 @@ class TestGetNodesByTags:
 
 
 class TestGetAllTags:
-    @pytest.mark.asyncio
     async def test_returns_unique_tags(
         self, service: NodeService, repo: AsyncMock
     ) -> None:
@@ -71,7 +69,6 @@ class TestGetAllTags:
         tags = await service.get_all_tags()
         assert tags == ["prod", "staging", "web"]
 
-    @pytest.mark.asyncio
     async def test_empty_when_no_tags(
         self, service: NodeService, repo: AsyncMock
     ) -> None:
@@ -81,7 +78,6 @@ class TestGetAllTags:
 
 
 class TestAddTag:
-    @pytest.mark.asyncio
     async def test_adds_tag_to_node(
         self, service: NodeService, repo: AsyncMock
     ) -> None:
@@ -93,7 +89,6 @@ class TestAddTag:
         assert result.tags == ["prod"]
         repo.update.assert_called_once_with(node.id, {"tags": ["prod"]})
 
-    @pytest.mark.asyncio
     async def test_does_not_duplicate_tag(
         self, service: NodeService, repo: AsyncMock
     ) -> None:
@@ -103,7 +98,6 @@ class TestAddTag:
         assert result.tags == ["prod"]
         repo.update.assert_not_called()
 
-    @pytest.mark.asyncio
     async def test_node_not_found(self, service: NodeService, repo: AsyncMock) -> None:
         repo.get_by_id.return_value = None
         with pytest.raises(NodeNotFoundError):
@@ -111,7 +105,6 @@ class TestAddTag:
 
 
 class TestRemoveTag:
-    @pytest.mark.asyncio
     async def test_removes_tag_from_node(
         self, service: NodeService, repo: AsyncMock
     ) -> None:
@@ -123,7 +116,6 @@ class TestRemoveTag:
         assert result.tags == ["web"]
         repo.update.assert_called_once_with(node.id, {"tags": ["web"]})
 
-    @pytest.mark.asyncio
     async def test_noop_when_tag_absent(
         self, service: NodeService, repo: AsyncMock
     ) -> None:
@@ -133,7 +125,6 @@ class TestRemoveTag:
         assert result.tags == ["web"]
         repo.update.assert_not_called()
 
-    @pytest.mark.asyncio
     async def test_node_not_found(self, service: NodeService, repo: AsyncMock) -> None:
         repo.get_by_id.return_value = None
         with pytest.raises(NodeNotFoundError):
@@ -141,7 +132,6 @@ class TestRemoveTag:
 
 
 class TestTagsInCreate:
-    @pytest.mark.asyncio
     async def test_create_with_tags(
         self, service: NodeService, repo: AsyncMock
     ) -> None:
@@ -158,7 +148,6 @@ class TestTagsInCreate:
         call_data = repo.create.call_args[0][0]
         assert call_data["tags"] == ["prod", "web"]
 
-    @pytest.mark.asyncio
     async def test_create_without_tags(
         self, service: NodeService, repo: AsyncMock
     ) -> None:

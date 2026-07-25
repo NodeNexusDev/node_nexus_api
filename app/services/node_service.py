@@ -13,7 +13,8 @@ if TYPE_CHECKING:
 import structlog
 
 from app.core.exceptions import ConnectionFailedError, NodeNotFoundError
-from app.core.security import decrypt, encrypt
+from app.core.security import encrypt
+from app.core.ssh_utils import decrypt_value, get_connector_factory
 from app.repositories.node_repo import NodeRepository
 from app.schemas.node import (
     BulkCommandRequest,
@@ -64,19 +65,20 @@ class NodeService:
 
     async def get_all_nodes(
         self,
-        skip: int = 0,
-        limit: int = 100,
+        page: int = 1,
+        size: int = 20,
         tags: list[str] | None = None,
         search: str | None = None,
     ) -> tuple[list[NodeResponse], int]:
         """Get all nodes with total count, optionally filtered by tags and/or search."""
+        skip = (page - 1) * size
         if tags or search:
             nodes = await self._repository.get_filtered(
-                tags=tags, search=search, skip=skip, limit=limit
+                tags=tags, search=search, skip=skip, limit=size
             )
             total = await self._repository.count_filtered(tags=tags, search=search)
         else:
-            nodes = await self._repository.get_all(skip=skip, limit=limit)
+            nodes = await self._repository.get_all(skip=skip, limit=size)
             total = await self._repository.count()
         return [NodeResponse.model_validate(node) for node in nodes], total
 
@@ -162,21 +164,6 @@ class NodeService:
             if isinstance(value, str) and value:
                 data[field] = encrypt(value)
 
-    @staticmethod
-    def _decrypt_value(value: str | None) -> str | None:
-        """Decrypt a single value if it looks encrypted."""
-        if not value:
-            return value
-        try:
-            return decrypt(value)
-        except Exception:
-            return value
-
-    def _get_connector_factory(self) -> ConnectorFactory:
-        if self._connector_factory is None:
-            raise RuntimeError("ConnectorFactory not configured")
-        return self._connector_factory
-
     async def check_connectivity(self, node_id: UUID) -> NodeResponse:
         """Check SSH connectivity to a node and update its status."""
         node_response = await self.get_node(node_id)
@@ -184,9 +171,9 @@ class NodeService:
         if node is None:
             raise NodeNotFoundError(f"Node {node_id} not found")
 
-        password = self._decrypt_value(node.password)
-        ssh_key = self._decrypt_value(node.ssh_key)
-        connector = self._get_connector_factory().create_ssh(
+        password = decrypt_value(node.password)
+        ssh_key = decrypt_value(node.ssh_key)
+        connector = get_connector_factory(self._connector_factory).create_ssh(
             host=node_response.host,
             port=node_response.port,
             username=node_response.username,
@@ -200,11 +187,20 @@ class NodeService:
             new_status = "active"
             audit.info("node.connectivity.ok", node_id=str(node_id))
             await self._log("check", node_id=node_id, details={"status": "active"})
-        except Exception as exc:
+        except ConnectionFailedError as exc:
             new_status = "unreachable"
             audit.warning(
                 "node.connectivity.failed",
                 node_id=str(node_id),
+                error=str(exc),
+            )
+            await self._log("check", node_id=node_id, details={"status": "unreachable"})
+        except Exception as exc:
+            new_status = "unreachable"
+            audit.error(
+                "node.connectivity.unexpected_error",
+                node_id=str(node_id),
+                error_type=type(exc).__name__,
                 error=str(exc),
             )
             await self._log("check", node_id=node_id, details={"status": "unreachable"})
@@ -221,9 +217,9 @@ class NodeService:
         if node is None:
             raise NodeNotFoundError(f"Node {node_id} not found")
 
-        password = self._decrypt_value(node.password)
-        ssh_key = self._decrypt_value(node.ssh_key)
-        connector = self._get_connector_factory().create_ssh(
+        password = decrypt_value(node.password)
+        ssh_key = decrypt_value(node.ssh_key)
+        connector = get_connector_factory(self._connector_factory).create_ssh(
             host=node_response.host,
             port=node_response.port,
             username=node_response.username,
@@ -251,11 +247,25 @@ class NodeService:
                 stderr=stderr,
                 exit_code=exit_code,
             )
-        except Exception as exc:
+        except ConnectionFailedError as exc:
             audit.error(
                 "node.command.failed",
                 node_id=str(node_id),
                 command=data.command,
+                error=str(exc),
+            )
+            await self._log(
+                "execute_failed",
+                node_id=node_id,
+                details={"command": data.command, "error": str(exc)},
+            )
+            raise
+        except Exception as exc:
+            audit.error(
+                "node.command.unexpected_error",
+                node_id=str(node_id),
+                command=data.command,
+                error_type=type(exc).__name__,
                 error=str(exc),
             )
             await self._log(
@@ -309,9 +319,9 @@ class NodeService:
 
     async def _execute_on_single_node(self, node: Any, command: str) -> BulkNodeResult:
         """Execute a command on a single node, returning result (never raises)."""
-        password = self._decrypt_value(node.password)
-        ssh_key = self._decrypt_value(node.ssh_key)
-        connector = self._get_connector_factory().create_ssh(
+        password = decrypt_value(node.password)
+        ssh_key = decrypt_value(node.ssh_key)
+        connector = get_connector_factory(self._connector_factory).create_ssh(
             host=node.host,
             port=node.port,
             username=node.username,
@@ -339,11 +349,31 @@ class NodeService:
                 stderr=stderr,
                 exit_code=exit_code,
             )
-        except Exception as exc:
+        except ConnectionFailedError as exc:
             audit.error(
                 "node.bulk.execute.failed",
                 node_id=str(node.id),
                 command=command,
+                error=str(exc),
+            )
+            await self._log(
+                "bulk_execute_failed",
+                node_id=node.id,
+                details={"command": command, "error": str(exc)},
+            )
+            return BulkNodeResult(
+                node_id=node.id,
+                node_name=node.name,
+                stdout="",
+                stderr=str(exc),
+                exit_code=1,
+            )
+        except Exception as exc:
+            audit.error(
+                "node.bulk.execute.unexpected_error",
+                node_id=str(node.id),
+                command=command,
+                error_type=type(exc).__name__,
                 error=str(exc),
             )
             await self._log(

@@ -1,9 +1,9 @@
 name: Release
 
 on:
-  push:
-    tags:
-      - "v*"
+  pull_request:
+    types: [closed]
+    branches: [main]
 
 permissions:
   contents: write
@@ -13,20 +13,37 @@ env:
 
 jobs:
   release:
+    if: github.event.pull_request.merged == true
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
+      - name: Find tag on merged commit
+        id: find_tag
+        run: |
+          HEAD_SHA="${{ github.event.pull_request.merge_commit_sha }}"
+          TAG=$(git tag --points-at "$HEAD_SHA" | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1)
+          if [ -z "$TAG" ]; then
+            echo "No version tag found on merge commit, skipping release"
+            echo "skip=true" >> $GITHUB_OUTPUT
+          else
+            echo "Found tag: $TAG"
+            echo "tag=$TAG" >> $GITHUB_OUTPUT
+            echo "skip=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Set image tag
+        if: steps.find_tag.outputs.skip == 'false'
         id: meta
         run: |
           OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
           REPO=$(echo "${{ github.event.repository.name }}" | tr '[:upper:]' '[:lower:]')
-          echo "image=ghcr.io/${OWNER}/${REPO}:${{ github.ref_name }}" >> $GITHUB_OUTPUT
+          echo "image=ghcr.io/${OWNER}/${REPO}:${{ steps.find_tag.outputs.tag }}" >> $GITHUB_OUTPUT
 
       - name: Build Docker image
+        if: steps.find_tag.outputs.skip == 'false'
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -34,8 +51,10 @@ jobs:
           tags: ${{ steps.meta.outputs.image }}
 
       - name: Create GitHub Release
+        if: steps.find_tag.outputs.skip == 'false'
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ steps.find_tag.outputs.tag }}
           generate_release_notes: true
           files: |
             Dockerfile

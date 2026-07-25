@@ -3,7 +3,7 @@
 import uuid
 
 import structlog
-from dishka.integrations.fastapi import FromDishka, inject
+from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
 from fastapi import APIRouter, HTTPException, Query, Security
 
 from app.api.deps import get_current_api_key
@@ -27,7 +27,7 @@ from app.services.script_service import ScriptService
 
 audit = structlog.get_logger("audit")
 
-router = APIRouter(prefix="/scripts", tags=["scripts"])
+router = APIRouter(prefix="/scripts", tags=["scripts"], route_class=DishkaRoute)
 
 
 @router.get("/", response_model=PaginatedResponse[ScriptResponse])
@@ -40,8 +40,7 @@ async def get_scripts(
 ) -> PaginatedResponse[ScriptResponse]:
     """Get all scripts with pagination."""
     audit.info("api.scripts.list", page=page, size=size)
-    skip = (page - 1) * size
-    scripts, total = await service.get_all_scripts(skip=skip, limit=size)
+    scripts, total = await service.get_all_scripts(page=page, size=size)
     return PaginatedResponse(items=scripts, total=total, page=page, size=size)
 
 
@@ -148,9 +147,8 @@ async def get_executions(
     """Get execution history for a script."""
     audit.info("api.scripts.executions", script_id=str(script_id))
     try:
-        skip = (page - 1) * size
         executions, total = await service.get_executions(
-            script_id, skip=skip, limit=size
+            script_id, page=page, size=size
         )
         return PaginatedResponse(items=executions, total=total, page=page, size=size)
     except ScriptNotFoundError:

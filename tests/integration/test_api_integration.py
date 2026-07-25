@@ -5,7 +5,6 @@ from collections.abc import AsyncGenerator, AsyncIterable
 from typing import Any
 from unittest.mock import MagicMock, patch
 
-import pytest
 import pytest_asyncio
 from dishka import Provider, Scope, make_async_container, provide
 from dishka.integrations.fastapi import setup_dishka
@@ -21,7 +20,9 @@ from sqlalchemy.ext.asyncio import (
 from app.api.v1.health import router as health_router
 from app.api.v1.nodes import router as nodes_router
 from app.models.base import Base
+from app.repositories.api_key_repo import APIKeyRepository
 from app.repositories.node_repo import NodeRepository
+from app.services.api_key_service import APIKeyService
 from app.services.node_service import NodeService
 
 MASTER_KEY = "test-master-key"
@@ -61,8 +62,16 @@ class IntegrationDbProvider(Provider):
         return NodeRepository(session)
 
     @provide(scope=Scope.REQUEST)
+    def get_api_key_repo(self, session: AsyncSession) -> APIKeyRepository:
+        return APIKeyRepository(session)
+
+    @provide(scope=Scope.REQUEST)
     def get_service(self, repo: NodeRepository) -> NodeService:
         return NodeService(repository=repo)
+
+    @provide(scope=Scope.REQUEST)
+    def get_api_key_service(self, repo: APIKeyRepository) -> APIKeyService:
+        return APIKeyService(repository=repo)
 
 
 def _mock_settings(master_key: str = "") -> MagicMock:
@@ -82,7 +91,6 @@ async def integration_client(
     app.include_router(health_router)
     app.include_router(nodes_router, prefix="/api/v1")
     setup_dishka(container, app)
-    app.state.sessionmaker = sessionmaker
 
     with patch("app.api.deps.get_settings", return_value=_mock_settings(MASTER_KEY)):
         async with AsyncClient(
@@ -111,7 +119,6 @@ async def _create_node(client: AsyncClient, **overrides: Any) -> dict[str, Any]:
 # --- GET /nodes/ ---
 
 
-@pytest.mark.asyncio
 async def test_get_nodes_empty(integration_client: AsyncClient) -> None:
     resp = await integration_client.get(NODES_URL)
     assert resp.status_code == 200
@@ -120,7 +127,6 @@ async def test_get_nodes_empty(integration_client: AsyncClient) -> None:
     assert data["total"] == 0
 
 
-@pytest.mark.asyncio
 async def test_get_nodes_with_data(integration_client: AsyncClient) -> None:
     await _create_node(integration_client, name="n1")
     await _create_node(integration_client, name="n2")
@@ -134,7 +140,6 @@ async def test_get_nodes_with_data(integration_client: AsyncClient) -> None:
     assert names == {"n1", "n2"}
 
 
-@pytest.mark.asyncio
 async def test_get_nodes_pagination(integration_client: AsyncClient) -> None:
     for i in range(5):
         await _create_node(integration_client, name=f"node-{i}")
@@ -148,7 +153,6 @@ async def test_get_nodes_pagination(integration_client: AsyncClient) -> None:
     assert data["size"] == 2
 
 
-@pytest.mark.asyncio
 async def test_get_nodes_pagination_page_2(integration_client: AsyncClient) -> None:
     for i in range(5):
         await _create_node(integration_client, name=f"node-{i}")
@@ -163,7 +167,6 @@ async def test_get_nodes_pagination_page_2(integration_client: AsyncClient) -> N
     assert names == {"node-2", "node-3"}
 
 
-@pytest.mark.asyncio
 async def test_get_nodes_pagination_empty_page(integration_client: AsyncClient) -> None:
     for i in range(3):
         await _create_node(integration_client, name=f"node-{i}")
@@ -175,7 +178,6 @@ async def test_get_nodes_pagination_empty_page(integration_client: AsyncClient) 
     assert data["total"] == 3
 
 
-@pytest.mark.asyncio
 async def test_get_nodes_pagination_invalid_params(
     integration_client: AsyncClient,
 ) -> None:
@@ -189,7 +191,6 @@ async def test_get_nodes_pagination_invalid_params(
     assert resp.status_code == 422
 
 
-@pytest.mark.asyncio
 async def test_get_nodes_pagination_response_structure(
     integration_client: AsyncClient,
 ) -> None:
@@ -212,7 +213,6 @@ async def test_get_nodes_pagination_response_structure(
 # --- GET /nodes/{id} ---
 
 
-@pytest.mark.asyncio
 async def test_get_node_found(integration_client: AsyncClient) -> None:
     node = await _create_node(integration_client)
     resp = await integration_client.get(f"/api/v1/nodes/{node['id']}")
@@ -220,7 +220,6 @@ async def test_get_node_found(integration_client: AsyncClient) -> None:
     assert resp.json()["name"] == "test-node"
 
 
-@pytest.mark.asyncio
 async def test_get_node_not_found(integration_client: AsyncClient) -> None:
     resp = await integration_client.get(f"/api/v1/nodes/{uuid.uuid4()}")
     assert resp.status_code == 404
@@ -229,7 +228,6 @@ async def test_get_node_not_found(integration_client: AsyncClient) -> None:
 # --- POST /nodes/ ---
 
 
-@pytest.mark.asyncio
 async def test_create_node(integration_client: AsyncClient) -> None:
     resp = await integration_client.post(
         NODES_URL,
@@ -248,7 +246,6 @@ async def test_create_node(integration_client: AsyncClient) -> None:
     assert data["status"] == "active"
 
 
-@pytest.mark.asyncio
 async def test_create_node_validation_error(
     integration_client: AsyncClient,
 ) -> None:
@@ -262,7 +259,6 @@ async def test_create_node_validation_error(
 # --- PUT /nodes/{id} ---
 
 
-@pytest.mark.asyncio
 async def test_update_node_found(integration_client: AsyncClient) -> None:
     node = await _create_node(integration_client)
     resp = await integration_client.put(
@@ -274,7 +270,6 @@ async def test_update_node_found(integration_client: AsyncClient) -> None:
     assert resp.json()["id"] == node["id"]
 
 
-@pytest.mark.asyncio
 async def test_update_node_not_found(integration_client: AsyncClient) -> None:
     resp = await integration_client.put(
         f"/api/v1/nodes/{uuid.uuid4()}",
@@ -286,7 +281,6 @@ async def test_update_node_not_found(integration_client: AsyncClient) -> None:
 # --- DELETE /nodes/{id} ---
 
 
-@pytest.mark.asyncio
 async def test_delete_node_found(integration_client: AsyncClient) -> None:
     node = await _create_node(integration_client)
     resp = await integration_client.delete(f"/api/v1/nodes/{node['id']}")
@@ -296,7 +290,6 @@ async def test_delete_node_found(integration_client: AsyncClient) -> None:
     assert resp.status_code == 404
 
 
-@pytest.mark.asyncio
 async def test_delete_node_not_found(integration_client: AsyncClient) -> None:
     resp = await integration_client.delete(f"/api/v1/nodes/{uuid.uuid4()}")
     assert resp.status_code == 404
@@ -305,7 +298,6 @@ async def test_delete_node_not_found(integration_client: AsyncClient) -> None:
 # --- POST /nodes/{id}/check ---
 
 
-@pytest.mark.asyncio
 async def test_check_node_not_found(integration_client: AsyncClient) -> None:
     resp = await integration_client.post(f"/api/v1/nodes/{uuid.uuid4()}/check")
     assert resp.status_code == 404
@@ -314,7 +306,6 @@ async def test_check_node_not_found(integration_client: AsyncClient) -> None:
 # --- POST /nodes/{id}/execute ---
 
 
-@pytest.mark.asyncio
 async def test_execute_command_not_found(integration_client: AsyncClient) -> None:
     resp = await integration_client.post(
         f"/api/v1/nodes/{uuid.uuid4()}/execute",
@@ -323,7 +314,6 @@ async def test_execute_command_not_found(integration_client: AsyncClient) -> Non
     assert resp.status_code == 404
 
 
-@pytest.mark.asyncio
 async def test_execute_command_validation_error(
     integration_client: AsyncClient,
 ) -> None:
@@ -338,7 +328,6 @@ async def test_execute_command_validation_error(
 # --- Health ---
 
 
-@pytest.mark.asyncio
 async def test_health_check(integration_client: AsyncClient) -> None:
     resp = await integration_client.get("/health")
     assert resp.status_code == 200
