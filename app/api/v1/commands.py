@@ -34,11 +34,15 @@ async def get_commands(
     service: FromDishka[CommandService],
     page: int = Query(1, ge=1),
     size: int = Query(20, ge=1, le=100),
+    tag: str | None = Query(None, description="Filter by tag (AND)"),
     _key: str = Security(get_current_api_key),
 ) -> PaginatedResponse[CommandResponse]:
     """Get all commands with pagination."""
-    audit.info("api.commands.list", page=page, size=size)
-    commands, total = await service.get_all_commands(page=page, size=size)
+    tag_list = [t.strip() for t in tag.split(",")] if tag else None
+    audit.info("api.commands.list", page=page, size=size, tags=tag_list)
+    commands, total = await service.get_all_commands(
+        page=page, size=size, tags=tag_list
+    )
     return PaginatedResponse(items=commands, total=total, page=page, size=size)
 
 

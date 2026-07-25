@@ -159,16 +159,20 @@ async def test_master_key_auth(
     await app.state._container.close()
 
 
-async def test_health_requires_auth(
+async def test_health_no_auth_required(
     sessionmaker: async_sessionmaker[AsyncSession],
 ) -> None:
+    """Health endpoint no longer requires authentication (for K8s probes)."""
     app = _create_app(sessionmaker)
     with patch("app.api.deps.get_settings", return_value=_mock_settings(MASTER_KEY)):
         async with AsyncClient(
             transport=ASGITransport(app=app), base_url="http://test"
         ) as client:
             resp = await client.get("/health")
-    assert resp.status_code == 401
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["status"] == "healthy"
+    assert "version" in data
     await app.state._container.close()
 
 
@@ -182,7 +186,9 @@ async def test_health_with_master_key(
         ) as client:
             resp = await client.get("/health", headers={"X-API-Key": MASTER_KEY})
     assert resp.status_code == 200
-    assert resp.json() == {"status": "healthy"}
+    data = resp.json()
+    assert data["status"] == "healthy"
+    assert "version" in data
     await app.state._container.close()
 
 

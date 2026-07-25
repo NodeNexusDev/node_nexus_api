@@ -14,6 +14,7 @@ from app.schemas.node import (
     CommandRequest,
     CommandResult,
     NodeCreate,
+    NodeMetrics,
     NodeResponse,
     NodeUpdate,
     PaginatedResponse,
@@ -186,6 +187,29 @@ async def execute_command(
     except ConnectionFailedError as exc:
         audit.error(
             "api.nodes.connection_failed",
+            node_id=str(node_id),
+            error=str(exc),
+        )
+        raise HTTPException(status_code=503, detail=str(exc))
+
+
+@router.get("/{node_id}/metrics", response_model=NodeMetrics)
+@inject
+async def get_node_metrics(
+    node_id: uuid.UUID,
+    service: FromDishka[NodeService],
+    _key: str = Security(get_current_api_key),
+) -> NodeMetrics:
+    """Get system metrics from a node (CPU, memory, disk)."""
+    audit.info("api.nodes.metrics", node_id=str(node_id))
+    try:
+        return await service.get_node_metrics(node_id)
+    except NodeNotFoundError:
+        audit.warning("api.nodes.not_found", node_id=str(node_id))
+        raise HTTPException(status_code=404, detail="Node not found")
+    except ConnectionFailedError as exc:
+        audit.error(
+            "api.nodes.metrics_failed",
             node_id=str(node_id),
             error=str(exc),
         )

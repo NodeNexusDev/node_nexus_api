@@ -10,6 +10,7 @@ from app.core.connectors.ssh import SSHConnectorFactory
 from app.repositories.api_key_repo import APIKeyRepository
 from app.repositories.audit_repo import AuditLogRepository
 from app.repositories.command_repo import CommandRepository
+from app.repositories.health_repo import HealthRepository
 from app.repositories.node_repo import NodeRepository
 from app.repositories.script_execution_repo import ScriptExecutionRepository
 from app.repositories.script_repo import ScriptRepository
@@ -17,6 +18,7 @@ from app.services.api_key_service import APIKeyService
 from app.services.audit_service import AuditService
 from app.services.command_service import CommandService
 from app.services.docker_service import DockerService
+from app.services.health_service import HealthService
 from app.services.node_service import NodeService
 from app.services.script_service import ScriptService
 
@@ -74,6 +76,11 @@ class RepositoryProvider(Provider):
     def get_api_key_repository(self, session: AsyncSession) -> APIKeyRepository:
         """Get API key repository."""
         return APIKeyRepository(session)
+
+    @provide(scope=Scope.REQUEST)
+    def get_health_repository(self, session: AsyncSession) -> HealthRepository:
+        """Get health check repository."""
+        return HealthRepository(session)
 
 
 class ConnectorProvider(Provider):
@@ -161,6 +168,11 @@ class ServiceProvider(Provider):
             audit_service=audit_service,
             connector_factory=connector_factory,
         )
+
+    @provide(scope=Scope.REQUEST)
+    def get_health_service(self, repository: HealthRepository) -> HealthService:
+        """Get health check service."""
+        return HealthService(repository=repository)
 
 
 class ConfigProvider(Provider):

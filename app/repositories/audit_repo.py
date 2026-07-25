@@ -1,9 +1,11 @@
 """Audit log repository implementation."""
 
-from typing import Any
+from datetime import datetime
+from typing import Any, cast
 from uuid import UUID
 
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
+from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.audit_log import AuditLogModel
@@ -53,3 +55,19 @@ class AuditLogRepository:
             query = query.where(AuditLogModel.action == action)
         result = await self._session.execute(query)
         return result.scalar_one()
+
+    async def count_all(self) -> int:
+        """Count all audit log entries."""
+        result = await self._session.execute(select(func.count(AuditLogModel.id)))
+        return result.scalar_one()
+
+    async def delete_before(self, cutoff: datetime) -> int:
+        """Delete audit logs older than cutoff date.
+
+        Returns:
+            Number of deleted rows.
+        """
+        stmt = delete(AuditLogModel).where(AuditLogModel.created_at < cutoff)
+        result = await self._session.execute(stmt)
+        await self._session.flush()
+        return cast(CursorResult, result).rowcount

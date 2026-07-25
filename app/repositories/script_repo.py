@@ -22,14 +22,23 @@ class ScriptRepository(IRepository[ScriptModel]):
         )
         return result.scalar_one_or_none()
 
-    async def get_all(self, skip: int = 0, limit: int = 100) -> list[ScriptModel]:
-        result = await self._session.execute(
-            select(ScriptModel).offset(skip).limit(limit)
-        )
+    async def get_all(
+        self, skip: int = 0, limit: int = 100, tags: list[str] | None = None
+    ) -> list[ScriptModel]:
+        query = select(ScriptModel)
+        if tags:
+            for tag in tags:
+                query = query.where(ScriptModel.tags.op("@>")([tag]))
+        query = query.offset(skip).limit(limit)
+        result = await self._session.execute(query)
         return list(result.scalars().all())
 
-    async def count(self) -> int:
-        result = await self._session.execute(select(func.count(ScriptModel.id)))
+    async def count(self, tags: list[str] | None = None) -> int:
+        query = select(func.count(ScriptModel.id))
+        if tags:
+            for tag in tags:
+                query = query.where(ScriptModel.tags.op("@>")([tag]))
+        result = await self._session.execute(query)
         return result.scalar_one()
 
     async def create(self, data: dict[str, Any]) -> ScriptModel:

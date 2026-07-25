@@ -457,4 +457,6 @@ class TestHealth:
     async def test_health_check(self, client: AsyncClient) -> None:
         response = await client.get("/health")
         assert response.status_code == 200
-        assert response.json() == {"status": "healthy"}
+        data = response.json()
+        assert data["status"] == "healthy"
+        assert "version" in data

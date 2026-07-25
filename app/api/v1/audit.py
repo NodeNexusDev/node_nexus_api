@@ -4,7 +4,7 @@ import uuid
 
 import structlog
 from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
-from fastapi import APIRouter, Query, Security
+from fastapi import APIRouter, HTTPException, Query, Security
 
 from app.api.deps import get_current_api_key
 from app.schemas.audit_log import AuditLogResponse
@@ -38,3 +38,29 @@ async def get_audit_logs(
         node_id=node_id, action=action, page=page, size=size
     )
     return PaginatedResponse(items=logs, total=total, page=page, size=size)
+
+
+@router.delete("/")
+@inject
+async def delete_audit_logs(
+    service: FromDishka[AuditService],
+    confirm: str | None = Query(None),
+    _key: str = Security(get_current_api_key),
+) -> dict[str, int]:
+    """Delete all audit log entries.
+
+    Requires ?confirm=yes parameter to prevent accidental deletion.
+    Only master key can delete all logs.
+    """
+    if _key != "master":
+        raise HTTPException(
+            status_code=403, detail="Only master key can delete all audit logs"
+        )
+    if confirm != "yes":
+        raise HTTPException(
+            status_code=422,
+            detail="Add ?confirm=yes to confirm deletion of all audit logs",
+        )
+    audit.info("api.audit.delete_all")
+    deleted = await service.delete_all_logs()
+    return {"deleted_count": deleted}

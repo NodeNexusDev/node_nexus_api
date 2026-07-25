@@ -36,11 +36,13 @@ async def get_scripts(
     service: FromDishka[ScriptService],
     page: int = Query(1, ge=1),
     size: int = Query(20, ge=1, le=100),
+    tag: str | None = Query(None, description="Filter by tag (AND)"),
     _key: str = Security(get_current_api_key),
 ) -> PaginatedResponse[ScriptResponse]:
     """Get all scripts with pagination."""
-    audit.info("api.scripts.list", page=page, size=size)
-    scripts, total = await service.get_all_scripts(page=page, size=size)
+    tag_list = [t.strip() for t in tag.split(",")] if tag else None
+    audit.info("api.scripts.list", page=page, size=size, tags=tag_list)
+    scripts, total = await service.get_all_scripts(page=page, size=size, tags=tag_list)
     return PaginatedResponse(items=scripts, total=total, page=page, size=size)
 
 

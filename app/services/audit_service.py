@@ -1,6 +1,7 @@
 """Audit log service for tracking operations."""
 
 import json
+from datetime import UTC, datetime, timedelta
 from typing import Any
 from uuid import UUID
 
@@ -57,3 +58,33 @@ class AuditService:
         )
         total = await self._repository.count(node_id=node_id, action=action)
         return [AuditLogResponse.model_validate(log) for log in logs], total
+
+    async def cleanup_old_logs(self, retention_days: int) -> int:
+        """Delete audit logs older than retention_days.
+
+        Returns:
+            Number of deleted rows.
+        """
+        if retention_days <= 0:
+            return 0
+        cutoff = datetime.now(UTC) - timedelta(days=retention_days)
+        deleted = await self._repository.delete_before(cutoff)
+        if deleted > 0:
+            audit.info(
+                "audit.cleanup.ok",
+                deleted=deleted,
+                retention_days=retention_days,
+            )
+        return deleted
+
+    async def delete_all_logs(self) -> int:
+        """Delete all audit log entries.
+
+        Returns:
+            Number of deleted rows.
+        """
+        from datetime import datetime as dt
+
+        deleted = await self._repository.delete_before(dt.max.replace(tzinfo=UTC))
+        audit.info("audit.delete_all.ok", deleted=deleted)
+        return deleted
