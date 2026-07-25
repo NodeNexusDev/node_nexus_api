@@ -51,6 +51,18 @@ markers = [
     "docker: tests requiring running Docker infrastructure (PostgreSQL, SSH)",
 ]
 
+[tool.coverage.run]
+source = ["app"]
+omit = ["tests/*", "alembic/*"]
+
+[tool.coverage.report]
+show_missing = true
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "if __name__ == .__main__.",
+]
+
 [dependency-groups]
 dev = [
     "ty>=0.0.59",

@@ -57,10 +57,10 @@ jobs:
         run: uv sync --all-extras
 
       - name: Run unit and integration tests
-        run: uv run pytest tests/unit/ tests/integration/ -q --tb=short
+        run: uv run pytest tests/unit/ tests/integration/ tests/integration_ssh/ -q --tb=short
 
       - name: Run tests with coverage
-        run: uv run pytest tests/unit/ tests/integration/ --cov=app --cov-report=xml --cov-report=term-missing -q
+        run: uv run pytest tests/unit/ tests/integration/ tests/integration_ssh/ --cov=app --cov-report=xml --cov-report=term-missing -q
 
       - name: Upload coverage report
         if: always()
