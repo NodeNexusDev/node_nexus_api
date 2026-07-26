@@ -6,7 +6,7 @@ import structlog
 from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
 from fastapi import APIRouter, HTTPException, Query, Security
 
-from app.api.deps import get_current_api_key
+from app.api.deps import get_current_api_key, require_write_scope
 from app.core.exceptions import ConnectionFailedError, NodeNotFoundError
 from app.schemas.node import (
     BulkCommandRequest,
@@ -79,7 +79,7 @@ async def get_node(
 async def create_node(
     data: NodeCreate,
     service: FromDishka[NodeService],
-    _key: str = Security(get_current_api_key),
+    _key: str = Security(require_write_scope),
 ) -> NodeResponse:
     """Create a new node."""
     audit.info("api.nodes.create", name=data.name, connection_type=data.connection_type)
@@ -92,7 +92,7 @@ async def update_node(
     node_id: uuid.UUID,
     data: NodeUpdate,
     service: FromDishka[NodeService],
-    _key: str = Security(get_current_api_key),
+    _key: str = Security(require_write_scope),
 ) -> NodeResponse:
     """Update an existing node."""
     audit.info("api.nodes.update", node_id=str(node_id))
@@ -108,7 +108,7 @@ async def update_node(
 async def delete_node(
     node_id: uuid.UUID,
     service: FromDishka[NodeService],
-    _key: str = Security(get_current_api_key),
+    _key: str = Security(require_write_scope),
 ) -> None:
     """Delete a node."""
     audit.info("api.nodes.delete", node_id=str(node_id))
@@ -124,7 +124,7 @@ async def delete_node(
 async def bulk_execute_command(
     data: BulkCommandRequest,
     service: FromDishka[NodeService],
-    _key: str = Security(get_current_api_key),
+    _key: str = Security(require_write_scope),
 ) -> BulkCommandResult:
     """Execute a command on multiple nodes by IDs and/or tags."""
     audit.info(
@@ -148,7 +148,7 @@ async def bulk_execute_command(
 async def check_node(
     node_id: uuid.UUID,
     service: FromDishka[NodeService],
-    _key: str = Security(get_current_api_key),
+    _key: str = Security(require_write_scope),
 ) -> NodeResponse:
     """Check SSH connectivity to a node."""
     audit.info("api.nodes.check", node_id=str(node_id))
@@ -175,7 +175,7 @@ async def execute_command(
     node_id: uuid.UUID,
     data: CommandRequest,
     service: FromDishka[NodeService],
-    _key: str = Security(get_current_api_key),
+    _key: str = Security(require_write_scope),
 ) -> CommandResult:
     """Execute a command on a node via SSH."""
     audit.info("api.nodes.execute", node_id=str(node_id), command=data.command)
@@ -222,7 +222,7 @@ async def add_tag(
     node_id: uuid.UUID,
     data: TagAdd,
     service: FromDishka[NodeService],
-    _key: str = Security(get_current_api_key),
+    _key: str = Security(require_write_scope),
 ) -> NodeResponse:
     """Add a tag to a node."""
     audit.info("api.nodes.tags.add", node_id=str(node_id), tag=data.tag)
@@ -239,7 +239,7 @@ async def remove_tag(
     node_id: uuid.UUID,
     data: TagRemove,
     service: FromDishka[NodeService],
-    _key: str = Security(get_current_api_key),
+    _key: str = Security(require_write_scope),
 ) -> NodeResponse:
     """Remove a tag from a node."""
     audit.info("api.nodes.tags.remove", node_id=str(node_id), tag=data.tag)
