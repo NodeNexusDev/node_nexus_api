@@ -6,7 +6,7 @@ import structlog
 from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
 from fastapi import APIRouter, HTTPException, Query, Security
 
-from app.api.deps import get_current_api_key, require_write_scope
+from app.api.deps import get_current_api_key
 from app.core.exceptions import (
     CommandNotFoundError,
     ConnectionFailedError,
@@ -67,7 +67,7 @@ async def get_script(
 async def create_script(
     data: ScriptCreate,
     service: FromDishka[ScriptService],
-    _key: str = Security(require_write_scope),
+    _key: str = Security(get_current_api_key),
 ) -> ScriptResponse:
     """Create a new script."""
     audit.info("api.scripts.create", name=data.name)
@@ -80,7 +80,7 @@ async def update_script(
     script_id: uuid.UUID,
     data: ScriptUpdate,
     service: FromDishka[ScriptService],
-    _key: str = Security(require_write_scope),
+    _key: str = Security(get_current_api_key),
 ) -> ScriptResponse:
     """Update an existing script."""
     audit.info("api.scripts.update", script_id=str(script_id))
@@ -96,7 +96,7 @@ async def update_script(
 async def delete_script(
     script_id: uuid.UUID,
     service: FromDishka[ScriptService],
-    _key: str = Security(require_write_scope),
+    _key: str = Security(get_current_api_key),
 ) -> None:
     """Delete a script."""
     audit.info("api.scripts.delete", script_id=str(script_id))
@@ -113,7 +113,7 @@ async def execute_script(
     script_id: uuid.UUID,
     data: ScriptExecuteRequest,
     service: FromDishka[ScriptService],
-    _key: str = Security(require_write_scope),
+    _key: str = Security(get_current_api_key),
 ) -> ScriptExecutionBatchResult:
     """Execute a script on multiple nodes."""
     audit.info(

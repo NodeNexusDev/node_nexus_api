@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from app.core.config import Settings, get_settings
 from app.core.connectors.ssh import SSHConnectorFactory
+from app.core.scheduler import ScriptScheduler
 from app.repositories.api_key_repo import APIKeyRepository
 from app.repositories.audit_repo import AuditLogRepository
 from app.repositories.command_repo import CommandRepository
@@ -184,8 +185,17 @@ class ConfigProvider(Provider):
         return get_settings()
 
 
+class SchedulerProvider(Provider):
+    """Scheduler providers."""
+
+    @provide(scope=Scope.APP)
+    def get_script_scheduler(self) -> ScriptScheduler:
+        """Get script scheduler singleton."""
+        return ScriptScheduler()
+
+
 class AppProvider(
-    ConfigProvider, DbProvider, RepositoryProvider, ConnectorProvider, ServiceProvider
+    ConfigProvider, DbProvider, RepositoryProvider, ConnectorProvider, SchedulerProvider, ServiceProvider
 ):
     """Main application provider."""
 
