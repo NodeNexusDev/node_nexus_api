@@ -1,5 +1,7 @@
 """SSH connector implementation."""
 
+from collections.abc import AsyncIterator
+
 import asyncssh
 import structlog
 
@@ -98,6 +100,37 @@ class SSHConnector(BaseConnector):
         except asyncssh.Error as exc:
             audit.error(
                 "ssh.command.failed",
+                host=self._host,
+                command=command,
+                error=str(exc),
+            )
+            raise
+
+    async def execute_command_streaming(self, command: str) -> AsyncIterator[str]:
+        """Execute a command and yield stdout chunks as they arrive.
+
+        Yields lines of stdout output. Raises on connection errors.
+        """
+        if not self._connection:
+            raise RuntimeError("Not connected")
+
+        logger.debug("ssh.stream.start", host=self._host, command=command)
+        try:
+            async with self._connection.create_process(command) as process:
+                async for line in process.stdout:
+                    yield line
+                # Wait for process to finish
+                await process.wait()
+                exit_code = process.exit_status or 0
+                audit.info(
+                    "ssh.stream.ok",
+                    host=self._host,
+                    command=command,
+                    exit_code=exit_code,
+                )
+        except asyncssh.Error as exc:
+            audit.error(
+                "ssh.stream.failed",
                 host=self._host,
                 command=command,
                 error=str(exc),
