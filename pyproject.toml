@@ -11,7 +11,7 @@ dependencies = [
     "asyncssh>=2.24.0",
     "cryptography>=49.0.0",
     "dishka>=1.10.1",
-    "fastapi>=0.139.0",
+    "fastapi>=0.140.0",
     "httpx2>=2.9.1",
     "opentelemetry-exporter-otlp-proto-grpc>=1.44.0",
     "opentelemetry-instrumentation-fastapi>=0.65b0",
@@ -30,14 +30,14 @@ dev = [
     "aiosqlite>=0.22.1",
     "bandit>=1.8.0",
     "pip-audit>=2.7.0",
-    "pre-commit>=4.0.0",
-    "ty>=0.0.59",
+    "pre-commit>=4.6.1",
+    "ty>=0.0.63",
     "pytest>=9.1.1",
     "pytest-asyncio>=1.4.0",
     "pytest-cov>=7.1.0",
     "pytest-docker>=3.2.5",
     "pytest-mock>=3.15.1",
-    "ruff>=0.15.21",
+    "ruff>=0.16.0",
 ]
 
 [tool.ruff]
