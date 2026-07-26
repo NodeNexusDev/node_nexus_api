@@ -1,12 +1,13 @@
 """Node repository implementation."""
 
+from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from sqlalchemy import Select
 from uuid import UUID
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.node import NodeModel
@@ -139,6 +140,37 @@ class NodeRepository(IRepository[NodeModel]):
         )
         result = await self._session.execute(query)
         return result.scalar_one()
+
+    async def get_list_cursor(
+        self,
+        cursor: tuple[datetime, UUID] | None = None,
+        limit: int = 20,
+        tags: list[str] | None = None,
+        search: str | None = None,
+    ) -> list[NodeModel]:
+        """Get nodes using cursor-based pagination.
+
+        Cursor is (created_at, id). Results are ordered by created_at DESC, id DESC.
+        Fetches limit+1 to determine has_more.
+        Uses explicit comparisons for SQLite compatibility (tuple_() with UUID fails).
+        """
+        query = self._apply_filters(select(NodeModel), tags=tags, search=search)
+        if cursor is not None:
+            cursor_dt, cursor_id = cursor
+            query = query.where(
+                or_(
+                    NodeModel.created_at < cursor_dt,
+                    and_(
+                        NodeModel.created_at == cursor_dt,
+                        NodeModel.id < cursor_id,
+                    ),
+                )
+            )
+        query = query.order_by(NodeModel.created_at.desc(), NodeModel.id.desc()).limit(
+            limit + 1
+        )
+        result = await self._session.execute(query)
+        return list(result.scalars().all())
 
     async def create(self, data: dict[str, Any]) -> NodeModel:
         """Create a new node."""

@@ -8,6 +8,7 @@ from fastapi import APIRouter, HTTPException, Query, Security
 
 from app.api.deps import get_current_api_key, require_write_scope
 from app.core.exceptions import ConnectionFailedError, NodeNotFoundError
+from app.schemas.common import CursorPage, decode_cursor
 from app.schemas.node import (
     BulkCommandRequest,
     BulkCommandResult,
@@ -28,7 +29,7 @@ audit = structlog.get_logger("audit")
 router = APIRouter(prefix="/nodes", tags=["nodes"], route_class=DishkaRoute)
 
 
-@router.get("/", response_model=PaginatedResponse[NodeResponse])
+@router.get("/")
 @inject
 async def get_nodes(
     service: FromDishka[NodeService],
@@ -36,10 +37,33 @@ async def get_nodes(
     size: int = Query(20, ge=1, le=100),
     tags: str | None = Query(None, description="Comma-separated tags (AND)"),
     search: str | None = Query(None, description="Search by name or host"),
+    cursor: str | None = Query(None, description="Cursor for keyset pagination"),
+    limit: int = Query(20, ge=1, le=100, description="Page size for cursor pagination"),
     _key: str = Security(get_current_api_key),
-) -> PaginatedResponse[NodeResponse]:
-    """Get all nodes with pagination, optional tag filtering and search."""
+):
+    """Get all nodes with pagination, optional tag filtering and search.
+
+    Supports two pagination modes:
+    - Offset-based (default): ?page=1&size=20
+    - Cursor-based: ?cursor=<base64>&limit=20
+    """
     tag_list = [t.strip() for t in tags.split(",")] if tags else None
+
+    if cursor is not None:
+        # Cursor-based pagination
+        try:
+            decoded = decode_cursor(cursor)
+        except ValueError:
+            raise HTTPException(status_code=422, detail="Invalid cursor")
+        audit.info("api.nodes.list_cursor", limit=limit, tags=tag_list, search=search)
+        items, next_cursor, has_more = await service.get_nodes_cursor(
+            cursor=decoded, limit=limit, tags=tag_list, search=search
+        )
+        return CursorPage(
+            items=items, next_cursor=next_cursor, has_more=has_more, limit=limit
+        )
+
+    # Offset-based pagination (default)
     audit.info("api.nodes.list", page=page, size=size, tags=tag_list, search=search)
     nodes, total = await service.get_all_nodes(
         page=page, size=size, tags=tag_list, search=search
