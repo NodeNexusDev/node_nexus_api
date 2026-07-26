@@ -1,17 +1,23 @@
 [project]
 name = "node-nexus-api"
-version = "0.5.0"
+version = "0.6.0"
 description = "REST API for managing server nodes"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "alembic>=1.18.5",
+    "apscheduler>=3.11.3",
     "asyncpg>=0.31.0",
     "asyncssh>=2.24.0",
     "cryptography>=49.0.0",
     "dishka>=1.10.1",
     "fastapi>=0.139.0",
     "httpx2>=2.9.1",
+    "opentelemetry-exporter-otlp-proto-grpc>=1.44.0",
+    "opentelemetry-instrumentation-fastapi>=0.65b0",
+    "opentelemetry-instrumentation-sqlalchemy>=0.65b0",
+    "opentelemetry-sdk>=1.44.0",
+    "prometheus-fastapi-instrumentator>=8.0.2",
     "pydantic>=2.13.4",
     "pydantic-settings>=2.14.2",
     "sqlalchemy>=2.0.51",

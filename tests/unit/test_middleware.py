@@ -1,12 +1,18 @@
 """Tests for security headers and CORS middleware."""
 
+import asyncio
+
 import pytest
 from httpx2 import ASGITransport, AsyncClient
 from starlette.applications import Starlette
 from starlette.responses import JSONResponse
 from starlette.routing import Route
 
-from app.api.middleware import RequestLoggingMiddleware
+from app.api.middleware import (
+    RateLimitMiddleware,
+    RequestLoggingMiddleware,
+    TimeoutMiddleware,
+)
 from app.main import create_app
 
 
@@ -149,3 +155,103 @@ class TestRequestLoggingMiddleware:
             resp = await ac.get("/ok")
             assert resp.status_code == 200
             assert resp.json() == {"status": "ok"}
+
+
+async def _slow_handler(request):
+    await asyncio.sleep(10)
+    return JSONResponse({"status": "ok"})
+
+
+async def _fast_handler(request):
+    return JSONResponse({"status": "ok"})
+
+
+class TestTimeoutMiddleware:
+    async def test_timeout_returns_504(self):
+        """Request exceeding timeout returns 504."""
+        app = Starlette(routes=[Route("/slow", _slow_handler)])
+        app.add_middleware(TimeoutMiddleware, timeout=0.01)
+
+        async with AsyncClient(
+            transport=ASGITransport(app=app),
+            base_url="http://test",
+        ) as ac:
+            resp = await ac.get("/slow")
+            assert resp.status_code == 504
+            assert "timed out" in resp.json()["detail"]
+
+    async def test_fast_request_not_timed_out(self):
+        """Fast request completes normally."""
+        app = Starlette(routes=[Route("/fast", _fast_handler)])
+        app.add_middleware(TimeoutMiddleware, timeout=5)
+
+        async with AsyncClient(
+            transport=ASGITransport(app=app),
+            base_url="http://test",
+        ) as ac:
+            resp = await ac.get("/fast")
+            assert resp.status_code == 200
+
+    async def test_health_excluded_from_timeout(self):
+        """Health endpoint is excluded from timeout."""
+
+        async def _health(request):
+            return JSONResponse({"status": "healthy"})
+
+        app = Starlette(routes=[Route("/health", _health)])
+        app.add_middleware(TimeoutMiddleware, timeout=0.01)
+
+        async with AsyncClient(
+            transport=ASGITransport(app=app),
+            base_url="http://test",
+        ) as ac:
+            resp = await ac.get("/health")
+            assert resp.status_code == 200
+
+
+class TestRateLimitMiddleware:
+    async def test_rate_limit_returns_429(self):
+        """Exceeding rate limit returns 429."""
+        app = Starlette(routes=[Route("/test", _fast_handler)])
+        app.add_middleware(RateLimitMiddleware, requests=2, window=60)
+
+        async with AsyncClient(
+            transport=ASGITransport(app=app),
+            base_url="http://test",
+        ) as ac:
+            await ac.get("/test")
+            await ac.get("/test")
+            resp = await ac.get("/test")  # 3rd request
+            assert resp.status_code == 429
+            assert "Rate limit" in resp.json()["detail"]
+
+    async def test_rate_limit_headers_present(self):
+        """Rate limit headers are present on responses."""
+        app = Starlette(routes=[Route("/test", _fast_handler)])
+        app.add_middleware(RateLimitMiddleware, requests=10, window=60)
+
+        async with AsyncClient(
+            transport=ASGITransport(app=app),
+            base_url="http://test",
+        ) as ac:
+            resp = await ac.get("/test")
+            assert "x-ratelimit-limit" in resp.headers
+            assert "x-ratelimit-remaining" in resp.headers
+
+    async def test_health_excluded_from_rate_limit(self):
+        """Health endpoint is excluded from rate limiting."""
+
+        async def _health(request):
+            return JSONResponse({"status": "healthy"})
+
+        app = Starlette(routes=[Route("/health", _health)])
+        app.add_middleware(RateLimitMiddleware, requests=1, window=60)
+
+        async with AsyncClient(
+            transport=ASGITransport(app=app),
+            base_url="http://test",
+        ) as ac:
+            # Should not be rate limited even with many requests
+            for _ in range(5):
+                resp = await ac.get("/health")
+                assert resp.status_code == 200

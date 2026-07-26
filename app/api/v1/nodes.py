@@ -6,8 +6,9 @@ import structlog
 from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
 from fastapi import APIRouter, HTTPException, Query, Security
 
-from app.api.deps import get_current_api_key
+from app.api.deps import get_current_api_key, require_write_scope
 from app.core.exceptions import ConnectionFailedError, NodeNotFoundError
+from app.schemas.common import CursorPage, decode_cursor
 from app.schemas.node import (
     BulkCommandRequest,
     BulkCommandResult,
@@ -28,7 +29,7 @@ audit = structlog.get_logger("audit")
 router = APIRouter(prefix="/nodes", tags=["nodes"], route_class=DishkaRoute)
 
 
-@router.get("/", response_model=PaginatedResponse[NodeResponse])
+@router.get("/")
 @inject
 async def get_nodes(
     service: FromDishka[NodeService],
@@ -36,10 +37,33 @@ async def get_nodes(
     size: int = Query(20, ge=1, le=100),
     tags: str | None = Query(None, description="Comma-separated tags (AND)"),
     search: str | None = Query(None, description="Search by name or host"),
+    cursor: str | None = Query(None, description="Cursor for keyset pagination"),
+    limit: int = Query(20, ge=1, le=100, description="Page size for cursor pagination"),
     _key: str = Security(get_current_api_key),
-) -> PaginatedResponse[NodeResponse]:
-    """Get all nodes with pagination, optional tag filtering and search."""
+):
+    """Get all nodes with pagination, optional tag filtering and search.
+
+    Supports two pagination modes:
+    - Offset-based (default): ?page=1&size=20
+    - Cursor-based: ?cursor=<base64>&limit=20
+    """
     tag_list = [t.strip() for t in tags.split(",")] if tags else None
+
+    if cursor is not None:
+        # Cursor-based pagination
+        try:
+            decoded = decode_cursor(cursor)
+        except ValueError:
+            raise HTTPException(status_code=422, detail="Invalid cursor")
+        audit.info("api.nodes.list_cursor", limit=limit, tags=tag_list, search=search)
+        items, next_cursor, has_more = await service.get_nodes_cursor(
+            cursor=decoded, limit=limit, tags=tag_list, search=search
+        )
+        return CursorPage(
+            items=items, next_cursor=next_cursor, has_more=has_more, limit=limit
+        )
+
+    # Offset-based pagination (default)
     audit.info("api.nodes.list", page=page, size=size, tags=tag_list, search=search)
     nodes, total = await service.get_all_nodes(
         page=page, size=size, tags=tag_list, search=search
@@ -79,7 +103,7 @@ async def get_node(
 async def create_node(
     data: NodeCreate,
     service: FromDishka[NodeService],
-    _key: str = Security(get_current_api_key),
+    _key: str = Security(require_write_scope),
 ) -> NodeResponse:
     """Create a new node."""
     audit.info("api.nodes.create", name=data.name, connection_type=data.connection_type)
@@ -92,7 +116,7 @@ async def update_node(
     node_id: uuid.UUID,
     data: NodeUpdate,
     service: FromDishka[NodeService],
-    _key: str = Security(get_current_api_key),
+    _key: str = Security(require_write_scope),
 ) -> NodeResponse:
     """Update an existing node."""
     audit.info("api.nodes.update", node_id=str(node_id))
@@ -108,7 +132,7 @@ async def update_node(
 async def delete_node(
     node_id: uuid.UUID,
     service: FromDishka[NodeService],
-    _key: str = Security(get_current_api_key),
+    _key: str = Security(require_write_scope),
 ) -> None:
     """Delete a node."""
     audit.info("api.nodes.delete", node_id=str(node_id))
@@ -124,7 +148,7 @@ async def delete_node(
 async def bulk_execute_command(
     data: BulkCommandRequest,
     service: FromDishka[NodeService],
-    _key: str = Security(get_current_api_key),
+    _key: str = Security(require_write_scope),
 ) -> BulkCommandResult:
     """Execute a command on multiple nodes by IDs and/or tags."""
     audit.info(
@@ -148,7 +172,7 @@ async def bulk_execute_command(
 async def check_node(
     node_id: uuid.UUID,
     service: FromDishka[NodeService],
-    _key: str = Security(get_current_api_key),
+    _key: str = Security(require_write_scope),
 ) -> NodeResponse:
     """Check SSH connectivity to a node."""
     audit.info("api.nodes.check", node_id=str(node_id))
@@ -175,7 +199,7 @@ async def execute_command(
     node_id: uuid.UUID,
     data: CommandRequest,
     service: FromDishka[NodeService],
-    _key: str = Security(get_current_api_key),
+    _key: str = Security(require_write_scope),
 ) -> CommandResult:
     """Execute a command on a node via SSH."""
     audit.info("api.nodes.execute", node_id=str(node_id), command=data.command)
@@ -222,7 +246,7 @@ async def add_tag(
     node_id: uuid.UUID,
     data: TagAdd,
     service: FromDishka[NodeService],
-    _key: str = Security(get_current_api_key),
+    _key: str = Security(require_write_scope),
 ) -> NodeResponse:
     """Add a tag to a node."""
     audit.info("api.nodes.tags.add", node_id=str(node_id), tag=data.tag)
@@ -239,7 +263,7 @@ async def remove_tag(
     node_id: uuid.UUID,
     data: TagRemove,
     service: FromDishka[NodeService],
-    _key: str = Security(get_current_api_key),
+    _key: str = Security(require_write_scope),
 ) -> NodeResponse:
     """Remove a tag from a node."""
     audit.info("api.nodes.tags.remove", node_id=str(node_id), tag=data.tag)

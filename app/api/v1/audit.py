@@ -6,7 +6,7 @@ import structlog
 from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
 from fastapi import APIRouter, HTTPException, Query, Security
 
-from app.api.deps import get_current_api_key
+from app.api.deps import get_current_api_key, require_write_scope
 from app.schemas.audit_log import AuditLogResponse
 from app.schemas.node import PaginatedResponse
 from app.services.audit_service import AuditService
@@ -45,7 +45,7 @@ async def get_audit_logs(
 async def delete_audit_logs(
     service: FromDishka[AuditService],
     confirm: str | None = Query(None),
-    _key: str = Security(get_current_api_key),
+    _key: str = Security(require_write_scope),
 ) -> dict[str, int]:
     """Delete all audit log entries.
 

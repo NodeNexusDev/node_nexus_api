@@ -1,10 +1,12 @@
 """E2E tests for the full application stack."""
 
+from datetime import UTC, datetime
 from uuid import uuid4
 
 import httpx2 as httpx
 import pytest
 
+from app.schemas.common import encode_cursor
 from tests.e2e.conftest import ServicePorts
 
 pytestmark = pytest.mark.docker
@@ -1685,3 +1687,770 @@ def test_rate_limit_headers(e2e_client: httpx.Client) -> None:
     assert resp.status_code == 200
     assert "X-RateLimit-Limit" in resp.headers
     assert "X-RateLimit-Remaining" in resp.headers
+
+
+# ---------------------------------------------------------------------------
+# Prometheus metrics
+# ---------------------------------------------------------------------------
+
+
+def test_metrics_endpoint_exists(e2e_client: httpx.Client) -> None:
+    """GET /metrics returns Prometheus text format."""
+    resp = e2e_client.get("/metrics")
+    assert resp.status_code == 200
+    text = resp.text
+    assert "http_requests_total" in text or "http_request_duration" in text
+
+
+def test_metrics_no_auth_required(e2e_client_no_auth: httpx.Client) -> None:
+    """/metrics does not require authentication."""
+    resp = e2e_client_no_auth.get("/metrics")
+    assert resp.status_code == 200
+
+
+def test_metrics_excludes_health(
+    e2e_client: httpx.Client, e2e_client_no_auth: httpx.Client
+) -> None:
+    """/metrics response does not count /health hits."""
+    for _ in range(5):
+        e2e_client_no_auth.get("/health")
+    resp = e2e_client.get("/metrics")
+    assert resp.status_code == 200
+
+
+# ---------------------------------------------------------------------------
+# Cursor-based pagination
+# ---------------------------------------------------------------------------
+
+
+def test_cursor_first_page(e2e_client: httpx.Client) -> None:
+    """First page without cursor returns nodes."""
+    nodes = []
+    for i in range(3):
+        resp = e2e_client.post(
+            "/api/v1/nodes/",
+            json={
+                "name": f"cursor-node-{i}",
+                "host": f"10.0.0.{i}",
+                "port": 22,
+                "connection_type": "ssh",
+            },
+        )
+        assert resp.status_code == 201
+        nodes.append(resp.json())
+
+    try:
+        cursor = encode_cursor(datetime.now(UTC), uuid4())
+        resp = e2e_client.get(f"/api/v1/nodes/?cursor={cursor}&limit=2")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "items" in data
+        assert "has_more" in data
+        assert "next_cursor" in data
+        assert len(data["items"]) <= 2
+    finally:
+        for node in nodes:
+            e2e_client.delete(f"/api/v1/nodes/{node['id']}")
+
+
+def test_cursor_pagination(e2e_client: httpx.Client) -> None:
+    """Cursor pagination returns next page without duplicates."""
+    nodes = []
+    for i in range(5):
+        resp = e2e_client.post(
+            "/api/v1/nodes/",
+            json={
+                "name": f"cursor-page-{i}",
+                "host": f"10.0.1.{i}",
+                "port": 22,
+                "connection_type": "ssh",
+            },
+        )
+        assert resp.status_code == 201
+        nodes.append(resp.json())
+
+    try:
+        cursor = encode_cursor(datetime.now(UTC), uuid4())
+        resp = e2e_client.get(f"/api/v1/nodes/?cursor={cursor}&limit=2")
+        assert resp.status_code == 200
+        page1 = resp.json()
+        assert page1["has_more"] is True
+        assert page1["next_cursor"] is not None
+
+        resp = e2e_client.get(f"/api/v1/nodes/?cursor={page1['next_cursor']}&limit=2")
+        assert resp.status_code == 200
+        page2 = resp.json()
+
+        page1_ids = {n["id"] for n in page1["items"]}
+        page2_ids = {n["id"] for n in page2["items"]}
+        assert not page1_ids & page2_ids
+    finally:
+        for node in nodes:
+            e2e_client.delete(f"/api/v1/nodes/{node['id']}")
+
+
+def test_cursor_invalid(e2e_client: httpx.Client) -> None:
+    """Invalid cursor returns 422."""
+    resp = e2e_client.get("/api/v1/nodes/?cursor=invalid-cursor!!!")
+    assert resp.status_code == 422
+
+
+# ---------------------------------------------------------------------------
+# Config export/import
+# ---------------------------------------------------------------------------
+
+
+def test_config_export(e2e_client: httpx.Client) -> None:
+    """GET /api/v1/config/export returns all data."""
+    resp = e2e_client.get("/api/v1/config/export")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "version" in data
+    assert "exported_at" in data
+    assert isinstance(data["nodes"], list)
+    assert isinstance(data["commands"], list)
+    assert isinstance(data["scripts"], list)
+
+
+def test_config_export_excludes_secrets(e2e_client: httpx.Client) -> None:
+    """Exported nodes don't contain password/ssh_key."""
+    resp = e2e_client.post(
+        "/api/v1/nodes/",
+        json={
+            "name": "export-secret-node",
+            "host": "10.0.0.99",
+            "port": 22,
+            "connection_type": "ssh",
+            "password": "secret123",
+        },
+    )
+    assert resp.status_code == 201
+    node_id = resp.json()["id"]
+
+    try:
+        resp = e2e_client.get("/api/v1/config/export")
+        data = resp.json()
+        exported = next(
+            (n for n in data["nodes"] if n["name"] == "export-secret-node"), None
+        )
+        assert exported is not None
+        assert "password" not in exported
+        assert "ssh_key" not in exported
+    finally:
+        e2e_client.delete(f"/api/v1/nodes/{node_id}")
+
+
+def test_config_import(e2e_client: httpx.Client) -> None:
+    """POST /api/v1/config/import creates items."""
+    resp = e2e_client.post(
+        "/api/v1/config/import",
+        json={
+            "nodes": [
+                {
+                    "name": "imported-e2e",
+                    "host": "10.0.0.50",
+                    "port": 22,
+                    "connection_type": "ssh",
+                }
+            ],
+            "commands": [{"name": "imported-cmd-e2e", "command": "echo hi"}],
+            "scripts": [],
+        },
+    )
+    assert resp.status_code == 200
+    result = resp.json()
+    assert result["nodes_created"] >= 1
+    assert result["commands_created"] >= 1
+
+    # Cleanup — export doesn't include id, use list endpoints instead
+    resp = e2e_client.get("/api/v1/nodes/")
+    for n in resp.json()["items"]:
+        if n["name"] == "imported-e2e":
+            e2e_client.delete(f"/api/v1/nodes/{n['id']}")
+    resp = e2e_client.get("/api/v1/commands/")
+    for c in resp.json()["items"]:
+        if c["name"] == "imported-cmd-e2e":
+            e2e_client.delete(f"/api/v1/commands/{c['id']}")
+
+
+def test_config_import_skips_duplicates(e2e_client: httpx.Client) -> None:
+    """Import skips items that already exist by name."""
+    resp = e2e_client.post(
+        "/api/v1/commands/",
+        json={"name": "dup-e2e-cmd", "command": "echo dup"},
+    )
+    assert resp.status_code == 201
+    cmd_id = resp.json()["id"]
+
+    try:
+        resp = e2e_client.post(
+            "/api/v1/config/import",
+            json={"commands": [{"name": "dup-e2e-cmd", "command": "echo dup"}]},
+        )
+        assert resp.status_code == 200
+        result = resp.json()
+        assert result["commands_created"] == 0
+        assert len(result["errors"]) >= 1
+    finally:
+        e2e_client.delete(f"/api/v1/commands/{cmd_id}")
+
+
+# ---------------------------------------------------------------------------
+# Script scheduling
+# ---------------------------------------------------------------------------
+
+
+_INLINE_STEP = [{"label": "step1", "type": "inline", "command": "echo ok"}]
+
+
+def test_script_schedule(e2e_client: httpx.Client) -> None:
+    """POST /scripts/{id}/schedule schedules a script."""
+    resp = e2e_client.post(
+        "/api/v1/scripts/",
+        json={"name": "sched-e2e-script", "steps": _INLINE_STEP},
+    )
+    assert resp.status_code == 201
+    script = resp.json()
+
+    resp = e2e_client.post(
+        "/api/v1/nodes/",
+        json={
+            "name": "sched-e2e-node",
+            "host": "10.0.0.1",
+            "port": 22,
+            "connection_type": "ssh",
+        },
+    )
+    assert resp.status_code == 201
+    node = resp.json()
+
+    try:
+        resp = e2e_client.post(
+            f"/api/v1/scripts/{script['id']}/schedule",
+            json={"cron": "0 9 * * *", "node_ids": [node["id"]]},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["cron"] == "0 9 * * *"
+    finally:
+        e2e_client.delete(f"/api/v1/scripts/{script['id']}")
+        e2e_client.delete(f"/api/v1/nodes/{node['id']}")
+
+
+def test_script_unschedule(e2e_client: httpx.Client) -> None:
+    """DELETE /scripts/{id}/schedule removes schedule."""
+    resp = e2e_client.post(
+        "/api/v1/scripts/",
+        json={"name": "unsched-e2e-script", "steps": _INLINE_STEP},
+    )
+    assert resp.status_code == 201
+    script = resp.json()
+
+    resp = e2e_client.post(
+        "/api/v1/nodes/",
+        json={
+            "name": "unsched-e2e-node",
+            "host": "10.0.0.1",
+            "port": 22,
+            "connection_type": "ssh",
+        },
+    )
+    assert resp.status_code == 201
+    node = resp.json()
+
+    try:
+        e2e_client.post(
+            f"/api/v1/scripts/{script['id']}/schedule",
+            json={"cron": "0 9 * * *", "node_ids": [node["id"]]},
+        )
+        resp = e2e_client.delete(f"/api/v1/scripts/{script['id']}/schedule")
+        assert resp.status_code == 200
+        assert "unscheduled" in resp.json()["message"]
+    finally:
+        e2e_client.delete(f"/api/v1/scripts/{script['id']}")
+        e2e_client.delete(f"/api/v1/nodes/{node['id']}")
+
+
+def test_script_get_schedule(e2e_client: httpx.Client) -> None:
+    """GET /scripts/{id}/schedule returns schedule info."""
+    resp = e2e_client.post(
+        "/api/v1/scripts/",
+        json={"name": "getsched-e2e", "steps": _INLINE_STEP},
+    )
+    assert resp.status_code == 201
+    script = resp.json()
+
+    resp = e2e_client.post(
+        "/api/v1/nodes/",
+        json={
+            "name": "getsched-e2e-node",
+            "host": "10.0.0.1",
+            "port": 22,
+            "connection_type": "ssh",
+        },
+    )
+    assert resp.status_code == 201
+    node = resp.json()
+
+    try:
+        e2e_client.post(
+            f"/api/v1/scripts/{script['id']}/schedule",
+            json={"cron": "0 9 * * *", "node_ids": [node["id"]]},
+        )
+        resp = e2e_client.get(f"/api/v1/scripts/{script['id']}/schedule")
+        assert resp.status_code == 200
+        assert "cron" in resp.json()
+    finally:
+        e2e_client.delete(f"/api/v1/scripts/{script['id']}")
+        e2e_client.delete(f"/api/v1/nodes/{node['id']}")
+
+
+def test_script_get_schedule_not_found(e2e_client: httpx.Client) -> None:
+    """GET /scripts/{id}/schedule returns 404 when not scheduled."""
+    resp = e2e_client.post(
+        "/api/v1/scripts/",
+        json={"name": "nosched-e2e", "steps": _INLINE_STEP},
+    )
+    assert resp.status_code == 201
+    script = resp.json()
+
+    try:
+        resp = e2e_client.get(f"/api/v1/scripts/{script['id']}/schedule")
+        assert resp.status_code == 404
+    finally:
+        e2e_client.delete(f"/api/v1/scripts/{script['id']}")
+
+
+def test_script_schedule_nonexistent(e2e_client: httpx.Client) -> None:
+    """POST /scripts/{id}/schedule returns 404 for missing script."""
+    resp = e2e_client.post(
+        f"/api/v1/scripts/{uuid4()}/schedule",
+        json={"cron": "0 9 * * *", "node_ids": [str(uuid4())]},
+    )
+    assert resp.status_code == 404
+
+
+def test_script_schedule_invalid_cron(e2e_client: httpx.Client) -> None:
+    """POST /scripts/{id}/schedule with invalid cron returns 422."""
+    resp = e2e_client.post(
+        "/api/v1/scripts/",
+        json={"name": "badcron-e2e", "steps": _INLINE_STEP},
+    )
+    assert resp.status_code == 201
+    script = resp.json()
+
+    resp = e2e_client.post(
+        "/api/v1/nodes/",
+        json={
+            "name": "badcron-e2e-node",
+            "host": "10.0.0.1",
+            "port": 22,
+            "connection_type": "ssh",
+        },
+    )
+    assert resp.status_code == 201
+    node = resp.json()
+
+    try:
+        resp = e2e_client.post(
+            f"/api/v1/scripts/{script['id']}/schedule",
+            json={"cron": "invalid", "node_ids": [node["id"]]},
+        )
+        assert resp.status_code == 422
+    finally:
+        e2e_client.delete(f"/api/v1/scripts/{script['id']}")
+        e2e_client.delete(f"/api/v1/nodes/{node['id']}")
+
+
+# ---------------------------------------------------------------------------
+# Docker E2E helpers
+# ---------------------------------------------------------------------------
+
+
+def _create_docker_node(e2e_client, **overrides):
+    """Create an SSH node with Docker host pointing to internal dind."""
+    return _create_ssh_node(
+        e2e_client,
+        name="docker-e2e-node",
+        docker_host="tcp://dind:2375",
+        **overrides,
+    )
+
+
+def _docker_pull_alpine(e2e_client, node_id):
+    """Pull alpine image on a Docker node (prerequisite for container tests)."""
+    resp = e2e_client.post(
+        f"/api/v1/nodes/{node_id}/docker/images/pull",
+        json={"image": "alpine:latest", "timeout": 120},
+    )
+    assert resp.status_code == 200
+
+
+# ---------------------------------------------------------------------------
+# Docker Images
+# ---------------------------------------------------------------------------
+
+
+def test_docker_list_images(e2e_client):
+    """GET /nodes/{id}/docker/images returns image list."""
+    node = _create_docker_node(e2e_client)
+    try:
+        _docker_pull_alpine(e2e_client, node["id"])
+        resp = e2e_client.get(f"/api/v1/nodes/{node['id']}/docker/images")
+        assert resp.status_code == 200
+        images = resp.json()
+        assert isinstance(images, list)
+        alpine_images = [i for i in images if "alpine" in str(i).lower()]
+        assert len(alpine_images) >= 1
+    finally:
+        e2e_client.delete(f"/api/v1/nodes/{node['id']}")
+
+
+def test_docker_pull_image(e2e_client):
+    """POST /nodes/{id}/docker/images/pull pulls an image."""
+    node = _create_docker_node(e2e_client)
+    try:
+        resp = e2e_client.post(
+            f"/api/v1/nodes/{node['id']}/docker/images/pull",
+            json={"image": "alpine:3.20", "timeout": 120},
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["success"] is True
+    finally:
+        e2e_client.delete(f"/api/v1/nodes/{node['id']}")
+
+
+# ---------------------------------------------------------------------------
+# Docker Containers
+# ---------------------------------------------------------------------------
+
+
+def test_docker_list_containers(e2e_client):
+    """GET /nodes/{id}/docker/containers returns list."""
+    node = _create_docker_node(e2e_client)
+    try:
+        _docker_pull_alpine(e2e_client, node["id"])
+        resp = e2e_client.get(f"/api/v1/nodes/{node['id']}/docker/containers")
+        assert resp.status_code == 200
+        assert isinstance(resp.json(), list)
+    finally:
+        e2e_client.delete(f"/api/v1/nodes/{node['id']}")
+
+
+def test_docker_list_containers_all(e2e_client):
+    """GET .../containers?all=true includes stopped containers."""
+    node = _create_docker_node(e2e_client)
+    try:
+        _docker_pull_alpine(e2e_client, node["id"])
+        resp = e2e_client.get(f"/api/v1/nodes/{node['id']}/docker/containers?all=true")
+        assert resp.status_code == 200
+        assert isinstance(resp.json(), list)
+    finally:
+        e2e_client.delete(f"/api/v1/nodes/{node['id']}")
+
+
+def test_docker_container_lifecycle(e2e_client):
+    """Full container lifecycle: run, inspect, stop, start, restart, remove."""
+    node = _create_docker_node(e2e_client)
+    try:
+        _docker_pull_alpine(e2e_client, node["id"])
+
+        # Run a container via SSH exec (docker run -d alpine sleep 300)
+        resp = e2e_client.post(
+            f"/api/v1/nodes/{node['id']}/execute",
+            json={"command": "docker run -d --name e2e-test-ctr alpine sleep 300"},
+        )
+        assert resp.status_code == 200
+
+        # Inspect
+        resp = e2e_client.get(
+            f"/api/v1/nodes/{node['id']}/docker/containers/e2e-test-ctr"
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["State"]["status"] == "running"
+
+        # Stop
+        resp = e2e_client.post(
+            f"/api/v1/nodes/{node['id']}/docker/containers/e2e-test-ctr/stop"
+        )
+        assert resp.status_code == 204
+
+        # Start
+        resp = e2e_client.post(
+            f"/api/v1/nodes/{node['id']}/docker/containers/e2e-test-ctr/start"
+        )
+        assert resp.status_code == 204
+
+        # Restart
+        resp = e2e_client.post(
+            f"/api/v1/nodes/{node['id']}/docker/containers/e2e-test-ctr/restart"
+        )
+        assert resp.status_code == 204
+
+        # Logs
+        resp = e2e_client.get(
+            f"/api/v1/nodes/{node['id']}/docker/containers/e2e-test-ctr/logs"
+        )
+        assert resp.status_code == 200
+
+        # Exec
+        resp = e2e_client.post(
+            f"/api/v1/nodes/{node['id']}/docker/containers/e2e-test-ctr/exec",
+            json={"command": "echo exec-ok"},
+        )
+        assert resp.status_code == 200
+        result = resp.json()
+        assert "exec-ok" in result["stdout"]
+
+        # Stats
+        resp = e2e_client.get(
+            f"/api/v1/nodes/{node['id']}/docker/containers/e2e-test-ctr/stats"
+        )
+        assert resp.status_code == 200
+        stats = resp.json()
+        assert "Name" in stats or "CPUPerc" in stats
+
+        # Remove (force)
+        resp = e2e_client.delete(
+            f"/api/v1/nodes/{node['id']}/docker/containers/e2e-test-ctr?force=true"
+        )
+        assert resp.status_code == 204
+
+    finally:
+        e2e_client.delete(f"/api/v1/nodes/{node['id']}")
+
+
+def test_docker_container_not_found(e2e_client):
+    """GET .../containers/{id} returns 404 for missing container."""
+    node = _create_docker_node(e2e_client)
+    try:
+        resp = e2e_client.get(
+            f"/api/v1/nodes/{node['id']}/docker/containers/nonexistent"
+        )
+        assert resp.status_code == 404
+    finally:
+        e2e_client.delete(f"/api/v1/nodes/{node['id']}")
+
+
+def test_docker_exec_validation(e2e_client):
+    """POST .../exec returns 422 for invalid container ID."""
+    node = _create_docker_node(e2e_client)
+    try:
+        resp = e2e_client.post(
+            f"/api/v1/nodes/{node['id']}/docker/containers/bad;$id/exec",
+            json={"command": "ls"},
+        )
+        assert resp.status_code == 422
+    finally:
+        e2e_client.delete(f"/api/v1/nodes/{node['id']}")
+
+
+# ---------------------------------------------------------------------------
+# Docker Networks and Volumes
+# ---------------------------------------------------------------------------
+
+
+def test_docker_list_networks(e2e_client):
+    """GET /nodes/{id}/docker/networks returns network list."""
+    node = _create_docker_node(e2e_client)
+    try:
+        resp = e2e_client.get(f"/api/v1/nodes/{node['id']}/docker/networks")
+        assert resp.status_code == 200
+        networks = resp.json()
+        assert isinstance(networks, list)
+        # bridge network should exist by default
+        names = [n.get("Name", "") for n in networks]
+        assert "bridge" in names
+    finally:
+        e2e_client.delete(f"/api/v1/nodes/{node['id']}")
+
+
+def test_docker_list_volumes(e2e_client):
+    """GET /nodes/{id}/docker/volumes returns volume list."""
+    node = _create_docker_node(e2e_client)
+    try:
+        resp = e2e_client.get(f"/api/v1/nodes/{node['id']}/docker/volumes")
+        assert resp.status_code == 200
+        assert isinstance(resp.json(), list)
+    finally:
+        e2e_client.delete(f"/api/v1/nodes/{node['id']}")
+
+
+# ---------------------------------------------------------------------------
+# Docker Bulk Operations
+# ---------------------------------------------------------------------------
+
+
+def test_docker_bulk_start(e2e_client):
+    """POST /api/v1/docker/bulk/start starts container on multiple nodes."""
+    node = _create_docker_node(e2e_client)
+    try:
+        _docker_pull_alpine(e2e_client, node["id"])
+        # Run a container via SSH
+        e2e_client.post(
+            f"/api/v1/nodes/{node['id']}/execute",
+            json={"command": "docker run -d --name bulk-start-ctr alpine sleep 300"},
+        )
+        # Stop it first
+        e2e_client.post(
+            f"/api/v1/nodes/{node['id']}/docker/containers/bulk-start-ctr/stop"
+        )
+
+        resp = e2e_client.post(
+            "/api/v1/docker/bulk/start",
+            json={
+                "node_ids": [node["id"]],
+                "container_id": "bulk-start-ctr",
+            },
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["action"] == "start"
+        assert data["total"] == 1
+        assert data["succeeded"] == 1
+    finally:
+        e2e_client.delete(f"/api/v1/nodes/{node['id']}")
+
+
+def test_docker_bulk_stop(e2e_client):
+    """POST /api/v1/docker/bulk/stop stops container on multiple nodes."""
+    node = _create_docker_node(e2e_client)
+    try:
+        _docker_pull_alpine(e2e_client, node["id"])
+        e2e_client.post(
+            f"/api/v1/nodes/{node['id']}/execute",
+            json={"command": "docker run -d --name bulk-stop-ctr alpine sleep 300"},
+        )
+
+        resp = e2e_client.post(
+            "/api/v1/docker/bulk/stop",
+            json={
+                "node_ids": [node["id"]],
+                "container_id": "bulk-stop-ctr",
+                "timeout": 5,
+            },
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["action"] == "stop"
+        assert data["total"] == 1
+    finally:
+        e2e_client.delete(f"/api/v1/nodes/{node['id']}")
+
+
+def test_docker_bulk_restart(e2e_client):
+    """POST /api/v1/docker/bulk/restart restarts container on multiple nodes."""
+    node = _create_docker_node(e2e_client)
+    try:
+        _docker_pull_alpine(e2e_client, node["id"])
+        e2e_client.post(
+            f"/api/v1/nodes/{node['id']}/execute",
+            json={"command": "docker run -d --name bulk-restart-ctr alpine sleep 300"},
+        )
+
+        resp = e2e_client.post(
+            "/api/v1/docker/bulk/restart",
+            json={
+                "node_ids": [node["id"]],
+                "container_id": "bulk-restart-ctr",
+                "timeout": 5,
+            },
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["action"] == "restart"
+        assert data["succeeded"] == 1
+    finally:
+        e2e_client.delete(f"/api/v1/nodes/{node['id']}")
+
+
+def test_docker_bulk_exec(e2e_client):
+    """POST /api/v1/docker/bulk/exec runs command in containers."""
+    node = _create_docker_node(e2e_client)
+    try:
+        _docker_pull_alpine(e2e_client, node["id"])
+        e2e_client.post(
+            f"/api/v1/nodes/{node['id']}/execute",
+            json={"command": "docker run -d --name bulk-exec-ctr alpine sleep 300"},
+        )
+
+        resp = e2e_client.post(
+            "/api/v1/docker/bulk/exec",
+            json={
+                "node_ids": [node["id"]],
+                "container_id": "bulk-exec-ctr",
+                "command": "echo exec-works",
+                "timeout": 10,
+            },
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["action"] == "exec"
+        results = data["results"]
+        assert len(results) == 1
+        assert "exec-works" in results[0]["output"]
+    finally:
+        e2e_client.delete(f"/api/v1/nodes/{node['id']}")
+
+
+# ---------------------------------------------------------------------------
+# API Key scope enforcement (403 on read-only)
+# ---------------------------------------------------------------------------
+
+
+def test_read_only_key_rejected_on_write(e2e_client):
+    """403 when read-only API key tries POST/PUT/DELETE."""
+    master_key = _get_master_key()
+    resp = e2e_client.post(
+        "/api/v1/api-keys/",
+        json={"name": "ro-scope-test", "scope": "read-only"},
+        headers={"X-API-Key": master_key},
+    )
+    assert resp.status_code == 201
+    ro_key = resp.json()["key"]
+    key_id = resp.json()["id"]
+
+    try:
+        # POST with read-only key should return 403
+        resp = e2e_client.post(
+            "/api/v1/nodes/",
+            json={
+                "name": "should-fail",
+                "host": "1.1.1.1",
+                "port": 22,
+                "connection_type": "ssh",
+            },
+            headers={"X-API-Key": ro_key},
+        )
+        assert resp.status_code == 403
+    finally:
+        e2e_client.delete(
+            f"/api/v1/api-keys/{key_id}",
+            headers={"X-API-Key": master_key},
+        )
+
+
+def test_read_only_key_can_read(e2e_client):
+    """200 when read-only API key accesses GET endpoints."""
+    master_key = _get_master_key()
+    resp = e2e_client.post(
+        "/api/v1/api-keys/",
+        json={"name": "ro-read-test", "scope": "read-only"},
+        headers={"X-API-Key": master_key},
+    )
+    assert resp.status_code == 201
+    ro_key = resp.json()["key"]
+    key_id = resp.json()["id"]
+
+    try:
+        resp = e2e_client.get(
+            "/api/v1/nodes/",
+            headers={"X-API-Key": ro_key},
+        )
+        assert resp.status_code == 200
+    finally:
+        e2e_client.delete(
+            f"/api/v1/api-keys/{key_id}",
+            headers={"X-API-Key": master_key},
+        )

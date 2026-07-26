@@ -1,6 +1,7 @@
 """Command template renderer with parameter substitution."""
 
 import re
+import shlex
 from typing import Any
 
 from app.core.exceptions import TemplateRenderError
@@ -53,9 +54,9 @@ def render_command(
     def _replace(match: re.Match[str]) -> str:
         name = match.group(1)
         if name in params:
-            return str(params[name])
+            return shlex.quote(str(params[name]))
         if defaults.get(name) is not None:
-            return str(defaults[name])
+            return shlex.quote(str(defaults[name]))
         return match.group(0)
 
     return PLACEHOLDER_RE.sub(_replace, template)

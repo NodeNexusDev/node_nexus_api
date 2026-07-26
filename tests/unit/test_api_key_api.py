@@ -115,8 +115,8 @@ class TestCreateApiKey:
         mock_get_settings.return_value = _mock_settings("test-master-key")
         app = _create_test_app(mock_service)
 
-        mock_service.create_api_key.side_effect = lambda name: _make_api_key_created(
-            name=name
+        mock_service.create_api_key.side_effect = lambda name, scope="read-write": (
+            _make_api_key_created(name=name)
         )
 
         async with AsyncClient(
@@ -133,7 +133,9 @@ class TestCreateApiKey:
         data = response.json()
         assert data["name"] == "my-key"
         assert data["key"] == "nnk_abc123def456"
-        mock_service.create_api_key.assert_called_once_with("my-key")
+        mock_service.create_api_key.assert_called_once_with(
+            "my-key", scope="read-write"
+        )
 
     @patch("app.api.deps.get_settings")
     async def test_validation_error(

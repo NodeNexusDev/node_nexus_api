@@ -1,6 +1,7 @@
 """Base connector interface."""
 
 from abc import ABC, abstractmethod
+from collections.abc import AsyncIterator
 from types import TracebackType
 from typing import Protocol
 
@@ -23,6 +24,18 @@ class BaseConnector(ABC):
         Returns:
             Tuple of (stdout, stderr, exit_code).
         """
+
+    async def execute_command_streaming(self, command: str) -> AsyncIterator[str]:
+        """Execute a command and stream stdout chunks.
+
+        Not all connectors support streaming. Default raises NotImplementedError.
+        """
+        raise NotImplementedError(
+            f"{type(self).__name__} does not support command streaming"
+        )
+        # Make this an async generator for correct type narrowing
+        # (ty infers async def without yield as Coroutine, not AsyncIterator)
+        yield  # type: ignore[unreachable]
 
     async def __aenter__(self) -> "BaseConnector":
         """Enter async context manager."""

@@ -4,14 +4,19 @@ REST API для управления серверными нодами с SSH-п
 
 ## Возможности
 
-- **Ноды** — CRUD, фильтрация по тегам, поиск, проверка SSH-связности
-- **SSH-команды** — выполнение команд на нодах, bulk-выполнение по ID и тегам
-- **Шаблоны команд** — сохранение часто используемых команд с параметрами
-- **Скрипты** — пайплайны команд (inline + шаблоны) с поддержкой `on_failure: stop|continue`
-- **Docker** — управление контейнерами, образами, сетями и томами на удалённых нодах через SSH
-- **Аудит-лог** — запись всех операций с фильтрацией по нодам и типу действия
-- **API ключи** — аутентификация через `X-API-Key`, master key, хеширование ключей (SHA-256)
-- **Безопасность** — шифрование SSH-ключей и паролей (AES-256-GCM), секреты не возвращаются в ответах
+- **Ноды** — CRUD, фильтрация по тегам, поиск, cursor-based пагинация, проверка SSH-связности
+- **Системные метрики** — CPU, RAM, диск, uptime для каждой ноды через SSH
+- **SSH-команды** — выполнение команд на нодах с настраиваемым таймаутом, bulk-выполнение по ID и тегам
+- **Шаблоны команд** — сохранение часто используемых команд с параметрами и тегами, защита от shell-инъекций
+- **Скрипты** — пайплайны команд (inline + шаблоны) с поддержкой `on_failure: stop|continue`, теги, выполнение на нескольких нодах
+- **Docker** — управление контейнерами, образами, сетями и томами на удалённых нодах через SSH, bulk-операции
+- **Планировщик** — cron-расписание для автоматического выполнения скриптов
+- **WebSocket** — real-time стриминг вывода команд на ноды
+- **Аудит-лог** — запись всех операций с фильтрацией по нодам и типу действия, автоочистка по retention
+- **API ключи** — аутентификация через `X-API-Key`, master key, SHA-256 хеширование, scope (read-only/read-write), срок действия
+- **Экспорт/импорт** — бэкап и восстановление конфигурации (ноды, команды, скрипты) без секретов
+- **Безопасность** — шифрование паролей/SSH-ключей (AES-256-GCM), rate limiting, global request timeout, security headers
+- **Observability** — Prometheus `/metrics`, OpenTelemetry tracing, `/health` и `/ready` пробы для Kubernetes
 
 ## Быстрый старт
 
@@ -36,7 +41,7 @@ uv run python -m app.main
 
 ## Стек
 
-[Python](https://www.python.org/) 3.13 · [FastAPI](https://fastapi.tiangolo.com/) · [SQLAlchemy](https://www.sqlalchemy.org/) 2.0 (async) · [Alembic](https://alembic.sqlalchemy.org/) · [Pydantic](https://docs.pydantic.dev/) · [dishka](https://dishka.dev/) · [asyncssh](https://asyncssh.readthedocs.io/) · [cryptography](https://cryptography.io/) · [structlog](https://www.structlog.org/) · [PostgreSQL](https://www.postgresql.org/)
+[Python](https://www.python.org/) 3.13 · [FastAPI](https://fastapi.tiangolo.com/) · [SQLAlchemy](https://www.sqlalchemy.org/) 2.0 (async) · [Alembic](https://alembic.sqlalchemy.org/) · [Pydantic](https://docs.pydantic.dev/) · [dishka](https://dishka.dev/) · [asyncssh](https://asyncssh.readthedocs.io/) · [cryptography](https://cryptography.io/) · [structlog](https://www.structlog.org/) · [PostgreSQL](https://www.postgresql.org/) · [APScheduler](https://apscheduler.readthedocs.io/) · [Prometheus](https://prometheus.io/) · [OpenTelemetry](https://opentelemetry.io/)
 
 ## Документация
 
