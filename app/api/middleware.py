@@ -56,7 +56,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
 class TimeoutMiddleware(BaseHTTPMiddleware):
     """Middleware that enforces a global request timeout."""
 
-    EXCLUDED_PATHS = frozenset({"/health", "/ready"})
+    EXCLUDED_PATHS = frozenset({"/health", "/ready", "/metrics"})
 
     def __init__(self, app, timeout: int = 300) -> None:  # noqa: ANN001
         super().__init__(app)
@@ -87,7 +87,7 @@ class TimeoutMiddleware(BaseHTTPMiddleware):
 class RateLimitMiddleware(BaseHTTPMiddleware):
     """Middleware that enforces per-IP rate limiting."""
 
-    EXCLUDED_PATHS = frozenset({"/health", "/ready"})
+    EXCLUDED_PATHS = frozenset({"/health", "/ready", "/metrics"})
 
     def __init__(
         self,
@@ -98,6 +98,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         super().__init__(app)
         self._requests = requests
         self._window = window
+        # TODO: consider Redis-backed rate limiting for multi-replica deployments
         self._ip_counts: dict[str, list[float]] = defaultdict(list)
 
     def clear(self) -> None:

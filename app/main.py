@@ -13,6 +13,7 @@ from dishka.integrations.fastapi import FastapiProvider, setup_dishka
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from prometheus_fastapi_instrumentator import Instrumentator
 
 from alembic import command as alembic_command
 from app.api.middleware import (
@@ -48,6 +49,7 @@ from app.core.exceptions import (
     TemplateRenderError,
 )
 from app.core.logging import configure_logging
+from app.core.telemetry import init_telemetry
 from app.di.providers import AppProvider
 
 logger = structlog.get_logger()  # operational: lifecycle, performance
@@ -107,8 +109,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
     configure_logging(log_level=settings.LOG_LEVEL, debug=settings.DEBUG)
     logger.info("app.startup")
-    await _run_migrations()
-    logger.info("migrations.applied")
+    if settings.AUTO_MIGRATE:
+        await _run_migrations()
+        logger.info("migrations.applied")
+    else:
+        logger.info("migrations.skipped", reason="AUTO_MIGRATE is disabled")
     await _cleanup_audit_logs()
 
     yield
@@ -203,6 +208,20 @@ def create_app() -> FastAPI:
     app.include_router(audit_router, prefix="/api/v1")
     app.include_router(api_keys_router, prefix="/api/v1")
     app.include_router(docker_router, prefix="/api/v1")
+
+    # Prometheus metrics (sits inside all custom middleware)
+    if settings.PROMETHEUS_ENABLED:
+        instrumentator = Instrumentator(
+            should_group_status_codes=False,
+            should_ignore_untemplated=True,
+            excluded_handlers=["/health", "/ready", settings.PROMETHEUS_PATH],
+        )
+        instrumentator.instrument(app)
+        instrumentator.expose(app, endpoint=settings.PROMETHEUS_PATH)
+
+    # OpenTelemetry tracing
+    init_telemetry(app, settings)
+
     return app
 
 
