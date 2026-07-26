@@ -9,7 +9,7 @@ from dishka.integrations.fastapi import setup_dishka
 from fastapi import FastAPI
 from httpx2 import ASGITransport, AsyncClient
 
-from app.api.v1.docker import router as docker_router
+from app.api.v1.docker_bulk import router as docker_bulk_router
 from app.schemas.docker import BulkDockerNodeResult, BulkDockerResponse
 from app.services.docker_service import DockerService
 from tests.unit.conftest import MockAuthServiceProvider, _mock_settings
@@ -17,7 +17,7 @@ from tests.unit.conftest import MockAuthServiceProvider, _mock_settings
 
 def _create_test_app(service: DockerService | AsyncMock) -> FastAPI:
     app = FastAPI()
-    app.include_router(docker_router, prefix="/api/v1")
+    app.include_router(docker_bulk_router, prefix="/api/v1")
 
     class MockServiceProvider(Provider):
         @provide(scope=Scope.REQUEST)
@@ -65,7 +65,7 @@ class TestBulkStartContainers:
         )
 
         resp = await client.post(
-            "/api/v1/nodes/00000000-0000-0000-0000-000000000001/docker/bulk/start",
+            "/api/v1/docker/bulk/start",
             json={"node_ids": ["node-1"], "container_id": "nginx"},
         )
         assert resp.status_code == 200
@@ -98,7 +98,7 @@ class TestBulkStartContainers:
         )
 
         resp = await client.post(
-            "/api/v1/nodes/00000000-0000-0000-0000-000000000001/docker/bulk/start",
+            "/api/v1/docker/bulk/start",
             json={"node_ids": ["node-1", "node-2"], "container_id": "nginx"},
         )
         assert resp.status_code == 200
@@ -125,7 +125,7 @@ class TestBulkStopContainers:
         )
 
         resp = await client.post(
-            "/api/v1/nodes/00000000-0000-0000-0000-000000000001/docker/bulk/stop",
+            "/api/v1/docker/bulk/stop",
             json={"node_ids": ["node-1"], "container_id": "nginx", "timeout": 5},
         )
         assert resp.status_code == 200
@@ -151,7 +151,7 @@ class TestBulkRestartContainers:
         )
 
         resp = await client.post(
-            "/api/v1/nodes/00000000-0000-0000-0000-000000000001/docker/bulk/restart",
+            "/api/v1/docker/bulk/restart",
             json={"node_ids": ["node-1"], "container_id": "nginx"},
         )
         assert resp.status_code == 200
@@ -177,7 +177,7 @@ class TestBulkExecInContainers:
         )
 
         resp = await client.post(
-            "/api/v1/nodes/00000000-0000-0000-0000-000000000001/docker/bulk/exec",
+            "/api/v1/docker/bulk/exec",
             json={
                 "node_ids": ["node-1"],
                 "container_id": "nginx",
@@ -193,7 +193,7 @@ class TestBulkExecInContainers:
         self, client: AsyncClient, mock_service: AsyncMock
     ) -> None:
         resp = await client.post(
-            "/api/v1/nodes/00000000-0000-0000-0000-000000000001/docker/bulk/exec",
+            "/api/v1/docker/bulk/exec",
             json={"node_ids": ["node-1"], "container_id": "nginx"},
         )
         assert resp.status_code == 422
