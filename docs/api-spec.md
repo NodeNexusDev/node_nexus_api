@@ -200,7 +200,7 @@ X-API-Key: nnk_abc123def456...
 
 ### GET /api/v1/nodes/
 
-Список нод с пагинацией, фильтрацией по тегам и поиском.
+Список нод с пагинацией, фильтрацией по тегам и поиском. Поддерживает два режима пагинации: offset-based (по умолчанию) и cursor-based.
 
 **Query Parameters:**
 
@@ -210,6 +210,10 @@ X-API-Key: nnk_abc123def456...
 | `size` | int | 20 | Размер страницы (1–100) |
 | `tags` | string \| null | null | Теги через запятую (AND-фильтр) |
 | `search` | string \| null | null | Поиск по name или host (ILIKE) |
+| `cursor` | string \| null | null | Cursor для keyset pagination (base64) |
+| `limit` | int | 20 | Лимит для cursor pagination (1–100) |
+
+> При использовании `cursor` игнорируются `page` и `size`. Cursor возвращается в ответе `CursorPage`.
 
 **Примеры:**
 
@@ -305,6 +309,7 @@ GET /api/v1/nodes/?tags=production&search=web&page=1&size=10
 | `username` | string \| null | нет | Имя пользователя |
 | `password` | string \| null | нет | Пароль (шифруется при сохранении) |
 | `ssh_key` | string \| null | нет | Приватный SSH-ключ (шифруется при сохранении) |
+| `docker_host` | string \| null | нет | Docker daemon URL (обязателен для connection_type=docker) |
 | `tags` | list[string] | нет (`[]`) | Теги ноды |
 
 **Response 201:** Объект `NodeResponse`.
@@ -341,6 +346,7 @@ GET /api/v1/nodes/?tags=production&search=web&page=1&size=10
 | `username` | string \| null | нет | Имя пользователя |
 | `password` | string \| null | нет | Пароль |
 | `ssh_key` | string \| null | нет | Приватный SSH-ключ |
+| `docker_host` | string \| null | нет | Docker daemon URL |
 | `tags` | list[string] \| null | нет | Теги ноды |
 
 **Response 200:** Объект `NodeResponse`.
@@ -658,6 +664,36 @@ Bulk-выполнение команды на нескольких нодах п
   "page": 1,
   "size": 20
 }
+```
+
+---
+
+### DELETE /api/v1/audit/
+
+Удаление всех записей аудит-лога. Требует master key и параметр подтверждения.
+
+**Query Parameters:**
+
+| Параметр | Тип | Обязательно | Описание |
+|----------|-----|-------------|----------|
+| `confirm` | string | да | Значение `yes` для подтверждения |
+
+**Response 200:**
+
+```json
+{ "deleted_count": 42 }
+```
+
+**Response 403:**
+
+```json
+{ "detail": "Only master key can delete all audit logs" }
+```
+
+**Response 422:**
+
+```json
+{ "detail": "Add ?confirm=yes to confirm deletion of all audit logs" }
 ```
 
 ---
@@ -1288,13 +1324,15 @@ Bulk-выполнение команды на нескольких нодах п
 
 ```json
 {
-  "name": "my-app-key"
+  "name": "my-app-key",
+  "scope": "read-write"
 }
 ```
 
 | Поле | Тип | Обязательно | Описание |
 |------|-----|-------------|----------|
 | `name` | string | да | Имя ключа (1–255 символов) |
+| `scope` | string | нет (`read-write`) | Scope: `read-only` или `read-write` |
 
 **Response 201:**
 
@@ -1428,7 +1466,7 @@ Bulk-выполнение команды на нескольких нодах п
 
 ```json
 {
-  "version": "0.5.0",
+  "version": "0.6.0",
   "exported_at": "2026-07-26T12:00:00Z",
   "nodes": [
     {
@@ -2034,6 +2072,7 @@ Readiness probe — проверяет доступность базы данн�
 | `connection_type` | string | Тип подключения |
 | `status` | string | Статус: `active`, `unreachable`, `error` |
 | `username` | string \| null | Имя пользователя |
+| `docker_host` | string \| null | Docker daemon URL |
 | `tags` | list[string] | Теги ноды |
 | `created_at` | datetime | Время создания |
 | `updated_at` | datetime | Время обновления |
@@ -2269,6 +2308,7 @@ Readiness probe — проверяет доступность базы данн�
 | Поле | Тип | Обязательно | Описание |
 |------|-----|-------------|----------|
 | `name` | string | да | Имя ключа (1–255 символов) |
+| `scope` | string | нет (`read-write`) | Scope: `read-only` или `read-write` |
 
 ### APIKeyCreated
 

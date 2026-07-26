@@ -67,7 +67,7 @@ Domain Models / Core / Infrastructure (коннекторы, внешние се
 
 ### Core (`app/core`)
 
-- Конфигурация (Pydantic Settings) — 21 переменная окружения
+- Конфигурация (Pydantic Settings) — 18 переменных окружения
 - Доменные исключения — 17 классов
 - Безопасность (AES-256-GCM, SHA-256 хеширование API ключей)
 - Абстрактные интерфейсы (коннекторы, ConnectorFactory)
@@ -124,10 +124,10 @@ connectors      → core (базовые исключения/интерфейс
 |----------|-----------|
 | `ConfigProvider` | `Settings` |
 | `DbProvider` | `async_sessionmaker`, `AsyncSession` |
-| `RepositoryProvider` | Все 6 репозиториев |
+| `RepositoryProvider` | Все 7 репозиториев |
 | `ConnectorProvider` | `SSHConnectorFactory` |
 | `SchedulerProvider` | `ScriptScheduler` |
-| `ServiceProvider` | Все 7 сервисов |
+| `ServiceProvider` | Все 8 сервисов |
 
 ---
 
@@ -143,7 +143,7 @@ connectors      → core (базовые исключения/интерфейс
 
 ### Docker (`DockerService`)
 
-- Управление Docker контейнерами на нодах через SSH-коннектор
+- Сервис для управления Docker контейнерами на нодах через SSH-коннектор
 - `docker_validation.py` — валидация container ID и image name (защита от command injection)
 - `shlex.quote()` для безопасного экранирования команд
 - Bulk-операции с `asyncio.gather` (параллельное выполнение)
@@ -190,7 +190,7 @@ app/
 │       ├── websocket.py   # WebSocket стриминг команд
 │       └── health.py      # Healthcheck (liveness + readiness)
 ├── core/
-│   ├── config.py          # Pydantic Settings (21 переменная)
+│   ├── config.py          # Pydantic Settings (18 переменных)
 │   ├── exceptions.py      # 17 доменных исключений
 │   ├── security.py        # AES-256-GCM + hash_api_key
 │   ├── ssh_utils.py       # SSH-утилиты
@@ -205,7 +205,7 @@ app/
 ├── models/                # 6 SQLAlchemy ORM-моделей
 ├── schemas/               # Pydantic Request/Response + common + config + scheduler
 ├── repositories/          # CRUD доступ к данным (+ health repo)
-├── services/              # 7 сервисов (+ health, config)
+├── services/              # 8 сервисов (+ health, config)
 └── di/
     ├── container.py        # Экспорт container для WebSocket/scheduler
     └── providers.py        # dishka провайдеры (6 провайдеров)
