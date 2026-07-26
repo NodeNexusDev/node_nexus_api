@@ -62,11 +62,14 @@ tests/
 ### Команды
 
 ```bash
-# Unit + integration тесты
+# Unit + integration тесты (быстро, без Docker)
 uv run pytest tests/unit/ tests/integration/ -v
 
 # С покрытием
 uv run pytest tests/unit/ tests/integration/ --cov=app --cov-report=term-missing
+
+# Конкретный файл
+uv run pytest tests/unit/test_node_metrics.py -v
 
 # E2E (требует Docker)
 uv run pytest tests/e2e/ -v
@@ -81,10 +84,11 @@ uv run pytest tests/integration_ssh/ -v
 - Внешние системы (SSH, HTTP API) **обязательно** мокать в unit-тестах
 - Интеграционные тесты используют in-memory SQLite
 - E2E тесты запускаются отдельно
+- Для тестов `@inject`-эндпоинтов через `ASGITransport` — использовать `__dishka_orig_func__` для bypass декоратора
 
 ### Coverage
 
-- Текущее покрытие: **91%**
+- Текущее покрытие: **95%** (769 тестов)
 - Минимум для нового кода: **80%**
 - Критическая бизнес-логика: **≥90%**
 
@@ -118,7 +122,12 @@ uv run alembic upgrade head
 
 # Откатить одну
 uv run alembic downgrade -1
+
+# Показать историю
+uv run alembic history
 ```
+
+Всего миграций: **13**.
 
 ---
 
@@ -131,4 +140,22 @@ uv run pytest ...             # Тесты
 uv run ruff check app/ tests/ # Линтер
 uv run ruff format app/ tests/# Форматтер
 uv run ty check app/          # Типы
+uv run alembic upgrade head   # Миграции
 ```
+
+---
+
+## CI/CD
+
+### GitHub Actions
+
+- **CI** (`.github/workflows/ci.yml`): lint → test → docker build → security scan
+- **Release** (`.github/workflows/release.yml`): build Docker image + create GitHub Release при пуше тега
+
+### Pre-commit хуки
+
+- `ruff` (lint + format)
+- `trailing-whitespace`, `end-of-file-fixer`
+- `check-yaml`, `check-added-large-files`, `check-merge-conflict`
+- `debug-statements`
+- `commitizen` (проверка формата коммитов)

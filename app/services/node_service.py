@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from datetime import datetime
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
@@ -85,6 +86,30 @@ class NodeService:
             nodes = await self._repository.get_all(skip=skip, limit=size)
             total = await self._repository.count()
         return [NodeResponse.model_validate(node) for node in nodes], total
+
+    async def get_nodes_cursor(
+        self,
+        cursor: tuple[datetime, UUID] | None = None,
+        limit: int = 20,
+        tags: list[str] | None = None,
+        search: str | None = None,
+    ) -> tuple[list[NodeResponse], str | None, bool]:
+        """Get nodes using cursor-based pagination.
+
+        Returns (items, next_cursor, has_more).
+        """
+        nodes = await self._repository.get_list_cursor(
+            cursor=cursor, limit=limit, tags=tags, search=search
+        )
+        has_more = len(nodes) > limit
+        items = nodes[:limit]
+        next_cursor = None
+        if has_more and items:
+            last = items[-1]
+            from app.schemas.common import encode_cursor
+
+            next_cursor = encode_cursor(last.created_at, last.id)
+        return [NodeResponse.model_validate(n) for n in items], next_cursor, has_more
 
     async def create_node(self, data: NodeCreate) -> NodeResponse:
         """Create a new node. Encrypts sensitive fields before storage."""

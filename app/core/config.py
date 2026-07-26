@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     MASTER_API_KEY: str = ""
 
     # Encryption
-    ENCRYPTION_SALT: str = "node-nexus-ssh-v1"
+    ENCRYPTION_SALT: str = "node-nexus-ssh-v1"  # Override in production via .env
 
     # Request timeout
     REQUEST_TIMEOUT: int = 300  # seconds
@@ -37,6 +37,18 @@ class Settings(BaseSettings):
 
     # Audit log retention
     AUDIT_LOG_RETENTION_DAYS: int = 90  # 0 = disabled
+
+    # Auto-migration on startup (disable for manual migration control in prod)
+    AUTO_MIGRATE: bool = True
+
+    # Prometheus metrics
+    PROMETHEUS_ENABLED: bool = True
+    PROMETHEUS_PATH: str = "/metrics"
+
+    # OpenTelemetry
+    OTEL_ENABLED: bool = False
+    OTEL_ENDPOINT: str = "http://localhost:4317"
+    OTEL_SERVICE_NAME: str = "node-nexus-api"
 
 
 @lru_cache

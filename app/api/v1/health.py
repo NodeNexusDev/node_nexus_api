@@ -16,7 +16,7 @@ def _get_app_version() -> str:
     try:
         return pkg_version("node-nexus-api")
     except PackageNotFoundError:
-        return "0.4.0"
+        return "unknown"
 
 
 @router.get("/health")

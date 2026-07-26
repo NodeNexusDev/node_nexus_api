@@ -2,8 +2,10 @@ FROM lscr.io/linuxserver/openssh-server:latest
 
 USER root
 
+# Install Docker CLI (for communicating with dind daemon)
 RUN apk add --no-cache docker-cli
 
-# Add abc user to docker group (GID 990 matches host Docker socket)
-RUN groupadd -g 990 docker 2>/dev/null || true \
-    && usermod -aG docker abc
+# Ensure DOCKER_HOST is available in SSH sessions.
+# /etc/environment is sourced by PAM on SSH login (Alpine/linuxserver image).
+ENV DOCKER_HOST=tcp://dind:2375
+RUN echo "DOCKER_HOST=tcp://dind:2375" >> /etc/environment

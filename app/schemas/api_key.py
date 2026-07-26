@@ -11,6 +11,7 @@ class APIKeyCreate(BaseModel):
     """Schema for creating an API key."""
 
     name: str = Field(..., min_length=1, max_length=255)
+    scope: Literal["read-only", "read-write"] = "read-write"
 
 
 class APIKeyCreated(BaseModel):
