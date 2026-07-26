@@ -6,7 +6,7 @@ import structlog
 from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
 from fastapi import APIRouter, HTTPException, Query, Security
 
-from app.api.deps import get_current_api_key
+from app.api.deps import get_current_api_key, require_write_scope
 from app.core.exceptions import APIKeyNotFoundError
 from app.schemas.api_key import (
     APIKeyCreate,
@@ -27,11 +27,11 @@ router = APIRouter(prefix="/api-keys", tags=["api-keys"], route_class=DishkaRout
 async def create_api_key(
     data: APIKeyCreate,
     service: FromDishka[APIKeyService],
-    _key: str = Security(get_current_api_key),
+    _key: str = Security(require_write_scope),
 ) -> APIKeyCreated:
     """Create a new API key. The full key is returned only once."""
     audit.info("api.api_keys.create", name=data.name)
-    return await service.create_api_key(data.name)
+    return await service.create_api_key(data.name, scope=data.scope)
 
 
 @router.get("/", response_model=APIKeyList)
@@ -53,7 +53,7 @@ async def update_api_key(
     key_id: uuid.UUID,
     data: APIKeyUpdate,
     service: FromDishka[APIKeyService],
-    _key: str = Security(get_current_api_key),
+    _key: str = Security(require_write_scope),
 ) -> APIKeyResponse:
     """Update an API key (name, is_active, scope, expires_at)."""
     audit.info("api.api_keys.update", key_id=str(key_id))
@@ -68,7 +68,7 @@ async def update_api_key(
 async def revoke_api_key(
     key_id: uuid.UUID,
     service: FromDishka[APIKeyService],
-    _key: str = Security(get_current_api_key),
+    _key: str = Security(require_write_scope),
 ) -> None:
     """Revoke an API key."""
     audit.info("api.api_keys.revoke", key_id=str(key_id))

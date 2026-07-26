@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import shlex
 import uuid
@@ -512,9 +513,8 @@ class DockerService:
             BulkDockerResponse with per-node results.
         """
         validated_id = validate_container_id(container_id)
-        results = []
 
-        for node_id_str in node_ids:
+        async def _action_on_node(node_id_str: str) -> BulkDockerNodeResult:
             try:
                 node_id = uuid.UUID(node_id_str)
                 node = await self._get_docker_node(node_id)
@@ -532,50 +532,42 @@ class DockerService:
 
                 stdout, stderr, exit_code = await self._execute_docker_cmd(node, cmd)
                 if exit_code != 0 and stderr:
-                    results.append(
-                        BulkDockerNodeResult(
-                            node_id=node_id_str,
-                            node_name=node.name,
-                            status="error",
-                            error=stderr.strip(),
-                        )
-                    )
-                else:
-                    results.append(
-                        BulkDockerNodeResult(
-                            node_id=node_id_str,
-                            node_name=node.name,
-                            status="success",
-                            output=stdout.strip(),
-                        )
-                    )
-            except NodeNotFoundError:
-                results.append(
-                    BulkDockerNodeResult(
+                    return BulkDockerNodeResult(
                         node_id=node_id_str,
-                        node_name="unknown",
+                        node_name=node.name,
                         status="error",
-                        error="Node not found",
+                        error=stderr.strip(),
                     )
+                return BulkDockerNodeResult(
+                    node_id=node_id_str,
+                    node_name=node.name,
+                    status="success",
+                    output=stdout.strip(),
+                )
+            except NodeNotFoundError:
+                return BulkDockerNodeResult(
+                    node_id=node_id_str,
+                    node_name="unknown",
+                    status="error",
+                    error="Node not found",
                 )
             except DockerError as exc:
-                results.append(
-                    BulkDockerNodeResult(
-                        node_id=node_id_str,
-                        node_name="unknown",
-                        status="error",
-                        error=str(exc),
-                    )
+                return BulkDockerNodeResult(
+                    node_id=node_id_str,
+                    node_name="unknown",
+                    status="error",
+                    error=str(exc),
                 )
             except Exception as exc:
-                results.append(
-                    BulkDockerNodeResult(
-                        node_id=node_id_str,
-                        node_name="unknown",
-                        status="error",
-                        error=str(exc),
-                    )
+                return BulkDockerNodeResult(
+                    node_id=node_id_str,
+                    node_name="unknown",
+                    status="error",
+                    error=str(exc),
                 )
+
+        tasks = [_action_on_node(nid) for nid in node_ids]
+        results = list(await asyncio.gather(*tasks))
 
         succeeded = sum(1 for r in results if r.status == "success")
         failed = len(results) - succeeded
@@ -612,9 +604,8 @@ class DockerService:
             BulkDockerResponse with per-node results.
         """
         validated_id = validate_container_id(container_id)
-        results = []
 
-        for node_id_str in node_ids:
+        async def _exec_on_node(node_id_str: str) -> BulkDockerNodeResult:
             try:
                 node_id = uuid.UUID(node_id_str)
                 node = await self._get_docker_node(node_id)
@@ -628,51 +619,43 @@ class DockerService:
                 )
 
                 if exit_code != 0:
-                    results.append(
-                        BulkDockerNodeResult(
-                            node_id=node_id_str,
-                            node_name=node.name,
-                            status="error",
-                            output=stdout.strip(),
-                            error=stderr.strip(),
-                        )
-                    )
-                else:
-                    results.append(
-                        BulkDockerNodeResult(
-                            node_id=node_id_str,
-                            node_name=node.name,
-                            status="success",
-                            output=stdout.strip(),
-                        )
-                    )
-            except NodeNotFoundError:
-                results.append(
-                    BulkDockerNodeResult(
+                    return BulkDockerNodeResult(
                         node_id=node_id_str,
-                        node_name="unknown",
+                        node_name=node.name,
                         status="error",
-                        error="Node not found",
+                        output=stdout.strip(),
+                        error=stderr.strip(),
                     )
+                return BulkDockerNodeResult(
+                    node_id=node_id_str,
+                    node_name=node.name,
+                    status="success",
+                    output=stdout.strip(),
+                )
+            except NodeNotFoundError:
+                return BulkDockerNodeResult(
+                    node_id=node_id_str,
+                    node_name="unknown",
+                    status="error",
+                    error="Node not found",
                 )
             except DockerError as exc:
-                results.append(
-                    BulkDockerNodeResult(
-                        node_id=node_id_str,
-                        node_name="unknown",
-                        status="error",
-                        error=str(exc),
-                    )
+                return BulkDockerNodeResult(
+                    node_id=node_id_str,
+                    node_name="unknown",
+                    status="error",
+                    error=str(exc),
                 )
             except Exception as exc:
-                results.append(
-                    BulkDockerNodeResult(
-                        node_id=node_id_str,
-                        node_name="unknown",
-                        status="error",
-                        error=str(exc),
-                    )
+                return BulkDockerNodeResult(
+                    node_id=node_id_str,
+                    node_name="unknown",
+                    status="error",
+                    error=str(exc),
                 )
+
+        tasks = [_exec_on_node(nid) for nid in node_ids]
+        results = list(await asyncio.gather(*tasks))
 
         succeeded = sum(1 for r in results if r.status == "success")
         failed = len(results) - succeeded

@@ -14,13 +14,15 @@ Base URL: `/api/v1`
 | Ресурс | Описание |
 |--------|----------|
 | [Аутентификация](#аутентификация) | API Key аутентификация |
-| [Nodes](#nodes) | CRUD ноды, проверка доступности, SSH-команды |
-| [Audit](#audit) | Аудит-лог операций |
-| [Commands](#commands) | Шаблоны команд с параметрами |
-| [Scripts](#scripts) | Пайплайны команд (скрипты) |
-| [API Keys](#api-keys) | Управление API ключами |
-| [Docker](#docker) | Управление Docker контейнерами на нодах |
-| [Health](#health) | Healthcheck |
+| [Nodes](#nodes) | CRUD ноды, проверка доступности, SSH-команды, метрики |
+| [Audit](#audit) | Аудит-лог операций, очистка |
+| [Commands](#commands) | Шаблоны команд с параметрами и тегами |
+| [Scripts](#scripts) | Пайплайны команд (скрипты), планировщик |
+| [API Keys](#api-keys) | Управление API ключами (scope, expiry) |
+| [Docker](#docker) | Управление Docker контейнерами на нодах + bulk |
+| [Config](#config) | Экспорт/импорт конфигурации |
+| [WebSocket](#websocket) | Стриминг вывода команд |
+| [Health](#health) | Healthcheck (liveness + readiness) |
 
 ### Nodes
 
@@ -54,13 +56,16 @@ Base URL: `/api/v1`
 
 | Метод | Endpoint | Описание |
 |-------|----------|----------|
-| GET | [`/api/v1/scripts/`](#get-apiv1scripts) | Список скриптов |
+| GET | [`/api/v1/scripts/`](#get-apiv1scripts) | Список скриптов (с фильтрацией по тегам) |
 | GET | [`/api/v1/scripts/{script_id}`](#get-apiv1scriptsscript_id) | Скрипт по ID |
 | POST | [`/api/v1/scripts/`](#post-apiv1scripts) | Создать скрипт |
 | PUT | [`/api/v1/scripts/{script_id}`](#put-apiv1scriptsscript_id) | Обновить скрипт |
 | DELETE | [`/api/v1/scripts/{script_id}`](#delete-apiv1scriptsscript_id) | Удалить скрипт |
 | POST | [`/api/v1/scripts/{script_id}/execute`](#post-apiv1scriptsscript_idexecute) | Выполнить на нодах |
 | GET | [`/api/v1/scripts/{script_id}/executions`](#get-apiv1scriptsscript_idexecutions) | История выполнений |
+| POST | [`/api/v1/scripts/{script_id}/schedule`](#post-apiv1scriptsscript_idschedule) | Запланировать скрипт |
+| DELETE | [`/api/v1/scripts/{script_id}/schedule`](#delete-apiv1scriptsscript_idschedule) | Отменить расписание |
+| GET | [`/api/v1/scripts/{script_id}/schedule`](#get-apiv1scriptsscript_idschedule) | Получить расписание |
 
 ### API Keys
 
@@ -88,12 +93,30 @@ Base URL: `/api/v1`
 | POST | [`/api/v1/nodes/{node_id}/docker/images/pull`](#post-apiv1nodesnode_iddockerimagespull) | Скачать образ |
 | GET | [`/api/v1/nodes/{node_id}/docker/networks`](#get-apiv1nodesnode_iddockernetworks) | Список сетей |
 | GET | [`/api/v1/nodes/{node_id}/docker/volumes`](#get-apiv1nodesnode_iddockervolumes) | Список томов |
-| POST | `/api/v1/nodes/{node_id}/docker/bulk/start` | Bulk-запуск контейнеров |
-| POST | `/api/v1/nodes/{node_id}/docker/bulk/stop` | Bulk-остановка контейнеров |
-| POST | `/api/v1/nodes/{node_id}/docker/bulk/restart` | Bulk-перезапуск контейнеров |
-| POST | `/api/v1/nodes/{node_id}/docker/bulk/exec` | Bulk-выполнение команд |
+| POST | [`/api/v1/docker/bulk/start`](#post-apiv1dockerbulkstart) | Bulk-запуск контейнеров |
+| POST | [`/api/v1/docker/bulk/stop`](#post-apiv1dockerbulkstop) | Bulk-остановка контейнеров |
+| POST | [`/api/v1/docker/bulk/restart`](#post-apiv1dockerbulkrestart) | Bulk-перезапуск контейнеров |
+| POST | [`/api/v1/docker/bulk/exec`](#post-apiv1dockerbulkexec) | Bulk-выполнение команд |
 
-### Схемы
+### Config
+
+| Метод | Endpoint | Описание |
+|-------|----------|----------|
+| GET | [`/api/v1/config/export`](#get-apiv1configexport) | Экспорт конфигурации |
+| POST | [`/api/v1/config/import`](#post-apiv1configimport) | Импорт конфигурации |
+
+### WebSocket
+
+| Метод | Endpoint | Описание |
+|-------|----------|----------|
+| WS | [`/api/v1/nodes/{node_id}/exec-stream`](#ws-apiv1nodesnode_idexec-stream) | Стриминг вывода команд |
+
+### Health
+
+| Метод | Endpoint | Описание |
+|-------|----------|----------|
+| GET | [`/health`](#get-health) | Liveness probe |
+| GET | [`/ready`](#get-ready) | Readiness probe (проверка БД) |
 
 | Схема | Описание |
 |-------|----------|
@@ -1171,6 +1194,88 @@ Bulk-выполнение команды на нескольких нодах п
 
 ---
 
+### Script Scheduler
+
+#### POST /api/v1/scripts/{script_id}/schedule
+
+Запланировать выполнение скрипта по cron-выражению.
+
+**Request:**
+
+```json
+{
+  "cron": "0 9 * * *",
+  "node_ids": ["00000000-0000-0000-0000-000000000001"]
+}
+```
+
+| Поле | Тип | Описание |
+|------|-----|----------|
+| `cron` | string | Cron-выражение (минимум 5 полей) |
+| `node_ids` | UUID[] | ID нод для выполнения (минимум 1) |
+
+**Response 200:**
+
+```json
+{
+  "script_id": "550e8400-e29b-41d4-a716-446655440000",
+  "cron": "0 9 * * *",
+  "message": "Script scheduled successfully"
+}
+```
+
+**Response 422:**
+
+```json
+{ "detail": "Invalid cron expression" }
+```
+
+---
+
+#### DELETE /api/v1/scripts/{script_id}/schedule
+
+Отменить расписание скрипта.
+
+**Response 200:**
+
+```json
+{
+  "message": "Script unscheduled",
+  "script_id": "550e8400-e29b-41d4-a716-446655440000"
+}
+```
+
+**Response 404:**
+
+```json
+{ "detail": "No schedule found for script" }
+```
+
+---
+
+#### GET /api/v1/scripts/{script_id}/schedule
+
+Получить информацию о расписании скрипта.
+
+**Response 200:**
+
+```json
+{
+  "script_id": "550e8400-e29b-41d4-a716-446655440000",
+  "cron": "0 9 * * *",
+  "next_run_time": "2026-07-27T09:00:00",
+  "node_ids": ["00000000-0000-0000-0000-000000000001"]
+}
+```
+
+**Response 404:**
+
+```json
+{ "detail": "No schedule found for script" }
+```
+
+---
+
 ## API Keys
 
 Управление API ключами для аутентификации.
@@ -1308,6 +1413,128 @@ Bulk-выполнение команды на нескольких нодах п
 ```json
 { "detail": "API key not found" }
 ```
+
+---
+
+## Config
+
+Экспорт и импорт конфигурации (ноды, команды, скрипты). Секреты (пароли, SSH-ключи) исключаются из экспорта.
+
+### GET /api/v1/config/export
+
+Экспортировать все ноды, команды и скрипты.
+
+**Response 200:**
+
+```json
+{
+  "version": "0.5.0",
+  "exported_at": "2026-07-26T12:00:00Z",
+  "nodes": [
+    {
+      "name": "web-server",
+      "host": "10.0.0.1",
+      "port": 22,
+      "connection_type": "ssh",
+      "username": "root",
+      "tags": ["prod", "web"]
+    }
+  ],
+  "commands": [
+    {
+      "name": "check-disk",
+      "description": "Проверить свободное место",
+      "command": "df -h {mount_point}",
+      "parameters": [
+        {"name": "mount_point", "type": "string", "required": true}
+      ],
+      "tags": ["monitoring"]
+    }
+  ],
+  "scripts": [
+    {
+      "name": "deploy-app",
+      "description": "Деплой приложения",
+      "steps": [
+        {"label": "Pull", "type": "inline", "command": "git pull"}
+      ],
+      "tags": ["deploy"]
+    }
+  ]
+}
+```
+
+---
+
+### POST /api/v1/config/import
+
+Импортировать конфигурацию. Дубликаты по имени пропускаются.
+
+**Request:**
+
+```json
+{
+  "nodes": [
+    {
+      "name": "web-server",
+      "host": "10.0.0.1",
+      "port": 22,
+      "connection_type": "ssh",
+      "username": "root",
+      "tags": ["prod"]
+    }
+  ],
+  "commands": [],
+  "scripts": []
+}
+```
+
+**Response 200:**
+
+```json
+{
+  "nodes_created": 1,
+  "commands_created": 0,
+  "scripts_created": 0,
+  "errors": []
+}
+```
+
+---
+
+## WebSocket
+
+### WS /api/v1/nodes/{node_id}/exec-stream
+
+Стриминг вывода команд через WebSocket. Аутентификация через query-параметр `?token=<api_key>`.
+
+**Подключение:**
+```
+ws://localhost:8000/api/v1/nodes/{node_id}/exec-stream?token=nnk_abc123...
+```
+
+**Клиент → Сервер (JSON):**
+
+```json
+{"command": "ls -la"}
+{"type": "signal", "signal": "SIGINT"}
+```
+
+**Сервер → Клиент (JSON):**
+
+```json
+{"type": "stdout", "data": "output line 1\n"}
+{"type": "done", "exit_code": 0}
+{"type": "error", "message": "SSH connection failed"}
+```
+
+Коды закрытия:
+| Код | Причина |
+|-----|---------|
+| 4001 | Отсутствует токен |
+| 4003 | Невалидный API ключ |
+| 4004 | Нода не найдена |
+| 1011 | Внутренняя ошибка |
 
 ---
 
@@ -1688,6 +1915,69 @@ Base URL для Docker: `/api/v1/nodes/{node_id}/docker`
 ]
 ```
 
+---
+
+## Docker Bulk
+
+Bulk-операции выполняются параллельно (`asyncio.gather`) на нескольких нодах.
+
+Base URL: `/api/v1/docker`
+
+### POST /api/v1/docker/bulk/start
+
+Запустить контейнер на нескольких нодах.
+
+**Request:**
+
+```json
+{
+  "node_ids": ["uuid-1", "uuid-2"],
+  "container_id": "my-container"
+}
+```
+
+| Поле | Тип | Обязательно | Описание |
+|------|-----|-------------|----------|
+| `node_ids` | string[] | да | ID нод (минимум 1) |
+| `container_id` | string | да | ID или имя контейнера |
+| `timeout` | int \| null | нет | Таймаут в секундах (1–300) |
+| `command` | string \| null | нет | Команда (только для `/bulk/exec`) |
+
+**Response 200:**
+
+```json
+{
+  "action": "start",
+  "results": [
+    {"node_id": "uuid-1", "node_name": "web-1", "status": "success", "output": "my-container"},
+    {"node_id": "uuid-2", "node_name": "web-2", "status": "error", "error": "Container not found"}
+  ],
+  "total": 2,
+  "succeeded": 1,
+  "failed": 1
+}
+```
+
+---
+
+### POST /api/v1/docker/bulk/stop
+
+Остановить контейнер на нескольких нодах. Принимает `timeout` (по умолчанию 10с).
+
+---
+
+### POST /api/v1/docker/bulk/restart
+
+Перезапустить контейнер на нескольких нодах. Принимает `timeout` (по умолчанию 10с).
+
+---
+
+### POST /api/v1/docker/bulk/exec
+
+Выполнить команду в контейнере на нескольких нодах. Поле `command` обязательно.
+
+---
+
 ## Health
 
 ### GET /health
@@ -1953,6 +2243,7 @@ Readiness probe — проверяет доступность базы данн�
 | Поле | Тип | Описание |
 |------|-----|----------|
 | `command` | string | Команда для выполнения |
+| `timeout` | int \| null | Таймаут в секундах (1–600) |
 
 ### CommandResult (Nodes API)
 
@@ -1999,6 +2290,8 @@ Readiness probe — проверяет доступность базы данн�
 | `is_active` | bool | Активен ли ключ |
 | `created_at` | datetime | Время создания |
 | `last_used_at` | datetime \| null | Время последнего использования |
+| `scope` | string | `read-write` или `read-only` |
+| `expires_at` | datetime \| null | Дата истечения |
 
 ### APIKeyList
 
@@ -2123,14 +2416,52 @@ Readiness probe — проверяет доступность базы данн�
 
 ---
 
+### CursorPage
+
+Cursor-based keyset pagination. Fields: `items`, `next_cursor`, `has_more`, `limit`.
+
+### BulkDockerRequest
+
+Fields: `node_ids`, `container_id`, `timeout`, `command`.
+
+### BulkDockerResponse
+
+Fields: `action`, `results`, `total`, `succeeded`, `failed`.
+
+### ScheduleRequest
+
+Fields: `cron` (5-field cron expression), `node_ids` (list of UUIDs).
+
+### ScheduleResponse
+
+Fields: `script_id`, `cron`, `message`.
+
+### NodeMetrics
+
+Fields: `cpu` (usage_percent, cores), `memory` (total_bytes, used_bytes, percent),
+`disk` (total_bytes, used_bytes, percent), `uptime_since`.
+
+### ConfigExport
+
+Fields: `version`, `exported_at`, `nodes` (no secrets), `commands`, `scripts`.
+
+### ImportResult
+
+Fields: `nodes_created`, `commands_created`, `scripts_created`, `errors`.
+
+---
+
 ## Коды ошибок
 
 | HTTP | Описание |
 |------|----------|
 | 201 | Создано успешно |
 | 204 | Удалено успешно |
-| 401 | Не авторизован / невалидный API ключ |
-| 404 | Ресурс не найден (Node, Command, Script, API Key, Container) |
-| 422 | Ошибка валидации запроса / TemplateRenderError / DockerValidationError |
-| 502 | Ошибка Docker-операции на удалённой ноде (DockerError) |
-| 503 | Ошибка подключения к ноде (ConnectionFailedError, DockerDaemonError) |
+| 401 | Не авторизован / невалидный / отозван / истёк API ключ |
+| 403 | Недостаточно прав (read-only ключ на write-операции) |
+| 404 | Ресурс не найден |
+| 422 | Ошибка валидации / TemplateRenderError / DockerValidationError |
+| 429 | Превышен лимит запросов (rate limiting) |
+| 502 | Ошибка Docker-операции |
+| 503 | Ошибка подключения к ноде |
+| 504 | Превышен таймаут запроса (RequestTimeoutError) |

@@ -15,8 +15,28 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  dind:
+    image: docker:27-dind
+    privileged: true
+    environment:
+      DOCKER_TLS_CERTDIR: ""
+    ports:
+      - "2376:2375"
+    healthcheck:
+      test: ["CMD", "docker", "info"]
+      interval: 3s
+      timeout: 5s
+      retries: 10
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
   ssh-server:
-    image: lscr.io/linuxserver/openssh-server:latest
+    build:
+      context: ..
+      dockerfile: tests/Dockerfile.ssh-docker
     environment:
       - PUID=1000
       - PGID=1000
@@ -24,11 +44,15 @@ services:
       - USER_NAME=testuser
       - USER_PASSWORD=testpass
       - PASSWORD_ACCESS=true
+      - DOCKER_HOST=tcp://dind:2375
     ports:
       - "2223:2222"
+    depends_on:
+      dind:
+        condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "echo ok"]
-      interval: 2s
+      test: ["CMD-SHELL", "docker info"]
+      interval: 3s
       timeout: 5s
       retries: 10
     logging:

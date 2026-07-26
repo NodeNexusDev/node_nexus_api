@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     MASTER_API_KEY: str = ""
 
     # Encryption
-    ENCRYPTION_SALT: str = "node-nexus-ssh-v1"
+    ENCRYPTION_SALT: str = "node-nexus-ssh-v1"  # Override in production via .env
 
     # Request timeout
     REQUEST_TIMEOUT: int = 300  # seconds

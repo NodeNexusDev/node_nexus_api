@@ -6,7 +6,7 @@ import structlog
 from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
 from fastapi import APIRouter, HTTPException, Query, Security
 
-from app.api.deps import get_current_api_key
+from app.api.deps import get_current_api_key, require_write_scope
 from app.core.docker_validation import validate_container_id
 from app.core.exceptions import (
     ConnectionFailedError,
@@ -16,8 +16,6 @@ from app.core.exceptions import (
     NodeNotFoundError,
 )
 from app.schemas.docker import (
-    BulkDockerRequest,
-    BulkDockerResponse,
     DockerContainer,
     DockerContainerInspect,
     DockerExecRequest,
@@ -87,7 +85,7 @@ async def start_container(
     node_id: uuid.UUID,
     container_id: str,
     service: FromDishka[DockerService],
-    _key: str = Security(get_current_api_key),
+    _key: str = Security(require_write_scope),
 ) -> None:
     """Start a container."""
     validated_id = validate_container_id(container_id)
@@ -113,7 +111,7 @@ async def stop_container(
     container_id: str,
     service: FromDishka[DockerService],
     timeout: int = Query(10, ge=1, le=300),
-    _key: str = Security(get_current_api_key),
+    _key: str = Security(require_write_scope),
 ) -> None:
     """Stop a container."""
     validated_id = validate_container_id(container_id)
@@ -139,7 +137,7 @@ async def restart_container(
     container_id: str,
     service: FromDishka[DockerService],
     timeout: int = Query(10, ge=1, le=300),
-    _key: str = Security(get_current_api_key),
+    _key: str = Security(require_write_scope),
 ) -> None:
     """Restart a container."""
     validated_id = validate_container_id(container_id)
@@ -165,7 +163,7 @@ async def remove_container(
     container_id: str,
     service: FromDishka[DockerService],
     force: bool = Query(False),
-    _key: str = Security(get_current_api_key),
+    _key: str = Security(require_write_scope),
 ) -> None:
     """Remove a container."""
     validated_id = validate_container_id(container_id)
@@ -218,7 +216,7 @@ async def exec_command(
     container_id: str,
     data: DockerExecRequest,
     service: FromDishka[DockerService],
-    _key: str = Security(get_current_api_key),
+    _key: str = Security(require_write_scope),
 ) -> DockerExecResult:
     """Execute a command in a container."""
     validated_id = validate_container_id(container_id)
@@ -267,7 +265,7 @@ async def pull_image(
     node_id: uuid.UUID,
     data: DockerImagePullRequest,
     service: FromDishka[DockerService],
-    _key: str = Security(get_current_api_key),
+    _key: str = Security(require_write_scope),
 ) -> DockerPullResult:
     """Pull a Docker image."""
     audit.info("api.docker.images.pull", node_id=str(node_id), image=data.image)
@@ -338,75 +336,3 @@ async def list_volumes(
         raise HTTPException(status_code=404, detail="Node not found")
     except DockerError as exc:
         raise HTTPException(status_code=502, detail=str(exc))
-
-
-# --- Bulk Docker operations ---
-
-
-@router.post("/bulk/start")
-@inject
-async def bulk_start_containers(
-    data: BulkDockerRequest,
-    service: FromDishka[DockerService],
-    _key: str = Security(get_current_api_key),
-) -> BulkDockerResponse:
-    """Start containers on multiple nodes."""
-    audit.info("api.docker.bulk.start", node_count=len(data.node_ids))
-    return await service.bulk_container_action(
-        node_ids=data.node_ids,
-        container_id=data.container_id,
-        action="start",
-    )
-
-
-@router.post("/bulk/stop")
-@inject
-async def bulk_stop_containers(
-    data: BulkDockerRequest,
-    service: FromDishka[DockerService],
-    _key: str = Security(get_current_api_key),
-) -> BulkDockerResponse:
-    """Stop containers on multiple nodes."""
-    audit.info("api.docker.bulk.stop", node_count=len(data.node_ids))
-    return await service.bulk_container_action(
-        node_ids=data.node_ids,
-        container_id=data.container_id,
-        action="stop",
-        timeout=data.timeout,
-    )
-
-
-@router.post("/bulk/restart")
-@inject
-async def bulk_restart_containers(
-    data: BulkDockerRequest,
-    service: FromDishka[DockerService],
-    _key: str = Security(get_current_api_key),
-) -> BulkDockerResponse:
-    """Restart containers on multiple nodes."""
-    audit.info("api.docker.bulk.restart", node_count=len(data.node_ids))
-    return await service.bulk_container_action(
-        node_ids=data.node_ids,
-        container_id=data.container_id,
-        action="restart",
-        timeout=data.timeout,
-    )
-
-
-@router.post("/bulk/exec")
-@inject
-async def bulk_exec_in_containers(
-    data: BulkDockerRequest,
-    service: FromDishka[DockerService],
-    _key: str = Security(get_current_api_key),
-) -> BulkDockerResponse:
-    """Execute a command in containers on multiple nodes."""
-    if not data.command:
-        raise HTTPException(status_code=422, detail="command is required for exec")
-    audit.info("api.docker.bulk.exec", node_count=len(data.node_ids))
-    return await service.bulk_exec(
-        node_ids=data.node_ids,
-        container_id=data.container_id,
-        command=data.command,
-        timeout=data.timeout or 30,
-    )

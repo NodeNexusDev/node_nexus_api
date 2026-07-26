@@ -6,7 +6,7 @@ import structlog
 from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
 from fastapi import APIRouter, HTTPException, Query, Security
 
-from app.api.deps import get_current_api_key
+from app.api.deps import get_current_api_key, require_write_scope
 from app.core.exceptions import (
     CommandNotFoundError,
     ConnectionFailedError,
@@ -67,7 +67,7 @@ async def get_command(
 async def create_command(
     data: CommandCreate,
     service: FromDishka[CommandService],
-    _key: str = Security(get_current_api_key),
+    _key: str = Security(require_write_scope),
 ) -> CommandResponse:
     """Create a new command template."""
     audit.info("api.commands.create", name=data.name)
@@ -80,7 +80,7 @@ async def update_command(
     command_id: uuid.UUID,
     data: CommandUpdate,
     service: FromDishka[CommandService],
-    _key: str = Security(get_current_api_key),
+    _key: str = Security(require_write_scope),
 ) -> CommandResponse:
     """Update an existing command template."""
     audit.info("api.commands.update", command_id=str(command_id))
@@ -96,7 +96,7 @@ async def update_command(
 async def delete_command(
     command_id: uuid.UUID,
     service: FromDishka[CommandService],
-    _key: str = Security(get_current_api_key),
+    _key: str = Security(require_write_scope),
 ) -> None:
     """Delete a command template."""
     audit.info("api.commands.delete", command_id=str(command_id))
@@ -113,7 +113,7 @@ async def execute_command(
     command_id: uuid.UUID,
     data: CommandExecuteRequest,
     service: FromDishka[CommandService],
-    _key: str = Security(get_current_api_key),
+    _key: str = Security(require_write_scope),
 ) -> CommandResult:
     """Execute a command template on a node."""
     audit.info(

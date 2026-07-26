@@ -8,8 +8,7 @@ from importlib.metadata import version as pkg_version
 
 import structlog
 from alembic.config import Config as AlembicConfig
-from dishka import make_async_container
-from dishka.integrations.fastapi import FastapiProvider, setup_dishka
+from dishka.integrations.fastapi import setup_dishka
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -24,10 +23,13 @@ from app.api.middleware import (
 from app.api.v1.api_keys import router as api_keys_router
 from app.api.v1.audit import router as audit_router
 from app.api.v1.commands import router as commands_router
+from app.api.v1.config import router as config_router
 from app.api.v1.docker import router as docker_router
+from app.api.v1.docker_bulk import router as docker_bulk_router
 from app.api.v1.health import router as health_router
 from app.api.v1.nodes import router as nodes_router
 from app.api.v1.scripts import router as scripts_router
+from app.api.v1.websocket import router as ws_router
 from app.core.config import get_settings
 from app.core.exceptions import (
     APIKeyExpiredError,
@@ -50,12 +52,10 @@ from app.core.exceptions import (
 )
 from app.core.logging import configure_logging
 from app.core.telemetry import init_telemetry
-from app.di.providers import AppProvider
+from app.di.container import container
 
 logger = structlog.get_logger()  # operational: lifecycle, performance
 audit = structlog.get_logger("audit")  # security: exceptions, errors
-
-container = make_async_container(AppProvider(), FastapiProvider())
 
 
 def _run_migrations_sync() -> None:
@@ -128,7 +128,7 @@ def create_app() -> FastAPI:
     try:
         app_version = pkg_version("node-nexus-api")
     except PackageNotFoundError:
-        app_version = "0.3.0"
+        app_version = "unknown"
     app = FastAPI(
         title="Node Nexus API",
         description="REST API для управления серверными нодами с SSH-подключениями",
@@ -207,7 +207,10 @@ def create_app() -> FastAPI:
     app.include_router(scripts_router, prefix="/api/v1")
     app.include_router(audit_router, prefix="/api/v1")
     app.include_router(api_keys_router, prefix="/api/v1")
+    app.include_router(config_router, prefix="/api/v1")
     app.include_router(docker_router, prefix="/api/v1")
+    app.include_router(docker_bulk_router, prefix="/api/v1")
+    app.include_router(ws_router, prefix="/api/v1")
 
     # Prometheus metrics (sits inside all custom middleware)
     if settings.PROMETHEUS_ENABLED:

@@ -195,7 +195,12 @@ class SchedulerProvider(Provider):
 
 
 class AppProvider(
-    ConfigProvider, DbProvider, RepositoryProvider, ConnectorProvider, SchedulerProvider, ServiceProvider
+    ConfigProvider,
+    DbProvider,
+    RepositoryProvider,
+    ConnectorProvider,
+    SchedulerProvider,
+    ServiceProvider,
 ):
     """Main application provider."""
 
