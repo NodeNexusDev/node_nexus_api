@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import json
 import shlex
 import uuid
 from typing import TYPE_CHECKING, Any
@@ -20,9 +19,7 @@ from app.core.docker_validation import validate_container_id, validate_image_nam
 from app.core.exceptions import (
     ConnectionFailedError,
     ContainerNotFoundError,
-    DockerDaemonError,
     DockerError,
-    ImageNotFoundError,
     NodeNotFoundError,
 )
 from app.core.ssh_utils import decrypt_value, get_connector_factory
@@ -40,6 +37,9 @@ from app.schemas.docker import (
     DockerStats,
     DockerVolume,
 )
+from app.services.docker.command_builder import build_docker_command
+from app.services.docker.error_mapper import raise_for_docker_error
+from app.services.docker.parsers import parse_json_array, parse_json_lines
 
 audit = structlog.get_logger("audit")
 
@@ -98,52 +98,19 @@ class DockerService:
 
     def _build_docker_cmd(self, node: Any, docker_args: str) -> str:
         """Build docker command with DOCKER_HOST if set."""
-        if node.docker_host:
-            escaped_host = shlex.quote(node.docker_host)
-            return f"DOCKER_HOST={escaped_host} docker {docker_args}"
-        return f"docker {docker_args}"
+        return build_docker_command(node, docker_args)
 
     def _parse_json_lines(self, stdout: str) -> list[dict[str, Any]]:
         """Robust parsing of JSON lines from docker CLI output."""
-        results: list[dict[str, Any]] = []
-        for line in stdout.strip().splitlines():
-            line = line.strip()
-            if not line or not line.startswith("{"):
-                continue
-            try:
-                results.append(json.loads(line))
-            except json.JSONDecodeError:
-                continue
-        return results
+        return parse_json_lines(stdout)
 
     def _parse_json_array(self, stdout: str) -> list[dict[str, Any]]:
         """Parse JSON array (docker inspect returns [{...}])."""
-        try:
-            data = json.loads(stdout.strip())
-            if isinstance(data, list):
-                return data
-            return [data]
-        except json.JSONDecodeError:
-            return []
+        return parse_json_array(stdout)
 
     def _map_docker_error(self, stderr: str, exit_code: int) -> None:
         """Map Docker CLI errors to domain exceptions."""
-        if exit_code == 0:
-            return
-        stderr_lower = stderr.lower()
-        if (
-            "no such container" in stderr_lower
-            or "no such image or container" in stderr_lower
-            or "no such object" in stderr_lower
-        ):
-            raise ContainerNotFoundError(stderr)
-        if "no such image" in stderr_lower:
-            raise ImageNotFoundError(stderr)
-        if "cannot connect to the docker daemon" in stderr_lower:
-            raise DockerDaemonError(stderr)
-        if "is not running" in stderr_lower:
-            raise DockerError(stderr)
-        raise DockerError(f"Docker command failed (exit {exit_code}): {stderr}")
+        raise_for_docker_error(stderr, exit_code)
 
     # --- Container operations ---
 
