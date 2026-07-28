@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
+from app.adapters.persistence.node_reader import ScopedNodeConnectionReader
 from app.application.services.streaming_command_service import StreamingCommandService
 from app.core.config import Settings, get_settings
 from app.core.connectors.ssh import SSHConnectorFactory
@@ -60,6 +61,13 @@ class DbProvider(Provider):
 
 class RepositoryProvider(Provider):
     """Repository providers."""
+
+    @provide(scope=Scope.APP)
+    def get_scoped_node_reader(
+        self, sessionmaker: async_sessionmaker[AsyncSession]
+    ) -> ScopedNodeConnectionReader:
+        """Get a node reader that owns a short session per operation."""
+        return ScopedNodeConnectionReader(sessionmaker)
 
     @provide(scope=Scope.REQUEST)
     def get_node_repository(self, session: AsyncSession) -> NodeRepository:
@@ -114,11 +122,11 @@ class ServiceProvider(Provider):
     @provide(scope=Scope.REQUEST)
     def get_streaming_command_service(
         self,
-        repository: NodeRepository,
+        node_reader: ScopedNodeConnectionReader,
         connector_factory: SSHConnectorFactory,
     ) -> StreamingCommandService:
         """Get WebSocket streaming orchestration service."""
-        return StreamingCommandService(repository, connector_factory)
+        return StreamingCommandService(node_reader, connector_factory)
 
     @provide(scope=Scope.REQUEST)
     def get_audit_service(self, repository: AuditLogRepository) -> AuditService:
