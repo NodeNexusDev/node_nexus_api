@@ -79,3 +79,11 @@ def test_docker_router_delegates_domain_errors_to_global_handler() -> None:
         "DockerValidationError",
         "NodeNotFoundError",
     }
+
+
+def test_docker_facade_remains_a_small_compatibility_layer() -> None:
+    """Prevent domain logic and legacy implementations returning to the facade."""
+    path = APP_ROOT / "services" / "docker_service.py"
+    source = path.read_text(encoding="utf-8")
+    assert len(source.splitlines()) <= 200
+    assert "_legacy_" not in source
