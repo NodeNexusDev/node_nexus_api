@@ -1,88 +1,157 @@
 name: CI
 
 on:
-  push:
-    branches: [main]
   pull_request:
     branches: [main]
+
+permissions:
+  contents: read
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
 jobs:
-  lint:
+  documentation:
+    if: github.head_ref == 'dev'
     runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: "sqlite+aiosqlite:///:memory:"
+      SECRET_KEY: docs-ci-only
+      MASTER_API_KEY: docs-ci-only
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: uv.lock
 
       - name: Set up Python
         run: uv python install 3.13
 
       - name: Install dependencies
-        run: uv sync --all-extras
+        run: uv sync --locked --all-extras
+
+      - name: Check structure, locale parity, Markdown, and local links
+        run: uv run python scripts/docs/check_docs.py
+
+      - name: Build English documentation
+        run: uv run mkdocs build --strict -f mkdocs.en.yml
+
+      - name: Build Russian documentation
+        run: uv run mkdocs build --strict -f mkdocs.ru.yml
+
+      - name: Export OpenAPI
+        run: uv run python scripts/docs/export_openapi.py
+
+      - name: Validate OpenAPI
+        run: uv run python scripts/docs/validate_openapi.py build/openapi.json
+
+      - name: Smoke test generated sites
+        run: |
+          test -f site/en/index.html
+          test -f site/ru/index.html
+          test -f site/en/assets/javascripts/language-switcher.js
+          test -f site/ru/assets/javascripts/language-switcher.js
+          grep -q 'hreflang="ru"' site/en/index.html
+          grep -q 'hreflang="en"' site/ru/index.html
+
+      - name: Upload documentation preview
+        uses: actions/upload-artifact@v7
+        with:
+          name: documentation-preview
+          path: site/
+
+      - name: Upload OpenAPI contract
+        uses: actions/upload-artifact@v7
+        with:
+          name: openapi-contract
+          path: build/openapi.json
+
+  lint:
+    if: github.head_ref == 'dev'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+
+      - name: Set up Python
+        run: uv python install 3.13
+
+      - name: Install dependencies
+        run: uv sync --locked --all-extras
 
       - name: Ruff check
-        run: uv run ruff check app/ tests/
+        run: uv run ruff check app/ tests/ scripts/
 
       - name: Ruff format check
-        run: uv run ruff format --check app/ tests/
+        run: uv run ruff format --check app/ tests/ scripts/
 
       - name: Type check
         run: uv run ty check app/
 
   test:
+    if: github.head_ref == 'dev'
     runs-on: ubuntu-latest
     needs: lint
     env:
-      DATABASE_URL: sqlite+aiosqlite:///test.db
+      DATABASE_URL: "sqlite+aiosqlite:///test.db"
       SECRET_KEY: test-secret-key-for-ci
       MASTER_API_KEY: test-master-key-for-ci
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: uv.lock
 
       - name: Set up Python
         run: uv python install 3.13
 
       - name: Install dependencies
-        run: uv sync --all-extras
+        run: uv sync --locked --all-extras
 
       - name: Verify architecture contracts
         run: uv run pytest tests/architecture/ -q --tb=short
 
-      - name: Run unit and integration tests
-        run: uv run pytest tests/unit/ tests/integration/ tests/integration_ssh/ -q --tb=short
-
       - name: Run tests with coverage
-        run: uv run pytest tests/unit/ tests/integration/ tests/integration_ssh/ --cov=app --cov-report=xml --cov-report=term-missing -q
+        run: >-
+          uv run pytest
+          tests/unit/ tests/integration/ tests/integration_ssh/
+          --cov=app
+          --cov-report=xml
+          --cov-report=term-missing
+          -q
+          --tb=short
 
       - name: Upload coverage report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-report
           path: coverage.xml
 
   docker:
+    if: github.head_ref == 'dev'
     runs-on: ubuntu-latest
     needs: test
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       - name: Build Docker image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           push: false
@@ -100,22 +169,26 @@ jobs:
             node-nexus-api:test python -c "from app.main import app; print('App loaded successfully')"
 
   security:
+    if: github.head_ref == 'dev'
     runs-on: ubuntu-latest
     needs: lint
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: uv.lock
 
       - name: Set up Python
         run: uv python install 3.13
 
       - name: Install dependencies
-        run: uv sync --all-extras
+        run: uv sync --locked --all-extras
 
       - name: Run bandit security scan
-        run: uv run bandit -r app/ -c pyproject.toml || true
+        run: uv run bandit -r app/ -c pyproject.toml
 
       - name: Check for vulnerable dependencies
-        run: uv run pip-audit || true
+        run: uv run pip-audit

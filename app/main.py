@@ -11,6 +11,7 @@ from alembic.config import Config as AlembicConfig
 from dishka.integrations.fastapi import setup_dishka
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.routing import APIRoute
 from prometheus_fastapi_instrumentator import Instrumentator
 
 from alembic import command as alembic_command
@@ -39,6 +40,19 @@ from app.di.container import container
 
 logger = structlog.get_logger()  # operational: lifecycle, performance
 audit = structlog.get_logger("audit")  # security: exceptions, errors
+
+
+def stable_operation_id(route: APIRoute) -> str:
+    """Build a deterministic OpenAPI operation identifier."""
+    methods = "_".join(sorted(method.lower() for method in route.methods or []))
+    path = (
+        route.path_format.strip("/")
+        .replace("/", "_")
+        .replace("{", "")
+        .replace("}", "")
+        .replace("-", "_")
+    )
+    return f"{methods}_{path or 'root'}"
 
 
 def _run_migrations_sync() -> None:
@@ -130,8 +144,20 @@ def create_app() -> FastAPI:
         app_version = "unknown"
     app = FastAPI(
         title="Node Nexus API",
-        description="REST API для управления серверными нодами с SSH-подключениями",
+        description=(
+            "REST API for managing server nodes, SSH commands, scripts, "
+            "and remote Docker resources."
+        ),
         version=app_version,
+        contact={
+            "name": "Node Nexus maintainers",
+            "url": "https://github.com/NodeNexusDev/node_nexus_api",
+        },
+        license_info={
+            "name": "MIT",
+            "identifier": "MIT",
+        },
+        generate_unique_id_function=stable_operation_id,
         lifespan=lifespan,
         openapi_tags=[
             {"name": "nodes", "description": "CRUD-операции и SSH-команды для нод"},
@@ -142,6 +168,9 @@ def create_app() -> FastAPI:
                 "name": "docker",
                 "description": "Управление Docker контейнерами на нодах",
             },
+            {"name": "api-keys", "description": "API key lifecycle and scopes"},
+            {"name": "config", "description": "Configuration backup and restore"},
+            {"name": "health", "description": "Liveness and readiness probes"},
         ],
     )
 
