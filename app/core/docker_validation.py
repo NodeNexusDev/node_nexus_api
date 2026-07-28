@@ -4,19 +4,20 @@ import re
 
 from app.core.exceptions import DockerValidationError
 
-_CONTAINER_ID_RE = re.compile(r"^[a-fA-F0-9\-]+$")
+_CONTAINER_REFERENCE_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9_.-]*$")
 _IMAGE_NAME_RE = re.compile(r"^[a-zA-Z0-9\-_./:]+$")
 
 
 def validate_container_id(container_id: str) -> str:
-    """Validate Docker container ID format.
+    """Validate Docker container ID or name format.
 
-    Only allows hexadecimal characters and hyphens to prevent command injection.
+    Allows Docker IDs and names while blocking shell metacharacters.
     """
-    if not container_id or not _CONTAINER_ID_RE.match(container_id):
+    if not container_id or not _CONTAINER_REFERENCE_RE.fullmatch(container_id):
         raise DockerValidationError(
-            f"Invalid container ID format: {container_id!r}. "
-            "Container ID must contain only hexadecimal characters and hyphens."
+            f"Invalid container reference format: {container_id!r}. "
+            "Container reference must start with an alphanumeric character and "
+            "contain only alphanumeric characters, hyphens, underscores, and dots."
         )
     return container_id
 

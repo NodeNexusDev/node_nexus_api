@@ -572,6 +572,22 @@ class TestRestartContainer:
 
 
 class TestGetContainerNotFound:
+    async def test_docker_no_such_object(
+        self,
+        service: DockerService,
+        repo: AsyncMock,
+        mock_factory: MagicMock,
+        docker_node: Any,
+    ) -> None:
+        mock_connector = mock_factory.create_ssh.return_value
+        mock_connector.execute_command.return_value = (
+            "",
+            "Error response from daemon: No such object: nonexistent",
+            1,
+        )
+        with pytest.raises(ContainerNotFoundError):
+            await service.get_container(docker_node.id, "nonexistent")
+
     async def test_empty_inspect(
         self,
         service: DockerService,

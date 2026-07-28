@@ -16,6 +16,7 @@ from app.repositories.script_repo import ScriptRepository
 from app.services.api_key_service import APIKeyService
 from app.services.audit_service import AuditService
 from app.services.command_service import CommandService
+from app.services.config_service import ConfigService
 from app.services.docker_service import DockerService
 from app.services.node_service import NodeService
 from app.services.script_service import ScriptService
@@ -74,3 +75,6 @@ def test_service_provider_resolves() -> None:
 
     docker_svc = svc_provider.get_docker_service(node_repo, audit_svc, factory)
     assert isinstance(docker_svc, DockerService)
+
+    config_svc = svc_provider.get_config_service(node_repo, cmd_repo, script_repo)
+    assert isinstance(config_svc, ConfigService)
