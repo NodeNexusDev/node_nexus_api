@@ -2071,6 +2071,7 @@ def _create_docker_node(e2e_client, **overrides):
     return _create_ssh_node(
         e2e_client,
         name="docker-e2e-node",
+        connection_type="docker",
         docker_host="tcp://dind:2375",
         **overrides,
     )

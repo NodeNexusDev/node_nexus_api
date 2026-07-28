@@ -176,5 +176,9 @@ async def exec_stream(
         audit.error("ws.exec.unexpected_error", node_id=str(node_id), error=str(exc))
         try:
             await websocket.close(code=1011, reason="Internal error")
-        except Exception:
-            pass
+        except Exception as close_exc:
+            logger.debug(
+                "ws.exec.close_failed",
+                node_id=str(node_id),
+                error=str(close_exc),
+            )
