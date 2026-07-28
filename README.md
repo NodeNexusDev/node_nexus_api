@@ -10,7 +10,7 @@ REST API для управления серверными нодами с SSH-п
 - **Шаблоны команд** — сохранение часто используемых команд с параметрами и тегами, защита от shell-инъекций
 - **Скрипты** — пайплайны команд (inline + шаблоны) с поддержкой `on_failure: stop|continue`, теги, выполнение на нескольких нодах
 - **Docker** — управление контейнерами, образами, сетями и томами на удалённых нодах через SSH, bulk-операции
-- **Планировщик** — cron-расписание для автоматического выполнения скриптов
+- **Планировщик** — cron-расписание для автоматического выполнения скриптов внутри одного процесса
 - **WebSocket** — real-time стриминг вывода команд на ноды
 - **Аудит-лог** — запись всех операций с фильтрацией по нодам и типу действия, автоочистка по retention
 - **API ключи** — аутентификация через `X-API-Key`, master key, SHA-256 хеширование, scope (read-only/read-write), срок действия
@@ -47,8 +47,22 @@ uv run python -m app.main
 
 - [API спецификация](docs/api-spec.md) — все эндпоинты, схемы, ошибки
 - [Архитектура](docs/architecture.md) — слои, структура проекта, DI, коннекторы
+- [Architecture overview и ADR](docs/architecture/overview.md) — границы, транзакции и lifecycle
 - [Конфигурация](docs/configuration.md) — переменные окружения, Docker, аутентификация
 - [Разработка](docs/development.md) — workflow, тестирование, команды
+
+Scheduler хранит задания только в памяти процесса: после рестарта расписания
+теряются, multi-replica координация не поддерживается.
+
+Полная проверка:
+
+```bash
+uv run ruff check app/ tests/
+uv run ruff format --check app/ tests/
+uv run ty check app/
+uv run pytest tests/architecture/ tests/unit/ tests/integration/ tests/integration_ssh/ -q
+uv run pytest tests/e2e/ -q
+```
 
 ## Лицензия
 
