@@ -5,6 +5,8 @@ from unittest.mock import AsyncMock, Mock
 
 import pytest
 
+from app.application.dto.command_template import CommandTemplateDTO
+from app.application.dto.node_connection import NodeConnectionDTO
 from app.core.exceptions import (
     CommandNotFoundError,
     ConnectionFailedError,
@@ -124,6 +126,49 @@ class TestUpdateCommand:
 
 
 class TestExecuteCommand:
+    async def test_uses_application_readers_for_remote_execution(
+        self,
+        cmd_repo: AsyncMock,
+        node_repo: AsyncMock,
+    ) -> None:
+        command_id = uuid.uuid4()
+        node_id = uuid.uuid4()
+        command_reader = AsyncMock()
+        command_reader.get_template.return_value = CommandTemplateDTO(
+            id=command_id,
+            command="echo ok",
+            parameters=(),
+        )
+        node_reader = AsyncMock()
+        node_reader.get_connection.return_value = NodeConnectionDTO(
+            id=node_id,
+            name="node",
+            host="127.0.0.1",
+            port=22,
+            connection_type="ssh",
+            username="root",
+        )
+        connector = AsyncMock()
+        connector.execute_command.return_value = ("ok", "", 0)
+        factory = Mock()
+        factory.create_ssh.return_value = connector
+        service = CommandService(
+            repository=cmd_repo,
+            node_repository=node_repo,
+            connector_factory=factory,
+            command_reader=command_reader,
+            node_reader=node_reader,
+        )
+
+        result = await service.execute_command(
+            command_id,
+            CommandExecuteRequest(node_id=node_id, params={}),
+        )
+
+        assert result.exit_code == 0
+        cmd_repo.get_by_id.assert_not_awaited()
+        node_repo.get_by_id.assert_not_awaited()
+
     async def test_success(
         self,
         cmd_repo: AsyncMock,

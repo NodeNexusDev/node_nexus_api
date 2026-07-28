@@ -86,6 +86,7 @@ def test_connector_provider_resolves() -> None:
 
 
 def test_service_provider_resolves() -> None:
+    from app.adapters.persistence.command_reader import ScopedCommandTemplateReader
     from app.adapters.persistence.node_reader import ScopedNodeConnectionReader
 
     session = MagicMock()
@@ -101,6 +102,7 @@ def test_service_provider_resolves() -> None:
     api_key_repo = repo_provider.get_api_key_repository(session)
     factory = conn_provider.get_ssh_connector_factory()
     node_reader = ScopedNodeConnectionReader(MagicMock())
+    command_reader = ScopedCommandTemplateReader(MagicMock())
 
     audit_svc = svc_provider.get_audit_service(audit_repo)
     assert isinstance(audit_svc, AuditService)
@@ -108,7 +110,14 @@ def test_service_provider_resolves() -> None:
     node_svc = svc_provider.get_node_service(node_repo, audit_svc, factory, node_reader)
     assert isinstance(node_svc, NodeService)
 
-    cmd_svc = svc_provider.get_command_service(cmd_repo, node_repo, audit_svc, factory)
+    cmd_svc = svc_provider.get_command_service(
+        cmd_repo,
+        node_repo,
+        audit_svc,
+        factory,
+        command_reader,
+        node_reader,
+    )
     assert isinstance(cmd_svc, CommandService)
 
     script_svc = svc_provider.get_script_service(

@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
+from app.adapters.persistence.command_reader import ScopedCommandTemplateReader
 from app.adapters.persistence.node_reader import ScopedNodeConnectionReader
 from app.application.services.streaming_command_service import StreamingCommandService
 from app.core.config import Settings, get_settings
@@ -61,6 +62,13 @@ class DbProvider(Provider):
 
 class RepositoryProvider(Provider):
     """Repository providers."""
+
+    @provide(scope=Scope.APP)
+    def get_scoped_command_reader(
+        self, sessionmaker: async_sessionmaker[AsyncSession]
+    ) -> ScopedCommandTemplateReader:
+        """Get a command reader that owns a short session per operation."""
+        return ScopedCommandTemplateReader(sessionmaker)
 
     @provide(scope=Scope.APP)
     def get_scoped_node_reader(
@@ -156,6 +164,8 @@ class ServiceProvider(Provider):
         node_repository: NodeRepository,
         audit_service: AuditService,
         connector_factory: SSHConnectorFactory,
+        command_reader: ScopedCommandTemplateReader,
+        node_reader: ScopedNodeConnectionReader,
     ) -> CommandService:
         """Get command service."""
         return CommandService(
@@ -163,6 +173,8 @@ class ServiceProvider(Provider):
             node_repository=node_repository,
             audit_service=audit_service,
             connector_factory=connector_factory,
+            command_reader=command_reader,
+            node_reader=node_reader,
         )
 
     @provide(scope=Scope.REQUEST)

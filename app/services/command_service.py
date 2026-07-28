@@ -6,6 +6,8 @@ from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 if TYPE_CHECKING:
+    from app.application.ports.command_reader import CommandTemplateReader
+    from app.application.ports.node_reader import NodeConnectionReader
     from app.core.connectors.base import ConnectorFactory
     from app.repositories.node_repo import NodeRepository
     from app.services.audit_service import AuditService
@@ -40,11 +42,15 @@ class CommandService:
         node_repository: NodeRepository,
         audit_service: AuditService | None = None,
         connector_factory: ConnectorFactory | None = None,
+        command_reader: CommandTemplateReader | None = None,
+        node_reader: NodeConnectionReader | None = None,
     ):
         self._repository = repository
         self._node_repository = node_repository
         self._audit = audit_service
         self._connector_factory = connector_factory
+        self._command_reader = command_reader
+        self._node_reader = node_reader
 
     async def _log(
         self,
@@ -105,14 +111,22 @@ class CommandService:
         self, command_id: UUID, data: CommandExecuteRequest
     ) -> CommandResult:
         """Execute a command template on a node."""
-        command = await self._repository.get_by_id(command_id)
+        command = (
+            await self._command_reader.get_template(command_id)
+            if self._command_reader
+            else await self._repository.get_by_id(command_id)
+        )
         if command is None:
             raise CommandNotFoundError(f"Command {command_id} not found")
 
-        parameters = command.parameters if command.parameters else []
+        parameters = list(command.parameters) if command.parameters else []
         rendered = render_command(command.command, parameters, data.params)
 
-        node = await self._node_repository.get_by_id(data.node_id)
+        node = (
+            await self._node_reader.get_connection(data.node_id)
+            if self._node_reader
+            else await self._node_repository.get_by_id(data.node_id)
+        )
         if node is None:
             raise NodeNotFoundError(f"Node {data.node_id} not found")
 
