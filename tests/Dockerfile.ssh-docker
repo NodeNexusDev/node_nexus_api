@@ -5,7 +5,9 @@ USER root
 # Install Docker CLI (for communicating with dind daemon)
 RUN apk add --no-cache docker-cli
 
-# Ensure DOCKER_HOST is available in SSH sessions.
-# /etc/environment is sourced by PAM on SSH login (Alpine/linuxserver image).
+# Ensure Docker CLI uses dind in non-interactive SSH sessions.
 ENV DOCKER_HOST=tcp://dind:2375
-RUN echo "DOCKER_HOST=tcp://dind:2375" >> /etc/environment
+RUN mv /usr/bin/docker /usr/bin/docker-cli \
+    && printf '#!/bin/sh\nDOCKER_HOST="${DOCKER_HOST:-tcp://dind:2375}" exec /usr/bin/docker-cli "$@"\n' \
+        > /usr/bin/docker \
+    && chmod +x /usr/bin/docker

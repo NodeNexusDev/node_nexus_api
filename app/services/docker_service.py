@@ -134,6 +134,7 @@ class DockerService:
         if (
             "no such container" in stderr_lower
             or "no such image or container" in stderr_lower
+            or "no such object" in stderr_lower
         ):
             raise ContainerNotFoundError(stderr)
         if "no such image" in stderr_lower:

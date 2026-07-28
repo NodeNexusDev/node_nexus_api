@@ -16,36 +16,39 @@ class TestValidateContainerId:
     def test_valid_with_hyphens(self) -> None:
         assert validate_container_id("abc-123-def-456") == "abc-123-def-456"
 
+    def test_valid_container_name(self) -> None:
+        assert validate_container_id("e2e-test_ctr.1") == "e2e-test_ctr.1"
+
     def test_valid_full_id(self) -> None:
         full_id = "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2"
         assert validate_container_id(full_id) == full_id
 
     def test_empty_string_raises(self) -> None:
-        with pytest.raises(DockerValidationError, match="Invalid container ID"):
+        with pytest.raises(DockerValidationError, match="Invalid container reference"):
             validate_container_id("")
 
     def test_none_like_raises(self) -> None:
-        with pytest.raises(DockerValidationError, match="Invalid container ID"):
+        with pytest.raises(DockerValidationError, match="Invalid container reference"):
             validate_container_id("abc; rm -rf /")
 
     def test_shell_injection_semicolon(self) -> None:
-        with pytest.raises(DockerValidationError, match="Invalid container ID"):
+        with pytest.raises(DockerValidationError, match="Invalid container reference"):
             validate_container_id("abc;rm -rf /")
 
     def test_shell_injection_pipe(self) -> None:
-        with pytest.raises(DockerValidationError, match="Invalid container ID"):
+        with pytest.raises(DockerValidationError, match="Invalid container reference"):
             validate_container_id("abc|cat /etc/passwd")
 
     def test_shell_injection_dollar(self) -> None:
-        with pytest.raises(DockerValidationError, match="Invalid container ID"):
+        with pytest.raises(DockerValidationError, match="Invalid container reference"):
             validate_container_id("$(whoami)")
 
     def test_shell_injection_backtick(self) -> None:
-        with pytest.raises(DockerValidationError, match="Invalid container ID"):
+        with pytest.raises(DockerValidationError, match="Invalid container reference"):
             validate_container_id("`whoami`")
 
     def test_shell_injection_space(self) -> None:
-        with pytest.raises(DockerValidationError, match="Invalid container ID"):
+        with pytest.raises(DockerValidationError, match="Invalid container reference"):
             validate_container_id("abc def")
 
 

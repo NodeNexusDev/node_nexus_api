@@ -18,6 +18,7 @@ from app.repositories.script_repo import ScriptRepository
 from app.services.api_key_service import APIKeyService
 from app.services.audit_service import AuditService
 from app.services.command_service import CommandService
+from app.services.config_service import ConfigService
 from app.services.docker_service import DockerService
 from app.services.health_service import HealthService
 from app.services.node_service import NodeService
@@ -174,6 +175,20 @@ class ServiceProvider(Provider):
     def get_health_service(self, repository: HealthRepository) -> HealthService:
         """Get health check service."""
         return HealthService(repository=repository)
+
+    @provide(scope=Scope.REQUEST)
+    def get_config_service(
+        self,
+        node_repository: NodeRepository,
+        command_repository: CommandRepository,
+        script_repository: ScriptRepository,
+    ) -> ConfigService:
+        """Get configuration import/export service."""
+        return ConfigService(
+            node_repository=node_repository,
+            command_repository=command_repository,
+            script_repository=script_repository,
+        )
 
 
 class ConfigProvider(Provider):
