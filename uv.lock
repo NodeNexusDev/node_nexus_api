@@ -1005,7 +1005,7 @@ wheels = [
 [[package]]
 name = "node-nexus-api"
 version = "0.6.4"
-source = { virtual = "." }
+source = { editable = "." }
 dependencies = [
     { name = "alembic" },
     { name = "apscheduler" },
