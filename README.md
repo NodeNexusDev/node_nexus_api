@@ -61,7 +61,7 @@ uv run ruff check app/ tests/
 uv run ruff format --check app/ tests/
 uv run ty check app/
 uv run pytest tests/architecture/ tests/unit/ tests/integration/ tests/integration_ssh/ -q
-uv run pytest tests/e2e/ -q
+uv run pytest tests/e2e/ -m docker -q
 ```
 
 ## Лицензия

@@ -56,3 +56,13 @@ Bulk execution follows three distinct phases:
 - Audit persistence failure is logged and must not leave another transaction in
   a failed state.
 - Cancellation must finalize connectors and any active persistence scope.
+
+## Implemented gateways
+
+- `ScopedNodeConnectionReader`
+- `ScopedCommandTemplateReader`
+- `ScopedScriptDefinitionReader`
+- `ScopedScriptExecutionWriter`
+
+Script command templates are resolved before opening the SSH connector.
+Execution state transitions use independent committed transactions.

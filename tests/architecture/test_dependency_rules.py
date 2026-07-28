@@ -87,3 +87,20 @@ def test_docker_facade_remains_a_small_compatibility_layer() -> None:
     source = path.read_text(encoding="utf-8")
     assert len(source.splitlines()) <= 200
     assert "_legacy_" not in source
+
+
+@pytest.mark.parametrize(
+    "relative_path",
+    ["api/v1/websocket.py", "core/scheduler.py"],
+)
+def test_runtime_orchestration_does_not_import_global_container(
+    relative_path: str,
+) -> None:
+    path = APP_ROOT / relative_path
+    assert "app.di.container" not in _imports(path)
+
+
+def test_app_resources_define_lifecycle_finalizers() -> None:
+    source = (APP_ROOT / "di" / "providers.py").read_text(encoding="utf-8")
+    assert "await engine.dispose()" in source
+    assert "await scheduler.stop()" in source

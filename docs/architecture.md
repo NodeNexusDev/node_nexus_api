@@ -46,6 +46,10 @@ Domain Models / Core / Infrastructure (коннекторы, внешние се
 Не знает детали HTTP. CRUD временно может использовать ORM через
 request-scoped repository; remote orchestration получает immutable DTO.
 
+`DockerService` — стабильный compatibility facade. Реальная ответственность
+разделена между `DockerCommandRunner`, `DockerContainerService`,
+`DockerImageService`, `DockerResourceService` и `DockerBulkService`.
+
 ### Repositories (`app/repositories`)
 
 - Абстракции для доступа к данным
@@ -129,10 +133,10 @@ connectors      → core (базовые исключения/интерфейс
 |----------|-----------|
 | `ConfigProvider` | `Settings` |
 | `DbProvider` | `async_sessionmaker`, `AsyncSession` |
-| `RepositoryProvider` | Все 7 репозиториев |
+| `RepositoryProvider` | Request repositories и APP-scoped short readers/writers |
 | `ConnectorProvider` | `SSHConnectorFactory` |
 | `SchedulerProvider` | `ScriptScheduler` |
-| `ServiceProvider` | Все 8 сервисов |
+| `ServiceProvider` | HTTP/application services и Docker facade |
 
 ---
 
@@ -146,9 +150,11 @@ connectors      → core (базовые исключения/интерфейс
 - Таймаут подключения и выполнения команд
 - Аудит-логирование всех SSH-операций
 
-### Docker (`DockerService`)
+### Docker
 
-- Сервис для управления Docker контейнерами на нодах через SSH-коннектор
+- `DockerCommandRunner` владеет target loading и SSH lifecycle
+- Container/image/resource/bulk use cases разделены по отдельным сервисам
+- `DockerService` сохраняет публичный контракт и только делегирует
 - `docker_validation.py` — валидация container ID и image name (защита от command injection)
 - `shlex.quote()` для безопасного экранирования команд
 - Bulk-операции с `asyncio.gather` (параллельное выполнение)
@@ -213,7 +219,9 @@ app/
 ├── models/                # 6 SQLAlchemy ORM-моделей
 ├── schemas/               # Pydantic Request/Response + common + config + scheduler
 ├── repositories/          # CRUD доступ к данным (+ health repo)
-├── services/              # 8 сервисов (+ health, config)
+├── services/
+│   ├── docker_service.py  # компактный compatibility facade
+│   └── docker/            # runner + container/image/resource/bulk components
 └── di/
     ├── container.py        # application composition root
     └── providers.py        # dishka провайдеры (6 провайдеров)

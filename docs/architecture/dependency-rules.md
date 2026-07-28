@@ -44,5 +44,9 @@ condition.
 
 ## Enforcement
 
-The final architecture is enforced by automated tests. New reverse dependencies
+The architecture is enforced by automated tests. New reverse dependencies
 must fail CI rather than rely on code-review memory.
+
+The Docker compatibility facade is limited to 200 lines and cannot contain
+`_legacy_*` implementations. Docker routers must delegate domain exceptions to
+the global handler.

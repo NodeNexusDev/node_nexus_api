@@ -22,6 +22,10 @@ flowchart LR
 - `app/api`: HTTP and WebSocket protocol adapters.
 - `app/application`: use-case DTOs, ports, and orchestration services.
 - `app/services`: existing application services being incrementally migrated.
+- `app/services/docker`: focused Docker runner and container/image/resource/bulk
+  use cases behind a small compatibility facade.
+- `app/adapters/persistence`: short-scope readers and writers for long-running
+  command, script, Docker, and WebSocket operations.
 - `app/repositories`: SQLAlchemy persistence adapters.
 - `app/models`: database representation.
 - `app/schemas`: public API contracts.

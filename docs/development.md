@@ -75,8 +75,8 @@ uv run pytest tests/unit/ tests/integration/ --cov=app --cov-report=term-missing
 # Конкретный файл
 uv run pytest tests/unit/test_node_metrics.py -v
 
-# E2E (требует Docker)
-uv run pytest tests/e2e/ -v
+# E2E (требует Docker; marker исключён в pytest defaults)
+uv run pytest tests/e2e/ -m docker -v
 
 # SSH Docker тесты
 uv run pytest tests/integration_ssh/ -v
@@ -163,6 +163,10 @@ uv run alembic upgrade head   # Миграции
 - SSH/Docker/WebSocket: short reader → immutable DTO → закрытая session →
   remote I/O → short writer.
 - Один `AsyncSession` запрещено передавать в `asyncio.gather`.
+- Script execution использует short definition/command/node readers и
+  отдельный execution writer для каждого state transition.
+- Docker facade остаётся тонким; use case добавляется в соответствующий модуль
+  `app/services/docker/`, а не непосредственно в facade.
 - Новый архитектурный компромисс оформляется ADR в
   `docs/architecture/decisions/`.
 - **Release** (`.github/workflows/release.yml`): build Docker image + create GitHub Release при пуше тега

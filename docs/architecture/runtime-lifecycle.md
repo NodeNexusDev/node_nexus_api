@@ -25,7 +25,7 @@ Resource finalization must run even when startup or request processing fails.
 ## DI scopes
 
 - `APP`: settings, SQLAlchemy engine, sessionmaker, connector factories,
-  scheduler.
+  scheduler, short-scope persistence gateways.
 - `SESSION`: one WebSocket connection.
 - `REQUEST`: one HTTP request, one scheduled invocation, or one nested WebSocket
   message operation.
