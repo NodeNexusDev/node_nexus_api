@@ -7,6 +7,12 @@ from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 if TYPE_CHECKING:
+    from app.application.ports.command_reader import CommandTemplateReader
+    from app.application.ports.node_reader import NodeConnectionReader
+    from app.application.ports.script_persistence import (
+        ScriptDefinitionReader,
+        ScriptExecutionWriter,
+    )
     from app.core.connectors.base import ConnectorFactory
     from app.repositories.command_repo import CommandRepository
     from app.repositories.node_repo import NodeRepository
@@ -50,6 +56,10 @@ class ScriptService:
         execution_repository: ScriptExecutionRepository,
         audit_service: AuditService | None = None,
         connector_factory: ConnectorFactory | None = None,
+        script_reader: ScriptDefinitionReader | None = None,
+        command_reader: CommandTemplateReader | None = None,
+        node_reader: NodeConnectionReader | None = None,
+        execution_writer: ScriptExecutionWriter | None = None,
     ):
         self._repository = repository
         self._command_repository = command_repository
@@ -57,6 +67,10 @@ class ScriptService:
         self._execution_repository = execution_repository
         self._audit = audit_service
         self._connector_factory = connector_factory
+        self._script_reader = script_reader
+        self._command_reader = command_reader
+        self._node_reader = node_reader
+        self._execution_writer = execution_writer
 
     async def _log(
         self,
@@ -132,7 +146,11 @@ class ScriptService:
         self, script_id: UUID, data: ScriptExecuteRequest
     ) -> ScriptExecutionBatchResult:
         """Execute a script on multiple nodes in parallel."""
-        script = await self._repository.get_by_id(script_id)
+        script = (
+            await self._script_reader.get_definition(script_id)
+            if self._script_reader
+            else await self._repository.get_by_id(script_id)
+        )
         if script is None:
             raise ScriptNotFoundError(f"Script {script_id} not found")
 
@@ -176,23 +194,36 @@ class ScriptService:
         params: dict[str, Any],
     ) -> ScriptNodeResult:
         """Execute all script steps on a single node."""
-        node = await self._node_repository.get_by_id(node_id)
+        node = (
+            await self._node_reader.get_connection(node_id)
+            if self._node_reader
+            else await self._node_repository.get_by_id(node_id)
+        )
         if node is None:
             raise NodeNotFoundError(f"Node {node_id} not found")
 
-        execution = await self._execution_repository.create(
-            {
-                "script_id": script_id,
-                "node_id": node_id,
-                "params": params,
-                "status": "running",
-                "steps": [],
-                "started_at": datetime.now(UTC),
-            }
-        )
+        execution_data = {
+            "script_id": script_id,
+            "node_id": node_id,
+            "params": params,
+            "status": "running",
+            "steps": [],
+            "started_at": datetime.now(UTC),
+        }
+        if self._execution_writer:
+            execution_id = await self._execution_writer.create_execution(execution_data)
+        else:
+            execution = await self._execution_repository.create(execution_data)
+            execution_id = execution.id
 
         step_results: list[dict[str, Any]] = []
         final_status = "completed"
+        resolved_steps: list[tuple[str, Exception | None]] = []
+        for step in steps:
+            try:
+                resolved_steps.append((await self._resolve_command(step, params), None))
+            except (CommandNotFoundError, TemplateRenderError) as exc:
+                resolved_steps.append(("", exc))
 
         try:
             password = decrypt_value(node.password)
@@ -206,16 +237,17 @@ class ScriptService:
             )
 
             async with connector:
-                for idx, step in enumerate(steps):
-                    command_str = step.command or ""
-                    try:
-                        command_str = await self._resolve_command(step, params)
+                for idx, (step, resolved) in enumerate(
+                    zip(steps, resolved_steps, strict=True)
+                ):
+                    command_str, resolution_error = resolved
+                    if resolution_error is None:
                         stdout, stderr, exit_code = await connector.execute_command(
                             command_str
                         )
-                    except (CommandNotFoundError, TemplateRenderError) as exc:
+                    else:
                         stdout = ""
-                        stderr = str(exc)
+                        stderr = str(resolution_error)
                         exit_code = 1
 
                     step_result = {
@@ -247,17 +279,18 @@ class ScriptService:
                 error=str(exc),
             )
         finally:
-            await self._execution_repository.update(
-                execution.id,
-                {
-                    "status": final_status,
-                    "steps": step_results,
-                    "finished_at": datetime.now(UTC),
-                },
-            )
+            update_data = {
+                "status": final_status,
+                "steps": step_results,
+                "finished_at": datetime.now(UTC),
+            }
+            if self._execution_writer:
+                await self._execution_writer.update_execution(execution_id, update_data)
+            else:
+                await self._execution_repository.update(execution_id, update_data)
 
         return ScriptNodeResult(
-            execution_id=execution.id,
+            execution_id=execution_id,
             node_id=node_id,
             node_name=node.name,
             status=final_status,
@@ -276,10 +309,14 @@ class ScriptService:
         if step.type == "command":
             if not step.command_id:
                 raise TemplateRenderError("Command step has no command_id")
-            command = await self._command_repository.get_by_id(step.command_id)
+            command = (
+                await self._command_reader.get_template(step.command_id)
+                if self._command_reader
+                else await self._command_repository.get_by_id(step.command_id)
+            )
             if command is None:
                 raise CommandNotFoundError(f"Command {step.command_id} not found")
-            parameters = command.parameters if command.parameters else []
+            parameters = list(command.parameters) if command.parameters else []
             merged_params = {**global_params, **step.params}
             return render_command(command.command, parameters, merged_params)
 

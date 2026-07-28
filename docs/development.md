@@ -51,6 +51,7 @@ test(services): add unit tests for NodeService
 
 ```
 tests/
+├── architecture/          # исполняемые dependency contracts
 ├── unit/                  # моки, in-memory SQLite
 ├── integration/           # SQLite (полный CRUD через HTTP)
 ├── integration_ssh/       # реальный SSH сервер (Docker)
@@ -65,14 +66,17 @@ tests/
 # Unit + integration тесты (быстро, без Docker)
 uv run pytest tests/unit/ tests/integration/ -v
 
+# Архитектурные контракты (запускаются в CI первыми)
+uv run pytest tests/architecture/ -q
+
 # С покрытием
 uv run pytest tests/unit/ tests/integration/ --cov=app --cov-report=term-missing
 
 # Конкретный файл
 uv run pytest tests/unit/test_node_metrics.py -v
 
-# E2E (требует Docker)
-uv run pytest tests/e2e/ -v
+# E2E (требует Docker; marker исключён в pytest defaults)
+uv run pytest tests/e2e/ -m docker -v
 
 # SSH Docker тесты
 uv run pytest tests/integration_ssh/ -v
@@ -88,7 +92,7 @@ uv run pytest tests/integration_ssh/ -v
 
 ### Coverage
 
-- Текущее покрытие: **95%** (769 тестов)
+- Количество тестов не фиксируется в документации: актуальное значение сообщает pytest
 - Минимум для нового кода: **80%**
 - Критическая бизнес-логика: **≥90%**
 
@@ -127,7 +131,9 @@ uv run alembic downgrade -1
 uv run alembic history
 ```
 
-Всего миграций: **13**.
+Перед merge проверить `upgrade` и `downgrade`. Миграция unique index для
+`nodes.name` намеренно завершится ошибкой при существующих дублях: сначала их
+должен однозначно исправить оператор.
 
 ---
 
@@ -149,7 +155,20 @@ uv run alembic upgrade head   # Миграции
 
 ### GitHub Actions
 
-- **CI** (`.github/workflows/ci.yml`): lint → test → docker build → security scan
+- **CI** (`.github/workflows/ci.yml`): lint → architecture contracts → test → docker build → security scan
+
+## Persistence scope
+
+- Короткий CRUD использует request-scoped repository.
+- SSH/Docker/WebSocket: short reader → immutable DTO → закрытая session →
+  remote I/O → short writer.
+- Один `AsyncSession` запрещено передавать в `asyncio.gather`.
+- Script execution использует short definition/command/node readers и
+  отдельный execution writer для каждого state transition.
+- Docker facade остаётся тонким; use case добавляется в соответствующий модуль
+  `app/services/docker/`, а не непосредственно в facade.
+- Новый архитектурный компромисс оформляется ADR в
+  `docs/architecture/decisions/`.
 - **Release** (`.github/workflows/release.yml`): build Docker image + create GitHub Release при пуше тега
 
 ### Pre-commit хуки
