@@ -11,10 +11,10 @@ from alembic.config import Config as AlembicConfig
 from dishka.integrations.fastapi import setup_dishka
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
 from prometheus_fastapi_instrumentator import Instrumentator
 
 from alembic import command as alembic_command
+from app.api.error_mapping import domain_error_handler
 from app.api.middleware import (
     RateLimitMiddleware,
     RequestLoggingMiddleware,
@@ -31,25 +31,7 @@ from app.api.v1.nodes import router as nodes_router
 from app.api.v1.scripts import router as scripts_router
 from app.api.v1.websocket import router as ws_router
 from app.core.config import get_settings
-from app.core.exceptions import (
-    APIKeyExpiredError,
-    APIKeyNotFoundError,
-    APIKeyRevokedError,
-    AuthenticationError,
-    CommandNotFoundError,
-    ConnectionFailedError,
-    ContainerNotFoundError,
-    DockerDaemonError,
-    DockerError,
-    DockerValidationError,
-    DomainError,
-    ImageNotFoundError,
-    NodeNotFoundError,
-    RequestTimeoutError,
-    ScriptNotFoundError,
-    TagNotFoundError,
-    TemplateRenderError,
-)
+from app.core.exceptions import DomainError
 from app.core.logging import configure_logging
 from app.core.scheduler import ScriptScheduler
 from app.core.telemetry import init_telemetry
@@ -190,32 +172,7 @@ def create_app() -> FastAPI:
         )
         return response
 
-    @app.exception_handler(DomainError)
-    async def _domain_error_handler(request: Request, exc: DomainError):  # noqa: ANN001
-        audit.error("app.exception", error_type=type(exc).__name__, detail=str(exc))
-        _error_status_map: dict[type[DomainError], int] = {
-            NodeNotFoundError: 404,
-            CommandNotFoundError: 404,
-            ScriptNotFoundError: 404,
-            APIKeyNotFoundError: 401,
-            APIKeyRevokedError: 401,
-            APIKeyExpiredError: 401,
-            AuthenticationError: 401,
-            TagNotFoundError: 404,
-            ConnectionFailedError: 503,
-            TemplateRenderError: 422,
-            DockerError: 502,
-            ContainerNotFoundError: 404,
-            ImageNotFoundError: 404,
-            DockerDaemonError: 503,
-            DockerValidationError: 422,
-            RequestTimeoutError: 504,
-        }
-        status_code = _error_status_map.get(type(exc), 422)
-        return JSONResponse(
-            status_code=status_code,
-            content={"detail": str(exc)},
-        )
+    app.add_exception_handler(DomainError, domain_error_handler)
 
     setup_dishka(container, app)
     app.include_router(health_router)
