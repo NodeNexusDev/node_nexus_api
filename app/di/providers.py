@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
+from app.application.services.streaming_command_service import StreamingCommandService
 from app.core.config import Settings, get_settings
 from app.core.connectors.ssh import SSHConnectorFactory
 from app.core.scheduler import ScriptScheduler
@@ -109,6 +110,15 @@ class ConnectorProvider(Provider):
 
 class ServiceProvider(Provider):
     """Service providers."""
+
+    @provide(scope=Scope.REQUEST)
+    def get_streaming_command_service(
+        self,
+        repository: NodeRepository,
+        connector_factory: SSHConnectorFactory,
+    ) -> StreamingCommandService:
+        """Get WebSocket streaming orchestration service."""
+        return StreamingCommandService(repository, connector_factory)
 
     @provide(scope=Scope.REQUEST)
     def get_audit_service(self, repository: AuditLogRepository) -> AuditService:

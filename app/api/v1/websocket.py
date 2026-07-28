@@ -7,10 +7,9 @@ import structlog
 from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
-from app.core.exceptions import ConnectionFailedError
-from app.core.ssh_utils import decrypt_value
+from app.application.services.streaming_command_service import StreamingCommandService
+from app.core.exceptions import ConnectionFailedError, NodeNotFoundError
 from app.services.api_key_service import APIKeyService
-from app.services.node_service import NodeService
 
 logger = structlog.get_logger()
 audit = structlog.get_logger("audit")
@@ -48,7 +47,7 @@ async def _validate_ws_token(
 async def exec_stream(
     websocket: WebSocket,
     node_id: UUID,
-    node_service: FromDishka[NodeService],
+    streaming_service: FromDishka[StreamingCommandService],
     api_key_service: FromDishka[APIKeyService],
 ) -> None:
     """Stream command output via WebSocket.
@@ -67,107 +66,67 @@ async def exec_stream(
     await websocket.accept()
 
     try:
-        # Resolve node via service layer (avoids direct repo access)
         try:
-            await node_service.get_node(node_id)
-        except Exception:
+            connection = streaming_service.connect(node_id)
+            async with connection as streaming_session:
+                audit.info("ws.exec.connected", node_id=str(node_id))
+
+                while True:
+                    try:
+                        data = await websocket.receive_json()
+                    except json.JSONDecodeError:
+                        await websocket.send_json(
+                            {"type": "error", "message": "Invalid JSON"}
+                        )
+                        continue
+
+                    command = data.get("command")
+                    signal_type = data.get("type")
+
+                    if signal_type == "signal":
+                        signal = data.get("signal", "SIGINT")
+                        audit.info(
+                            "ws.exec.signal", node_id=str(node_id), signal=signal
+                        )
+                        await websocket.send_json(
+                            {"type": "signal_ack", "signal": signal}
+                        )
+                        continue
+
+                    if not command:
+                        await websocket.send_json(
+                            {"type": "error", "message": "Missing 'command'"}
+                        )
+                        continue
+
+                    audit.info("ws.exec.command", node_id=str(node_id), command=command)
+                    try:
+                        async for chunk in streaming_session.execute(command):
+                            await websocket.send_json({"type": "stdout", "data": chunk})
+                        await websocket.send_json({"type": "done", "exit_code": 0})
+                    except ConnectionFailedError as exc:
+                        await websocket.send_json(
+                            {"type": "error", "message": str(exc)}
+                        )
+                        await websocket.send_json({"type": "done", "exit_code": 1})
+                    except Exception as exc:
+                        audit.error(
+                            "ws.exec.failed",
+                            node_id=str(node_id),
+                            command=command,
+                            error=str(exc),
+                        )
+                        await websocket.send_json(
+                            {"type": "error", "message": str(exc)}
+                        )
+                        await websocket.send_json({"type": "done", "exit_code": 1})
+        except NodeNotFoundError:
             await websocket.send_json(
                 {"type": "error", "message": f"Node {node_id} not found"}
             )
             await websocket.close(code=4004, reason="Node not found")
             return
-
-        # Get the node model for credentials (service only returns safe response)
-        from app.di.container import container
-        from app.repositories.node_repo import NodeRepository
-
-        async with container() as request_container:
-            node_repo = await request_container.get(NodeRepository)
-            node = await node_repo.get_by_id(node_id)
-            if node is None:
-                await websocket.send_json(
-                    {"type": "error", "message": f"Node {node_id} not found"}
-                )
-                await websocket.close(code=4004, reason="Node not found")
-                return
-
-            password = decrypt_value(node.password)
-            ssh_key = decrypt_value(node.ssh_key)
-
-            from app.core.connectors.ssh import SSHConnectorFactory
-
-            connector_factory: SSHConnectorFactory = await request_container.get(
-                SSHConnectorFactory
-            )
-            connector = connector_factory.create_ssh(
-                host=node.host,
-                port=node.port,
-                username=node.username,
-                password=password,
-                ssh_key=ssh_key,
-            )
-
-        try:
-            await connector.connect()
-            audit.info(
-                "ws.exec.connected",
-                node_id=str(node_id),
-                host=node.host,
-            )
-
-            while True:
-                try:
-                    data = await websocket.receive_json()
-                except json.JSONDecodeError:
-                    await websocket.send_json(
-                        {"type": "error", "message": "Invalid JSON"}
-                    )
-                    continue
-
-                command = data.get("command")
-                signal_type = data.get("type")
-
-                if signal_type == "signal":
-                    signal = data.get("signal", "SIGINT")
-                    audit.info(
-                        "ws.exec.signal",
-                        node_id=str(node_id),
-                        signal=signal,
-                    )
-                    await websocket.send_json({"type": "signal_ack", "signal": signal})
-                    continue
-
-                if not command:
-                    await websocket.send_json(
-                        {"type": "error", "message": "Missing 'command'"}
-                    )
-                    continue
-
-                audit.info(
-                    "ws.exec.command",
-                    node_id=str(node_id),
-                    command=command,
-                )
-
-                try:
-                    async for chunk in connector.execute_command_streaming(command):
-                        await websocket.send_json({"type": "stdout", "data": chunk})
-                    await websocket.send_json({"type": "done", "exit_code": 0})
-                except ConnectionFailedError as exc:
-                    await websocket.send_json({"type": "error", "message": str(exc)})
-                    await websocket.send_json({"type": "done", "exit_code": 1})
-                except Exception as exc:
-                    audit.error(
-                        "ws.exec.failed",
-                        node_id=str(node_id),
-                        command=command,
-                        error=str(exc),
-                    )
-                    await websocket.send_json({"type": "error", "message": str(exc)})
-                    await websocket.send_json({"type": "done", "exit_code": 1})
-
         finally:
-            await connector.disconnect()
             audit.info("ws.exec.disconnected", node_id=str(node_id))
 
     except WebSocketDisconnect:
