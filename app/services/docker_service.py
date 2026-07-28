@@ -23,7 +23,6 @@ from app.core.exceptions import (
     DockerError,
     NodeNotFoundError,
 )
-from app.core.ssh_utils import decrypt_value, get_connector_factory
 from app.schemas.docker import (
     BulkDockerNodeResult,
     BulkDockerResponse,
@@ -38,7 +37,7 @@ from app.schemas.docker import (
     DockerStats,
     DockerVolume,
 )
-from app.services.docker.command_builder import build_docker_command
+from app.services.docker.command_runner import DockerCommandRunner
 from app.services.docker.error_mapper import raise_for_docker_error
 from app.services.docker.parsers import parse_json_array, parse_json_lines
 
@@ -59,6 +58,11 @@ class DockerService:
         self._audit = audit_service
         self._connector_factory = connector_factory
         self._node_reader = node_reader
+        self._runner = DockerCommandRunner(
+            repository=repository,
+            connector_factory=connector_factory,
+            node_reader=node_reader,
+        )
 
     async def _log(
         self,
@@ -71,41 +75,17 @@ class DockerService:
 
     async def _get_docker_node(self, node_id: UUID) -> Any:
         """Get node and validate connection_type='docker'."""
-        node = (
-            await self._node_reader.get_connection(node_id)
-            if self._node_reader
-            else await self._repository.get_by_id(node_id)
-        )
-        if node is None:
-            raise NodeNotFoundError(f"Node {node_id} not found")
-        if node.connection_type != "docker":
-            raise DockerError(f"Node {node_id} is not a Docker node")
-        return node
+        return await self._runner.get_target(node_id)
 
     async def _execute_docker_cmd(
         self, node: Any, command: str, timeout: int = 30
     ) -> tuple[str, str, int]:
         """Execute a docker CLI command via SSH."""
-        password = decrypt_value(node.password)
-        ssh_key = decrypt_value(node.ssh_key)
-        connector = get_connector_factory(self._connector_factory).create_ssh(
-            host=node.host,
-            port=node.port,
-            username=node.username,
-            password=password,
-            ssh_key=ssh_key,
-        )
-        try:
-            async with connector:
-                return await connector.execute_command(command)
-        except Exception as exc:
-            raise ConnectionFailedError(
-                f"Failed to connect to Docker host {node.host}: {exc}"
-            ) from exc
+        return await self._runner.execute(node, command, timeout)
 
     def _build_docker_cmd(self, node: Any, docker_args: str) -> str:
         """Build docker command with DOCKER_HOST if set."""
-        return build_docker_command(node, docker_args)
+        return self._runner.build_command(node, docker_args)
 
     def _parse_json_lines(self, stdout: str) -> list[dict[str, Any]]:
         """Robust parsing of JSON lines from docker CLI output."""
