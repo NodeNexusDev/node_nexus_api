@@ -7,6 +7,8 @@ from unittest.mock import AsyncMock, Mock
 
 import pytest
 
+from app.application.dto.node_connection import NodeConnectionDTO
+from app.application.dto.script_definition import ScriptDefinitionDTO
 from app.core.exceptions import (
     CommandNotFoundError,
     ScriptNotFoundError,
@@ -231,6 +233,67 @@ class TestGetExecutions:
 
 
 class TestExecuteScript:
+    async def test_remote_path_uses_short_scope_ports(
+        self,
+        script_repo: AsyncMock,
+        cmd_repo: AsyncMock,
+        node_repo: AsyncMock,
+        exec_repo: AsyncMock,
+    ) -> None:
+        script_id = uuid.uuid4()
+        node_id = uuid.uuid4()
+        execution_id = uuid.uuid4()
+        script_reader = AsyncMock()
+        script_reader.get_definition.return_value = ScriptDefinitionDTO(
+            id=script_id,
+            steps=(
+                {
+                    "label": "check",
+                    "type": "inline",
+                    "command": "echo ok",
+                    "on_failure": "stop",
+                },
+            ),
+        )
+        node_reader = AsyncMock()
+        node_reader.get_connection.return_value = NodeConnectionDTO(
+            id=node_id,
+            name="node",
+            host="127.0.0.1",
+            port=22,
+            connection_type="ssh",
+            username="root",
+        )
+        writer = AsyncMock()
+        writer.create_execution.return_value = execution_id
+        connector = AsyncMock()
+        connector.execute_command.return_value = ("ok", "", 0)
+        factory = Mock()
+        factory.create_ssh.return_value = connector
+        service = ScriptService(
+            repository=script_repo,
+            command_repository=cmd_repo,
+            node_repository=node_repo,
+            execution_repository=exec_repo,
+            connector_factory=factory,
+            script_reader=script_reader,
+            command_reader=AsyncMock(),
+            node_reader=node_reader,
+            execution_writer=writer,
+        )
+
+        result = await service.execute_script(
+            script_id, ScriptExecuteRequest(node_ids=[node_id], params={})
+        )
+
+        assert result.results[0].execution_id == execution_id
+        writer.create_execution.assert_awaited_once()
+        writer.update_execution.assert_awaited_once()
+        script_repo.get_by_id.assert_not_awaited()
+        node_repo.get_by_id.assert_not_awaited()
+        exec_repo.create.assert_not_awaited()
+        exec_repo.update.assert_not_awaited()
+
     async def test_success(
         self,
         service: ScriptService,

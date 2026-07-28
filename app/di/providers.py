@@ -12,6 +12,10 @@ from sqlalchemy.ext.asyncio import (
 
 from app.adapters.persistence.command_reader import ScopedCommandTemplateReader
 from app.adapters.persistence.node_reader import ScopedNodeConnectionReader
+from app.adapters.persistence.script_gateway import (
+    ScopedScriptDefinitionReader,
+    ScopedScriptExecutionWriter,
+)
 from app.application.services.streaming_command_service import StreamingCommandService
 from app.core.config import Settings, get_settings
 from app.core.connectors.ssh import SSHConnectorFactory
@@ -62,6 +66,20 @@ class DbProvider(Provider):
 
 class RepositoryProvider(Provider):
     """Repository providers."""
+
+    @provide(scope=Scope.APP)
+    def get_scoped_script_reader(
+        self, sessionmaker: async_sessionmaker[AsyncSession]
+    ) -> ScopedScriptDefinitionReader:
+        """Get a script reader that owns a short session per operation."""
+        return ScopedScriptDefinitionReader(sessionmaker)
+
+    @provide(scope=Scope.APP)
+    def get_scoped_execution_writer(
+        self, sessionmaker: async_sessionmaker[AsyncSession]
+    ) -> ScopedScriptExecutionWriter:
+        """Get a writer that commits execution transitions independently."""
+        return ScopedScriptExecutionWriter(sessionmaker)
 
     @provide(scope=Scope.APP)
     def get_scoped_command_reader(
@@ -186,6 +204,10 @@ class ServiceProvider(Provider):
         execution_repository: ScriptExecutionRepository,
         audit_service: AuditService,
         connector_factory: SSHConnectorFactory,
+        script_reader: ScopedScriptDefinitionReader,
+        command_reader: ScopedCommandTemplateReader,
+        node_reader: ScopedNodeConnectionReader,
+        execution_writer: ScopedScriptExecutionWriter,
     ) -> ScriptService:
         """Get script service."""
         return ScriptService(
@@ -195,6 +217,10 @@ class ServiceProvider(Provider):
             execution_repository=execution_repository,
             audit_service=audit_service,
             connector_factory=connector_factory,
+            script_reader=script_reader,
+            command_reader=command_reader,
+            node_reader=node_reader,
+            execution_writer=execution_writer,
         )
 
     @provide(scope=Scope.REQUEST)
