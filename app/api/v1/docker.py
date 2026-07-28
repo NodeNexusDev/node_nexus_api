@@ -1,20 +1,13 @@
-"""Docker management API endpoints."""
+"""Docker management HTTP adapter."""
 
 import uuid
 
 import structlog
 from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
-from fastapi import APIRouter, HTTPException, Query, Security
+from fastapi import APIRouter, Query, Security
 
 from app.api.deps import get_current_api_key, require_write_scope
 from app.core.docker_validation import validate_container_id
-from app.core.exceptions import (
-    ConnectionFailedError,
-    ContainerNotFoundError,
-    DockerError,
-    DockerValidationError,
-    NodeNotFoundError,
-)
 from app.schemas.docker import (
     DockerContainer,
     DockerContainerInspect,
@@ -30,7 +23,6 @@ from app.schemas.docker import (
 from app.services.docker_service import DockerService
 
 audit = structlog.get_logger("audit")
-
 router = APIRouter(
     prefix="/nodes/{node_id}/docker", tags=["docker"], route_class=DishkaRoute
 )
@@ -46,12 +38,7 @@ async def list_containers(
 ) -> list[DockerContainer]:
     """List containers on a Docker node."""
     audit.info("api.docker.containers.list", node_id=str(node_id), all=all)
-    try:
-        return await service.list_containers(node_id, all=all)
-    except NodeNotFoundError:
-        raise HTTPException(status_code=404, detail="Node not found")
-    except DockerError as exc:
-        raise HTTPException(status_code=502, detail=str(exc))
+    return await service.list_containers(node_id, all=all)
 
 
 @router.get("/containers/{container_id}")
@@ -67,16 +54,7 @@ async def get_container(
     audit.info(
         "api.docker.containers.get", node_id=str(node_id), container_id=validated_id
     )
-    try:
-        return await service.get_container(node_id, validated_id)
-    except NodeNotFoundError:
-        raise HTTPException(status_code=404, detail="Node not found")
-    except ContainerNotFoundError:
-        raise HTTPException(status_code=404, detail="Container not found")
-    except DockerValidationError as exc:
-        raise HTTPException(status_code=422, detail=str(exc))
-    except DockerError as exc:
-        raise HTTPException(status_code=502, detail=str(exc))
+    return await service.get_container(node_id, validated_id)
 
 
 @router.post("/containers/{container_id}/start", status_code=204)
@@ -92,16 +70,7 @@ async def start_container(
     audit.info(
         "api.docker.containers.start", node_id=str(node_id), container_id=validated_id
     )
-    try:
-        await service.start_container(node_id, validated_id)
-    except NodeNotFoundError:
-        raise HTTPException(status_code=404, detail="Node not found")
-    except ContainerNotFoundError:
-        raise HTTPException(status_code=404, detail="Container not found")
-    except DockerValidationError as exc:
-        raise HTTPException(status_code=422, detail=str(exc))
-    except DockerError as exc:
-        raise HTTPException(status_code=502, detail=str(exc))
+    await service.start_container(node_id, validated_id)
 
 
 @router.post("/containers/{container_id}/stop", status_code=204)
@@ -118,16 +87,7 @@ async def stop_container(
     audit.info(
         "api.docker.containers.stop", node_id=str(node_id), container_id=validated_id
     )
-    try:
-        await service.stop_container(node_id, validated_id, timeout=timeout)
-    except NodeNotFoundError:
-        raise HTTPException(status_code=404, detail="Node not found")
-    except ContainerNotFoundError:
-        raise HTTPException(status_code=404, detail="Container not found")
-    except DockerValidationError as exc:
-        raise HTTPException(status_code=422, detail=str(exc))
-    except DockerError as exc:
-        raise HTTPException(status_code=502, detail=str(exc))
+    await service.stop_container(node_id, validated_id, timeout=timeout)
 
 
 @router.post("/containers/{container_id}/restart", status_code=204)
@@ -144,16 +104,7 @@ async def restart_container(
     audit.info(
         "api.docker.containers.restart", node_id=str(node_id), container_id=validated_id
     )
-    try:
-        await service.restart_container(node_id, validated_id, timeout=timeout)
-    except NodeNotFoundError:
-        raise HTTPException(status_code=404, detail="Node not found")
-    except ContainerNotFoundError:
-        raise HTTPException(status_code=404, detail="Container not found")
-    except DockerValidationError as exc:
-        raise HTTPException(status_code=422, detail=str(exc))
-    except DockerError as exc:
-        raise HTTPException(status_code=502, detail=str(exc))
+    await service.restart_container(node_id, validated_id, timeout=timeout)
 
 
 @router.delete("/containers/{container_id}", status_code=204)
@@ -170,16 +121,7 @@ async def remove_container(
     audit.info(
         "api.docker.containers.remove", node_id=str(node_id), container_id=validated_id
     )
-    try:
-        await service.remove_container(node_id, validated_id, force=force)
-    except NodeNotFoundError:
-        raise HTTPException(status_code=404, detail="Node not found")
-    except ContainerNotFoundError:
-        raise HTTPException(status_code=404, detail="Container not found")
-    except DockerValidationError as exc:
-        raise HTTPException(status_code=422, detail=str(exc))
-    except DockerError as exc:
-        raise HTTPException(status_code=502, detail=str(exc))
+    await service.remove_container(node_id, validated_id, force=force)
 
 
 @router.get("/containers/{container_id}/logs")
@@ -197,16 +139,7 @@ async def get_logs(
     audit.info(
         "api.docker.containers.logs", node_id=str(node_id), container_id=validated_id
     )
-    try:
-        return await service.get_logs(node_id, validated_id, tail=tail, since=since)
-    except NodeNotFoundError:
-        raise HTTPException(status_code=404, detail="Node not found")
-    except ContainerNotFoundError:
-        raise HTTPException(status_code=404, detail="Container not found")
-    except DockerValidationError as exc:
-        raise HTTPException(status_code=422, detail=str(exc))
-    except DockerError as exc:
-        raise HTTPException(status_code=502, detail=str(exc))
+    return await service.get_logs(node_id, validated_id, tail=tail, since=since)
 
 
 @router.post("/containers/{container_id}/exec")
@@ -226,20 +159,9 @@ async def exec_command(
         container_id=validated_id,
         command=data.command,
     )
-    try:
-        return await service.exec_command(
-            node_id, validated_id, data.command, timeout=data.timeout
-        )
-    except NodeNotFoundError:
-        raise HTTPException(status_code=404, detail="Node not found")
-    except ContainerNotFoundError:
-        raise HTTPException(status_code=404, detail="Container not found")
-    except DockerValidationError as exc:
-        raise HTTPException(status_code=422, detail=str(exc))
-    except ConnectionFailedError as exc:
-        raise HTTPException(status_code=503, detail=str(exc))
-    except DockerError as exc:
-        raise HTTPException(status_code=502, detail=str(exc))
+    return await service.exec_command(
+        node_id, validated_id, data.command, timeout=data.timeout
+    )
 
 
 @router.get("/images")
@@ -251,12 +173,7 @@ async def list_images(
 ) -> list[DockerImage]:
     """List images on a Docker node."""
     audit.info("api.docker.images.list", node_id=str(node_id))
-    try:
-        return await service.list_images(node_id)
-    except NodeNotFoundError:
-        raise HTTPException(status_code=404, detail="Node not found")
-    except DockerError as exc:
-        raise HTTPException(status_code=502, detail=str(exc))
+    return await service.list_images(node_id)
 
 
 @router.post("/images/pull")
@@ -269,14 +186,7 @@ async def pull_image(
 ) -> DockerPullResult:
     """Pull a Docker image."""
     audit.info("api.docker.images.pull", node_id=str(node_id), image=data.image)
-    try:
-        return await service.pull_image(node_id, data.image, timeout=data.timeout)
-    except NodeNotFoundError:
-        raise HTTPException(status_code=404, detail="Node not found")
-    except DockerValidationError as exc:
-        raise HTTPException(status_code=422, detail=str(exc))
-    except DockerError as exc:
-        raise HTTPException(status_code=502, detail=str(exc))
+    return await service.pull_image(node_id, data.image, timeout=data.timeout)
 
 
 @router.get("/containers/{container_id}/stats")
@@ -292,16 +202,7 @@ async def get_stats(
     audit.info(
         "api.docker.containers.stats", node_id=str(node_id), container_id=validated_id
     )
-    try:
-        return await service.get_stats(node_id, validated_id)
-    except NodeNotFoundError:
-        raise HTTPException(status_code=404, detail="Node not found")
-    except ContainerNotFoundError:
-        raise HTTPException(status_code=404, detail="Container not found")
-    except DockerValidationError as exc:
-        raise HTTPException(status_code=422, detail=str(exc))
-    except DockerError as exc:
-        raise HTTPException(status_code=502, detail=str(exc))
+    return await service.get_stats(node_id, validated_id)
 
 
 @router.get("/networks")
@@ -313,12 +214,7 @@ async def list_networks(
 ) -> list[DockerNetwork]:
     """List Docker networks."""
     audit.info("api.docker.networks.list", node_id=str(node_id))
-    try:
-        return await service.list_networks(node_id)
-    except NodeNotFoundError:
-        raise HTTPException(status_code=404, detail="Node not found")
-    except DockerError as exc:
-        raise HTTPException(status_code=502, detail=str(exc))
+    return await service.list_networks(node_id)
 
 
 @router.get("/volumes")
@@ -330,9 +226,4 @@ async def list_volumes(
 ) -> list[DockerVolume]:
     """List Docker volumes."""
     audit.info("api.docker.volumes.list", node_id=str(node_id))
-    try:
-        return await service.list_volumes(node_id)
-    except NodeNotFoundError:
-        raise HTTPException(status_code=404, detail="Node not found")
-    except DockerError as exc:
-        raise HTTPException(status_code=502, detail=str(exc))
+    return await service.list_volumes(node_id)

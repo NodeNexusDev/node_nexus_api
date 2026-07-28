@@ -60,3 +60,22 @@ def test_api_does_not_construct_services_or_repositories() -> None:
                 violations.append(f"{path.relative_to(APP_ROOT)}:{node.lineno} {name}")
 
     assert not violations, "Manual dependency construction:\n" + "\n".join(violations)
+
+
+def test_docker_router_delegates_domain_errors_to_global_handler() -> None:
+    """Docker endpoints must not maintain a second error-to-HTTP registry."""
+    path = APP_ROOT / "api" / "v1" / "docker.py"
+    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    caught_names = {
+        getattr(handler.type, "id", "")
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Try)
+        for handler in node.handlers
+        if handler.type is not None
+    }
+    assert not caught_names & {
+        "DomainError",
+        "DockerError",
+        "DockerValidationError",
+        "NodeNotFoundError",
+    }
