@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 if TYPE_CHECKING:
+    from app.application.ports.node_reader import NodeConnectionReader
     from app.core.connectors.base import ConnectorFactory
     from app.services.audit_service import AuditService
 
@@ -52,8 +53,10 @@ class NodeService:
         repository: NodeRepository,
         audit_service: AuditService | None = None,
         connector_factory: ConnectorFactory | None = None,
+        node_reader: NodeConnectionReader | None = None,
     ):
         self._repository = repository
+        self._node_reader = node_reader
         self._audit = audit_service
         self._connector_factory = connector_factory
 
@@ -205,17 +208,20 @@ class NodeService:
 
     async def check_connectivity(self, node_id: UUID) -> NodeResponse:
         """Check SSH connectivity to a node and update its status."""
-        node_response = await self.get_node(node_id)
-        node = await self._repository.get_by_id(node_id)
+        node = (
+            await self._node_reader.get_connection(node_id)
+            if self._node_reader
+            else await self._repository.get_by_id(node_id)
+        )
         if node is None:
             raise NodeNotFoundError(f"Node {node_id} not found")
 
         password = decrypt_value(node.password)
         ssh_key = decrypt_value(node.ssh_key)
         connector = get_connector_factory(self._connector_factory).create_ssh(
-            host=node_response.host,
-            port=node_response.port,
-            username=node_response.username,
+            host=node.host,
+            port=node.port,
+            username=node.username,
             password=password,
             ssh_key=ssh_key,
         )
@@ -251,8 +257,11 @@ class NodeService:
         self, node_id: UUID, data: CommandRequest
     ) -> CommandResult:
         """Execute a command on a node via SSH."""
-        node_response = await self.get_node(node_id)
-        node = await self._repository.get_by_id(node_id)
+        node = (
+            await self._node_reader.get_connection(node_id)
+            if self._node_reader
+            else await self._repository.get_by_id(node_id)
+        )
         if node is None:
             raise NodeNotFoundError(f"Node {node_id} not found")
 
@@ -260,9 +269,9 @@ class NodeService:
         ssh_key = decrypt_value(node.ssh_key)
 
         connector_kwargs = {
-            "host": node_response.host,
-            "port": node_response.port,
-            "username": node_response.username,
+            "host": node.host,
+            "port": node.port,
+            "username": node.username,
             "password": password,
             "ssh_key": ssh_key,
         }
@@ -325,17 +334,20 @@ class NodeService:
 
     async def get_node_metrics(self, node_id: UUID) -> NodeMetrics:
         """Get system metrics from a node via SSH."""
-        node_response = await self.get_node(node_id)
-        node = await self._repository.get_by_id(node_id)
+        node = (
+            await self._node_reader.get_connection(node_id)
+            if self._node_reader
+            else await self._repository.get_by_id(node_id)
+        )
         if node is None:
             raise NodeNotFoundError(f"Node {node_id} not found")
 
         password = decrypt_value(node.password)
         ssh_key = decrypt_value(node.ssh_key)
         connector = get_connector_factory(self._connector_factory).create_ssh(
-            host=node_response.host,
-            port=node_response.port,
-            username=node_response.username,
+            host=node.host,
+            port=node.port,
+            username=node.username,
             password=password,
             ssh_key=ssh_key,
         )
@@ -465,11 +477,19 @@ class NodeService:
         """Resolve target nodes from IDs and/or tags."""
         nodes_by_ids = None
         if data.node_ids:
-            nodes_by_ids = await self._repository.get_by_ids(data.node_ids)
+            nodes_by_ids = (
+                await self._node_reader.get_connections_by_ids(data.node_ids)
+                if self._node_reader
+                else await self._repository.get_by_ids(data.node_ids)
+            )
 
         nodes_by_tags = None
         if data.tags:
-            nodes_by_tags = await self._repository.get_by_tags(data.tags)
+            nodes_by_tags = (
+                await self._node_reader.get_connections_by_tags(data.tags)
+                if self._node_reader
+                else await self._repository.get_by_tags(data.tags)
+            )
 
         if nodes_by_ids is not None and nodes_by_tags is not None:
             tag_ids = {n.id for n in nodes_by_tags}

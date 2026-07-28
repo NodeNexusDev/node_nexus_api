@@ -139,12 +139,14 @@ class ServiceProvider(Provider):
         repository: NodeRepository,
         audit_service: AuditService,
         connector_factory: SSHConnectorFactory,
+        node_reader: ScopedNodeConnectionReader,
     ) -> NodeService:
         """Get node service."""
         return NodeService(
             repository=repository,
             audit_service=audit_service,
             connector_factory=connector_factory,
+            node_reader=node_reader,
         )
 
     @provide(scope=Scope.REQUEST)
@@ -194,12 +196,14 @@ class ServiceProvider(Provider):
         repository: NodeRepository,
         audit_service: AuditService,
         connector_factory: SSHConnectorFactory,
+        node_reader: ScopedNodeConnectionReader,
     ) -> DockerService:
         """Get Docker service."""
         return DockerService(
             repository=repository,
             audit_service=audit_service,
             connector_factory=connector_factory,
+            node_reader=node_reader,
         )
 
     @provide(scope=Scope.REQUEST)

@@ -86,6 +86,8 @@ def test_connector_provider_resolves() -> None:
 
 
 def test_service_provider_resolves() -> None:
+    from app.adapters.persistence.node_reader import ScopedNodeConnectionReader
+
     session = MagicMock()
     repo_provider = RepositoryProvider()
     conn_provider = ConnectorProvider()
@@ -98,11 +100,12 @@ def test_service_provider_resolves() -> None:
     exec_repo = repo_provider.get_script_execution_repository(session)
     api_key_repo = repo_provider.get_api_key_repository(session)
     factory = conn_provider.get_ssh_connector_factory()
+    node_reader = ScopedNodeConnectionReader(MagicMock())
 
     audit_svc = svc_provider.get_audit_service(audit_repo)
     assert isinstance(audit_svc, AuditService)
 
-    node_svc = svc_provider.get_node_service(node_repo, audit_svc, factory)
+    node_svc = svc_provider.get_node_service(node_repo, audit_svc, factory, node_reader)
     assert isinstance(node_svc, NodeService)
 
     cmd_svc = svc_provider.get_command_service(cmd_repo, node_repo, audit_svc, factory)
@@ -116,7 +119,9 @@ def test_service_provider_resolves() -> None:
     api_key_svc = svc_provider.get_api_key_service(api_key_repo)
     assert isinstance(api_key_svc, APIKeyService)
 
-    docker_svc = svc_provider.get_docker_service(node_repo, audit_svc, factory)
+    docker_svc = svc_provider.get_docker_service(
+        node_repo, audit_svc, factory, node_reader
+    )
     assert isinstance(docker_svc, DockerService)
 
     config_svc = svc_provider.get_config_service(node_repo, cmd_repo, script_repo)

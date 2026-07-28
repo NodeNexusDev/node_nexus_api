@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 if TYPE_CHECKING:
+    from app.application.ports.node_reader import NodeConnectionReader
     from app.core.connectors.base import ConnectorFactory
     from app.repositories.node_repo import NodeRepository
     from app.services.audit_service import AuditService
@@ -52,10 +53,12 @@ class DockerService:
         repository: NodeRepository,
         audit_service: AuditService | None = None,
         connector_factory: ConnectorFactory | None = None,
+        node_reader: NodeConnectionReader | None = None,
     ):
         self._repository = repository
         self._audit = audit_service
         self._connector_factory = connector_factory
+        self._node_reader = node_reader
 
     async def _log(
         self,
@@ -68,7 +71,11 @@ class DockerService:
 
     async def _get_docker_node(self, node_id: UUID) -> Any:
         """Get node and validate connection_type='docker'."""
-        node = await self._repository.get_by_id(node_id)
+        node = (
+            await self._node_reader.get_connection(node_id)
+            if self._node_reader
+            else await self._repository.get_by_id(node_id)
+        )
         if node is None:
             raise NodeNotFoundError(f"Node {node_id} not found")
         if node.connection_type != "docker":

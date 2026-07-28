@@ -164,27 +164,19 @@ class TestDecryptValue:
 
 
 class TestCheckConnectivityEdgeCases:
-    async def test_orm_node_not_found_after_get_node(
-        self, service: NodeService, repo: AsyncMock
-    ) -> None:
-        """When get_node succeeds but ORM node is gone (race condition)."""
-        orm_node = make_orm_node()
-        repo.get_by_id.side_effect = [orm_node, None]
+    async def test_node_not_found(self, service: NodeService, repo: AsyncMock) -> None:
+        repo.get_by_id.return_value = None
         with pytest.raises(NodeNotFoundError):
-            await service.check_connectivity(orm_node.id)
+            await service.check_connectivity(uuid.uuid4())
 
 
 class TestExecuteCommandEdgeCases:
-    async def test_orm_node_not_found_after_get_node(
-        self, service: NodeService, repo: AsyncMock
-    ) -> None:
-        """When get_node succeeds but ORM node is gone (race condition)."""
-        orm_node = make_orm_node()
-        repo.get_by_id.side_effect = [orm_node, None]
+    async def test_node_not_found(self, service: NodeService, repo: AsyncMock) -> None:
+        repo.get_by_id.return_value = None
         with pytest.raises(NodeNotFoundError):
             from app.schemas.node import CommandRequest
 
-            await service.execute_command(orm_node.id, CommandRequest(command="ls"))
+            await service.execute_command(uuid.uuid4(), CommandRequest(command="ls"))
 
 
 class TestGetAllNodesFiltering:
