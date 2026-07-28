@@ -1,0 +1,80 @@
+INHERIT: mkdocs.base.yml
+site_name: Документация Node Nexus API
+site_url: https://nodenexusdev.github.io/node_nexus_api/ru/
+docs_dir: docs/ru
+site_dir: site/ru
+theme:
+  language: ru
+extra_javascript:
+  - assets/javascripts/language-switcher.js
+plugins:
+  - search:
+      lang:
+        - ru
+        - en
+extra:
+  alternate:
+    - name: English
+      link: /node_nexus_api/en/
+      lang: en
+    - name: Русский
+      link: /node_nexus_api/ru/
+      lang: ru
+nav:
+  - Главная: index.md
+  - Начало работы:
+      - getting-started/index.md
+      - Установка: getting-started/installation.md
+      - Конфигурация: getting-started/configuration.md
+      - Первая нода: getting-started/first-node.md
+  - Руководства:
+      - guides/index.md
+      - Аутентификация: guides/authentication.md
+      - Ноды: guides/nodes.md
+      - Команды: guides/commands.md
+      - Скрипты: guides/scripts.md
+      - Docker: guides/docker.md
+      - WebSocket: guides/websocket.md
+      - Импорт и экспорт: guides/configuration-import-export.md
+      - Решение проблем: guides/troubleshooting.md
+  - Эксплуатация:
+      - operations/index.md
+      - Развёртывание: operations/deployment.md
+      - Миграции: operations/migrations.md
+      - Пробы: operations/health-and-readiness.md
+      - Наблюдаемость: operations/observability.md
+      - Резервное копирование: operations/backup-and-restore.md
+      - Безопасность: operations/security.md
+  - Разработка:
+      - development/index.md
+      - Локальная настройка: development/local-setup.md
+      - Workflow: development/workflow.md
+      - Тестирование: development/testing.md
+      - Quality gates: development/quality-gates.md
+      - Миграции: development/migrations.md
+      - Добавление endpoint: development/adding-an-endpoint.md
+      - Документация: development/documentation.md
+  - Архитектура:
+      - architecture/index.md
+      - Обзор: architecture/overview.md
+      - Правила зависимостей: architecture/dependency-rules.md
+      - Модель транзакций: architecture/transaction-model.md
+      - Runtime lifecycle: architecture/runtime-lifecycle.md
+      - Модель безопасности: architecture/security-model.md
+      - Решения:
+          - architecture/decisions/index.md
+          - ADR-001 Границы слоёв: architecture/decisions/ADR-001-layer-boundaries.md
+          - ADR-002 Транзакции: architecture/decisions/ADR-002-session-and-transaction-scope.md
+          - ADR-003 Планировщик: architecture/decisions/ADR-003-scheduler-lifecycle.md
+          - ADR-004 WebSocket: architecture/decisions/ADR-004-websocket-orchestration.md
+          - ADR-005 Ошибки: architecture/decisions/ADR-005-domain-error-mapping.md
+          - ADR-006 Платформа: architecture/decisions/ADR-006-documentation-platform.md
+          - ADR-007 Языковые деревья: architecture/decisions/ADR-007-separate-locale-trees.md
+          - ADR-008 OpenAPI: architecture/decisions/ADR-008-openapi-contract.md
+          - ADR-009 Политика перевода: architecture/decisions/ADR-009-translation-policy.md
+  - Справочник:
+      - reference/index.md
+      - HTTP API: reference/api.md
+      - Конфигурация: reference/configuration.md
+      - Каталог ошибок: reference/error-catalog.md
+      - Совместимость: reference/compatibility.md

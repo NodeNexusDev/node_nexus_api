@@ -1,0 +1,75 @@
+INHERIT: mkdocs.base.yml
+site_name: Node Nexus API Documentation
+site_url: https://nodenexusdev.github.io/node_nexus_api/en/
+docs_dir: docs/en
+site_dir: site/en
+theme:
+  language: en
+extra_javascript:
+  - assets/javascripts/language-switcher.js
+extra:
+  alternate:
+    - name: English
+      link: /node_nexus_api/en/
+      lang: en
+    - name: Русский
+      link: /node_nexus_api/ru/
+      lang: ru
+nav:
+  - Home: index.md
+  - Getting started:
+      - getting-started/index.md
+      - Installation: getting-started/installation.md
+      - Configuration: getting-started/configuration.md
+      - First node: getting-started/first-node.md
+  - Guides:
+      - guides/index.md
+      - Authentication: guides/authentication.md
+      - Nodes: guides/nodes.md
+      - Commands: guides/commands.md
+      - Scripts: guides/scripts.md
+      - Docker: guides/docker.md
+      - WebSocket: guides/websocket.md
+      - Import and export: guides/configuration-import-export.md
+      - Troubleshooting: guides/troubleshooting.md
+  - Operations:
+      - operations/index.md
+      - Deployment: operations/deployment.md
+      - Migrations: operations/migrations.md
+      - Health and readiness: operations/health-and-readiness.md
+      - Observability: operations/observability.md
+      - Backup and restore: operations/backup-and-restore.md
+      - Security: operations/security.md
+  - Development:
+      - development/index.md
+      - Local setup: development/local-setup.md
+      - Workflow: development/workflow.md
+      - Testing: development/testing.md
+      - Quality gates: development/quality-gates.md
+      - Migrations: development/migrations.md
+      - Adding an endpoint: development/adding-an-endpoint.md
+      - Documentation: development/documentation.md
+  - Architecture:
+      - architecture/index.md
+      - Overview: architecture/overview.md
+      - Dependency rules: architecture/dependency-rules.md
+      - Transaction model: architecture/transaction-model.md
+      - Runtime lifecycle: architecture/runtime-lifecycle.md
+      - Security model: architecture/security-model.md
+      - Decisions:
+          - architecture/decisions/index.md
+          - ADR-001 Layer boundaries: architecture/decisions/ADR-001-layer-boundaries.md
+          - ADR-002 Transaction scope: architecture/decisions/ADR-002-session-and-transaction-scope.md
+          - ADR-003 Scheduler lifecycle: architecture/decisions/ADR-003-scheduler-lifecycle.md
+          - ADR-004 WebSocket orchestration: architecture/decisions/ADR-004-websocket-orchestration.md
+          - ADR-005 Error mapping: architecture/decisions/ADR-005-domain-error-mapping.md
+          - ADR-006 Documentation platform: architecture/decisions/ADR-006-documentation-platform.md
+          - ADR-007 Locale trees: architecture/decisions/ADR-007-separate-locale-trees.md
+          - ADR-008 OpenAPI contract: architecture/decisions/ADR-008-openapi-contract.md
+          - ADR-009 Translation policy: architecture/decisions/ADR-009-translation-policy.md
+  - Reference:
+      - reference/index.md
+      - HTTP API: reference/api.md
+      - Configuration: reference/configuration.md
+      - Error catalog: reference/error-catalog.md
+      - Compatibility: reference/compatibility.md
