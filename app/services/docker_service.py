@@ -515,11 +515,30 @@ class DockerService:
         """
         validated_id = validate_container_id(container_id)
 
-        async def _action_on_node(node_id_str: str) -> BulkDockerNodeResult:
+        prepared: list[tuple[int, str, Any]] = []
+        results: list[BulkDockerNodeResult | None] = [None] * len(node_ids)
+        for index, node_id_str in enumerate(node_ids):
             try:
                 node_id = uuid.UUID(node_id_str)
                 node = await self._get_docker_node(node_id)
+                prepared.append((index, node_id_str, node))
+            except NodeNotFoundError:
+                results[index] = BulkDockerNodeResult(
+                    node_id=node_id_str,
+                    node_name="unknown",
+                    status="error",
+                    error="Node not found",
+                )
+            except (ValueError, DockerError) as exc:
+                results[index] = BulkDockerNodeResult(
+                    node_id=node_id_str,
+                    node_name="unknown",
+                    status="error",
+                    error=str(exc),
+                )
 
+        async def _action_on_node(node_id_str: str, node: Any) -> BulkDockerNodeResult:
+            try:
                 if action == "start":
                     cmd = self._build_docker_cmd(node, f"start {validated_id}")
                 elif action == "stop":
@@ -530,7 +549,6 @@ class DockerService:
                     cmd = self._build_docker_cmd(node, f"restart -t {t} {validated_id}")
                 else:
                     raise DockerError(f"Unknown action: {action}")
-
                 stdout, stderr, exit_code = await self._execute_docker_cmd(node, cmd)
                 if exit_code != 0 and stderr:
                     return BulkDockerNodeResult(
@@ -544,13 +562,6 @@ class DockerService:
                     node_name=node.name,
                     status="success",
                     output=stdout.strip(),
-                )
-            except NodeNotFoundError:
-                return BulkDockerNodeResult(
-                    node_id=node_id_str,
-                    node_name="unknown",
-                    status="error",
-                    error="Node not found",
                 )
             except DockerError as exc:
                 return BulkDockerNodeResult(
@@ -567,25 +578,29 @@ class DockerService:
                     error=str(exc),
                 )
 
-        tasks = [_action_on_node(nid) for nid in node_ids]
-        results = list(await asyncio.gather(*tasks))
+        remote_results = await asyncio.gather(
+            *(_action_on_node(node_id_str, node) for _, node_id_str, node in prepared)
+        )
+        for (index, _, _), result in zip(prepared, remote_results, strict=True):
+            results[index] = result
+        final_results = [result for result in results if result is not None]
 
-        succeeded = sum(1 for r in results if r.status == "success")
-        failed = len(results) - succeeded
+        succeeded = sum(1 for r in final_results if r.status == "success")
+        failed = len(final_results) - succeeded
 
         audit.info(
             "docker.bulk.action",
             action=action,
             container_id=validated_id,
-            total=len(results),
+            total=len(final_results),
             succeeded=succeeded,
             failed=failed,
         )
 
         return BulkDockerResponse(
             action=action,
-            results=results,
-            total=len(results),
+            results=final_results,
+            total=len(final_results),
             succeeded=succeeded,
             failed=failed,
         )
@@ -606,11 +621,30 @@ class DockerService:
         """
         validated_id = validate_container_id(container_id)
 
-        async def _exec_on_node(node_id_str: str) -> BulkDockerNodeResult:
+        prepared: list[tuple[int, str, Any]] = []
+        results: list[BulkDockerNodeResult | None] = [None] * len(node_ids)
+        for index, node_id_str in enumerate(node_ids):
             try:
                 node_id = uuid.UUID(node_id_str)
                 node = await self._get_docker_node(node_id)
+                prepared.append((index, node_id_str, node))
+            except NodeNotFoundError:
+                results[index] = BulkDockerNodeResult(
+                    node_id=node_id_str,
+                    node_name="unknown",
+                    status="error",
+                    error="Node not found",
+                )
+            except (ValueError, DockerError) as exc:
+                results[index] = BulkDockerNodeResult(
+                    node_id=node_id_str,
+                    node_name="unknown",
+                    status="error",
+                    error=str(exc),
+                )
 
+        async def _exec_on_node(node_id_str: str, node: Any) -> BulkDockerNodeResult:
+            try:
                 escaped_cmd = shlex.quote(command)
                 docker_cmd = self._build_docker_cmd(
                     node, f"exec {validated_id} sh -c {escaped_cmd}"
@@ -633,13 +667,6 @@ class DockerService:
                     status="success",
                     output=stdout.strip(),
                 )
-            except NodeNotFoundError:
-                return BulkDockerNodeResult(
-                    node_id=node_id_str,
-                    node_name="unknown",
-                    status="error",
-                    error="Node not found",
-                )
             except DockerError as exc:
                 return BulkDockerNodeResult(
                     node_id=node_id_str,
@@ -655,24 +682,28 @@ class DockerService:
                     error=str(exc),
                 )
 
-        tasks = [_exec_on_node(nid) for nid in node_ids]
-        results = list(await asyncio.gather(*tasks))
+        remote_results = await asyncio.gather(
+            *(_exec_on_node(node_id_str, node) for _, node_id_str, node in prepared)
+        )
+        for (index, _, _), result in zip(prepared, remote_results, strict=True):
+            results[index] = result
+        final_results = [result for result in results if result is not None]
 
-        succeeded = sum(1 for r in results if r.status == "success")
-        failed = len(results) - succeeded
+        succeeded = sum(1 for r in final_results if r.status == "success")
+        failed = len(final_results) - succeeded
 
         audit.info(
             "docker.bulk.exec",
             container_id=validated_id,
-            total=len(results),
+            total=len(final_results),
             succeeded=succeeded,
             failed=failed,
         )
 
         return BulkDockerResponse(
             action="exec",
-            results=results,
-            total=len(results),
+            results=final_results,
+            total=len(final_results),
             succeeded=succeeded,
             failed=failed,
         )

@@ -426,6 +426,22 @@ class NodeService:
         ]
         results = await asyncio.gather(*tasks)
 
+        # Persist audit records outside the concurrent SSH tasks. AuditService uses
+        # the request-scoped session, which must never be shared by asyncio tasks.
+        for result in results:
+            succeeded = result.exit_code == 0
+            details: dict[str, Any] = {
+                "command": data.command,
+                "exit_code": result.exit_code,
+            }
+            if not succeeded:
+                details["error"] = result.stderr
+            await self._log(
+                "bulk_execute" if succeeded else "bulk_execute_failed",
+                node_id=result.node_id,
+                details=details,
+            )
+
         succeeded = sum(1 for r in results if r.exit_code == 0)
         return BulkCommandResult(
             command=data.command,
@@ -472,11 +488,6 @@ class NodeService:
                 node_id=str(node.id),
                 command=command,
             )
-            await self._log(
-                "bulk_execute",
-                node_id=node.id,
-                details={"command": command, "exit_code": exit_code},
-            )
             return BulkNodeResult(
                 node_id=node.id,
                 node_name=node.name,
@@ -490,11 +501,6 @@ class NodeService:
                 node_id=str(node.id),
                 command=command,
                 error=str(exc),
-            )
-            await self._log(
-                "bulk_execute_failed",
-                node_id=node.id,
-                details={"command": command, "error": str(exc)},
             )
             return BulkNodeResult(
                 node_id=node.id,
@@ -510,11 +516,6 @@ class NodeService:
                 command=command,
                 error_type=type(exc).__name__,
                 error=str(exc),
-            )
-            await self._log(
-                "bulk_execute_failed",
-                node_id=node.id,
-                details={"command": command, "error": str(exc)},
             )
             return BulkNodeResult(
                 node_id=node.id,
