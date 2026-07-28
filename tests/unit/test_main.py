@@ -121,6 +121,8 @@ class TestLifespan:
             LOG_LEVEL="info", DEBUG=False, AUDIT_LOG_RETENTION_DAYS=0
         )
         mock_container.close = AsyncMock()
+        mock_scheduler = MagicMock()
+        mock_container.get = AsyncMock(return_value=mock_scheduler)
 
         from fastapi import FastAPI
 
@@ -130,6 +132,7 @@ class TestLifespan:
             mock_migrations.assert_called_once()
 
         mock_container.close.assert_awaited_once()
+        mock_scheduler.configure_executor.assert_called_once()
 
     @patch("app.main._cleanup_audit_logs", new_callable=AsyncMock)
     @patch("app.main.container")
@@ -149,6 +152,7 @@ class TestLifespan:
             LOG_LEVEL="info", DEBUG=False, AUDIT_LOG_RETENTION_DAYS=90
         )
         mock_container.close = AsyncMock()
+        mock_container.get = AsyncMock(return_value=MagicMock())
 
         from fastapi import FastAPI
 

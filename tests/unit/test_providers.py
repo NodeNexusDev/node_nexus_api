@@ -8,6 +8,7 @@ from app.di.providers import (
     ConnectorProvider,
     DbProvider,
     RepositoryProvider,
+    SchedulerProvider,
     ServiceProvider,
 )
 from app.repositories.api_key_repo import APIKeyRepository
@@ -50,6 +51,18 @@ def test_db_provider_builds_sessionmaker_from_engine() -> None:
 
     assert sessionmaker.kw["expire_on_commit"] is False
     assert sessionmaker.kw["bind"] is engine
+
+
+@pytest.mark.asyncio
+async def test_scheduler_provider_manages_lifecycle() -> None:
+    provider = SchedulerProvider()
+    resource = provider.get_script_scheduler()
+
+    scheduler = await anext(resource)
+    assert scheduler._scheduler.running is True
+
+    await resource.aclose()
+    assert scheduler._scheduler.running is False
 
 
 def test_repository_provider_resolves() -> None:

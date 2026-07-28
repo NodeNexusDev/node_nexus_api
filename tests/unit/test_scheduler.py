@@ -62,7 +62,6 @@ class TestScriptScheduler:
 
     def test_list_schedules_empty(self):
         """List schedules when empty."""
-        ScriptScheduler._instance = None
         scheduler = ScriptScheduler()
         jobs = scheduler.list_schedules()
         assert jobs == []
@@ -74,6 +73,33 @@ class TestScriptScheduler:
         await scheduler.start()
         assert scheduler._scheduler.running
         await scheduler.stop()
+
+    @pytest.mark.asyncio
+    async def test_configured_executor_runs_job(self):
+        """Default job callback delegates to the configured executor."""
+        script_id = uuid4()
+        node_ids = [uuid4()]
+        calls: list[tuple[object, object]] = []
+
+        async def executor(received_script_id, received_node_ids):
+            calls.append((received_script_id, received_node_ids))
+
+        scheduler = ScriptScheduler()
+        scheduler.configure_executor(executor)
+
+        await scheduler._execute_scheduled_script(script_id, node_ids)
+
+        assert calls == [(script_id, node_ids)]
+
+    @pytest.mark.asyncio
+    async def test_missing_executor_is_explicit(self):
+        """Executing a scheduled job without composition setup fails clearly."""
+        scheduler = ScriptScheduler()
+
+        with pytest.raises(
+            RuntimeError, match="Scheduled script executor is not configured"
+        ):
+            await scheduler._execute_scheduled_script(uuid4(), [uuid4()])
 
 
 class TestSchedulerSchemas:

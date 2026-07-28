@@ -217,9 +217,14 @@ class SchedulerProvider(Provider):
     """Scheduler providers."""
 
     @provide(scope=Scope.APP)
-    def get_script_scheduler(self) -> ScriptScheduler:
-        """Get script scheduler singleton."""
-        return ScriptScheduler()
+    async def get_script_scheduler(self) -> AsyncIterable[ScriptScheduler]:
+        """Start and finalize the application-scoped script scheduler."""
+        scheduler = ScriptScheduler()
+        await scheduler.start()
+        try:
+            yield scheduler
+        finally:
+            await scheduler.stop()
 
 
 class AppProvider(

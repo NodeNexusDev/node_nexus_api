@@ -51,6 +51,7 @@ from app.core.exceptions import (
     TemplateRenderError,
 )
 from app.core.logging import configure_logging
+from app.core.scheduler import ScriptScheduler
 from app.core.telemetry import init_telemetry
 from app.di.container import container
 
@@ -103,6 +104,19 @@ async def _cleanup_audit_logs() -> None:
         logger.warning("audit.cleanup.startup.failed")
 
 
+async def _execute_scheduled_script(script_id, node_ids) -> None:  # noqa: ANN001
+    """Execute one scheduled script in a fresh request scope."""
+    from app.schemas.script import ScriptExecuteRequest
+    from app.services.script_service import ScriptService
+
+    async with container() as request_container:
+        script_service = await request_container.get(ScriptService)
+        await script_service.execute_script(
+            script_id,
+            ScriptExecuteRequest(node_ids=node_ids, params={}),
+        )
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Application lifespan manager."""
@@ -114,12 +128,15 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         logger.info("migrations.applied")
     else:
         logger.info("migrations.skipped", reason="AUTO_MIGRATE is disabled")
+    scheduler = await container.get(ScriptScheduler)
+    scheduler.configure_executor(_execute_scheduled_script)
     await _cleanup_audit_logs()
 
-    yield
-
-    await container.close()
-    logger.info("app.shutdown")
+    try:
+        yield
+    finally:
+        await container.close()
+        logger.info("app.shutdown")
 
 
 def create_app() -> FastAPI:
