@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from app.repositories.command_repo import CommandRepository
@@ -33,11 +33,21 @@ class ConfigService:
         self._command_repo = command_repository
         self._script_repo = script_repository
 
+    @staticmethod
+    async def _load_all(repository: Any, batch_size: int = 1000) -> list[Any]:
+        """Load an unbounded collection through the repository pagination API."""
+        items: list[Any] = []
+        while True:
+            batch = await repository.get_all(skip=len(items), limit=batch_size)
+            items.extend(batch)
+            if len(batch) < batch_size:
+                return items
+
     async def export_all(self) -> ConfigExport:
         """Export all nodes, commands, and scripts."""
-        nodes = await self._node_repo.get_all(skip=0, limit=10000)
-        commands = await self._command_repo.get_all(skip=0, limit=10000)
-        scripts = await self._script_repo.get_all(skip=0, limit=10000)
+        nodes = await self._load_all(self._node_repo)
+        commands = await self._load_all(self._command_repo)
+        scripts = await self._load_all(self._script_repo)
 
         return ConfigExport(
             exported_at=datetime.now(UTC),
@@ -78,24 +88,18 @@ class ConfigService:
         result = ImportResult()
         existing_node_names = {
             item.name
-            for item in (
-                await self._node_repo.get_all(skip=0, limit=10000) if data.nodes else []
-            )
+            for item in (await self._load_all(self._node_repo) if data.nodes else [])
         }
         existing_command_names = {
             item.name
             for item in (
-                await self._command_repo.get_all(skip=0, limit=10000)
-                if data.commands
-                else []
+                await self._load_all(self._command_repo) if data.commands else []
             )
         }
         existing_script_names = {
             item.name
             for item in (
-                await self._script_repo.get_all(skip=0, limit=10000)
-                if data.scripts
-                else []
+                await self._load_all(self._script_repo) if data.scripts else []
             )
         }
 

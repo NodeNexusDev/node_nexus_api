@@ -208,8 +208,18 @@ class TestConfigImport:
 
         assert result.nodes_created == 1
         assert len(result.errors) == 1
-        node_repo.get_all.assert_awaited_once_with(skip=0, limit=10000)
+        node_repo.get_all.assert_awaited_once_with(skip=0, limit=1000)
         node_repo.create.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_load_all_has_no_fixed_total_limit(self):
+        repo = AsyncMock()
+        repo.get_all.side_effect = [[MagicMock()] * 1000, [MagicMock()] * 2]
+
+        items = await ConfigService._load_all(repo)
+
+        assert len(items) == 1002
+        assert repo.get_all.await_args_list[1].kwargs == {"skip": 1000, "limit": 1000}
 
 
 class TestConfigSchemas:
