@@ -3,7 +3,12 @@
 from collections.abc import AsyncIterable
 
 from dishka import Provider, Scope, provide
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import (
+    AsyncEngine,
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
 
 from app.core.config import Settings, get_settings
 from app.core.connectors.ssh import SSHConnectorFactory
@@ -29,9 +34,17 @@ class DbProvider(Provider):
     """Database session provider."""
 
     @provide(scope=Scope.APP)
-    def get_sessionmaker(self, settings: Settings) -> async_sessionmaker[AsyncSession]:
-        """Get a session maker."""
+    async def get_engine(self, settings: Settings) -> AsyncIterable[AsyncEngine]:
+        """Get the application engine and dispose its pool on shutdown."""
         engine = create_async_engine(settings.DATABASE_URL)
+        try:
+            yield engine
+        finally:
+            await engine.dispose()
+
+    @provide(scope=Scope.APP)
+    def get_sessionmaker(self, engine: AsyncEngine) -> async_sessionmaker[AsyncSession]:
+        """Get a session maker bound to the managed application engine."""
         return async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
     @provide(scope=Scope.REQUEST)

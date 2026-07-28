@@ -1,9 +1,12 @@
 """Tests for DI provider wiring — resolves all services from container."""
 
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 from app.di.providers import (
     ConnectorProvider,
+    DbProvider,
     RepositoryProvider,
     ServiceProvider,
 )
@@ -20,6 +23,33 @@ from app.services.config_service import ConfigService
 from app.services.docker_service import DockerService
 from app.services.node_service import NodeService
 from app.services.script_service import ScriptService
+
+
+@pytest.mark.asyncio
+async def test_db_provider_disposes_engine() -> None:
+    settings = MagicMock()
+    settings.DATABASE_URL = "sqlite+aiosqlite:///:memory:"
+    engine = MagicMock()
+    engine.dispose = AsyncMock()
+    provider = DbProvider()
+
+    with patch("app.di.providers.create_async_engine", return_value=engine):
+        resource = provider.get_engine(settings)
+        provided_engine = await anext(resource)
+        assert provided_engine is engine
+        await resource.aclose()
+
+    engine.dispose.assert_awaited_once()
+
+
+def test_db_provider_builds_sessionmaker_from_engine() -> None:
+    provider = DbProvider()
+    engine = MagicMock()
+
+    sessionmaker = provider.get_sessionmaker(engine)
+
+    assert sessionmaker.kw["expire_on_commit"] is False
+    assert sessionmaker.kw["bind"] is engine
 
 
 def test_repository_provider_resolves() -> None:
