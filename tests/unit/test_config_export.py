@@ -189,6 +189,28 @@ class TestConfigImport:
         assert result.scripts_created == 0
         assert result.errors == []
 
+    @pytest.mark.asyncio
+    async def test_import_preloads_once_and_skips_payload_duplicates(self):
+        """Duplicate detection is linear and includes earlier payload items."""
+        node_repo = AsyncMock()
+        cmd_repo = AsyncMock()
+        script_repo = AsyncMock()
+        node_repo.get_all.return_value = []
+        svc = ConfigService(node_repo, cmd_repo, script_repo)
+        duplicate = NodeExport(
+            name="same",
+            host="1.1.1.1",
+            port=22,
+            connection_type="ssh",
+        )
+
+        result = await svc.import_config(ConfigImport(nodes=[duplicate, duplicate]))
+
+        assert result.nodes_created == 1
+        assert len(result.errors) == 1
+        node_repo.get_all.assert_awaited_once_with(skip=0, limit=10000)
+        node_repo.create.assert_awaited_once()
+
 
 class TestConfigSchemas:
     """Tests for config export/import schemas."""

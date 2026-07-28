@@ -74,35 +74,57 @@ class ConfigService:
         )
 
     async def import_config(self, data: ConfigImport) -> ImportResult:
-        """Import configuration. Skips duplicates by name."""
+        """Import configuration atomically, skipping duplicate names."""
         result = ImportResult()
+        existing_node_names = {
+            item.name
+            for item in (
+                await self._node_repo.get_all(skip=0, limit=10000) if data.nodes else []
+            )
+        }
+        existing_command_names = {
+            item.name
+            for item in (
+                await self._command_repo.get_all(skip=0, limit=10000)
+                if data.commands
+                else []
+            )
+        }
+        existing_script_names = {
+            item.name
+            for item in (
+                await self._script_repo.get_all(skip=0, limit=10000)
+                if data.scripts
+                else []
+            )
+        }
 
         for node_data in data.nodes:
-            existing = await self._node_repo.get_all(skip=0, limit=10000)
-            if any(n.name == node_data.name for n in existing):
+            if node_data.name in existing_node_names:
                 result.errors.append(f"Node '{node_data.name}' already exists, skipped")
                 continue
             await self._node_repo.create(node_data.model_dump())
+            existing_node_names.add(node_data.name)
             result.nodes_created += 1
 
         for cmd_data in data.commands:
-            existing = await self._command_repo.get_all(skip=0, limit=10000)
-            if any(c.name == cmd_data.name for c in existing):
+            if cmd_data.name in existing_command_names:
                 result.errors.append(
                     f"Command '{cmd_data.name}' already exists, skipped"
                 )
                 continue
             await self._command_repo.create(cmd_data.model_dump())
+            existing_command_names.add(cmd_data.name)
             result.commands_created += 1
 
         for script_data in data.scripts:
-            existing = await self._script_repo.get_all(skip=0, limit=10000)
-            if any(s.name == script_data.name for s in existing):
+            if script_data.name in existing_script_names:
                 result.errors.append(
                     f"Script '{script_data.name}' already exists, skipped"
                 )
                 continue
             await self._script_repo.create(script_data.model_dump())
+            existing_script_names.add(script_data.name)
             result.scripts_created += 1
 
         return result
