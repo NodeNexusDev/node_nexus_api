@@ -38,6 +38,7 @@ from app.schemas.docker import (
     DockerVolume,
 )
 from app.services.docker.command_runner import DockerCommandRunner
+from app.services.docker.container_service import DockerContainerService
 from app.services.docker.error_mapper import raise_for_docker_error
 from app.services.docker.parsers import parse_json_array, parse_json_lines
 
@@ -63,6 +64,7 @@ class DockerService:
             connector_factory=connector_factory,
             node_reader=node_reader,
         )
+        self._containers = DockerContainerService(self._runner, audit_service)
 
     async def _log(
         self,
@@ -101,7 +103,7 @@ class DockerService:
 
     # --- Container operations ---
 
-    async def list_containers(
+    async def _legacy_list_containers(
         self, node_id: UUID, *, all: bool = False
     ) -> list[DockerContainer]:
         """List containers on a Docker node."""
@@ -123,7 +125,7 @@ class DockerService:
         )
         return [DockerContainer.model_validate(c) for c in containers]
 
-    async def get_container(
+    async def _legacy_get_container(
         self, node_id: UUID, container_id: str
     ) -> DockerContainerInspect:
         """Get container details."""
@@ -168,7 +170,7 @@ class DockerService:
             network_settings=data.get("NetworkSettings"),
         )
 
-    async def start_container(self, node_id: UUID, container_id: str) -> None:
+    async def _legacy_start_container(self, node_id: UUID, container_id: str) -> None:
         """Start a container."""
         validated_id = validate_container_id(container_id)
         node = await self._get_docker_node(node_id)
@@ -186,7 +188,7 @@ class DockerService:
             details={"container_id": validated_id},
         )
 
-    async def stop_container(
+    async def _legacy_stop_container(
         self, node_id: UUID, container_id: str, *, timeout: int = 10
     ) -> None:
         """Stop a container."""
@@ -206,7 +208,7 @@ class DockerService:
             details={"container_id": validated_id, "timeout": timeout},
         )
 
-    async def restart_container(
+    async def _legacy_restart_container(
         self, node_id: UUID, container_id: str, *, timeout: int = 10
     ) -> None:
         """Restart a container."""
@@ -226,7 +228,7 @@ class DockerService:
             details={"container_id": validated_id, "timeout": timeout},
         )
 
-    async def remove_container(
+    async def _legacy_remove_container(
         self, node_id: UUID, container_id: str, *, force: bool = False
     ) -> None:
         """Remove a container."""
@@ -247,7 +249,7 @@ class DockerService:
             details={"container_id": validated_id, "force": force},
         )
 
-    async def get_logs(
+    async def _legacy_get_logs(
         self,
         node_id: UUID,
         container_id: str,
@@ -276,7 +278,7 @@ class DockerService:
         )
         return stdout
 
-    async def exec_command(
+    async def _legacy_exec_command(
         self,
         node_id: UUID,
         container_id: str,
@@ -381,7 +383,7 @@ class DockerService:
 
     # --- Stats ---
 
-    async def get_stats(self, node_id: UUID, container_id: str) -> DockerStats:
+    async def _legacy_get_stats(self, node_id: UUID, container_id: str) -> DockerStats:
         """Get container stats."""
         validated_id = validate_container_id(container_id)
         node = await self._get_docker_node(node_id)
@@ -661,3 +663,60 @@ class DockerService:
             succeeded=succeeded,
             failed=failed,
         )
+
+    # Compatibility facade: public container API delegates to the focused
+    # component while routers and downstream callers migrate independently.
+    async def list_containers(
+        self, node_id: UUID, *, all: bool = False
+    ) -> list[DockerContainer]:
+        return await self._containers.list_containers(node_id, all=all)
+
+    async def get_container(
+        self, node_id: UUID, container_id: str
+    ) -> DockerContainerInspect:
+        return await self._containers.get_container(node_id, container_id)
+
+    async def start_container(self, node_id: UUID, container_id: str) -> None:
+        await self._containers.start_container(node_id, container_id)
+
+    async def stop_container(
+        self, node_id: UUID, container_id: str, *, timeout: int = 10
+    ) -> None:
+        await self._containers.stop_container(node_id, container_id, timeout=timeout)
+
+    async def restart_container(
+        self, node_id: UUID, container_id: str, *, timeout: int = 10
+    ) -> None:
+        await self._containers.restart_container(node_id, container_id, timeout=timeout)
+
+    async def remove_container(
+        self, node_id: UUID, container_id: str, *, force: bool = False
+    ) -> None:
+        await self._containers.remove_container(node_id, container_id, force=force)
+
+    async def get_logs(
+        self,
+        node_id: UUID,
+        container_id: str,
+        *,
+        tail: int = 100,
+        since: str | None = None,
+    ) -> str:
+        return await self._containers.get_logs(
+            node_id, container_id, tail=tail, since=since
+        )
+
+    async def exec_command(
+        self,
+        node_id: UUID,
+        container_id: str,
+        command: str,
+        *,
+        timeout: int = 30,
+    ) -> DockerExecResult:
+        return await self._containers.exec_command(
+            node_id, container_id, command, timeout=timeout
+        )
+
+    async def get_stats(self, node_id: UUID, container_id: str) -> DockerStats:
+        return await self._containers.get_stats(node_id, container_id)
