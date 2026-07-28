@@ -4,8 +4,9 @@ import uuid
 from unittest.mock import AsyncMock
 
 import pytest
+from sqlalchemy.exc import IntegrityError
 
-from app.core.exceptions import NodeNotFoundError
+from app.core.exceptions import NodeNameConflictError, NodeNotFoundError
 from app.core.security import decrypt, encrypt
 from app.repositories.node_repo import NodeRepository
 from app.schemas.node import BulkCommandRequest, NodeCreate, NodeUpdate
@@ -61,6 +62,15 @@ class TestCreateNode:
         result = await service.create_node(data)
         assert result.name == "server-1"
         repo.create.assert_called_once()
+
+    async def test_duplicate_name_is_domain_conflict(
+        self, service: NodeService, repo: AsyncMock
+    ) -> None:
+        repo.create.side_effect = IntegrityError("insert", {}, Exception("unique"))
+        data = NodeCreate(name="duplicate", host="1.2.3.4", connection_type="ssh")
+
+        with pytest.raises(NodeNameConflictError, match="duplicate"):
+            await service.create_node(data)
 
     async def test_encrypts_password(
         self, service: NodeService, repo: AsyncMock

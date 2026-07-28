@@ -17,6 +17,7 @@ from app.core.exceptions import (
     DockerValidationError,
     DomainError,
     ImageNotFoundError,
+    NodeNameConflictError,
     NodeNotFoundError,
     RequestTimeoutError,
     ScriptNotFoundError,
@@ -28,6 +29,7 @@ logger = structlog.get_logger()
 
 DOMAIN_ERROR_STATUS: dict[type[DomainError], int] = {
     NodeNotFoundError: 404,
+    NodeNameConflictError: 409,
     CommandNotFoundError: 404,
     ScriptNotFoundError: 404,
     APIKeyNotFoundError: 401,

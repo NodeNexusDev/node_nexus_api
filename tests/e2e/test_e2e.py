@@ -1123,7 +1123,7 @@ def test_create_node_port_zero(e2e_client: httpx.Client) -> None:
 
 
 def test_create_node_duplicate_name(e2e_client: httpx.Client) -> None:
-    """Nodes with same name should be allowed (no unique constraint on name)."""
+    """Node names are unique and duplicate creation is a conflict."""
     n1 = _create_node(e2e_client, name="dup-name")
     resp = e2e_client.post(
         "/api/v1/nodes/",
@@ -1134,11 +1134,8 @@ def test_create_node_duplicate_name(e2e_client: httpx.Client) -> None:
             "connection_type": "ssh",
         },
     )
-    assert resp.status_code == 201
-    n2 = resp.json()
-
-    for n in (n1, n2):
-        e2e_client.delete(f"/api/v1/nodes/{n['id']}")
+    assert resp.status_code == 409
+    e2e_client.delete(f"/api/v1/nodes/{n1['id']}")
 
 
 # ---------------------------------------------------------------------------

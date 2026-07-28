@@ -12,8 +12,13 @@ if TYPE_CHECKING:
     from app.services.audit_service import AuditService
 
 import structlog
+from sqlalchemy.exc import IntegrityError
 
-from app.core.exceptions import ConnectionFailedError, NodeNotFoundError
+from app.core.exceptions import (
+    ConnectionFailedError,
+    NodeNameConflictError,
+    NodeNotFoundError,
+)
 from app.core.security import encrypt
 from app.core.ssh_utils import decrypt_value, get_connector_factory
 from app.repositories.node_repo import NodeRepository
@@ -115,7 +120,12 @@ class NodeService:
         """Create a new node. Encrypts sensitive fields before storage."""
         raw = data.model_dump()
         self._encrypt_fields(raw)
-        node = await self._repository.create(raw)
+        try:
+            node = await self._repository.create(raw)
+        except IntegrityError as exc:
+            raise NodeNameConflictError(
+                f"Node name '{data.name}' already exists"
+            ) from exc
         audit.info("node.create.ok", node_id=str(node.id), name=data.name)
         await self._log("create", node_id=node.id, details={"name": data.name})
         return NodeResponse.model_validate(node)

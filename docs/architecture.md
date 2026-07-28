@@ -166,6 +166,7 @@ connectors      → core (базовые исключения/интерфейс
 | Исключения | HTTP |
 |------------|------|
 | `NodeNotFoundError`, `CommandNotFoundError`, `ScriptNotFoundError`, `TagNotFoundError`, `ContainerNotFoundError`, `ImageNotFoundError` | 404 |
+| `NodeNameConflictError` | 409 |
 | `APIKeyNotFoundError`, `APIKeyRevokedError`, `APIKeyExpiredError`, `AuthenticationError` | 401 |
 | `ConnectionFailedError`, `DockerDaemonError` | 503 |
 | `TemplateRenderError`, `DockerValidationError` | 422 |
