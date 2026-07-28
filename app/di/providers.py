@@ -3,8 +3,20 @@
 from collections.abc import AsyncIterable
 
 from dishka import Provider, Scope, provide
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import (
+    AsyncEngine,
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
 
+from app.adapters.persistence.command_reader import ScopedCommandTemplateReader
+from app.adapters.persistence.node_reader import ScopedNodeConnectionReader
+from app.adapters.persistence.script_gateway import (
+    ScopedScriptDefinitionReader,
+    ScopedScriptExecutionWriter,
+)
+from app.application.services.streaming_command_service import StreamingCommandService
 from app.core.config import Settings, get_settings
 from app.core.connectors.ssh import SSHConnectorFactory
 from app.core.scheduler import ScriptScheduler
@@ -29,9 +41,17 @@ class DbProvider(Provider):
     """Database session provider."""
 
     @provide(scope=Scope.APP)
-    def get_sessionmaker(self, settings: Settings) -> async_sessionmaker[AsyncSession]:
-        """Get a session maker."""
+    async def get_engine(self, settings: Settings) -> AsyncIterable[AsyncEngine]:
+        """Get the application engine and dispose its pool on shutdown."""
         engine = create_async_engine(settings.DATABASE_URL)
+        try:
+            yield engine
+        finally:
+            await engine.dispose()
+
+    @provide(scope=Scope.APP)
+    def get_sessionmaker(self, engine: AsyncEngine) -> async_sessionmaker[AsyncSession]:
+        """Get a session maker bound to the managed application engine."""
         return async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
     @provide(scope=Scope.REQUEST)
@@ -46,6 +66,34 @@ class DbProvider(Provider):
 
 class RepositoryProvider(Provider):
     """Repository providers."""
+
+    @provide(scope=Scope.APP)
+    def get_scoped_script_reader(
+        self, sessionmaker: async_sessionmaker[AsyncSession]
+    ) -> ScopedScriptDefinitionReader:
+        """Get a script reader that owns a short session per operation."""
+        return ScopedScriptDefinitionReader(sessionmaker)
+
+    @provide(scope=Scope.APP)
+    def get_scoped_execution_writer(
+        self, sessionmaker: async_sessionmaker[AsyncSession]
+    ) -> ScopedScriptExecutionWriter:
+        """Get a writer that commits execution transitions independently."""
+        return ScopedScriptExecutionWriter(sessionmaker)
+
+    @provide(scope=Scope.APP)
+    def get_scoped_command_reader(
+        self, sessionmaker: async_sessionmaker[AsyncSession]
+    ) -> ScopedCommandTemplateReader:
+        """Get a command reader that owns a short session per operation."""
+        return ScopedCommandTemplateReader(sessionmaker)
+
+    @provide(scope=Scope.APP)
+    def get_scoped_node_reader(
+        self, sessionmaker: async_sessionmaker[AsyncSession]
+    ) -> ScopedNodeConnectionReader:
+        """Get a node reader that owns a short session per operation."""
+        return ScopedNodeConnectionReader(sessionmaker)
 
     @provide(scope=Scope.REQUEST)
     def get_node_repository(self, session: AsyncSession) -> NodeRepository:
@@ -98,6 +146,15 @@ class ServiceProvider(Provider):
     """Service providers."""
 
     @provide(scope=Scope.REQUEST)
+    def get_streaming_command_service(
+        self,
+        node_reader: ScopedNodeConnectionReader,
+        connector_factory: SSHConnectorFactory,
+    ) -> StreamingCommandService:
+        """Get WebSocket streaming orchestration service."""
+        return StreamingCommandService(node_reader, connector_factory)
+
+    @provide(scope=Scope.REQUEST)
     def get_audit_service(self, repository: AuditLogRepository) -> AuditService:
         """Get audit service."""
         return AuditService(repository=repository)
@@ -108,12 +165,14 @@ class ServiceProvider(Provider):
         repository: NodeRepository,
         audit_service: AuditService,
         connector_factory: SSHConnectorFactory,
+        node_reader: ScopedNodeConnectionReader,
     ) -> NodeService:
         """Get node service."""
         return NodeService(
             repository=repository,
             audit_service=audit_service,
             connector_factory=connector_factory,
+            node_reader=node_reader,
         )
 
     @provide(scope=Scope.REQUEST)
@@ -123,6 +182,8 @@ class ServiceProvider(Provider):
         node_repository: NodeRepository,
         audit_service: AuditService,
         connector_factory: SSHConnectorFactory,
+        command_reader: ScopedCommandTemplateReader,
+        node_reader: ScopedNodeConnectionReader,
     ) -> CommandService:
         """Get command service."""
         return CommandService(
@@ -130,6 +191,8 @@ class ServiceProvider(Provider):
             node_repository=node_repository,
             audit_service=audit_service,
             connector_factory=connector_factory,
+            command_reader=command_reader,
+            node_reader=node_reader,
         )
 
     @provide(scope=Scope.REQUEST)
@@ -141,6 +204,10 @@ class ServiceProvider(Provider):
         execution_repository: ScriptExecutionRepository,
         audit_service: AuditService,
         connector_factory: SSHConnectorFactory,
+        script_reader: ScopedScriptDefinitionReader,
+        command_reader: ScopedCommandTemplateReader,
+        node_reader: ScopedNodeConnectionReader,
+        execution_writer: ScopedScriptExecutionWriter,
     ) -> ScriptService:
         """Get script service."""
         return ScriptService(
@@ -150,6 +217,10 @@ class ServiceProvider(Provider):
             execution_repository=execution_repository,
             audit_service=audit_service,
             connector_factory=connector_factory,
+            script_reader=script_reader,
+            command_reader=command_reader,
+            node_reader=node_reader,
+            execution_writer=execution_writer,
         )
 
     @provide(scope=Scope.REQUEST)
@@ -163,12 +234,14 @@ class ServiceProvider(Provider):
         repository: NodeRepository,
         audit_service: AuditService,
         connector_factory: SSHConnectorFactory,
+        node_reader: ScopedNodeConnectionReader,
     ) -> DockerService:
         """Get Docker service."""
         return DockerService(
             repository=repository,
             audit_service=audit_service,
             connector_factory=connector_factory,
+            node_reader=node_reader,
         )
 
     @provide(scope=Scope.REQUEST)
@@ -204,9 +277,14 @@ class SchedulerProvider(Provider):
     """Scheduler providers."""
 
     @provide(scope=Scope.APP)
-    def get_script_scheduler(self) -> ScriptScheduler:
-        """Get script scheduler singleton."""
-        return ScriptScheduler()
+    async def get_script_scheduler(self) -> AsyncIterable[ScriptScheduler]:
+        """Start and finalize the application-scoped script scheduler."""
+        scheduler = ScriptScheduler()
+        await scheduler.start()
+        try:
+            yield scheduler
+        finally:
+            await scheduler.stop()
 
 
 class AppProvider(

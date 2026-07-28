@@ -9,6 +9,10 @@ class NodeNotFoundError(DomainError):
     """Raised when a node is not found."""
 
 
+class NodeNameConflictError(DomainError):
+    """Raised when a node name violates its uniqueness contract."""
+
+
 class ConnectionFailedError(DomainError):
     """Raised when a connection to a node fails."""
 

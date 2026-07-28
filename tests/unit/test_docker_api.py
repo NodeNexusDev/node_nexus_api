@@ -11,6 +11,7 @@ from dishka.integrations.fastapi import setup_dishka
 from fastapi import FastAPI
 from httpx2 import ASGITransport, AsyncClient
 
+from app.api.error_mapping import domain_error_handler
 from app.api.v1.docker import router as docker_router
 from app.api.v1.health import router as health_router
 from app.core.exceptions import (
@@ -18,6 +19,7 @@ from app.core.exceptions import (
     ContainerNotFoundError,
     DockerError,
     DockerValidationError,
+    DomainError,
     NodeNotFoundError,
 )
 from app.schemas.docker import (
@@ -140,6 +142,7 @@ def _make_pull_result(**overrides: Any) -> DockerPullResult:
 
 def _create_test_app(service: DockerService | AsyncMock) -> FastAPI:
     app = FastAPI()
+    app.add_exception_handler(DomainError, domain_error_handler)
     app.include_router(health_router)
     app.include_router(docker_router, prefix="/api/v1")
 

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+from collections.abc import Awaitable, Callable
 from typing import TYPE_CHECKING
 
 import structlog
@@ -13,21 +15,20 @@ if TYPE_CHECKING:
 
 logger = structlog.get_logger()
 
+ScheduledScriptExecutor = Callable[["UUID", list["UUID"]], Awaitable[None]]
+
 
 class ScriptScheduler:
-    """Wrapper around APScheduler for script scheduling (singleton)."""
+    """Application-scoped wrapper around the in-memory script scheduler."""
 
-    _instance: ScriptScheduler | None = None
-    _scheduler: AsyncIOScheduler
-    _jobs: dict[str, dict]
+    def __init__(self) -> None:
+        self._scheduler = AsyncIOScheduler()
+        self._jobs: dict[str, dict] = {}
+        self._executor: ScheduledScriptExecutor | None = None
 
-    def __new__(cls) -> ScriptScheduler:
-        if cls._instance is None:
-            inst = super().__new__(cls)
-            inst._scheduler = AsyncIOScheduler()
-            inst._jobs = {}
-            cls._instance = inst
-        return cls._instance
+    def configure_executor(self, executor: ScheduledScriptExecutor) -> None:
+        """Configure the application callback used by scheduled jobs."""
+        self._executor = executor
 
     async def start(self) -> None:
         """Start the scheduler."""
@@ -39,6 +40,7 @@ class ScriptScheduler:
         """Stop the scheduler."""
         if self._scheduler.running:
             self._scheduler.shutdown(wait=False)
+            await asyncio.sleep(0)
             logger.info("scheduler.stopped")
 
     def schedule_script(
@@ -79,22 +81,15 @@ class ScriptScheduler:
     async def _execute_scheduled_script(
         self, script_id: UUID, node_ids: list[UUID]
     ) -> None:
-        """Default callback for APScheduler — executes the script via ScriptService."""
-        from app.di.container import container
-        from app.schemas.script import ScriptExecuteRequest
-        from app.services.script_service import ScriptService
-
+        """Execute a job through the callback configured by the composition root."""
         logger.info(
             "scheduler.script.executing",
             script_id=str(script_id),
             node_ids=[str(n) for n in node_ids],
         )
-        async with container() as c:
-            script_service = await c.get(ScriptService)
-            await script_service.execute_script(
-                script_id,
-                ScriptExecuteRequest(node_ids=node_ids, params={}),
-            )
+        if self._executor is None:
+            raise RuntimeError("Scheduled script executor is not configured")
+        await self._executor(script_id, node_ids)
 
     def unschedule_script(self, script_id: UUID) -> bool:
         """Remove a scheduled script.

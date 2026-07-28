@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from app.repositories.command_repo import CommandRepository
@@ -33,11 +33,21 @@ class ConfigService:
         self._command_repo = command_repository
         self._script_repo = script_repository
 
+    @staticmethod
+    async def _load_all(repository: Any, batch_size: int = 1000) -> list[Any]:
+        """Load an unbounded collection through the repository pagination API."""
+        items: list[Any] = []
+        while True:
+            batch = await repository.get_all(skip=len(items), limit=batch_size)
+            items.extend(batch)
+            if len(batch) < batch_size:
+                return items
+
     async def export_all(self) -> ConfigExport:
         """Export all nodes, commands, and scripts."""
-        nodes = await self._node_repo.get_all(skip=0, limit=10000)
-        commands = await self._command_repo.get_all(skip=0, limit=10000)
-        scripts = await self._script_repo.get_all(skip=0, limit=10000)
+        nodes = await self._load_all(self._node_repo)
+        commands = await self._load_all(self._command_repo)
+        scripts = await self._load_all(self._script_repo)
 
         return ConfigExport(
             exported_at=datetime.now(UTC),
@@ -74,35 +84,51 @@ class ConfigService:
         )
 
     async def import_config(self, data: ConfigImport) -> ImportResult:
-        """Import configuration. Skips duplicates by name."""
+        """Import configuration atomically, skipping duplicate names."""
         result = ImportResult()
+        existing_node_names = {
+            item.name
+            for item in (await self._load_all(self._node_repo) if data.nodes else [])
+        }
+        existing_command_names = {
+            item.name
+            for item in (
+                await self._load_all(self._command_repo) if data.commands else []
+            )
+        }
+        existing_script_names = {
+            item.name
+            for item in (
+                await self._load_all(self._script_repo) if data.scripts else []
+            )
+        }
 
         for node_data in data.nodes:
-            existing = await self._node_repo.get_all(skip=0, limit=10000)
-            if any(n.name == node_data.name for n in existing):
+            if node_data.name in existing_node_names:
                 result.errors.append(f"Node '{node_data.name}' already exists, skipped")
                 continue
             await self._node_repo.create(node_data.model_dump())
+            existing_node_names.add(node_data.name)
             result.nodes_created += 1
 
         for cmd_data in data.commands:
-            existing = await self._command_repo.get_all(skip=0, limit=10000)
-            if any(c.name == cmd_data.name for c in existing):
+            if cmd_data.name in existing_command_names:
                 result.errors.append(
                     f"Command '{cmd_data.name}' already exists, skipped"
                 )
                 continue
             await self._command_repo.create(cmd_data.model_dump())
+            existing_command_names.add(cmd_data.name)
             result.commands_created += 1
 
         for script_data in data.scripts:
-            existing = await self._script_repo.get_all(skip=0, limit=10000)
-            if any(s.name == script_data.name for s in existing):
+            if script_data.name in existing_script_names:
                 result.errors.append(
                     f"Script '{script_data.name}' already exists, skipped"
                 )
                 continue
             await self._script_repo.create(script_data.model_dump())
+            existing_script_names.add(script_data.name)
             result.scripts_created += 1
 
         return result

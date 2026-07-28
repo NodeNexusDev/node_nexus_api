@@ -10,6 +10,7 @@ from uuid import UUID
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.application.dto.node_connection import NodeConnectionDTO
 from app.models.node import NodeModel
 from app.repositories.base import IRepository
 
@@ -19,6 +20,40 @@ class NodeRepository(IRepository[NodeModel]):
 
     def __init__(self, session: AsyncSession):
         self._session = session
+
+    @staticmethod
+    def _to_connection_dto(node: NodeModel) -> NodeConnectionDTO:
+        """Map a persistence model to immutable connection data."""
+        return NodeConnectionDTO(
+            id=node.id,
+            name=node.name,
+            host=node.host,
+            port=node.port,
+            connection_type=node.connection_type,
+            username=node.username,
+            password=node.password,
+            ssh_key=node.ssh_key,
+            docker_host=node.docker_host,
+        )
+
+    async def get_connection(self, node_id: UUID) -> NodeConnectionDTO | None:
+        """Get immutable connection data for one node."""
+        node = await self.get_by_id(node_id)
+        if node is None:
+            return None
+        return self._to_connection_dto(node)
+
+    async def get_connections_by_ids(
+        self, node_ids: list[UUID]
+    ) -> list[NodeConnectionDTO]:
+        """Get immutable connection data for a list of node IDs."""
+        nodes = await self.get_by_ids(node_ids)
+        return [self._to_connection_dto(node) for node in nodes]
+
+    async def get_connections_by_tags(self, tags: list[str]) -> list[NodeConnectionDTO]:
+        """Get immutable connection data for nodes matching all tags."""
+        nodes = await self.get_by_tags(tags)
+        return [self._to_connection_dto(node) for node in nodes]
 
     async def get_by_id(self, id: UUID) -> NodeModel | None:
         """Get a node by ID."""

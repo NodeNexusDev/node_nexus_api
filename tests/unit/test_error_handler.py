@@ -1,10 +1,9 @@
 """Tests for domain error handler status code mapping."""
 
-import structlog
-from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI
 from httpx2 import ASGITransport, AsyncClient
 
+from app.api.error_mapping import domain_error_handler
 from app.core.exceptions import (
     APIKeyNotFoundError,
     CommandNotFoundError,
@@ -20,32 +19,8 @@ from app.core.exceptions import (
     TemplateRenderError,
 )
 
-audit = structlog.get_logger("audit")
-
-# Standalone test app with copy of the error handler
 app = FastAPI()
-
-
-@app.exception_handler(DomainError)
-async def _domain_error_handler(request: Request, exc: DomainError) -> JSONResponse:
-    _error_status_map: dict[type[DomainError], int] = {
-        NodeNotFoundError: 404,
-        CommandNotFoundError: 404,
-        APIKeyNotFoundError: 401,
-        TagNotFoundError: 404,
-        ConnectionFailedError: 503,
-        TemplateRenderError: 422,
-        DockerError: 502,
-        ContainerNotFoundError: 404,
-        ImageNotFoundError: 404,
-        DockerDaemonError: 503,
-        DockerValidationError: 422,
-    }
-    status_code = _error_status_map.get(type(exc), 422)
-    return JSONResponse(
-        status_code=status_code,
-        content={"detail": str(exc)},
-    )
+app.add_exception_handler(DomainError, domain_error_handler)
 
 
 @app.get("/test-node")

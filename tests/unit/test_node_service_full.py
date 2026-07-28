@@ -4,8 +4,9 @@ import uuid
 from unittest.mock import AsyncMock
 
 import pytest
+from sqlalchemy.exc import IntegrityError
 
-from app.core.exceptions import NodeNotFoundError
+from app.core.exceptions import NodeNameConflictError, NodeNotFoundError
 from app.core.security import decrypt, encrypt
 from app.repositories.node_repo import NodeRepository
 from app.schemas.node import BulkCommandRequest, NodeCreate, NodeUpdate
@@ -61,6 +62,15 @@ class TestCreateNode:
         result = await service.create_node(data)
         assert result.name == "server-1"
         repo.create.assert_called_once()
+
+    async def test_duplicate_name_is_domain_conflict(
+        self, service: NodeService, repo: AsyncMock
+    ) -> None:
+        repo.create.side_effect = IntegrityError("insert", {}, Exception("unique"))
+        data = NodeCreate(name="duplicate", host="1.2.3.4", connection_type="ssh")
+
+        with pytest.raises(NodeNameConflictError, match="duplicate"):
+            await service.create_node(data)
 
     async def test_encrypts_password(
         self, service: NodeService, repo: AsyncMock
@@ -154,27 +164,19 @@ class TestDecryptValue:
 
 
 class TestCheckConnectivityEdgeCases:
-    async def test_orm_node_not_found_after_get_node(
-        self, service: NodeService, repo: AsyncMock
-    ) -> None:
-        """When get_node succeeds but ORM node is gone (race condition)."""
-        orm_node = make_orm_node()
-        repo.get_by_id.side_effect = [orm_node, None]
+    async def test_node_not_found(self, service: NodeService, repo: AsyncMock) -> None:
+        repo.get_by_id.return_value = None
         with pytest.raises(NodeNotFoundError):
-            await service.check_connectivity(orm_node.id)
+            await service.check_connectivity(uuid.uuid4())
 
 
 class TestExecuteCommandEdgeCases:
-    async def test_orm_node_not_found_after_get_node(
-        self, service: NodeService, repo: AsyncMock
-    ) -> None:
-        """When get_node succeeds but ORM node is gone (race condition)."""
-        orm_node = make_orm_node()
-        repo.get_by_id.side_effect = [orm_node, None]
+    async def test_node_not_found(self, service: NodeService, repo: AsyncMock) -> None:
+        repo.get_by_id.return_value = None
         with pytest.raises(NodeNotFoundError):
             from app.schemas.node import CommandRequest
 
-            await service.execute_command(orm_node.id, CommandRequest(command="ls"))
+            await service.execute_command(uuid.uuid4(), CommandRequest(command="ls"))
 
 
 class TestGetAllNodesFiltering:

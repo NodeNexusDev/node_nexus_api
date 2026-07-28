@@ -8,12 +8,18 @@ from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 if TYPE_CHECKING:
+    from app.application.ports.node_reader import NodeConnectionReader
     from app.core.connectors.base import ConnectorFactory
     from app.services.audit_service import AuditService
 
 import structlog
+from sqlalchemy.exc import IntegrityError
 
-from app.core.exceptions import ConnectionFailedError, NodeNotFoundError
+from app.core.exceptions import (
+    ConnectionFailedError,
+    NodeNameConflictError,
+    NodeNotFoundError,
+)
 from app.core.security import encrypt
 from app.core.ssh_utils import decrypt_value, get_connector_factory
 from app.repositories.node_repo import NodeRepository
@@ -47,8 +53,10 @@ class NodeService:
         repository: NodeRepository,
         audit_service: AuditService | None = None,
         connector_factory: ConnectorFactory | None = None,
+        node_reader: NodeConnectionReader | None = None,
     ):
         self._repository = repository
+        self._node_reader = node_reader
         self._audit = audit_service
         self._connector_factory = connector_factory
 
@@ -115,7 +123,12 @@ class NodeService:
         """Create a new node. Encrypts sensitive fields before storage."""
         raw = data.model_dump()
         self._encrypt_fields(raw)
-        node = await self._repository.create(raw)
+        try:
+            node = await self._repository.create(raw)
+        except IntegrityError as exc:
+            raise NodeNameConflictError(
+                f"Node name '{data.name}' already exists"
+            ) from exc
         audit.info("node.create.ok", node_id=str(node.id), name=data.name)
         await self._log("create", node_id=node.id, details={"name": data.name})
         return NodeResponse.model_validate(node)
@@ -195,17 +208,20 @@ class NodeService:
 
     async def check_connectivity(self, node_id: UUID) -> NodeResponse:
         """Check SSH connectivity to a node and update its status."""
-        node_response = await self.get_node(node_id)
-        node = await self._repository.get_by_id(node_id)
+        node = (
+            await self._node_reader.get_connection(node_id)
+            if self._node_reader
+            else await self._repository.get_by_id(node_id)
+        )
         if node is None:
             raise NodeNotFoundError(f"Node {node_id} not found")
 
         password = decrypt_value(node.password)
         ssh_key = decrypt_value(node.ssh_key)
         connector = get_connector_factory(self._connector_factory).create_ssh(
-            host=node_response.host,
-            port=node_response.port,
-            username=node_response.username,
+            host=node.host,
+            port=node.port,
+            username=node.username,
             password=password,
             ssh_key=ssh_key,
         )
@@ -241,8 +257,11 @@ class NodeService:
         self, node_id: UUID, data: CommandRequest
     ) -> CommandResult:
         """Execute a command on a node via SSH."""
-        node_response = await self.get_node(node_id)
-        node = await self._repository.get_by_id(node_id)
+        node = (
+            await self._node_reader.get_connection(node_id)
+            if self._node_reader
+            else await self._repository.get_by_id(node_id)
+        )
         if node is None:
             raise NodeNotFoundError(f"Node {node_id} not found")
 
@@ -250,9 +269,9 @@ class NodeService:
         ssh_key = decrypt_value(node.ssh_key)
 
         connector_kwargs = {
-            "host": node_response.host,
-            "port": node_response.port,
-            "username": node_response.username,
+            "host": node.host,
+            "port": node.port,
+            "username": node.username,
             "password": password,
             "ssh_key": ssh_key,
         }
@@ -315,17 +334,20 @@ class NodeService:
 
     async def get_node_metrics(self, node_id: UUID) -> NodeMetrics:
         """Get system metrics from a node via SSH."""
-        node_response = await self.get_node(node_id)
-        node = await self._repository.get_by_id(node_id)
+        node = (
+            await self._node_reader.get_connection(node_id)
+            if self._node_reader
+            else await self._repository.get_by_id(node_id)
+        )
         if node is None:
             raise NodeNotFoundError(f"Node {node_id} not found")
 
         password = decrypt_value(node.password)
         ssh_key = decrypt_value(node.ssh_key)
         connector = get_connector_factory(self._connector_factory).create_ssh(
-            host=node_response.host,
-            port=node_response.port,
-            username=node_response.username,
+            host=node.host,
+            port=node.port,
+            username=node.username,
             password=password,
             ssh_key=ssh_key,
         )
@@ -426,6 +448,22 @@ class NodeService:
         ]
         results = await asyncio.gather(*tasks)
 
+        # Persist audit records outside the concurrent SSH tasks. AuditService uses
+        # the request-scoped session, which must never be shared by asyncio tasks.
+        for result in results:
+            succeeded = result.exit_code == 0
+            details: dict[str, Any] = {
+                "command": data.command,
+                "exit_code": result.exit_code,
+            }
+            if not succeeded:
+                details["error"] = result.stderr
+            await self._log(
+                "bulk_execute" if succeeded else "bulk_execute_failed",
+                node_id=result.node_id,
+                details=details,
+            )
+
         succeeded = sum(1 for r in results if r.exit_code == 0)
         return BulkCommandResult(
             command=data.command,
@@ -439,11 +477,19 @@ class NodeService:
         """Resolve target nodes from IDs and/or tags."""
         nodes_by_ids = None
         if data.node_ids:
-            nodes_by_ids = await self._repository.get_by_ids(data.node_ids)
+            nodes_by_ids = (
+                await self._node_reader.get_connections_by_ids(data.node_ids)
+                if self._node_reader
+                else await self._repository.get_by_ids(data.node_ids)
+            )
 
         nodes_by_tags = None
         if data.tags:
-            nodes_by_tags = await self._repository.get_by_tags(data.tags)
+            nodes_by_tags = (
+                await self._node_reader.get_connections_by_tags(data.tags)
+                if self._node_reader
+                else await self._repository.get_by_tags(data.tags)
+            )
 
         if nodes_by_ids is not None and nodes_by_tags is not None:
             tag_ids = {n.id for n in nodes_by_tags}
@@ -472,11 +518,6 @@ class NodeService:
                 node_id=str(node.id),
                 command=command,
             )
-            await self._log(
-                "bulk_execute",
-                node_id=node.id,
-                details={"command": command, "exit_code": exit_code},
-            )
             return BulkNodeResult(
                 node_id=node.id,
                 node_name=node.name,
@@ -490,11 +531,6 @@ class NodeService:
                 node_id=str(node.id),
                 command=command,
                 error=str(exc),
-            )
-            await self._log(
-                "bulk_execute_failed",
-                node_id=node.id,
-                details={"command": command, "error": str(exc)},
             )
             return BulkNodeResult(
                 node_id=node.id,
@@ -510,11 +546,6 @@ class NodeService:
                 command=command,
                 error_type=type(exc).__name__,
                 error=str(exc),
-            )
-            await self._log(
-                "bulk_execute_failed",
-                node_id=node.id,
-                details={"command": command, "error": str(exc)},
             )
             return BulkNodeResult(
                 node_id=node.id,

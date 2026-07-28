@@ -39,6 +39,9 @@
 |------------|----------|--------------|
 | `AUTO_MIGRATE` | Автоматический запуск Alembic миграций при старте приложения | `true` |
 
+Для контролируемого production rollout рекомендуется применять миграции до
+старта приложения и устанавливать `AUTO_MIGRATE=false`.
+
 ### Observability
 
 | Переменная | Описание | По умолчанию |
@@ -48,6 +51,9 @@
 | `OTEL_ENABLED` | Включить OpenTelemetry tracing | `false` |
 | `OTEL_ENDPOINT` | OTLP gRPC endpoint | `http://localhost:4317` |
 | `OTEL_SERVICE_NAME` | Имя сервиса в трейсах | `node-nexus-api` |
+
+Отдельных scheduler settings нет. Scheduler запускается с приложением, хранит
+jobs в памяти и не координируется между репликами.
 
 ---
 

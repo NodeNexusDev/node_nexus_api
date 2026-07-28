@@ -1,38 +1,20 @@
-"""Docker service for business logic."""
+"""Compatibility facade for focused Docker application services."""
 
 from __future__ import annotations
 
-import asyncio
-import json
-import shlex
-import uuid
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 if TYPE_CHECKING:
+    from app.application.ports.node_reader import NodeConnectionReader
     from app.core.connectors.base import ConnectorFactory
     from app.repositories.node_repo import NodeRepository
     from app.services.audit_service import AuditService
 
-import structlog
-
-from app.core.docker_validation import validate_container_id, validate_image_name
-from app.core.exceptions import (
-    ConnectionFailedError,
-    ContainerNotFoundError,
-    DockerDaemonError,
-    DockerError,
-    ImageNotFoundError,
-    NodeNotFoundError,
-)
-from app.core.ssh_utils import decrypt_value, get_connector_factory
 from app.schemas.docker import (
-    BulkDockerNodeResult,
     BulkDockerResponse,
     DockerContainer,
-    DockerContainerConfig,
     DockerContainerInspect,
-    DockerContainerState,
     DockerExecResult,
     DockerImage,
     DockerNetwork,
@@ -40,22 +22,35 @@ from app.schemas.docker import (
     DockerStats,
     DockerVolume,
 )
-
-audit = structlog.get_logger("audit")
+from app.services.docker.bulk_service import DockerBulkService
+from app.services.docker.command_runner import DockerCommandRunner
+from app.services.docker.container_service import DockerContainerService
+from app.services.docker.error_mapper import raise_for_docker_error
+from app.services.docker.image_service import DockerImageService
+from app.services.docker.parsers import parse_json_array, parse_json_lines
+from app.services.docker.resource_service import DockerResourceService
 
 
 class DockerService:
-    """Service for Docker operations via SSH."""
+    """Stable facade delegating to focused Docker domain services."""
 
     def __init__(
         self,
         repository: NodeRepository,
         audit_service: AuditService | None = None,
         connector_factory: ConnectorFactory | None = None,
-    ):
-        self._repository = repository
+        node_reader: NodeConnectionReader | None = None,
+    ) -> None:
         self._audit = audit_service
-        self._connector_factory = connector_factory
+        self._runner = DockerCommandRunner(
+            repository=repository,
+            connector_factory=connector_factory,
+            node_reader=node_reader,
+        )
+        self._containers = DockerContainerService(self._runner, audit_service)
+        self._images = DockerImageService(self._runner, audit_service)
+        self._resources = DockerResourceService(self._runner, audit_service)
+        self._bulk = DockerBulkService(self._runner)
 
     async def _log(
         self,
@@ -63,235 +58,61 @@ class DockerService:
         node_id: UUID | None = None,
         details: dict[str, Any] | None = None,
     ) -> None:
+        """Compatibility audit hook for internal callers."""
         if self._audit:
             await self._audit.log(action=action, node_id=node_id, details=details)
 
+    # Private compatibility methods retained for existing internal callers/tests.
     async def _get_docker_node(self, node_id: UUID) -> Any:
-        """Get node and validate connection_type='docker'."""
-        node = await self._repository.get_by_id(node_id)
-        if node is None:
-            raise NodeNotFoundError(f"Node {node_id} not found")
-        if node.connection_type != "docker":
-            raise DockerError(f"Node {node_id} is not a Docker node")
-        return node
+        return await self._runner.get_target(node_id)
 
     async def _execute_docker_cmd(
         self, node: Any, command: str, timeout: int = 30
     ) -> tuple[str, str, int]:
-        """Execute a docker CLI command via SSH."""
-        password = decrypt_value(node.password)
-        ssh_key = decrypt_value(node.ssh_key)
-        connector = get_connector_factory(self._connector_factory).create_ssh(
-            host=node.host,
-            port=node.port,
-            username=node.username,
-            password=password,
-            ssh_key=ssh_key,
-        )
-        try:
-            async with connector:
-                return await connector.execute_command(command)
-        except Exception as exc:
-            raise ConnectionFailedError(
-                f"Failed to connect to Docker host {node.host}: {exc}"
-            ) from exc
+        return await self._runner.execute(node, command, timeout)
 
     def _build_docker_cmd(self, node: Any, docker_args: str) -> str:
-        """Build docker command with DOCKER_HOST if set."""
-        if node.docker_host:
-            escaped_host = shlex.quote(node.docker_host)
-            return f"DOCKER_HOST={escaped_host} docker {docker_args}"
-        return f"docker {docker_args}"
+        return self._runner.build_command(node, docker_args)
 
-    def _parse_json_lines(self, stdout: str) -> list[dict[str, Any]]:
-        """Robust parsing of JSON lines from docker CLI output."""
-        results: list[dict[str, Any]] = []
-        for line in stdout.strip().splitlines():
-            line = line.strip()
-            if not line or not line.startswith("{"):
-                continue
-            try:
-                results.append(json.loads(line))
-            except json.JSONDecodeError:
-                continue
-        return results
+    @staticmethod
+    def _parse_json_lines(stdout: str) -> list[dict[str, Any]]:
+        return parse_json_lines(stdout)
 
-    def _parse_json_array(self, stdout: str) -> list[dict[str, Any]]:
-        """Parse JSON array (docker inspect returns [{...}])."""
-        try:
-            data = json.loads(stdout.strip())
-            if isinstance(data, list):
-                return data
-            return [data]
-        except json.JSONDecodeError:
-            return []
+    @staticmethod
+    def _parse_json_array(stdout: str) -> list[dict[str, Any]]:
+        return parse_json_array(stdout)
 
-    def _map_docker_error(self, stderr: str, exit_code: int) -> None:
-        """Map Docker CLI errors to domain exceptions."""
-        if exit_code == 0:
-            return
-        stderr_lower = stderr.lower()
-        if (
-            "no such container" in stderr_lower
-            or "no such image or container" in stderr_lower
-            or "no such object" in stderr_lower
-        ):
-            raise ContainerNotFoundError(stderr)
-        if "no such image" in stderr_lower:
-            raise ImageNotFoundError(stderr)
-        if "cannot connect to the docker daemon" in stderr_lower:
-            raise DockerDaemonError(stderr)
-        if "is not running" in stderr_lower:
-            raise DockerError(stderr)
-        raise DockerError(f"Docker command failed (exit {exit_code}): {stderr}")
-
-    # --- Container operations ---
+    @staticmethod
+    def _map_docker_error(stderr: str, exit_code: int) -> None:
+        raise_for_docker_error(stderr, exit_code)
 
     async def list_containers(
         self, node_id: UUID, *, all: bool = False
     ) -> list[DockerContainer]:
-        """List containers on a Docker node."""
-        node = await self._get_docker_node(node_id)
-        flag = " -a" if all else ""
-        cmd = self._build_docker_cmd(node, f"ps{flag} --format '{{{{json .}}}}'")
-        stdout, stderr, exit_code = await self._execute_docker_cmd(node, cmd)
-        self._map_docker_error(stderr, exit_code)
-        containers = self._parse_json_lines(stdout)
-        audit.info(
-            "docker.containers.list",
-            node_id=str(node_id),
-            count=len(containers),
-        )
-        await self._log(
-            "docker.containers.list",
-            node_id=node_id,
-            details={"count": len(containers)},
-        )
-        return [DockerContainer.model_validate(c) for c in containers]
+        return await self._containers.list_containers(node_id, all=all)
 
     async def get_container(
         self, node_id: UUID, container_id: str
     ) -> DockerContainerInspect:
-        """Get container details."""
-        validated_id = validate_container_id(container_id)
-        node = await self._get_docker_node(node_id)
-        cmd = self._build_docker_cmd(node, f"inspect {validated_id}")
-        stdout, stderr, exit_code = await self._execute_docker_cmd(node, cmd)
-        self._map_docker_error(stderr, exit_code)
-        items = self._parse_json_array(stdout)
-        if not items:
-            raise ContainerNotFoundError(f"Container {validated_id} not found")
-        data = items[0]
-        state_data = data.get("State", {})
-        config_data = data.get("Config", {})
-        audit.info(
-            "docker.container.inspect",
-            node_id=str(node_id),
-            container_id=validated_id,
-        )
-        await self._log(
-            "docker.container.inspect",
-            node_id=node_id,
-            details={"container_id": validated_id},
-        )
-        return DockerContainerInspect(
-            id=data.get("Id", ""),
-            name=data.get("Name", ""),
-            state=DockerContainerState(
-                status=state_data.get("Status", ""),
-                running=state_data.get("Running", False),
-                exit_code=state_data.get("ExitCode", 0),
-                started_at=state_data.get("StartedAt"),
-                finished_at=state_data.get("FinishedAt"),
-                oom_killed=state_data.get("OOMKilled"),
-            ),
-            config=DockerContainerConfig(
-                image=config_data.get("Image"),
-                cmd=config_data.get("Cmd"),
-                env=config_data.get("Env"),
-                hostname=config_data.get("Hostname"),
-            ),
-            network_settings=data.get("NetworkSettings"),
-        )
+        return await self._containers.get_container(node_id, container_id)
 
     async def start_container(self, node_id: UUID, container_id: str) -> None:
-        """Start a container."""
-        validated_id = validate_container_id(container_id)
-        node = await self._get_docker_node(node_id)
-        cmd = self._build_docker_cmd(node, f"start {validated_id}")
-        stdout, stderr, exit_code = await self._execute_docker_cmd(node, cmd)
-        self._map_docker_error(stderr, exit_code)
-        audit.info(
-            "docker.container.start",
-            node_id=str(node_id),
-            container_id=validated_id,
-        )
-        await self._log(
-            "docker.container.start",
-            node_id=node_id,
-            details={"container_id": validated_id},
-        )
+        await self._containers.start_container(node_id, container_id)
 
     async def stop_container(
         self, node_id: UUID, container_id: str, *, timeout: int = 10
     ) -> None:
-        """Stop a container."""
-        validated_id = validate_container_id(container_id)
-        node = await self._get_docker_node(node_id)
-        cmd = self._build_docker_cmd(node, f"stop -t {timeout} {validated_id}")
-        stdout, stderr, exit_code = await self._execute_docker_cmd(node, cmd)
-        self._map_docker_error(stderr, exit_code)
-        audit.info(
-            "docker.container.stop",
-            node_id=str(node_id),
-            container_id=validated_id,
-        )
-        await self._log(
-            "docker.container.stop",
-            node_id=node_id,
-            details={"container_id": validated_id, "timeout": timeout},
-        )
+        await self._containers.stop_container(node_id, container_id, timeout=timeout)
 
     async def restart_container(
         self, node_id: UUID, container_id: str, *, timeout: int = 10
     ) -> None:
-        """Restart a container."""
-        validated_id = validate_container_id(container_id)
-        node = await self._get_docker_node(node_id)
-        cmd = self._build_docker_cmd(node, f"restart -t {timeout} {validated_id}")
-        stdout, stderr, exit_code = await self._execute_docker_cmd(node, cmd)
-        self._map_docker_error(stderr, exit_code)
-        audit.info(
-            "docker.container.restart",
-            node_id=str(node_id),
-            container_id=validated_id,
-        )
-        await self._log(
-            "docker.container.restart",
-            node_id=node_id,
-            details={"container_id": validated_id, "timeout": timeout},
-        )
+        await self._containers.restart_container(node_id, container_id, timeout=timeout)
 
     async def remove_container(
         self, node_id: UUID, container_id: str, *, force: bool = False
     ) -> None:
-        """Remove a container."""
-        validated_id = validate_container_id(container_id)
-        node = await self._get_docker_node(node_id)
-        force_flag = " -f" if force else ""
-        cmd = self._build_docker_cmd(node, f"rm{force_flag} {validated_id}")
-        stdout, stderr, exit_code = await self._execute_docker_cmd(node, cmd)
-        self._map_docker_error(stderr, exit_code)
-        audit.info(
-            "docker.container.remove",
-            node_id=str(node_id),
-            container_id=validated_id,
-        )
-        await self._log(
-            "docker.container.remove",
-            node_id=node_id,
-            details={"container_id": validated_id, "force": force},
-        )
+        await self._containers.remove_container(node_id, container_id, force=force)
 
     async def get_logs(
         self,
@@ -301,26 +122,9 @@ class DockerService:
         tail: int = 100,
         since: str | None = None,
     ) -> str:
-        """Get container logs."""
-        validated_id = validate_container_id(container_id)
-        node = await self._get_docker_node(node_id)
-        since_flag = f" --since {since}" if since else ""
-        cmd = self._build_docker_cmd(
-            node, f"logs --tail {tail}{since_flag} {validated_id}"
+        return await self._containers.get_logs(
+            node_id, container_id, tail=tail, since=since
         )
-        stdout, stderr, exit_code = await self._execute_docker_cmd(node, cmd)
-        self._map_docker_error(stderr, exit_code)
-        audit.info(
-            "docker.container.logs",
-            node_id=str(node_id),
-            container_id=validated_id,
-        )
-        await self._log(
-            "docker.container.logs",
-            node_id=node_id,
-            details={"container_id": validated_id, "tail": tail},
-        )
-        return stdout
 
     async def exec_command(
         self,
@@ -330,170 +134,26 @@ class DockerService:
         *,
         timeout: int = 30,
     ) -> DockerExecResult:
-        """Execute a command in a container."""
-        validated_id = validate_container_id(container_id)
-        node = await self._get_docker_node(node_id)
-        escaped_cmd = shlex.quote(command)
-        cmd = self._build_docker_cmd(node, f"exec {validated_id} sh -c {escaped_cmd}")
-        stdout, stderr, exit_code = await self._execute_docker_cmd(
-            node, cmd, timeout=timeout
+        return await self._containers.exec_command(
+            node_id, container_id, command, timeout=timeout
         )
-        if exit_code != 0:
-            audit.warning(
-                "docker.container.exec.failed",
-                node_id=str(node_id),
-                container_id=validated_id,
-                exit_code=exit_code,
-            )
-        else:
-            audit.info(
-                "docker.container.exec.ok",
-                node_id=str(node_id),
-                container_id=validated_id,
-            )
-        await self._log(
-            "docker.container.exec",
-            node_id=node_id,
-            details={
-                "container_id": validated_id,
-                "command": command,
-                "exit_code": exit_code,
-            },
-        )
-        return DockerExecResult(stdout=stdout, stderr=stderr, exit_code=exit_code)
 
-    # --- Image operations ---
+    async def get_stats(self, node_id: UUID, container_id: str) -> DockerStats:
+        return await self._containers.get_stats(node_id, container_id)
 
     async def list_images(self, node_id: UUID) -> list[DockerImage]:
-        """List images on a Docker node."""
-        node = await self._get_docker_node(node_id)
-        cmd = self._build_docker_cmd(node, "images --format '{{json .}}'")
-        stdout, stderr, exit_code = await self._execute_docker_cmd(node, cmd)
-        self._map_docker_error(stderr, exit_code)
-        images = self._parse_json_lines(stdout)
-        audit.info(
-            "docker.images.list",
-            node_id=str(node_id),
-            count=len(images),
-        )
-        await self._log(
-            "docker.images.list",
-            node_id=node_id,
-            details={"count": len(images)},
-        )
-        return [DockerImage.model_validate(img) for img in images]
+        return await self._images.list_images(node_id)
 
     async def pull_image(
         self, node_id: UUID, image: str, *, timeout: int = 300
     ) -> DockerPullResult:
-        """Pull a Docker image."""
-        validated_image = validate_image_name(image)
-        node = await self._get_docker_node(node_id)
-        cmd = self._build_docker_cmd(node, f"pull {validated_image}")
-        try:
-            stdout, stderr, exit_code = await self._execute_docker_cmd(
-                node, cmd, timeout=timeout
-            )
-        except ConnectionFailedError as exc:
-            audit.error(
-                "docker.image.pull.failed",
-                node_id=str(node_id),
-                image=validated_image,
-                error=str(exc),
-            )
-            await self._log(
-                "docker.image.pull",
-                node_id=node_id,
-                details={"image": validated_image, "success": False},
-            )
-            return DockerPullResult(
-                image=validated_image, output=str(exc), success=False
-            )
-
-        self._map_docker_error(stderr, exit_code)
-        success = exit_code == 0
-        output = stdout if success else stderr
-        audit.info(
-            "docker.image.pull.ok" if success else "docker.image.pull.failed",
-            node_id=str(node_id),
-            image=validated_image,
-        )
-        await self._log(
-            "docker.image.pull",
-            node_id=node_id,
-            details={"image": validated_image, "success": success},
-        )
-        return DockerPullResult(image=validated_image, output=output, success=success)
-
-    # --- Stats ---
-
-    async def get_stats(self, node_id: UUID, container_id: str) -> DockerStats:
-        """Get container stats."""
-        validated_id = validate_container_id(container_id)
-        node = await self._get_docker_node(node_id)
-        cmd = self._build_docker_cmd(
-            node, f"stats --no-stream --format '{{{{json .}}}}' {validated_id}"
-        )
-        stdout, stderr, exit_code = await self._execute_docker_cmd(node, cmd)
-        self._map_docker_error(stderr, exit_code)
-        items = self._parse_json_lines(stdout)
-        if not items:
-            raise ContainerNotFoundError(
-                f"Container {validated_id} not found or not running"
-            )
-        audit.info(
-            "docker.container.stats",
-            node_id=str(node_id),
-            container_id=validated_id,
-        )
-        await self._log(
-            "docker.container.stats",
-            node_id=node_id,
-            details={"container_id": validated_id},
-        )
-        return DockerStats.model_validate(items[0])
-
-    # --- Network and Volume operations ---
+        return await self._images.pull_image(node_id, image, timeout=timeout)
 
     async def list_networks(self, node_id: UUID) -> list[DockerNetwork]:
-        """List Docker networks."""
-        node = await self._get_docker_node(node_id)
-        cmd = self._build_docker_cmd(node, "network ls --format '{{json .}}'")
-        stdout, stderr, exit_code = await self._execute_docker_cmd(node, cmd)
-        self._map_docker_error(stderr, exit_code)
-        networks = self._parse_json_lines(stdout)
-        audit.info(
-            "docker.networks.list",
-            node_id=str(node_id),
-            count=len(networks),
-        )
-        await self._log(
-            "docker.networks.list",
-            node_id=node_id,
-            details={"count": len(networks)},
-        )
-        return [DockerNetwork.model_validate(n) for n in networks]
+        return await self._resources.list_networks(node_id)
 
     async def list_volumes(self, node_id: UUID) -> list[DockerVolume]:
-        """List Docker volumes."""
-        node = await self._get_docker_node(node_id)
-        cmd = self._build_docker_cmd(node, "volume ls --format '{{json .}}'")
-        stdout, stderr, exit_code = await self._execute_docker_cmd(node, cmd)
-        self._map_docker_error(stderr, exit_code)
-        volumes = self._parse_json_lines(stdout)
-        audit.info(
-            "docker.volumes.list",
-            node_id=str(node_id),
-            count=len(volumes),
-        )
-        await self._log(
-            "docker.volumes.list",
-            node_id=node_id,
-            details={"count": len(volumes)},
-        )
-        return [DockerVolume.model_validate(v) for v in volumes]
-
-    # --- Bulk operations ---
+        return await self._resources.list_volumes(node_id)
 
     async def bulk_container_action(
         self,
@@ -502,177 +162,11 @@ class DockerService:
         action: str,
         timeout: int | None = None,
     ) -> BulkDockerResponse:
-        """Perform a Docker action on multiple nodes in parallel.
-
-        Args:
-            node_ids: List of node ID strings.
-            container_id: Container ID or name.
-            action: Docker action (start, stop, restart).
-            timeout: Optional timeout for stop/restart actions.
-
-        Returns:
-            BulkDockerResponse with per-node results.
-        """
-        validated_id = validate_container_id(container_id)
-
-        async def _action_on_node(node_id_str: str) -> BulkDockerNodeResult:
-            try:
-                node_id = uuid.UUID(node_id_str)
-                node = await self._get_docker_node(node_id)
-
-                if action == "start":
-                    cmd = self._build_docker_cmd(node, f"start {validated_id}")
-                elif action == "stop":
-                    t = timeout or 10
-                    cmd = self._build_docker_cmd(node, f"stop -t {t} {validated_id}")
-                elif action == "restart":
-                    t = timeout or 10
-                    cmd = self._build_docker_cmd(node, f"restart -t {t} {validated_id}")
-                else:
-                    raise DockerError(f"Unknown action: {action}")
-
-                stdout, stderr, exit_code = await self._execute_docker_cmd(node, cmd)
-                if exit_code != 0 and stderr:
-                    return BulkDockerNodeResult(
-                        node_id=node_id_str,
-                        node_name=node.name,
-                        status="error",
-                        error=stderr.strip(),
-                    )
-                return BulkDockerNodeResult(
-                    node_id=node_id_str,
-                    node_name=node.name,
-                    status="success",
-                    output=stdout.strip(),
-                )
-            except NodeNotFoundError:
-                return BulkDockerNodeResult(
-                    node_id=node_id_str,
-                    node_name="unknown",
-                    status="error",
-                    error="Node not found",
-                )
-            except DockerError as exc:
-                return BulkDockerNodeResult(
-                    node_id=node_id_str,
-                    node_name="unknown",
-                    status="error",
-                    error=str(exc),
-                )
-            except Exception as exc:
-                return BulkDockerNodeResult(
-                    node_id=node_id_str,
-                    node_name="unknown",
-                    status="error",
-                    error=str(exc),
-                )
-
-        tasks = [_action_on_node(nid) for nid in node_ids]
-        results = list(await asyncio.gather(*tasks))
-
-        succeeded = sum(1 for r in results if r.status == "success")
-        failed = len(results) - succeeded
-
-        audit.info(
-            "docker.bulk.action",
-            action=action,
-            container_id=validated_id,
-            total=len(results),
-            succeeded=succeeded,
-            failed=failed,
-        )
-
-        return BulkDockerResponse(
-            action=action,
-            results=results,
-            total=len(results),
-            succeeded=succeeded,
-            failed=failed,
+        return await self._bulk.bulk_container_action(
+            node_ids, container_id, action, timeout
         )
 
     async def bulk_exec(
         self, node_ids: list[str], container_id: str, command: str, timeout: int = 30
     ) -> BulkDockerResponse:
-        """Execute a command in a container on multiple nodes.
-
-        Args:
-            node_ids: List of node ID strings.
-            container_id: Container ID or name.
-            command: Command to execute.
-            timeout: Timeout in seconds.
-
-        Returns:
-            BulkDockerResponse with per-node results.
-        """
-        validated_id = validate_container_id(container_id)
-
-        async def _exec_on_node(node_id_str: str) -> BulkDockerNodeResult:
-            try:
-                node_id = uuid.UUID(node_id_str)
-                node = await self._get_docker_node(node_id)
-
-                escaped_cmd = shlex.quote(command)
-                docker_cmd = self._build_docker_cmd(
-                    node, f"exec {validated_id} sh -c {escaped_cmd}"
-                )
-                stdout, stderr, exit_code = await self._execute_docker_cmd(
-                    node, docker_cmd, timeout=timeout
-                )
-
-                if exit_code != 0:
-                    return BulkDockerNodeResult(
-                        node_id=node_id_str,
-                        node_name=node.name,
-                        status="error",
-                        output=stdout.strip(),
-                        error=stderr.strip(),
-                    )
-                return BulkDockerNodeResult(
-                    node_id=node_id_str,
-                    node_name=node.name,
-                    status="success",
-                    output=stdout.strip(),
-                )
-            except NodeNotFoundError:
-                return BulkDockerNodeResult(
-                    node_id=node_id_str,
-                    node_name="unknown",
-                    status="error",
-                    error="Node not found",
-                )
-            except DockerError as exc:
-                return BulkDockerNodeResult(
-                    node_id=node_id_str,
-                    node_name="unknown",
-                    status="error",
-                    error=str(exc),
-                )
-            except Exception as exc:
-                return BulkDockerNodeResult(
-                    node_id=node_id_str,
-                    node_name="unknown",
-                    status="error",
-                    error=str(exc),
-                )
-
-        tasks = [_exec_on_node(nid) for nid in node_ids]
-        results = list(await asyncio.gather(*tasks))
-
-        succeeded = sum(1 for r in results if r.status == "success")
-        failed = len(results) - succeeded
-
-        audit.info(
-            "docker.bulk.exec",
-            container_id=validated_id,
-            total=len(results),
-            succeeded=succeeded,
-            failed=failed,
-        )
-
-        return BulkDockerResponse(
-            action="exec",
-            results=results,
-            total=len(results),
-            succeeded=succeeded,
-            failed=failed,
-        )
+        return await self._bulk.bulk_exec(node_ids, container_id, command, timeout)

@@ -22,7 +22,7 @@ class NodeModel(Base):
 
     __tablename__ = "nodes"
     __table_args__ = (
-        Index("ix_nodes_name", "name"),
+        Index("ix_nodes_name", "name", unique=True),
         Index("ix_nodes_host", "host"),
         Index("ix_nodes_status", "status"),
         Index("ix_nodes_tags", "tags", postgresql_using="gin"),
