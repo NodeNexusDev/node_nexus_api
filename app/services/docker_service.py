@@ -40,7 +40,9 @@ from app.schemas.docker import (
 from app.services.docker.command_runner import DockerCommandRunner
 from app.services.docker.container_service import DockerContainerService
 from app.services.docker.error_mapper import raise_for_docker_error
+from app.services.docker.image_service import DockerImageService
 from app.services.docker.parsers import parse_json_array, parse_json_lines
+from app.services.docker.resource_service import DockerResourceService
 
 audit = structlog.get_logger("audit")
 
@@ -65,6 +67,8 @@ class DockerService:
             node_reader=node_reader,
         )
         self._containers = DockerContainerService(self._runner, audit_service)
+        self._images = DockerImageService(self._runner, audit_service)
+        self._resources = DockerResourceService(self._runner, audit_service)
 
     async def _log(
         self,
@@ -320,7 +324,7 @@ class DockerService:
 
     # --- Image operations ---
 
-    async def list_images(self, node_id: UUID) -> list[DockerImage]:
+    async def _legacy_list_images(self, node_id: UUID) -> list[DockerImage]:
         """List images on a Docker node."""
         node = await self._get_docker_node(node_id)
         cmd = self._build_docker_cmd(node, "images --format '{{json .}}'")
@@ -339,7 +343,7 @@ class DockerService:
         )
         return [DockerImage.model_validate(img) for img in images]
 
-    async def pull_image(
+    async def _legacy_pull_image(
         self, node_id: UUID, image: str, *, timeout: int = 300
     ) -> DockerPullResult:
         """Pull a Docker image."""
@@ -411,7 +415,7 @@ class DockerService:
 
     # --- Network and Volume operations ---
 
-    async def list_networks(self, node_id: UUID) -> list[DockerNetwork]:
+    async def _legacy_list_networks(self, node_id: UUID) -> list[DockerNetwork]:
         """List Docker networks."""
         node = await self._get_docker_node(node_id)
         cmd = self._build_docker_cmd(node, "network ls --format '{{json .}}'")
@@ -430,7 +434,7 @@ class DockerService:
         )
         return [DockerNetwork.model_validate(n) for n in networks]
 
-    async def list_volumes(self, node_id: UUID) -> list[DockerVolume]:
+    async def _legacy_list_volumes(self, node_id: UUID) -> list[DockerVolume]:
         """List Docker volumes."""
         node = await self._get_docker_node(node_id)
         cmd = self._build_docker_cmd(node, "volume ls --format '{{json .}}'")
@@ -720,3 +724,17 @@ class DockerService:
 
     async def get_stats(self, node_id: UUID, container_id: str) -> DockerStats:
         return await self._containers.get_stats(node_id, container_id)
+
+    async def list_images(self, node_id: UUID) -> list[DockerImage]:
+        return await self._images.list_images(node_id)
+
+    async def pull_image(
+        self, node_id: UUID, image: str, *, timeout: int = 300
+    ) -> DockerPullResult:
+        return await self._images.pull_image(node_id, image, timeout=timeout)
+
+    async def list_networks(self, node_id: UUID) -> list[DockerNetwork]:
+        return await self._resources.list_networks(node_id)
+
+    async def list_volumes(self, node_id: UUID) -> list[DockerVolume]:
+        return await self._resources.list_volumes(node_id)
