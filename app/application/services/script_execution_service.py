@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 import asyncio
-import hashlib
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, cast
 from uuid import UUID
 
 import structlog
 
+from app.application.command_policy import command_fingerprint
 from app.application.dto.script_execution import (
     ResolvedScriptStepDTO,
     ScriptExecutionBatchResultDTO,
@@ -200,9 +200,7 @@ class ScriptExecutionService:
                         ScriptStepResultDTO(
                             step_index=index,
                             label=step.label,
-                            command_fingerprint=hashlib.sha256(
-                                step.command.encode()
-                            ).hexdigest(),
+                            command_fingerprint=command_fingerprint(step.command),
                             stdout=safe_stdout.value,
                             stderr=safe_stderr.value,
                             stdout_bytes=safe_stdout.original_bytes,

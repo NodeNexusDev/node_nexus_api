@@ -4,10 +4,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from app.application.command_policy import command_fingerprint
 from app.core.connectors.ssh import (
     SSHConnector,
     SSHConnectorFactory,
-    command_fingerprint,
 )
 from app.core.exceptions import ConnectionFailedError
 
