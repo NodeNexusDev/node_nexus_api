@@ -8,6 +8,8 @@ from app.application.services.api_key_authentication import (
     APIKeyAuthenticationService,
 )
 from app.application.services.api_key_management import APIKeyManagementService
+from app.application.services.audit_event_service import AuditEventService
+from app.application.services.audit_log_service import AuditLogService
 from app.di.providers import (
     ConfigProvider,
     ConnectorProvider,
@@ -16,13 +18,11 @@ from app.di.providers import (
     SchedulerProvider,
     ServiceProvider,
 )
-from app.repositories.audit_repo import AuditLogRepository
 from app.repositories.command_repo import CommandRepository
 from app.repositories.health_repo import HealthRepository
 from app.repositories.node_repo import NodeRepository
 from app.repositories.script_execution_repo import ScriptExecutionRepository
 from app.repositories.script_repo import ScriptRepository
-from app.services.audit_service import AuditService
 from app.services.command_execution_service import CommandExecutionService
 from app.services.command_management_service import CommandManagementService
 from app.services.config_service import ConfigService
@@ -79,7 +79,9 @@ def test_repository_provider_resolves() -> None:
     session = MagicMock()
     provider = RepositoryProvider()
     assert isinstance(provider.get_node_repository(session), NodeRepository)
-    assert isinstance(provider.get_audit_repository(session), AuditLogRepository)
+    audit_gateway = provider.get_audit_log_gateway(MagicMock())
+    assert provider.get_audit_log_reader(audit_gateway) is audit_gateway
+    assert provider.get_audit_log_writer(audit_gateway) is audit_gateway
     assert isinstance(provider.get_command_repository(session), CommandRepository)
     assert isinstance(provider.get_script_repository(session), ScriptRepository)
     assert isinstance(
@@ -138,7 +140,6 @@ def test_service_provider_resolves() -> None:
     svc_provider = ServiceProvider()
 
     node_repo = repo_provider.get_node_repository(session)
-    audit_repo = repo_provider.get_audit_repository(session)
     cmd_repo = repo_provider.get_command_repository(session)
     script_repo = repo_provider.get_script_repository(session)
     settings = MagicMock()
@@ -150,9 +151,14 @@ def test_service_provider_resolves() -> None:
     command_reader = ScopedCommandTemplateReader(MagicMock())
     execution_writer = ScopedScriptExecutionWriter(MagicMock())
 
-    required_writer = svc_provider.get_required_audit_writer(MagicMock())
-    audit_svc = svc_provider.get_audit_service(audit_repo, required_writer)
-    assert isinstance(audit_svc, AuditService)
+    optional_outbox = svc_provider.get_request_audit_outbox(session)
+    required_outbox = svc_provider.get_required_audit_outbox(MagicMock())
+    audit_svc = svc_provider.get_audit_event_service(optional_outbox, required_outbox)
+    assert isinstance(audit_svc, AuditEventService)
+    assert isinstance(
+        svc_provider.get_audit_log_service(MagicMock(), MagicMock()),
+        AuditLogService,
+    )
 
     node_command_svc = svc_provider.get_node_command_service(
         audit_svc,

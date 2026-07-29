@@ -1,4 +1,4 @@
-"""Durable, idempotent delivery of transactional audit events."""
+"""SQLAlchemy worker for durable, idempotent audit-outbox delivery."""
 
 import asyncio
 from datetime import UTC, datetime, timedelta

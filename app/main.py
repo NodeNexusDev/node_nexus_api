@@ -90,9 +90,9 @@ async def _cleanup_audit_logs() -> None:
 
     try:
         async with container() as request_container:
-            from app.services.audit_service import AuditService
+            from app.application.services.audit_log_service import AuditLogService
 
-            audit_service = await request_container.get(AuditService)
+            audit_service = await request_container.get(AuditLogService)
             deleted = await audit_service.cleanup_old_logs(
                 settings.AUDIT_LOG_RETENTION_DAYS
             )
@@ -135,7 +135,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     scheduler = await container.get(ScriptScheduler)
     scheduled_executor = await container.get(ScheduledScriptExecutor)
     reconciler = await container.get(ScheduleReconciliationService)
-    from app.services.audit_outbox_worker import AuditOutboxWorker
+    from app.adapters.persistence.audit_outbox_worker import AuditOutboxWorker
 
     await container.get(AuditOutboxWorker)
     scheduler.configure_executor(scheduled_executor.execute)

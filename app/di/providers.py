@@ -11,6 +11,12 @@ from sqlalchemy.ext.asyncio import (
 )
 
 from app.adapters.persistence.api_key import SqlAlchemyAPIKeyGateway
+from app.adapters.persistence.audit import (
+    RequestAuditOutbox,
+    RequiredAuditOutbox,
+    SqlAlchemyAuditLogGateway,
+)
+from app.adapters.persistence.audit_outbox_worker import AuditOutboxWorker
 from app.adapters.persistence.command_management import SqlAlchemyCommandGateway
 from app.adapters.persistence.command_reader import ScopedCommandTemplateReader
 from app.adapters.persistence.node_management import (
@@ -27,6 +33,7 @@ from app.adapters.runtime.docker import SshDockerRuntime
 from app.adapters.runtime.scheduler import ApschedulerJobScheduler
 from app.adapters.security import AesGcmCredentialCipher
 from app.application.ports.api_key import APIKeyReader, APIKeyWriter
+from app.application.ports.audit_log import AuditLogReader, AuditLogWriter
 from app.application.ports.audit_sink import AuditEventSink
 from app.application.ports.command_management import CommandReader, CommandWriter
 from app.application.ports.command_reader import CommandTemplateReader
@@ -55,6 +62,8 @@ from app.application.services.api_key_authentication import (
     APIKeyAuthenticationService,
 )
 from app.application.services.api_key_management import APIKeyManagementService
+from app.application.services.audit_event_service import AuditEventService
+from app.application.services.audit_log_service import AuditLogService
 from app.application.services.schedule_management import (
     ScheduleManagementService,
 )
@@ -68,14 +77,11 @@ from app.application.services.streaming_command_service import StreamingCommandS
 from app.core.config import Settings, get_settings
 from app.core.connectors.ssh import SSHConnectorFactory
 from app.core.scheduler import ScriptScheduler
-from app.repositories.audit_repo import AuditLogRepository
 from app.repositories.command_repo import CommandRepository
 from app.repositories.health_repo import HealthRepository
 from app.repositories.node_repo import NodeRepository
 from app.repositories.script_execution_repo import ScriptExecutionRepository
 from app.repositories.script_repo import ScriptRepository
-from app.services.audit_outbox_worker import AuditOutboxWorker
-from app.services.audit_service import AuditService, RequiredAuditWriter
 from app.services.command_execution_service import CommandExecutionService
 from app.services.command_management_service import CommandManagementService
 from app.services.config_service import ConfigService
@@ -292,10 +298,26 @@ class RepositoryProvider(Provider):
         """Get node repository."""
         return NodeRepository(session)
 
-    @provide(scope=Scope.REQUEST)
-    def get_audit_repository(self, session: AsyncSession) -> AuditLogRepository:
-        """Get audit log repository."""
-        return AuditLogRepository(session)
+    @provide(scope=Scope.APP)
+    def get_audit_log_gateway(
+        self, sessionmaker: async_sessionmaker[AsyncSession]
+    ) -> SqlAlchemyAuditLogGateway:
+        """Get the persistent audit-log gateway."""
+        return SqlAlchemyAuditLogGateway(sessionmaker)
+
+    @provide(scope=Scope.APP)
+    def get_audit_log_reader(
+        self, gateway: SqlAlchemyAuditLogGateway
+    ) -> AuditLogReader:
+        """Bind audit-log queries."""
+        return gateway
+
+    @provide(scope=Scope.APP)
+    def get_audit_log_writer(
+        self, gateway: SqlAlchemyAuditLogGateway
+    ) -> AuditLogWriter:
+        """Bind audit-log retention writes."""
+        return gateway
 
     @provide(scope=Scope.REQUEST)
     def get_command_repository(self, session: AsyncSession) -> CommandRepository:
@@ -421,28 +443,42 @@ class ServiceProvider(Provider):
         return StreamingCommandService(node_reader, connector_factory)
 
     @provide(scope=Scope.REQUEST)
-    def get_audit_service(
+    def get_audit_event_service(
         self,
-        repository: AuditLogRepository,
-        required_writer: RequiredAuditWriter,
-    ) -> AuditService:
-        """Get audit service."""
-        return AuditService(
-            repository=repository,
-            required_writer=required_writer,
+        optional_outbox: RequestAuditOutbox,
+        required_outbox: RequiredAuditOutbox,
+    ) -> AuditEventService:
+        """Get audit event use cases."""
+        return AuditEventService(
+            optional_outbox=optional_outbox,
+            required_outbox=required_outbox,
         )
 
     @provide(scope=Scope.REQUEST)
-    def get_audit_event_sink(self, audit_service: AuditService) -> AuditEventSink:
+    def get_audit_event_sink(self, audit_service: AuditEventService) -> AuditEventSink:
         """Bind Node use cases to the application audit port."""
         return audit_service
 
+    @provide(scope=Scope.REQUEST)
+    def get_request_audit_outbox(self, session: AsyncSession) -> RequestAuditOutbox:
+        """Get the request-transaction audit outbox."""
+        return RequestAuditOutbox(session)
+
     @provide(scope=Scope.APP)
-    def get_required_audit_writer(
+    def get_required_audit_outbox(
         self, sessionmaker: async_sessionmaker[AsyncSession]
-    ) -> RequiredAuditWriter:
-        """Get the independent writer for pre-side-effect audit intents."""
-        return RequiredAuditWriter(sessionmaker)
+    ) -> RequiredAuditOutbox:
+        """Get the independent outbox for pre-side-effect audit intents."""
+        return RequiredAuditOutbox(sessionmaker)
+
+    @provide(scope=Scope.APP)
+    def get_audit_log_service(
+        self,
+        reader: AuditLogReader,
+        writer: AuditLogWriter,
+    ) -> AuditLogService:
+        """Get audit-log query and retention use cases."""
+        return AuditLogService(reader, writer)
 
     @provide(scope=Scope.REQUEST)
     def get_node_management_service(

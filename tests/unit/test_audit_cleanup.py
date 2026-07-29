@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from app.services.audit_service import AuditService
+from app.application.services.audit_log_service import AuditLogService
 
 
 class TestAuditCleanup:
@@ -15,7 +15,7 @@ class TestAuditCleanup:
         mock_repo = AsyncMock()
         mock_repo.delete_before.return_value = 10
 
-        service = AuditService(repository=mock_repo)
+        service = AuditLogService(reader=AsyncMock(), writer=mock_repo)
         deleted = await service.cleanup_old_logs(retention_days=30)
 
         assert deleted == 10
@@ -26,7 +26,7 @@ class TestAuditCleanup:
         """Cleanup should be disabled when retention_days is 0."""
         mock_repo = AsyncMock()
 
-        service = AuditService(repository=mock_repo)
+        service = AuditLogService(reader=AsyncMock(), writer=mock_repo)
         deleted = await service.cleanup_old_logs(retention_days=0)
 
         assert deleted == 0
@@ -37,7 +37,7 @@ class TestAuditCleanup:
         """Cleanup should be disabled when retention_days is negative."""
         mock_repo = AsyncMock()
 
-        service = AuditService(repository=mock_repo)
+        service = AuditLogService(reader=AsyncMock(), writer=mock_repo)
         deleted = await service.cleanup_old_logs(retention_days=-1)
 
         assert deleted == 0
@@ -49,7 +49,7 @@ class TestAuditCleanup:
         mock_repo = AsyncMock()
         mock_repo.delete_before.return_value = 5
 
-        service = AuditService(repository=mock_repo)
+        service = AuditLogService(reader=AsyncMock(), writer=mock_repo)
         await service.cleanup_old_logs(retention_days=90)
 
         call_args = mock_repo.delete_before.call_args
@@ -66,7 +66,7 @@ class TestAuditDeleteAll:
         mock_repo = AsyncMock()
         mock_repo.delete_before.return_value = 100
 
-        service = AuditService(repository=mock_repo)
+        service = AuditLogService(reader=AsyncMock(), writer=mock_repo)
         deleted = await service.delete_all_logs()
 
         assert deleted == 100
