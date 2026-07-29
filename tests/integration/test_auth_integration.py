@@ -5,8 +5,6 @@ from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest_asyncio
-from app.repositories.api_key_repo import APIKeyRepository
-from app.services.api_key_service import APIKeyService
 from dishka import Provider, Scope, make_async_container, provide
 from dishka.integrations.fastapi import setup_dishka
 from fastapi import FastAPI
@@ -18,12 +16,15 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
+from app.adapters.persistence.api_key import SqlAlchemyAPIKeyGateway
 from app.adapters.persistence.dao.node import NodeRepository
 from app.adapters.persistence.node_management import SqlAlchemyNodeManagementGateway
 from app.adapters.security import AesGcmCredentialCipher
 from app.api.v1.api_keys import router as api_keys_router
 from app.api.v1.health import router as health_router
 from app.api.v1.nodes import router as nodes_router
+from app.application.services.api_key_authentication import APIKeyAuthenticationService
+from app.application.services.api_key_management import APIKeyManagementService
 from app.models.base import Base
 from app.services.node_management_service import NodeManagementService
 
@@ -57,17 +58,25 @@ class IntegrationAuthProvider(Provider):
             async with session.begin():
                 yield session
 
-    @provide(scope=Scope.REQUEST)
-    def get_api_key_repo(self, session: AsyncSession) -> APIKeyRepository:
-        return APIKeyRepository(session)
+    @provide(scope=Scope.APP)
+    def get_api_key_gateway(self) -> SqlAlchemyAPIKeyGateway:
+        return SqlAlchemyAPIKeyGateway(self._sm)
 
     @provide(scope=Scope.REQUEST)
     def get_node_repo(self, session: AsyncSession) -> NodeRepository:
         return NodeRepository(session)
 
     @provide(scope=Scope.REQUEST)
-    def get_api_key_service(self, repo: APIKeyRepository) -> APIKeyService:
-        return APIKeyService(repository=repo)
+    def get_api_key_service(
+        self, gateway: SqlAlchemyAPIKeyGateway
+    ) -> APIKeyAuthenticationService:
+        return APIKeyAuthenticationService(gateway, gateway)
+
+    @provide(scope=Scope.REQUEST)
+    def get_api_key_management_service(
+        self, gateway: SqlAlchemyAPIKeyGateway
+    ) -> APIKeyManagementService:
+        return APIKeyManagementService(gateway, gateway)
 
     @provide(scope=Scope.REQUEST)
     def get_node_service(self) -> NodeManagementService:
