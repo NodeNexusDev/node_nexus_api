@@ -25,10 +25,12 @@ nav:
   - Guides:
       - guides/index.md
       - Authentication: guides/authentication.md
+      - API key lifecycle: guides/api-keys.md
       - Nodes: guides/nodes.md
       - Commands: guides/commands.md
       - Scripts: guides/scripts.md
       - Docker: guides/docker.md
+      - Audit log: guides/audit-log.md
       - WebSocket: guides/websocket.md
       - Import and export: guides/configuration-import-export.md
       - Troubleshooting: guides/troubleshooting.md
@@ -70,6 +72,7 @@ nav:
   - Reference:
       - reference/index.md
       - HTTP API: reference/api.md
+      - Interactive API reference: reference/openapi.html
       - Configuration: reference/configuration.md
       - Error catalog: reference/error-catalog.md
       - Compatibility: reference/compatibility.md

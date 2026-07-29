@@ -37,22 +37,27 @@ jobs:
       - name: Check structure, locale parity, Markdown, and local links
         run: uv run python scripts/docs/check_docs.py
 
+      - name: Export and validate OpenAPI
+        run: |
+          uv run python scripts/docs/export_openapi.py
+          uv run python scripts/docs/validate_openapi.py build/openapi.json
+          cp build/openapi.json docs/en/assets/openapi.json
+          cp build/openapi.json docs/ru/assets/openapi.json
+
       - name: Build English documentation
         run: uv run mkdocs build --strict -f mkdocs.en.yml
 
       - name: Build Russian documentation
         run: uv run mkdocs build --strict -f mkdocs.ru.yml
 
-      - name: Export OpenAPI
-        run: uv run python scripts/docs/export_openapi.py
-
-      - name: Validate OpenAPI
-        run: uv run python scripts/docs/validate_openapi.py build/openapi.json
-
       - name: Smoke test generated sites
         run: |
           test -f site/en/index.html
           test -f site/ru/index.html
+          test -f site/en/assets/openapi.json
+          test -f site/ru/assets/openapi.json
+          test -f site/en/reference/openapi.html
+          test -f site/ru/reference/openapi.html
           test -f site/en/assets/javascripts/language-switcher.js
           test -f site/ru/assets/javascripts/language-switcher.js
           grep -q 'hreflang="ru"' site/en/index.html

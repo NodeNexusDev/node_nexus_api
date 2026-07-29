@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Interactive Node Nexus API reference">
+    <title>Node Nexus API reference</title>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference@1.63.0"></script>
+    <script>
+      Scalar.createApiReference("#app", {
+        url: "../assets/openapi.json",
+        darkMode: true,
+        theme: "deepSpace",
+        layout: "modern",
+        hideTestRequestButton: true,
+        withDefaultFonts: false
+      })
+    </script>
+  </body>
+</html>

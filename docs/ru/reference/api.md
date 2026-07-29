@@ -12,6 +12,7 @@ endpoint не говорит иначе. Защищённым операциям
 
 Runtime contract:
 
+- [Интерактивный справочник API](openapi.html)
 - Swagger UI: `/docs`
 - ReDoc: `/redoc`
 - OpenAPI JSON: `/openapi.json`
