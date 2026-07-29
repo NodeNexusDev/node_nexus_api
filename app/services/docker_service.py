@@ -15,6 +15,7 @@ if TYPE_CHECKING:
 from app.adapters.runtime.docker import SshDockerRuntime
 from app.adapters.security import AesGcmCredentialCipher
 from app.application.dto.docker import (
+    BulkDockerResultDTO,
     DockerContainerDTO,
     DockerContainerInspectDTO,
     DockerExecResultDTO,
@@ -23,9 +24,6 @@ from app.application.dto.docker import (
     DockerPullResultDTO,
     DockerStatsDTO,
     DockerVolumeDTO,
-)
-from app.schemas.docker import (
-    BulkDockerResponse,
 )
 from app.services.docker.bulk_service import DockerBulkService
 from app.services.docker.command_runner import DockerCommandRunner
@@ -175,14 +173,14 @@ class DockerService:
         container_id: str,
         action: str,
         timeout: int | None = None,
-    ) -> BulkDockerResponse:
+    ) -> BulkDockerResultDTO:
         return await self._bulk.bulk_container_action(
             node_ids, container_id, action, timeout
         )
 
     async def bulk_exec(
         self, node_ids: list[str], container_id: str, command: str, timeout: int = 30
-    ) -> BulkDockerResponse:
+    ) -> BulkDockerResultDTO:
         return await self._bulk.bulk_exec(node_ids, container_id, command, timeout)
 
 

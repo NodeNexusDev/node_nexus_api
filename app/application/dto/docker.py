@@ -126,7 +126,7 @@ class DockerVolumeDTO:
 
 @dataclass(frozen=True, slots=True)
 class BulkDockerRequestDTO:
-    node_ids: tuple[UUID, ...]
+    node_ids: tuple[str, ...]
     container_id: str
     action: str
     timeout: int | None = None
@@ -135,7 +135,7 @@ class BulkDockerRequestDTO:
 
 @dataclass(frozen=True, slots=True)
 class BulkDockerNodeResultDTO:
-    node_id: UUID
+    node_id: str
     node_name: str
     status: str
     output: str = ""

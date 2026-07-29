@@ -1,18 +1,23 @@
 """Docker bulk orchestration."""
 
+from __future__ import annotations
+
 import asyncio
 import shlex
 import uuid
-from typing import Any
+from typing import TYPE_CHECKING
 
 import structlog
 
+from app.application.dto.docker import BulkDockerNodeResultDTO, BulkDockerResultDTO
 from app.core.docker_validation import validate_container_id
 from app.core.exceptions import DockerError, NodeNotFoundError
-from app.schemas.docker import BulkDockerNodeResult, BulkDockerResponse
 from app.services.docker.command_runner import DockerCommandRunner
 
 audit = structlog.get_logger("audit")
+
+if TYPE_CHECKING:
+    from app.application.dto.node_connection import NodeConnectionDTO
 
 
 class DockerBulkService:
@@ -24,24 +29,24 @@ class DockerBulkService:
     async def _prepare(
         self, node_ids: list[str]
     ) -> tuple[
-        list[tuple[int, str, Any]],
-        list[BulkDockerNodeResult | None],
+        list[tuple[int, str, NodeConnectionDTO]],
+        list[BulkDockerNodeResultDTO | None],
     ]:
-        prepared: list[tuple[int, str, Any]] = []
-        results: list[BulkDockerNodeResult | None] = [None] * len(node_ids)
+        prepared: list[tuple[int, str, NodeConnectionDTO]] = []
+        results: list[BulkDockerNodeResultDTO | None] = [None] * len(node_ids)
         for index, node_id_str in enumerate(node_ids):
             try:
                 node = await self._runner.get_target(uuid.UUID(node_id_str))
                 prepared.append((index, node_id_str, node))
             except NodeNotFoundError:
-                results[index] = BulkDockerNodeResult(
+                results[index] = BulkDockerNodeResultDTO(
                     node_id=node_id_str,
                     node_name="unknown",
                     status="error",
                     error="Node not found",
                 )
             except (ValueError, DockerError) as exc:
-                results[index] = BulkDockerNodeResult(
+                results[index] = BulkDockerNodeResultDTO(
                     node_id=node_id_str,
                     node_name="unknown",
                     status="error",
@@ -51,10 +56,10 @@ class DockerBulkService:
 
     @staticmethod
     def _finalize(
-        prepared: list[tuple[int, str, Any]],
-        slots: list[BulkDockerNodeResult | None],
-        remote_results: list[BulkDockerNodeResult],
-    ) -> list[BulkDockerNodeResult]:
+        prepared: list[tuple[int, str, NodeConnectionDTO]],
+        slots: list[BulkDockerNodeResultDTO | None],
+        remote_results: list[BulkDockerNodeResultDTO],
+    ) -> list[BulkDockerNodeResultDTO]:
         for (index, _, _), result in zip(prepared, remote_results, strict=True):
             slots[index] = result
         return [result for result in slots if result is not None]
@@ -65,11 +70,13 @@ class DockerBulkService:
         container_id: str,
         action: str,
         timeout: int | None = None,
-    ) -> BulkDockerResponse:
+    ) -> BulkDockerResultDTO:
         validated_id = validate_container_id(container_id)
         prepared, slots = await self._prepare(node_ids)
 
-        async def worker(node_id_str: str, node: Any) -> BulkDockerNodeResult:
+        async def worker(
+            node_id_str: str, node: NodeConnectionDTO
+        ) -> BulkDockerNodeResultDTO:
             try:
                 if action == "start":
                     args = f"start {validated_id}"
@@ -80,20 +87,20 @@ class DockerBulkService:
                 cmd = self._runner.build_command(node, args)
                 stdout, stderr, exit_code = await self._runner.execute(node, cmd)
                 if exit_code != 0 and stderr:
-                    return BulkDockerNodeResult(
+                    return BulkDockerNodeResultDTO(
                         node_id=node_id_str,
                         node_name=node.name,
                         status="error",
                         error=stderr.strip(),
                     )
-                return BulkDockerNodeResult(
+                return BulkDockerNodeResultDTO(
                     node_id=node_id_str,
                     node_name=node.name,
                     status="success",
                     output=stdout.strip(),
                 )
             except Exception as exc:
-                return BulkDockerNodeResult(
+                return BulkDockerNodeResultDTO(
                     node_id=node_id_str,
                     node_name="unknown",
                     status="error",
@@ -110,18 +117,20 @@ class DockerBulkService:
 
     async def bulk_exec(
         self, node_ids: list[str], container_id: str, command: str, timeout: int = 30
-    ) -> BulkDockerResponse:
+    ) -> BulkDockerResultDTO:
         validated_id = validate_container_id(container_id)
         prepared, slots = await self._prepare(node_ids)
 
-        async def worker(node_id_str: str, node: Any) -> BulkDockerNodeResult:
+        async def worker(
+            node_id_str: str, node: NodeConnectionDTO
+        ) -> BulkDockerNodeResultDTO:
             try:
                 args = f"exec {validated_id} sh -c {shlex.quote(command)}"
                 cmd = self._runner.build_command(node, args)
                 stdout, stderr, exit_code = await self._runner.execute(
                     node, cmd, timeout
                 )
-                return BulkDockerNodeResult(
+                return BulkDockerNodeResultDTO(
                     node_id=node_id_str,
                     node_name=node.name,
                     status="success" if exit_code == 0 else "error",
@@ -129,7 +138,7 @@ class DockerBulkService:
                     error=stderr.strip() if exit_code != 0 else "",
                 )
             except Exception as exc:
-                return BulkDockerNodeResult(
+                return BulkDockerNodeResultDTO(
                     node_id=node_id_str,
                     node_name="unknown",
                     status="error",
@@ -148,8 +157,8 @@ class DockerBulkService:
     def _response(
         action: str,
         container_id: str,
-        results: list[BulkDockerNodeResult],
-    ) -> BulkDockerResponse:
+        results: list[BulkDockerNodeResultDTO],
+    ) -> BulkDockerResultDTO:
         succeeded = sum(result.status == "success" for result in results)
         failed = len(results) - succeeded
         audit.info(
@@ -159,9 +168,9 @@ class DockerBulkService:
             succeeded=succeeded,
             failed=failed,
         )
-        return BulkDockerResponse(
+        return BulkDockerResultDTO(
             action=action,
-            results=results,
+            results=tuple(results),
             total=len(results),
             succeeded=succeeded,
             failed=failed,
