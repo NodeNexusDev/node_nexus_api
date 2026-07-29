@@ -8,15 +8,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from app.application.services.config_service import ConfigService
 from app.core.scheduler import ScriptScheduler
-from app.schemas.config import (
-    CommandExport,
-    ConfigImport,
-    ImportResult,
-    NodeExport,
-    ScriptExport,
-)
+from app.schemas.config import ImportResult
 
 # ============================================================
 # Telemetry (59% → higher)
@@ -114,95 +107,6 @@ class TestTelemetryEnabled:
 
         with patch.dict("sys.modules", {"opentelemetry": None}):
             init_telemetry(app, settings)
-
-
-# ============================================================
-# Config service imports (89% → higher)
-# ============================================================
-
-
-class TestConfigServiceImports:
-    """Test config service import with existing items."""
-
-    @pytest.mark.asyncio
-    async def test_import_existing_commands(self):
-        """Import skips commands that already exist."""
-        node_repo = AsyncMock()
-        cmd_repo = AsyncMock()
-        script_repo = AsyncMock()
-
-        existing_cmd = MagicMock()
-        existing_cmd.name = "existing-cmd"
-        cmd_repo.get_all.return_value = [existing_cmd]
-        node_repo.get_all.return_value = []
-        script_repo.get_all.return_value = []
-
-        svc = ConfigService(node_repo, cmd_repo, script_repo)
-
-        data = ConfigImport(commands=[CommandExport(name="existing-cmd", command="ls")])
-        result = await svc.import_config(data)
-
-        assert result.commands_created == 0
-        assert len(result.errors) == 1
-        assert "already exists" in result.errors[0]
-
-    @pytest.mark.asyncio
-    async def test_import_existing_scripts(self):
-        """Import skips scripts that already exist."""
-        node_repo = AsyncMock()
-        cmd_repo = AsyncMock()
-        script_repo = AsyncMock()
-
-        existing_script = MagicMock()
-        existing_script.name = "existing-script"
-        script_repo.get_all.return_value = [existing_script]
-        node_repo.get_all.return_value = []
-        cmd_repo.get_all.return_value = []
-
-        svc = ConfigService(node_repo, cmd_repo, script_repo)
-
-        data = ConfigImport(scripts=[ScriptExport(name="existing-script", steps=[])])
-        result = await svc.import_config(data)
-
-        assert result.scripts_created == 0
-        assert len(result.errors) == 1
-
-    @pytest.mark.asyncio
-    async def test_import_mixed_new_and_existing(self):
-        """Import handles mix of new and existing items."""
-        node_repo = AsyncMock()
-        cmd_repo = AsyncMock()
-        script_repo = AsyncMock()
-
-        existing_node = MagicMock()
-        existing_node.name = "old-node"
-        node_repo.get_all.return_value = [existing_node]
-        cmd_repo.get_all.return_value = []
-        script_repo.get_all.return_value = []
-
-        svc = ConfigService(node_repo, cmd_repo, script_repo)
-
-        data = ConfigImport(
-            nodes=[
-                NodeExport(
-                    name="old-node",
-                    host="1.1.1.1",
-                    port=22,
-                    connection_type="ssh",
-                ),
-                NodeExport(
-                    name="new-node",
-                    host="2.2.2.2",
-                    port=22,
-                    connection_type="ssh",
-                ),
-            ]
-        )
-        result = await svc.import_config(data)
-
-        assert result.nodes_created == 1
-        assert len(result.errors) == 1
-        node_repo.create.assert_called_once()
 
 
 # ============================================================

@@ -21,6 +21,7 @@ from app.adapters.persistence.audit import (
 from app.adapters.persistence.audit_outbox_worker import AuditOutboxWorker
 from app.adapters.persistence.command_management import SqlAlchemyCommandGateway
 from app.adapters.persistence.command_reader import ScopedCommandTemplateReader
+from app.adapters.persistence.config import SqlAlchemyConfigGateway
 from app.adapters.persistence.dao.command import CommandRepository
 from app.adapters.persistence.dao.health import HealthRepository
 from app.adapters.persistence.dao.node import NodeRepository
@@ -45,9 +46,8 @@ from app.application.ports.audit_sink import AuditEventSink
 from app.application.ports.command_management import CommandReader, CommandWriter
 from app.application.ports.command_reader import CommandTemplateReader
 from app.application.ports.config_persistence import (
-    CommandConfigStore,
-    NodeConfigStore,
-    ScriptConfigStore,
+    ConfigurationExporter,
+    ConfigurationImporter,
 )
 from app.application.ports.credential_cipher import CredentialCipher
 from app.application.ports.docker_runtime import DockerRuntime
@@ -355,21 +355,24 @@ class RepositoryProvider(Provider):
         """Get health check repository."""
         return HealthRepository(session)
 
-    @provide(scope=Scope.REQUEST)
-    def get_node_config_store(self, repository: NodeRepository) -> NodeConfigStore:
-        return repository
+    @provide(scope=Scope.APP)
+    def get_config_gateway(
+        self, sessionmaker: async_sessionmaker[AsyncSession]
+    ) -> SqlAlchemyConfigGateway:
+        """Get the coordinated configuration persistence gateway."""
+        return SqlAlchemyConfigGateway(sessionmaker)
 
-    @provide(scope=Scope.REQUEST)
-    def get_command_config_store(
-        self, repository: CommandRepository
-    ) -> CommandConfigStore:
-        return repository
+    @provide(scope=Scope.APP)
+    def get_configuration_exporter(
+        self, gateway: SqlAlchemyConfigGateway
+    ) -> ConfigurationExporter:
+        return gateway
 
-    @provide(scope=Scope.REQUEST)
-    def get_script_config_store(
-        self, repository: ScriptRepository
-    ) -> ScriptConfigStore:
-        return repository
+    @provide(scope=Scope.APP)
+    def get_configuration_importer(
+        self, gateway: SqlAlchemyConfigGateway
+    ) -> ConfigurationImporter:
+        return gateway
 
     @provide(scope=Scope.REQUEST)
     def get_database_health_probe(
@@ -696,19 +699,14 @@ class ServiceProvider(Provider):
             scheduler_enabled=settings.SCHEDULER_ENABLED,
         )
 
-    @provide(scope=Scope.REQUEST)
+    @provide(scope=Scope.APP)
     def get_config_service(
         self,
-        node_repository: NodeConfigStore,
-        command_repository: CommandConfigStore,
-        script_repository: ScriptConfigStore,
+        exporter: ConfigurationExporter,
+        importer: ConfigurationImporter,
     ) -> ConfigService:
         """Get configuration import/export service."""
-        return ConfigService(
-            node_repository=node_repository,
-            command_repository=command_repository,
-            script_repository=script_repository,
-        )
+        return ConfigService(exporter=exporter, importer=importer)
 
 
 class ConfigProvider(Provider):

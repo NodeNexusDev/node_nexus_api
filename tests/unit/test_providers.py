@@ -147,9 +147,6 @@ def test_service_provider_resolves() -> None:
     conn_provider = ConnectorProvider()
     svc_provider = ServiceProvider()
 
-    node_repo = repo_provider.get_node_repository(session)
-    cmd_repo = repo_provider.get_command_repository(session)
-    script_repo = repo_provider.get_script_repository(session)
     settings = MagicMock()
     settings.SSH_KNOWN_HOSTS_PATH = "/tmp/known_hosts"
     settings.SSH_STRICT_HOST_KEY_CHECKING = False
@@ -245,7 +242,7 @@ def test_service_provider_resolves() -> None:
         APIKeyManagementService,
     )
 
-    config_svc = svc_provider.get_config_service(node_repo, cmd_repo, script_repo)
+    config_svc = svc_provider.get_config_service(MagicMock(), MagicMock())
     assert isinstance(config_svc, ConfigService)
 
     scheduler = MagicMock()
