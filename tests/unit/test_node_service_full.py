@@ -6,10 +6,11 @@ from unittest.mock import AsyncMock
 import pytest
 from sqlalchemy.exc import IntegrityError
 
+from app.application.dto.command_execution import BulkCommandRequestDTO
 from app.core.exceptions import NodeNameConflictError, NodeNotFoundError
 from app.core.security import decrypt, encrypt
 from app.repositories.node_repo import NodeRepository
-from app.schemas.node import BulkCommandRequest, NodeCreate, NodeUpdate
+from app.schemas.node import NodeCreate, NodeUpdate
 from app.services.node_bulk_command_service import NodeBulkCommandService
 from app.services.node_command_service import NodeCommandService
 from app.services.node_management_service import NodeManagementService
@@ -271,7 +272,7 @@ class TestBulkExecuteCommand:
         service._bulk_command_service._connector_factory = factory
 
         result = await service.bulk_execute_command(
-            BulkCommandRequest(command="uptime", node_ids=[n1.id, n2.id])
+            BulkCommandRequestDTO(command="uptime", node_ids=[n1.id, n2.id])
         )
         assert result.total == 2
         assert result.succeeded == 2
@@ -306,7 +307,7 @@ class TestBulkExecuteCommand:
         service._bulk_command_service._connector_factory = factory
 
         result = await service.bulk_execute_command(
-            BulkCommandRequest(command="uptime", node_ids=[n1.id, n2.id])
+            BulkCommandRequestDTO(command="uptime", node_ids=[n1.id, n2.id])
         )
         assert result.total == 2
         assert result.succeeded == 1
@@ -318,7 +319,7 @@ class TestBulkExecuteCommand:
         repo.get_by_ids.return_value = []
         with pytest.raises(NodeNotFoundError):
             await service.bulk_execute_command(
-                BulkCommandRequest(command="ls", node_ids=[uuid.uuid4()])
+                BulkCommandRequestDTO(command="ls", node_ids=[uuid.uuid4()])
             )
 
     async def test_connection_error_returns_error_result(
@@ -339,7 +340,7 @@ class TestBulkExecuteCommand:
         service._bulk_command_service._connector_factory = factory
 
         result = await service.bulk_execute_command(
-            BulkCommandRequest(command="uptime", node_ids=[n1.id])
+            BulkCommandRequestDTO(command="uptime", node_ids=[n1.id])
         )
         assert result.total == 1
         assert result.failed == 1
@@ -363,7 +364,7 @@ class TestBulkExecuteCommand:
         service._bulk_command_service._connector_factory = factory
 
         result = await service.bulk_execute_command(
-            BulkCommandRequest(command="uptime", tags=["prod"])
+            BulkCommandRequestDTO(command="uptime", tags=["prod"])
         )
         assert result.total == 1
         repo.get_by_tags.assert_called_once_with(["prod"])
@@ -390,7 +391,11 @@ class TestBulkExecuteCommand:
         service._bulk_command_service._connector_factory = factory
 
         result = await service.bulk_execute_command(
-            BulkCommandRequest(command="uptime", node_ids=[n1.id, n2.id], tags=["prod"])
+            BulkCommandRequestDTO(
+                command="uptime",
+                node_ids=(n1.id, n2.id),
+                tags=("prod",),
+            )
         )
         assert result.total == 1
         assert result.results[0].node_id == n1.id
@@ -401,7 +406,7 @@ class TestBulkExecuteCommand:
         repo.get_by_tags.return_value = []
         with pytest.raises(NodeNotFoundError):
             await service.bulk_execute_command(
-                BulkCommandRequest(command="ls", tags=["nonexistent"])
+                BulkCommandRequestDTO(command="ls", tags=["nonexistent"])
             )
 
     async def test_resolve_by_both_empty_intersection(
@@ -414,7 +419,7 @@ class TestBulkExecuteCommand:
         repo.get_by_tags.return_value = [n2]
         with pytest.raises(NodeNotFoundError):
             await service.bulk_execute_command(
-                BulkCommandRequest(command="ls", node_ids=[n1.id], tags=["prod"])
+                BulkCommandRequestDTO(command="ls", node_ids=[n1.id], tags=["prod"])
             )
 
 

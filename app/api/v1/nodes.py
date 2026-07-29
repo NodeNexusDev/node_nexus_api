@@ -7,11 +7,15 @@ from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
 from fastapi import APIRouter, HTTPException, Query, Security
 
 from app.api.deps import get_current_api_key, require_write_scope
-from app.application.dto.command_execution import CommandRequestDTO
+from app.application.dto.command_execution import (
+    BulkCommandRequestDTO,
+    CommandRequestDTO,
+)
 from app.schemas.common import CursorPage, decode_cursor
 from app.schemas.node import (
     BulkCommandRequest,
     BulkCommandResult,
+    BulkNodeResult,
     CommandRequest,
     CommandResult,
     NodeCreate,
@@ -148,7 +152,29 @@ async def bulk_execute_command(
         node_ids=[str(n) for n in (data.node_ids or [])],
         tags=data.tags,
     )
-    return await service.bulk_execute_command(data)
+    result = await service.bulk_execute_command(
+        BulkCommandRequestDTO(
+            command=data.command,
+            node_ids=tuple(data.node_ids or ()),
+            tags=tuple(data.tags or ()),
+        )
+    )
+    return BulkCommandResult(
+        command=result.command,
+        results=[
+            BulkNodeResult(
+                node_id=item.node_id,
+                node_name=item.node_name,
+                stdout=item.stdout,
+                stderr=item.stderr,
+                exit_code=item.exit_code,
+            )
+            for item in result.results
+        ],
+        total=result.total,
+        succeeded=result.succeeded,
+        failed=result.failed,
+    )
 
 
 @router.post(

@@ -4,7 +4,13 @@ import uuid
 
 import pytest
 
-from app.application.dto.command_execution import CommandRequestDTO, CommandResultDTO
+from app.application.dto.command_execution import (
+    BulkCommandRequestDTO,
+    BulkCommandResultDTO,
+    CommandExecutionDTO,
+    CommandRequestDTO,
+    CommandResultDTO,
+)
 from app.application.dto.node_connection import NodeConnectionDTO
 from app.application.ports.node_reader import NodeConnectionReader
 from app.models.node import NodeModel
@@ -37,6 +43,33 @@ def test_command_boundary_dtos_are_immutable() -> None:
     assert result.exit_code == 0
     with pytest.raises(AttributeError):
         request.command = "whoami"  # type: ignore[misc]
+
+
+def test_bulk_command_dtos_use_immutable_collections() -> None:
+    node_id = uuid.uuid4()
+    request = BulkCommandRequestDTO(
+        command="uptime",
+        node_ids=(node_id,),
+        tags=("prod",),
+    )
+    result = BulkCommandResultDTO(
+        command="uptime",
+        results=(
+            CommandExecutionDTO(
+                node_id=node_id,
+                node_name="node",
+                stdout="ok",
+                stderr="",
+                exit_code=0,
+            ),
+        ),
+        total=1,
+        succeeded=1,
+        failed=0,
+    )
+
+    assert request.node_ids == (node_id,)
+    assert result.results[0].node_id == node_id
 
 
 def test_node_repository_maps_connection_dto() -> None:

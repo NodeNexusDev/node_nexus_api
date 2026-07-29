@@ -12,10 +12,14 @@ if TYPE_CHECKING:
     from app.core.connectors.base import ConnectorFactory
     from app.services.audit_service import AuditService
 
+from app.application.dto.command_execution import (
+    BulkCommandRequestDTO,
+    BulkCommandResultDTO,
+    CommandExecutionDTO,
+)
 from app.core.exceptions import ConnectionFailedError, NodeNotFoundError
 from app.core.ssh_utils import decrypt_value, get_connector_factory
 from app.repositories.node_repo import NodeRepository
-from app.schemas.node import BulkCommandRequest, BulkCommandResult, BulkNodeResult
 
 audit = structlog.get_logger("audit")
 
@@ -35,7 +39,7 @@ class NodeBulkCommandService:
         self._audit = audit_service
         self._connector_factory = connector_factory
 
-    async def execute(self, data: BulkCommandRequest) -> BulkCommandResult:
+    async def execute(self, data: BulkCommandRequestDTO) -> BulkCommandResultDTO:
         """Execute a command on all matching nodes in parallel."""
         target_nodes = await self._resolve_targets(data)
         if not target_nodes:
@@ -63,9 +67,9 @@ class NodeBulkCommandService:
                 )
 
         succeeded = sum(1 for result in results if result.exit_code == 0)
-        return BulkCommandResult(
+        return BulkCommandResultDTO(
             command=data.command,
-            results=results,
+            results=tuple(results),
             total=len(results),
             succeeded=succeeded,
             failed=len(results) - succeeded,
@@ -73,27 +77,27 @@ class NodeBulkCommandService:
 
     async def bulk_execute_command(
         self,
-        data: BulkCommandRequest,
-    ) -> BulkCommandResult:
+        data: BulkCommandRequestDTO,
+    ) -> BulkCommandResultDTO:
         """Expose the stable node API use-case name."""
         return await self.execute(data)
 
-    async def _resolve_targets(self, data: BulkCommandRequest) -> list[Any]:
+    async def _resolve_targets(self, data: BulkCommandRequestDTO) -> list[Any]:
         """Resolve target nodes from IDs and tags before concurrent work."""
         nodes_by_ids = None
         if data.node_ids:
             nodes_by_ids = (
-                await self._node_reader.get_connections_by_ids(data.node_ids)
+                await self._node_reader.get_connections_by_ids(list(data.node_ids))
                 if self._node_reader
-                else await self._repository.get_by_ids(data.node_ids)
+                else await self._repository.get_by_ids(list(data.node_ids))
             )
 
         nodes_by_tags = None
         if data.tags:
             nodes_by_tags = (
-                await self._node_reader.get_connections_by_tags(data.tags)
+                await self._node_reader.get_connections_by_tags(list(data.tags))
                 if self._node_reader
-                else await self._repository.get_by_tags(data.tags)
+                else await self._repository.get_by_tags(list(data.tags))
             )
 
         if nodes_by_ids is not None and nodes_by_tags is not None:
@@ -107,7 +111,7 @@ class NodeBulkCommandService:
         self,
         node: Any,
         command: str,
-    ) -> BulkNodeResult:
+    ) -> CommandExecutionDTO:
         """Execute on one node and always return a result."""
         connector = get_connector_factory(self._connector_factory).create_ssh(
             host=node.host,
@@ -121,7 +125,7 @@ class NodeBulkCommandService:
             async with connector:
                 stdout, stderr, exit_code = await connector.execute_command(command)
             audit.info("node.bulk.executed", node_id=str(node.id), command=command)
-            return BulkNodeResult(
+            return CommandExecutionDTO(
                 node_id=node.id,
                 node_name=node.name,
                 stdout=stdout,
@@ -147,8 +151,8 @@ class NodeBulkCommandService:
             return self._error_result(node, exc)
 
     @staticmethod
-    def _error_result(node: Any, exc: Exception) -> BulkNodeResult:
-        return BulkNodeResult(
+    def _error_result(node: Any, exc: Exception) -> CommandExecutionDTO:
+        return CommandExecutionDTO(
             node_id=node.id,
             node_name=node.name,
             stdout="",

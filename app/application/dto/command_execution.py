@@ -1,5 +1,7 @@
 """Remote command execution application DTO."""
 
+from __future__ import annotations
+
 from dataclasses import dataclass
 from uuid import UUID
 
@@ -19,6 +21,26 @@ class CommandResultDTO:
     stdout: str
     stderr: str
     exit_code: int
+
+
+@dataclass(frozen=True, slots=True)
+class BulkCommandRequestDTO:
+    """Transport-independent bulk command selection."""
+
+    command: str
+    node_ids: tuple[UUID, ...] = ()
+    tags: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class BulkCommandResultDTO:
+    """Aggregate result of a bulk command."""
+
+    command: str
+    results: tuple[CommandExecutionDTO, ...]
+    total: int
+    succeeded: int
+    failed: int
 
 
 @dataclass(frozen=True, slots=True)
