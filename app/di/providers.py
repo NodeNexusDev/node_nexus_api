@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
+from app.adapters.lifecycle.application_startup import ApplicationStartup
 from app.adapters.lifecycle.migration_runner import MigrationRunner
 from app.adapters.persistence.api_key import SqlAlchemyAPIKeyGateway
 from app.adapters.persistence.audit import (
@@ -780,6 +781,28 @@ class SchedulerProvider(Provider):
             yield worker
         finally:
             await worker.stop()
+
+    @provide(scope=Scope.APP)
+    def get_application_startup(
+        self,
+        settings: Settings,
+        migration_runner: MigrationRunner,
+        scheduler: ScriptScheduler,
+        scheduled_executor: ScheduledScriptExecutor,
+        schedule_restorer: ScheduleRestorer,
+        audit_cleanup: AuditCleanupJob,
+        audit_worker: AuditOutboxWorker,
+    ) -> ApplicationStartup:
+        """Compose the application lifecycle startup adapter."""
+        return ApplicationStartup(
+            settings=settings,
+            migration_runner=migration_runner,
+            scheduler=scheduler,
+            scheduled_executor=scheduled_executor,
+            schedule_restorer=schedule_restorer,
+            audit_cleanup=audit_cleanup,
+            audit_worker=audit_worker,
+        )
 
 
 class AppProvider(

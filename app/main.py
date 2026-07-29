@@ -5,14 +5,13 @@ from contextlib import asynccontextmanager
 from importlib.metadata import PackageNotFoundError
 from importlib.metadata import version as pkg_version
 
-import structlog
 from dishka.integrations.fastapi import setup_dishka
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.routing import APIRoute
 from prometheus_fastapi_instrumentator import Instrumentator
 
-from app.adapters.lifecycle.migration_runner import MigrationRunner
+from app.adapters.lifecycle.application_startup import ApplicationStartup
 from app.api.error_mapping import domain_error_handler
 from app.api.middleware import (
     RateLimitMiddleware,
@@ -29,19 +28,10 @@ from app.api.v1.health import router as health_router
 from app.api.v1.nodes import router as nodes_router
 from app.api.v1.scripts import router as scripts_router
 from app.api.v1.websocket import router as ws_router
-from app.application.services.schedule_restorer import ScheduleRestorer
-from app.application.services.scheduled_script_executor import (
-    ScheduledScriptExecutor,
-)
 from app.core.config import get_settings
 from app.core.exceptions import DomainError
-from app.core.logging import configure_logging
-from app.core.scheduler import ScriptScheduler
 from app.core.telemetry import init_telemetry
 from app.di.container import container
-
-logger = structlog.get_logger()  # operational: lifecycle, performance
-audit = structlog.get_logger("audit")  # security: exceptions, errors
 
 
 def stable_operation_id(route: APIRoute) -> str:
@@ -57,61 +47,15 @@ def stable_operation_id(route: APIRoute) -> str:
     return f"{methods}_{path or 'root'}"
 
 
-async def _cleanup_audit_logs() -> None:
-    """Cleanup old audit logs on startup."""
-    try:
-        from app.application.services.audit_cleanup_job import AuditCleanupJob
-
-        job = await container.get(AuditCleanupJob)
-        deleted = await job.run()
-        if deleted > 0:
-            logger.info("audit.cleanup.startup", deleted=deleted)
-    except Exception:
-        logger.warning("audit.cleanup.startup.failed")
-
-
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Application lifespan manager."""
-    settings = get_settings()
-    configure_logging(log_level=settings.LOG_LEVEL, debug=settings.DEBUG)
-    logger.info("app.startup")
-    if settings.AUTO_MIGRATE:
-        migration_runner = await container.get(MigrationRunner)
-        await migration_runner.run()
-        logger.info("migrations.applied")
-    else:
-        logger.info("migrations.skipped", reason="AUTO_MIGRATE is disabled")
-    scheduler = await container.get(ScriptScheduler)
-    scheduled_executor = await container.get(ScheduledScriptExecutor)
-    restorer = await container.get(ScheduleRestorer)
-    from app.adapters.persistence.audit_outbox_worker import AuditOutboxWorker
-
-    await container.get(AuditOutboxWorker)
-    scheduler.configure_executor(scheduled_executor.execute)
-    if settings.SCHEDULER_ENABLED:
-
-        async def restore() -> tuple[int, int]:
-            result = await restorer.run()
-            logger.info(
-                "scheduler.restore.completed",
-                restored=result.restored,
-                failed=result.failed,
-            )
-            return result.restored, result.failed
-
-        scheduler.configure_reconciler(restore)
-        await restore()
-        scheduler.start_reconciliation()
-    else:
-        restorer.mark_disabled()
-    await _cleanup_audit_logs()
-
+    startup = await container.get(ApplicationStartup)
+    await startup.run()
     try:
         yield
     finally:
         await container.close()
-        logger.info("app.shutdown")
 
 
 def create_app() -> FastAPI:
