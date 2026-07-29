@@ -14,6 +14,8 @@ from app.api.v1.scripts import router as scripts_router
 from app.core.exceptions import DomainError, ScheduleNotFoundError, ScriptNotFoundError
 from app.schemas.scheduler import ScheduledJob
 from app.services.schedule_service import ScheduleService
+from app.services.script_history_service import ScriptHistoryService
+from app.services.script_management_service import ScriptManagementService
 from app.services.script_service import ScriptService
 from tests.unit.conftest import MockAuthServiceProvider, _mock_settings
 
@@ -28,6 +30,14 @@ def _create_test_app(
     class MockServiceProvider(Provider):
         @provide(scope=Scope.REQUEST)
         def get_service(self) -> ScriptService:
+            return service
+
+        @provide(scope=Scope.REQUEST)
+        def get_management_service(self) -> ScriptManagementService:
+            return service
+
+        @provide(scope=Scope.REQUEST)
+        def get_history_service(self) -> ScriptHistoryService:
             return service
 
         @provide(scope=Scope.REQUEST)

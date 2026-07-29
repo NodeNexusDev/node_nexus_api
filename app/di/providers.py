@@ -64,6 +64,8 @@ from app.services.node_command_service import NodeCommandService
 from app.services.node_management_service import NodeManagementService
 from app.services.node_metrics_service import NodeMetricsService
 from app.services.schedule_service import ScheduleService
+from app.services.script_history_service import ScriptHistoryService
+from app.services.script_management_service import ScriptManagementService
 from app.services.script_service import ScriptService
 
 
@@ -425,6 +427,32 @@ class ServiceProvider(Provider):
             node_reader=node_reader,
             credential_cipher=credential_cipher,
             audit_service=audit_service,
+        )
+
+    @provide(scope=Scope.REQUEST)
+    def get_script_management_service(
+        self,
+        reader: ScriptReader,
+        writer: ScriptWriter,
+        audit_service: AuditEventSink,
+    ) -> ScriptManagementService:
+        """Get the script management service."""
+        return ScriptManagementService(
+            reader=reader,
+            writer=writer,
+            audit_service=audit_service,
+        )
+
+    @provide(scope=Scope.REQUEST)
+    def get_script_history_service(
+        self,
+        script_reader: ScriptReader,
+        execution_reader: ScriptExecutionReader,
+    ) -> ScriptHistoryService:
+        """Get the script execution history service."""
+        return ScriptHistoryService(
+            script_reader=script_reader,
+            execution_reader=execution_reader,
         )
 
     @provide(scope=Scope.REQUEST)

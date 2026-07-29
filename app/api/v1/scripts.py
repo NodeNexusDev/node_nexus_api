@@ -7,6 +7,13 @@ from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
 from fastapi import APIRouter, Query, Security
 
 from app.api.deps import get_current_api_key, require_write_scope
+from app.application.dto.script_execution import ScriptExecutionDTO
+from app.application.dto.script_management import (
+    ScriptCreateDTO,
+    ScriptStepDTO,
+    ScriptUpdateDTO,
+    ScriptViewDTO,
+)
 from app.schemas.node import PaginatedResponse
 from app.schemas.scheduler import ScheduledJob, ScheduleRequest, ScheduleResponse
 from app.schemas.script import (
@@ -14,10 +21,13 @@ from app.schemas.script import (
     ScriptExecuteRequest,
     ScriptExecutionBatchResult,
     ScriptResponse,
+    ScriptStep,
     ScriptUpdate,
 )
 from app.schemas.script_execution import ScriptExecutionResponse
 from app.services.schedule_service import ScheduleService
+from app.services.script_history_service import ScriptHistoryService
+from app.services.script_management_service import ScriptManagementService
 from app.services.script_service import ScriptService
 
 audit = structlog.get_logger("audit")
@@ -25,10 +35,69 @@ audit = structlog.get_logger("audit")
 router = APIRouter(prefix="/scripts", tags=["scripts"], route_class=DishkaRoute)
 
 
+def _step_dto(step: ScriptStep) -> ScriptStepDTO:
+    return ScriptStepDTO(
+        label=step.label,
+        type=step.type,
+        command=step.command,
+        command_id=step.command_id,
+        params=tuple(step.params.items()),
+        on_failure=step.on_failure,
+    )
+
+
+def _script_response(script: ScriptViewDTO) -> ScriptResponse:
+    return ScriptResponse(
+        id=script.id,
+        name=script.name,
+        description=script.description,
+        steps=[
+            {
+                "label": step.label,
+                "type": step.type,
+                "command": step.command,
+                "command_id": step.command_id,
+                "params": dict(step.params),
+                "on_failure": step.on_failure,
+            }
+            for step in script.steps
+        ],
+        tags=list(script.tags),
+        created_at=script.created_at,
+        updated_at=script.updated_at,
+    )
+
+
+def _execution_response(execution: ScriptExecutionDTO) -> ScriptExecutionResponse:
+    return ScriptExecutionResponse(
+        id=execution.id,
+        script_id=execution.script_id,
+        node_id=execution.node_id,
+        params=dict(execution.params),
+        status=execution.status,
+        steps=[
+            {
+                "step_index": step.step_index,
+                "label": step.label,
+                "command_fingerprint": step.command_fingerprint,
+                "stdout": step.stdout,
+                "stderr": step.stderr,
+                "stdout_bytes": step.stdout_bytes,
+                "stderr_bytes": step.stderr_bytes,
+                "truncated": step.truncated,
+                "exit_code": step.exit_code,
+            }
+            for step in execution.steps
+        ],
+        started_at=execution.started_at,
+        finished_at=execution.finished_at,
+    )
+
+
 @router.get("/", response_model=PaginatedResponse[ScriptResponse])
 @inject
 async def get_scripts(
-    service: FromDishka[ScriptService],
+    service: FromDishka[ScriptManagementService],
     page: int = Query(1, ge=1),
     size: int = Query(20, ge=1, le=100),
     tag: str | None = Query(None, description="Filter by tag (AND)"),
@@ -38,31 +107,44 @@ async def get_scripts(
     tag_list = [t.strip() for t in tag.split(",")] if tag else None
     audit.info("api.scripts.list", page=page, size=size, tags=tag_list)
     scripts, total = await service.get_all_scripts(page=page, size=size, tags=tag_list)
-    return PaginatedResponse(items=scripts, total=total, page=page, size=size)
+    return PaginatedResponse(
+        items=[_script_response(script) for script in scripts],
+        total=total,
+        page=page,
+        size=size,
+    )
 
 
 @router.get("/{script_id}", response_model=ScriptResponse)
 @inject
 async def get_script(
     script_id: uuid.UUID,
-    service: FromDishka[ScriptService],
+    service: FromDishka[ScriptManagementService],
     _key: str = Security(get_current_api_key),
 ) -> ScriptResponse:
     """Get a script by ID."""
     audit.info("api.scripts.get", script_id=str(script_id))
-    return await service.get_script(script_id)
+    return _script_response(await service.get_script(script_id))
 
 
 @router.post("/", response_model=ScriptResponse, status_code=201)
 @inject
 async def create_script(
     data: ScriptCreate,
-    service: FromDishka[ScriptService],
+    service: FromDishka[ScriptManagementService],
     _key: str = Security(get_current_api_key),
 ) -> ScriptResponse:
     """Create a new script."""
     audit.info("api.scripts.create", name=data.name)
-    return await service.create_script(data)
+    result = await service.create_script(
+        ScriptCreateDTO(
+            name=data.name,
+            description=data.description,
+            steps=tuple(_step_dto(step) for step in data.steps),
+            tags=tuple(data.tags),
+        )
+    )
+    return _script_response(result)
 
 
 @router.put("/{script_id}", response_model=ScriptResponse)
@@ -70,19 +152,28 @@ async def create_script(
 async def update_script(
     script_id: uuid.UUID,
     data: ScriptUpdate,
-    service: FromDishka[ScriptService],
+    service: FromDishka[ScriptManagementService],
     _key: str = Security(get_current_api_key),
 ) -> ScriptResponse:
     """Update an existing script."""
     audit.info("api.scripts.update", script_id=str(script_id))
-    return await service.update_script(script_id, data)
+    changes = data.model_dump(exclude_unset=True)
+    if isinstance(changes.get("steps"), list):
+        changes["steps"] = tuple(_step_dto(step) for step in (data.steps or ()))
+    if isinstance(changes.get("tags"), list):
+        changes["tags"] = tuple(changes["tags"])
+    result = await service.update_script(
+        script_id,
+        ScriptUpdateDTO(changes=tuple(changes.items())),
+    )
+    return _script_response(result)
 
 
 @router.delete("/{script_id}", status_code=204)
 @inject
 async def delete_script(
     script_id: uuid.UUID,
-    service: FromDishka[ScriptService],
+    service: FromDishka[ScriptManagementService],
     _key: str = Security(get_current_api_key),
 ) -> None:
     """Delete a script."""
@@ -111,7 +202,7 @@ async def execute_script(
 @inject
 async def get_executions(
     script_id: uuid.UUID,
-    service: FromDishka[ScriptService],
+    service: FromDishka[ScriptHistoryService],
     page: int = Query(1, ge=1),
     size: int = Query(20, ge=1, le=100),
     _key: str = Security(get_current_api_key),
@@ -119,7 +210,12 @@ async def get_executions(
     """Get execution history for a script."""
     audit.info("api.scripts.executions", script_id=str(script_id))
     executions, total = await service.get_executions(script_id, page=page, size=size)
-    return PaginatedResponse(items=executions, total=total, page=page, size=size)
+    return PaginatedResponse(
+        items=[_execution_response(execution) for execution in executions],
+        total=total,
+        page=page,
+        size=size,
+    )
 
 
 # --- Schedule endpoints ---

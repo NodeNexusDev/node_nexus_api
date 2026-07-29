@@ -29,6 +29,8 @@ from app.services.docker_service import DockerService
 from app.services.health_service import HealthService
 from app.services.node_management_service import NodeManagementService
 from app.services.schedule_service import ScheduleService
+from app.services.script_history_service import ScriptHistoryService
+from app.services.script_management_service import ScriptManagementService
 from app.services.script_service import ScriptService
 
 
@@ -194,6 +196,18 @@ def test_service_provider_resolves() -> None:
     )
     assert isinstance(command_management_svc, CommandManagementService)
     assert isinstance(command_execution_svc, CommandExecutionService)
+
+    script_management_svc = svc_provider.get_script_management_service(
+        MagicMock(),
+        MagicMock(),
+        audit_svc,
+    )
+    script_history_svc = svc_provider.get_script_history_service(
+        MagicMock(),
+        MagicMock(),
+    )
+    assert isinstance(script_management_svc, ScriptManagementService)
+    assert isinstance(script_history_svc, ScriptHistoryService)
 
     script_svc = svc_provider.get_script_service(
         script_repo,

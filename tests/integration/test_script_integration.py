@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
+from app.adapters.persistence.script_gateway import SqlAlchemyScriptGateway
 from app.api.error_mapping import domain_error_handler
 from app.api.v1.health import router as health_router
 from app.api.v1.scripts import router as scripts_router
@@ -28,6 +29,8 @@ from app.repositories.node_repo import NodeRepository
 from app.repositories.script_execution_repo import ScriptExecutionRepository
 from app.repositories.script_repo import ScriptRepository
 from app.services.api_key_service import APIKeyService
+from app.services.script_history_service import ScriptHistoryService
+from app.services.script_management_service import ScriptManagementService
 from app.services.script_service import ScriptService
 
 MASTER_KEY = "test-master-key"
@@ -78,6 +81,10 @@ class IntegrationDbProvider(Provider):
     def get_exec_repo(self, session: AsyncSession) -> ScriptExecutionRepository:
         return ScriptExecutionRepository(session)
 
+    @provide(scope=Scope.APP)
+    def get_script_gateway(self) -> SqlAlchemyScriptGateway:
+        return SqlAlchemyScriptGateway(self._sm)
+
     @provide(scope=Scope.REQUEST)
     def get_api_key_repo(self, session: AsyncSession) -> APIKeyRepository:
         return APIKeyRepository(session)
@@ -95,6 +102,21 @@ class IntegrationDbProvider(Provider):
             command_repository=command_repo,
             node_repository=node_repo,
             execution_repository=exec_repo,
+        )
+
+    @provide(scope=Scope.REQUEST)
+    def get_management_service(
+        self, gateway: SqlAlchemyScriptGateway
+    ) -> ScriptManagementService:
+        return ScriptManagementService(reader=gateway, writer=gateway)
+
+    @provide(scope=Scope.REQUEST)
+    def get_history_service(
+        self, gateway: SqlAlchemyScriptGateway
+    ) -> ScriptHistoryService:
+        return ScriptHistoryService(
+            script_reader=gateway,
+            execution_reader=gateway,
         )
 
     @provide(scope=Scope.REQUEST)

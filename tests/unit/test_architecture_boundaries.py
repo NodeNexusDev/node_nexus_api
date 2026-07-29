@@ -215,6 +215,32 @@ def test_command_services_depend_only_on_inward_facing_modules(
     assert not violations
 
 
+@pytest.mark.parametrize(
+    "filename",
+    ("script_management_service.py", "script_history_service.py"),
+)
+def test_focused_script_services_depend_only_on_inward_facing_modules(
+    filename: str,
+) -> None:
+    """Focused script services must not know transport or persistence details."""
+    imports = _imports_in_file(APP_ROOT / "services" / filename)
+    forbidden = (
+        "app.adapters",
+        "app.models",
+        "app.repositories",
+        "app.schemas",
+        "sqlalchemy",
+    )
+    violations = [
+        module
+        for module in imports
+        if any(
+            module == prefix or module.startswith(f"{prefix}.") for prefix in forbidden
+        )
+    ]
+    assert not violations
+
+
 def test_models_are_persistence_only() -> None:
     """ORM models may only depend on other ORM model modules."""
     violations = [

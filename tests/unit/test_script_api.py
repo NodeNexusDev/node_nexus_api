@@ -28,6 +28,8 @@ from app.schemas.script import (
     ScriptResponse,
     ScriptStepResult,
 )
+from app.services.script_history_service import ScriptHistoryService
+from app.services.script_management_service import ScriptManagementService
 from app.services.script_service import ScriptService
 from tests.unit.conftest import MockAuthServiceProvider, _mock_settings
 
@@ -75,7 +77,7 @@ def _make_batch_result(**overrides: Any) -> ScriptExecutionBatchResult:
     return ScriptExecutionBatchResult(**defaults)
 
 
-def _create_test_app(service: ScriptService | AsyncMock) -> FastAPI:
+def _create_test_app(service: AsyncMock) -> FastAPI:
     app = FastAPI()
     app.add_exception_handler(DomainError, domain_error_handler)
     app.include_router(health_router)
@@ -83,7 +85,15 @@ def _create_test_app(service: ScriptService | AsyncMock) -> FastAPI:
 
     class MockServiceProvider(Provider):
         @provide(scope=Scope.REQUEST)
-        def get_service(self) -> ScriptService:
+        def get_management_service(self) -> ScriptManagementService:
+            return service
+
+        @provide(scope=Scope.REQUEST)
+        def get_history_service(self) -> ScriptHistoryService:
+            return service
+
+        @provide(scope=Scope.REQUEST)
+        def get_execution_service(self) -> ScriptService:
             return service
 
     container = make_async_container(MockServiceProvider(), MockAuthServiceProvider())
@@ -93,7 +103,7 @@ def _create_test_app(service: ScriptService | AsyncMock) -> FastAPI:
 
 @pytest.fixture
 def mock_service() -> AsyncMock:
-    return AsyncMock(spec=ScriptService)
+    return AsyncMock()
 
 
 @pytest.fixture
