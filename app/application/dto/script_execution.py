@@ -6,7 +6,16 @@ from typing import Any
 from uuid import UUID
 
 from app.application.dto.node_connection import NodeConnectionDTO
-from app.application.dto.script_management import ScriptStepDTO
+
+
+@dataclass(frozen=True, slots=True)
+class ResolvedScriptStepDTO:
+    """One script step resolved before remote workers start."""
+
+    label: str
+    command: str
+    on_failure: str
+    resolution_error: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -21,10 +30,10 @@ class ScriptExecutionRequestDTO:
 class ScriptExecutionTargetDTO:
     """Fully loaded target passed to one remote worker."""
 
+    execution_id: UUID
     script_id: UUID
     node: NodeConnectionDTO
-    steps: tuple[ScriptStepDTO, ...]
-    params: tuple[tuple[str, Any], ...] = ()
+    steps: tuple[ResolvedScriptStepDTO, ...]
 
 
 @dataclass(frozen=True, slots=True)

@@ -28,9 +28,9 @@ from app.schemas.script import (
     ScriptResponse,
     ScriptStepResult,
 )
+from app.services.script_execution_service import ScriptExecutionService
 from app.services.script_history_service import ScriptHistoryService
 from app.services.script_management_service import ScriptManagementService
-from app.services.script_service import ScriptService
 from tests.unit.conftest import MockAuthServiceProvider, _mock_settings
 
 
@@ -93,7 +93,7 @@ def _create_test_app(service: AsyncMock) -> FastAPI:
             return service
 
         @provide(scope=Scope.REQUEST)
-        def get_execution_service(self) -> ScriptService:
+        def get_execution_service(self) -> ScriptExecutionService:
             return service
 
     container = make_async_container(MockServiceProvider(), MockAuthServiceProvider())

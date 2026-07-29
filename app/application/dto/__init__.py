@@ -34,6 +34,7 @@ from app.application.dto.node_metrics import (
 )
 from app.application.dto.node_view import NodeViewDTO
 from app.application.dto.script_execution import (
+    ResolvedScriptStepDTO,
     ScriptExecutionBatchResultDTO,
     ScriptExecutionDTO,
     ScriptExecutionPageDTO,
@@ -77,6 +78,7 @@ __all__ = [
     "NodeTagDTO",
     "NodeUpdateDTO",
     "NodeViewDTO",
+    "ResolvedScriptStepDTO",
     "ScriptCreateDTO",
     "ScriptExecutionBatchResultDTO",
     "ScriptExecutionDTO",

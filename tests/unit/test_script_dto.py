@@ -7,6 +7,7 @@ import pytest
 
 from app.application.dto.node_connection import NodeConnectionDTO
 from app.application.dto.script_execution import (
+    ResolvedScriptStepDTO,
     ScriptExecutionRequestDTO,
     ScriptExecutionTargetDTO,
 )
@@ -51,10 +52,16 @@ def test_execution_target_contains_only_immutable_contracts() -> None:
         params=(("environment", "prod"),),
     )
     target = ScriptExecutionTargetDTO(
+        execution_id=uuid.uuid4(),
         script_id=uuid.uuid4(),
         node=node,
-        steps=(ScriptStepDTO(label="deploy", type="inline", command="true"),),
-        params=request.params,
+        steps=(
+            ResolvedScriptStepDTO(
+                label="deploy",
+                command="true",
+                on_failure="stop",
+            ),
+        ),
     )
     assert target.node.id == request.node_ids[0]
-    assert dict(target.params) == {"environment": "prod"}
+    assert target.steps[0].command == "true"

@@ -64,6 +64,7 @@ from app.services.node_command_service import NodeCommandService
 from app.services.node_management_service import NodeManagementService
 from app.services.node_metrics_service import NodeMetricsService
 from app.services.schedule_service import ScheduleService
+from app.services.script_execution_service import ScriptExecutionService
 from app.services.script_history_service import ScriptHistoryService
 from app.services.script_management_service import ScriptManagementService
 from app.services.script_service import ScriptService
@@ -453,6 +454,28 @@ class ServiceProvider(Provider):
         return ScriptHistoryService(
             script_reader=script_reader,
             execution_reader=execution_reader,
+        )
+
+    @provide(scope=Scope.REQUEST)
+    def get_script_execution_service(
+        self,
+        script_reader: ScriptDefinitionReader,
+        command_reader: CommandTemplateReader,
+        node_reader: NodeConnectionReader,
+        execution_writer: ScriptExecutionWriter,
+        credential_cipher: CredentialCipher,
+        connector_factory: RemoteConnectorFactory,
+        audit_service: AuditEventSink,
+    ) -> ScriptExecutionService:
+        """Get transaction-safe script execution orchestration."""
+        return ScriptExecutionService(
+            script_reader=script_reader,
+            command_reader=command_reader,
+            node_reader=node_reader,
+            execution_writer=execution_writer,
+            credential_cipher=credential_cipher,
+            connector_factory=connector_factory,
+            audit_service=audit_service,
         )
 
     @provide(scope=Scope.REQUEST)

@@ -17,7 +17,13 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
-from app.adapters.persistence.script_gateway import SqlAlchemyScriptGateway
+from app.adapters.persistence.command_reader import ScopedCommandTemplateReader
+from app.adapters.persistence.node_reader import ScopedNodeConnectionReader
+from app.adapters.persistence.script_gateway import (
+    ScopedScriptExecutionWriter,
+    SqlAlchemyScriptGateway,
+)
+from app.adapters.security import AesGcmCredentialCipher
 from app.api.error_mapping import domain_error_handler
 from app.api.v1.health import router as health_router
 from app.api.v1.scripts import router as scripts_router
@@ -29,6 +35,7 @@ from app.repositories.node_repo import NodeRepository
 from app.repositories.script_execution_repo import ScriptExecutionRepository
 from app.repositories.script_repo import ScriptRepository
 from app.services.api_key_service import APIKeyService
+from app.services.script_execution_service import ScriptExecutionService
 from app.services.script_history_service import ScriptHistoryService
 from app.services.script_management_service import ScriptManagementService
 from app.services.script_service import ScriptService
@@ -117,6 +124,19 @@ class IntegrationDbProvider(Provider):
         return ScriptHistoryService(
             script_reader=gateway,
             execution_reader=gateway,
+        )
+
+    @provide(scope=Scope.REQUEST)
+    def get_execution_service(
+        self, gateway: SqlAlchemyScriptGateway
+    ) -> ScriptExecutionService:
+        return ScriptExecutionService(
+            script_reader=gateway,
+            command_reader=ScopedCommandTemplateReader(self._sm),
+            node_reader=ScopedNodeConnectionReader(self._sm),
+            execution_writer=ScopedScriptExecutionWriter(self._sm),
+            credential_cipher=AesGcmCredentialCipher(),
+            connector_factory=MagicMock(),
         )
 
     @provide(scope=Scope.REQUEST)

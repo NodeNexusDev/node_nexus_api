@@ -7,7 +7,11 @@ from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
 from fastapi import APIRouter, Query, Security
 
 from app.api.deps import get_current_api_key, require_write_scope
-from app.application.dto.script_execution import ScriptExecutionDTO
+from app.application.dto.script_execution import (
+    ScriptExecutionBatchResultDTO,
+    ScriptExecutionDTO,
+    ScriptExecutionRequestDTO,
+)
 from app.application.dto.script_management import (
     ScriptCreateDTO,
     ScriptStepDTO,
@@ -26,9 +30,9 @@ from app.schemas.script import (
 )
 from app.schemas.script_execution import ScriptExecutionResponse
 from app.services.schedule_service import ScheduleService
+from app.services.script_execution_service import ScriptExecutionService
 from app.services.script_history_service import ScriptHistoryService
 from app.services.script_management_service import ScriptManagementService
-from app.services.script_service import ScriptService
 
 audit = structlog.get_logger("audit")
 
@@ -91,6 +95,37 @@ def _execution_response(execution: ScriptExecutionDTO) -> ScriptExecutionRespons
         ],
         started_at=execution.started_at,
         finished_at=execution.finished_at,
+    )
+
+
+def _execution_batch_response(
+    result: ScriptExecutionBatchResultDTO,
+) -> ScriptExecutionBatchResult:
+    return ScriptExecutionBatchResult(
+        script_id=result.script_id,
+        results=[
+            {
+                "execution_id": node.execution_id,
+                "node_id": node.node_id,
+                "node_name": node.node_name,
+                "status": node.status,
+                "steps": [
+                    {
+                        "step_index": step.step_index,
+                        "label": step.label,
+                        "command_fingerprint": step.command_fingerprint,
+                        "stdout": step.stdout,
+                        "stderr": step.stderr,
+                        "stdout_bytes": step.stdout_bytes,
+                        "stderr_bytes": step.stderr_bytes,
+                        "truncated": step.truncated,
+                        "exit_code": step.exit_code,
+                    }
+                    for step in node.steps
+                ],
+            }
+            for node in result.results
+        ],
     )
 
 
@@ -186,7 +221,7 @@ async def delete_script(
 async def execute_script(
     script_id: uuid.UUID,
     data: ScriptExecuteRequest,
-    service: FromDishka[ScriptService],
+    service: FromDishka[ScriptExecutionService],
     _key: str = Security(get_current_api_key),
 ) -> ScriptExecutionBatchResult:
     """Execute a script on multiple nodes."""
@@ -195,7 +230,14 @@ async def execute_script(
         script_id=str(script_id),
         node_count=len(data.node_ids),
     )
-    return await service.execute_script(script_id, data)
+    result = await service.execute_script(
+        script_id,
+        ScriptExecutionRequestDTO(
+            node_ids=tuple(data.node_ids),
+            params=tuple(data.params.items()),
+        ),
+    )
+    return _execution_batch_response(result)
 
 
 @router.get("/{script_id}/executions")
