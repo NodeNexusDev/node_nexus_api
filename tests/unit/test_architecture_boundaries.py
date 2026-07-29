@@ -245,6 +245,11 @@ def test_focused_script_services_depend_only_on_inward_facing_modules(
     assert not violations
 
 
+def test_legacy_script_service_is_removed() -> None:
+    """Scripts must resolve focused use cases instead of a repository façade."""
+    assert not (APP_ROOT / "services" / "script_service.py").exists()
+
+
 def test_models_are_persistence_only() -> None:
     """ORM models may only depend on other ORM model modules."""
     violations = [

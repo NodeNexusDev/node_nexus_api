@@ -32,7 +32,6 @@ from app.services.schedule_service import ScheduleService
 from app.services.script_execution_service import ScriptExecutionService
 from app.services.script_history_service import ScriptHistoryService
 from app.services.script_management_service import ScriptManagementService
-from app.services.script_service import ScriptService
 
 
 @pytest.mark.asyncio
@@ -125,7 +124,6 @@ def test_service_provider_resolves() -> None:
     from app.adapters.persistence.command_reader import ScopedCommandTemplateReader
     from app.adapters.persistence.node_reader import ScopedNodeConnectionReader
     from app.adapters.persistence.script_gateway import (
-        ScopedScriptDefinitionReader,
         ScopedScriptExecutionWriter,
     )
 
@@ -138,7 +136,6 @@ def test_service_provider_resolves() -> None:
     audit_repo = repo_provider.get_audit_repository(session)
     cmd_repo = repo_provider.get_command_repository(session)
     script_repo = repo_provider.get_script_repository(session)
-    exec_repo = repo_provider.get_script_execution_repository(session)
     api_key_repo = repo_provider.get_api_key_repository(session)
     settings = MagicMock()
     settings.SSH_KNOWN_HOSTS_PATH = "/tmp/known_hosts"
@@ -147,7 +144,6 @@ def test_service_provider_resolves() -> None:
     credential_cipher = conn_provider.get_credential_cipher()
     node_reader = ScopedNodeConnectionReader(MagicMock())
     command_reader = ScopedCommandTemplateReader(MagicMock())
-    script_reader = ScopedScriptDefinitionReader(MagicMock())
     execution_writer = ScopedScriptExecutionWriter(MagicMock())
 
     required_writer = svc_provider.get_required_audit_writer(MagicMock())
@@ -219,20 +215,6 @@ def test_service_provider_resolves() -> None:
         audit_svc,
     )
     assert isinstance(script_execution_svc, ScriptExecutionService)
-
-    script_svc = svc_provider.get_script_service(
-        script_repo,
-        cmd_repo,
-        node_repo,
-        exec_repo,
-        audit_svc,
-        factory,
-        script_reader,
-        command_reader,
-        node_reader,
-        execution_writer,
-    )
-    assert isinstance(script_svc, ScriptService)
 
     api_key_svc = svc_provider.get_api_key_service(api_key_repo)
     assert isinstance(api_key_svc, APIKeyService)

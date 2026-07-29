@@ -30,15 +30,10 @@ from app.api.v1.scripts import router as scripts_router
 from app.core.exceptions import DomainError
 from app.models.base import Base
 from app.repositories.api_key_repo import APIKeyRepository
-from app.repositories.command_repo import CommandRepository
-from app.repositories.node_repo import NodeRepository
-from app.repositories.script_execution_repo import ScriptExecutionRepository
-from app.repositories.script_repo import ScriptRepository
 from app.services.api_key_service import APIKeyService
 from app.services.script_execution_service import ScriptExecutionService
 from app.services.script_history_service import ScriptHistoryService
 from app.services.script_management_service import ScriptManagementService
-from app.services.script_service import ScriptService
 
 MASTER_KEY = "test-master-key"
 
@@ -72,22 +67,6 @@ class IntegrationDbProvider(Provider):
             async with session.begin():
                 yield session
 
-    @provide(scope=Scope.REQUEST)
-    def get_script_repo(self, session: AsyncSession) -> ScriptRepository:
-        return ScriptRepository(session)
-
-    @provide(scope=Scope.REQUEST)
-    def get_command_repo(self, session: AsyncSession) -> CommandRepository:
-        return CommandRepository(session)
-
-    @provide(scope=Scope.REQUEST)
-    def get_node_repo(self, session: AsyncSession) -> NodeRepository:
-        return NodeRepository(session)
-
-    @provide(scope=Scope.REQUEST)
-    def get_exec_repo(self, session: AsyncSession) -> ScriptExecutionRepository:
-        return ScriptExecutionRepository(session)
-
     @provide(scope=Scope.APP)
     def get_script_gateway(self) -> SqlAlchemyScriptGateway:
         return SqlAlchemyScriptGateway(self._sm)
@@ -95,21 +74,6 @@ class IntegrationDbProvider(Provider):
     @provide(scope=Scope.REQUEST)
     def get_api_key_repo(self, session: AsyncSession) -> APIKeyRepository:
         return APIKeyRepository(session)
-
-    @provide(scope=Scope.REQUEST)
-    def get_service(
-        self,
-        script_repo: ScriptRepository,
-        command_repo: CommandRepository,
-        node_repo: NodeRepository,
-        exec_repo: ScriptExecutionRepository,
-    ) -> ScriptService:
-        return ScriptService(
-            repository=script_repo,
-            command_repository=command_repo,
-            node_repository=node_repo,
-            execution_repository=exec_repo,
-        )
 
     @provide(scope=Scope.REQUEST)
     def get_management_service(

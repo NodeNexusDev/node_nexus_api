@@ -67,7 +67,6 @@ from app.services.schedule_service import ScheduleService
 from app.services.script_execution_service import ScriptExecutionService
 from app.services.script_history_service import ScriptHistoryService
 from app.services.script_management_service import ScriptManagementService
-from app.services.script_service import ScriptService
 
 
 class DbProvider(Provider):
@@ -476,34 +475,6 @@ class ServiceProvider(Provider):
             credential_cipher=credential_cipher,
             connector_factory=connector_factory,
             audit_service=audit_service,
-        )
-
-    @provide(scope=Scope.REQUEST)
-    def get_script_service(
-        self,
-        repository: ScriptRepository,
-        command_repository: CommandRepository,
-        node_repository: NodeRepository,
-        execution_repository: ScriptExecutionRepository,
-        audit_service: AuditService,
-        connector_factory: SSHConnectorFactory,
-        script_reader: ScopedScriptDefinitionReader,
-        command_reader: ScopedCommandTemplateReader,
-        node_reader: ScopedNodeConnectionReader,
-        execution_writer: ScopedScriptExecutionWriter,
-    ) -> ScriptService:
-        """Get script service."""
-        return ScriptService(
-            repository=repository,
-            command_repository=command_repository,
-            node_repository=node_repository,
-            execution_repository=execution_repository,
-            audit_service=audit_service,
-            connector_factory=connector_factory,
-            script_reader=script_reader,
-            command_reader=command_reader,
-            node_reader=node_reader,
-            execution_writer=execution_writer,
         )
 
     @provide(scope=Scope.REQUEST)

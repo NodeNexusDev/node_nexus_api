@@ -17,22 +17,15 @@ from app.services.schedule_service import ScheduleService
 from app.services.script_execution_service import ScriptExecutionService
 from app.services.script_history_service import ScriptHistoryService
 from app.services.script_management_service import ScriptManagementService
-from app.services.script_service import ScriptService
 from tests.unit.conftest import MockAuthServiceProvider, _mock_settings
 
 
-def _create_test_app(
-    service: ScriptService, schedule_service: ScheduleService
-) -> FastAPI:
+def _create_test_app(service: AsyncMock, schedule_service: ScheduleService) -> FastAPI:
     app = FastAPI()
     app.add_exception_handler(DomainError, domain_error_handler)
     app.include_router(scripts_router, prefix="/api/v1")
 
     class MockServiceProvider(Provider):
-        @provide(scope=Scope.REQUEST)
-        def get_service(self) -> ScriptService:
-            return service
-
         @provide(scope=Scope.REQUEST)
         def get_management_service(self) -> ScriptManagementService:
             return service
@@ -56,7 +49,7 @@ def _create_test_app(
 
 @pytest.fixture
 def mock_service() -> AsyncMock:
-    return AsyncMock(spec=ScriptService)
+    return AsyncMock()
 
 
 @pytest.fixture

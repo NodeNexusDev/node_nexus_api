@@ -105,18 +105,21 @@ async def _execute_scheduled_script(
     params,  # noqa: ANN001
 ) -> None:
     """Execute one scheduled script in a fresh request scope."""
-    from app.schemas.script import ScriptExecuteRequest
+    from app.application.dto.script_execution import ScriptExecutionRequestDTO
     from app.services.schedule_service import ScheduleService
-    from app.services.script_service import ScriptService
+    from app.services.script_execution_service import ScriptExecutionService
 
     async with container() as request_container:
-        script_service = await request_container.get(ScriptService)
+        script_service = await request_container.get(ScriptExecutionService)
         schedule_service = await request_container.get(ScheduleService)
         await schedule_service.mark_started(script_id)
         try:
             await script_service.execute_script(
                 script_id,
-                ScriptExecuteRequest(node_ids=node_ids, params=params),
+                ScriptExecutionRequestDTO(
+                    node_ids=tuple(node_ids),
+                    params=tuple(params.items()),
+                ),
             )
         except Exception as exc:
             await schedule_service.mark_failed(script_id, type(exc).__name__)
