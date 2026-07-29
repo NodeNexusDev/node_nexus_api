@@ -4,6 +4,57 @@ from typing import Any, Protocol
 from uuid import UUID
 
 from app.application.dto.script_definition import ScriptDefinitionDTO
+from app.application.dto.script_execution import (
+    ScriptExecutionPageDTO,
+    ScriptExecutionQueryDTO,
+)
+from app.application.dto.script_management import (
+    ScriptCreateDTO,
+    ScriptListQueryDTO,
+    ScriptPageDTO,
+    ScriptUpdateDTO,
+    ScriptViewDTO,
+)
+
+
+class ScriptReader(Protocol):
+    """Read script management views."""
+
+    async def get_script(self, script_id: UUID) -> ScriptViewDTO | None:
+        """Return one script."""
+        ...
+
+    async def list_scripts(self, query: ScriptListQueryDTO) -> ScriptPageDTO:
+        """Return one page of scripts."""
+        ...
+
+
+class ScriptWriter(Protocol):
+    """Persist script mutations."""
+
+    async def create_script(self, data: ScriptCreateDTO) -> ScriptViewDTO:
+        """Create and return a script."""
+        ...
+
+    async def update_script(
+        self, script_id: UUID, data: ScriptUpdateDTO
+    ) -> ScriptViewDTO | None:
+        """Update and return a script when it exists."""
+        ...
+
+    async def delete_script(self, script_id: UUID) -> bool:
+        """Delete a script and report whether it existed."""
+        ...
+
+
+class ScriptExecutionReader(Protocol):
+    """Read immutable execution history."""
+
+    async def list_executions(
+        self, query: ScriptExecutionQueryDTO
+    ) -> ScriptExecutionPageDTO:
+        """Return one page of execution history."""
+        ...
 
 
 class ScriptDefinitionReader(Protocol):

@@ -19,6 +19,7 @@ from app.adapters.persistence.node_reader import ScopedNodeConnectionReader
 from app.adapters.persistence.script_gateway import (
     ScopedScriptDefinitionReader,
     ScopedScriptExecutionWriter,
+    SqlAlchemyScriptGateway,
 )
 from app.adapters.security import AesGcmCredentialCipher
 from app.application.ports.audit_sink import AuditEventSink
@@ -31,6 +32,13 @@ from app.application.ports.node_management import (
 )
 from app.application.ports.node_reader import NodeConnectionReader, NodeStatusWriter
 from app.application.ports.remote_command import RemoteConnectorFactory
+from app.application.ports.script_persistence import (
+    ScriptDefinitionReader,
+    ScriptExecutionReader,
+    ScriptExecutionWriter,
+    ScriptReader,
+    ScriptWriter,
+)
 from app.application.services.streaming_command_service import StreamingCommandService
 from app.core.config import Settings, get_settings
 from app.core.connectors.ssh import SSHConnectorFactory
@@ -102,6 +110,44 @@ class RepositoryProvider(Provider):
     ) -> ScopedScriptExecutionWriter:
         """Get a writer that commits execution transitions independently."""
         return ScopedScriptExecutionWriter(sessionmaker)
+
+    @provide(scope=Scope.APP)
+    def get_script_execution_writer(
+        self, writer: ScopedScriptExecutionWriter
+    ) -> ScriptExecutionWriter:
+        """Bind independent execution transitions to the writer port."""
+        return writer
+
+    @provide(scope=Scope.APP)
+    def get_script_gateway(
+        self, sessionmaker: async_sessionmaker[AsyncSession]
+    ) -> SqlAlchemyScriptGateway:
+        """Get the short-scope script persistence gateway."""
+        return SqlAlchemyScriptGateway(sessionmaker)
+
+    @provide(scope=Scope.APP)
+    def get_script_reader(self, gateway: SqlAlchemyScriptGateway) -> ScriptReader:
+        """Bind the script reader port."""
+        return gateway
+
+    @provide(scope=Scope.APP)
+    def get_script_writer(self, gateway: SqlAlchemyScriptGateway) -> ScriptWriter:
+        """Bind the script writer port."""
+        return gateway
+
+    @provide(scope=Scope.APP)
+    def get_script_execution_reader(
+        self, gateway: SqlAlchemyScriptGateway
+    ) -> ScriptExecutionReader:
+        """Bind the execution history reader port."""
+        return gateway
+
+    @provide(scope=Scope.APP)
+    def get_script_definition_reader(
+        self, gateway: SqlAlchemyScriptGateway
+    ) -> ScriptDefinitionReader:
+        """Bind script definitions to the script gateway."""
+        return gateway
 
     @provide(scope=Scope.APP)
     def get_scoped_command_reader(

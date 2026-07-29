@@ -76,6 +76,15 @@ class ScriptExecutionDTO:
 
 
 @dataclass(frozen=True, slots=True)
+class ScriptExecutionQueryDTO:
+    """Pagination input for one script's execution history."""
+
+    script_id: UUID
+    offset: int
+    limit: int
+
+
+@dataclass(frozen=True, slots=True)
 class ScriptExecutionPageDTO:
     """One page of execution history."""
 

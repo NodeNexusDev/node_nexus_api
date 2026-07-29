@@ -13,6 +13,13 @@ from app.application.ports.remote_command import (
     RemoteCommandSession,
     RemoteConnectorFactory,
 )
+from app.application.ports.script_persistence import (
+    ScriptDefinitionReader,
+    ScriptExecutionReader,
+    ScriptExecutionWriter,
+    ScriptReader,
+    ScriptWriter,
+)
 
 __all__ = [
     "AuditEventSink",
@@ -26,4 +33,9 @@ __all__ = [
     "NodeStatusWriter",
     "RemoteCommandSession",
     "RemoteConnectorFactory",
+    "ScriptDefinitionReader",
+    "ScriptExecutionReader",
+    "ScriptExecutionWriter",
+    "ScriptReader",
+    "ScriptWriter",
 ]

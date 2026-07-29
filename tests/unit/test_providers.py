@@ -90,9 +90,16 @@ def test_repository_provider_resolves() -> None:
     )
     assert isinstance(provider.get_health_repository(session), HealthRepository)
     assert provider.get_scoped_script_reader(MagicMock()) is not None
-    assert provider.get_scoped_execution_writer(MagicMock()) is not None
+    execution_writer = provider.get_scoped_execution_writer(MagicMock())
+    assert execution_writer is not None
+    assert provider.get_script_execution_writer(execution_writer) is execution_writer
     assert provider.get_scoped_command_reader(MagicMock()) is not None
     assert provider.get_scoped_node_reader(MagicMock()) is not None
+    script_gateway = provider.get_script_gateway(MagicMock())
+    assert provider.get_script_reader(script_gateway) is script_gateway
+    assert provider.get_script_writer(script_gateway) is script_gateway
+    assert provider.get_script_execution_reader(script_gateway) is script_gateway
+    assert provider.get_script_definition_reader(script_gateway) is script_gateway
     gateway = provider.get_command_management_gateway(MagicMock())
     assert provider.get_command_management_reader(gateway) is gateway
     assert provider.get_command_management_writer(gateway) is gateway
