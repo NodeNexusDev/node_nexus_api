@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
+from app.adapters.persistence.api_key import SqlAlchemyAPIKeyGateway
 from app.adapters.persistence.command_management import SqlAlchemyCommandGateway
 from app.adapters.persistence.command_reader import ScopedCommandTemplateReader
 from app.adapters.persistence.node_management import (
@@ -25,6 +26,7 @@ from app.adapters.persistence.script_gateway import (
 from app.adapters.runtime.docker import SshDockerRuntime
 from app.adapters.runtime.scheduler import ApschedulerJobScheduler
 from app.adapters.security import AesGcmCredentialCipher
+from app.application.ports.api_key import APIKeyReader, APIKeyWriter
 from app.application.ports.audit_sink import AuditEventSink
 from app.application.ports.command_management import CommandReader, CommandWriter
 from app.application.ports.command_reader import CommandTemplateReader
@@ -126,6 +128,23 @@ class RepositoryProvider(Provider):
     ) -> ScopedScriptDefinitionReader:
         """Get a script reader that owns a short session per operation."""
         return ScopedScriptDefinitionReader(sessionmaker)
+
+    @provide(scope=Scope.APP)
+    def get_api_key_gateway(
+        self, sessionmaker: async_sessionmaker[AsyncSession]
+    ) -> SqlAlchemyAPIKeyGateway:
+        """Get the short-scope API-key persistence gateway."""
+        return SqlAlchemyAPIKeyGateway(sessionmaker)
+
+    @provide(scope=Scope.APP)
+    def get_api_key_reader(self, gateway: SqlAlchemyAPIKeyGateway) -> APIKeyReader:
+        """Bind API-key authentication and management reads."""
+        return gateway
+
+    @provide(scope=Scope.APP)
+    def get_api_key_writer(self, gateway: SqlAlchemyAPIKeyGateway) -> APIKeyWriter:
+        """Bind API-key mutations and usage writes."""
+        return gateway
 
     @provide(scope=Scope.APP)
     def get_scoped_execution_writer(
