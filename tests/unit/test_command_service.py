@@ -5,6 +5,12 @@ from unittest.mock import AsyncMock, Mock
 
 import pytest
 
+from app.application.dto.command_management import (
+    CommandCreateDTO,
+    CommandExecuteRequestDTO,
+    CommandParameterDTO,
+    CommandUpdateDTO,
+)
 from app.application.dto.command_template import CommandTemplateDTO
 from app.application.dto.node_connection import NodeConnectionDTO
 from app.core.exceptions import (
@@ -14,7 +20,6 @@ from app.core.exceptions import (
 )
 from app.repositories.command_repo import CommandRepository
 from app.repositories.node_repo import NodeRepository
-from app.schemas.command import CommandCreate, CommandExecuteRequest, CommandUpdate
 from app.services.command_service import CommandService
 from tests.unit.conftest import make_orm_command, make_orm_node
 
@@ -53,7 +58,7 @@ class TestCreateCommand:
     async def test_create(self, service: CommandService, cmd_repo: AsyncMock) -> None:
         orm_cmd = make_orm_command()
         cmd_repo.create.return_value = orm_cmd
-        data = CommandCreate(name="check_disk", command="df -h")
+        data = CommandCreateDTO(name="check_disk", command="df -h")
         result = await service.create_command(data)
         assert result.name == "check_disk"
         cmd_repo.create.assert_called_once()
@@ -102,7 +107,7 @@ class TestUpdateCommand:
     ) -> None:
         orm_cmd = make_orm_command()
         cmd_repo.update.return_value = orm_cmd
-        data = CommandUpdate(name="new-name")
+        data = CommandUpdateDTO(changes=(("name", "new-name"),))
         result = await service.update_command(orm_cmd.id, data)
         assert result.name == "check_disk"
 
@@ -112,7 +117,20 @@ class TestUpdateCommand:
         params = [{"name": "mount_point", "type": "string", "required": True}]
         orm_cmd = make_orm_command(parameters=params)
         cmd_repo.update.return_value = orm_cmd
-        data = CommandUpdate(parameters=params)
+        data = CommandUpdateDTO(
+            changes=(
+                (
+                    "parameters",
+                    (
+                        CommandParameterDTO(
+                            name="mount_point",
+                            type="string",
+                            required=True,
+                        ),
+                    ),
+                ),
+            )
+        )
         result = await service.update_command(orm_cmd.id, data)
         assert result.parameters is not None
 
@@ -120,7 +138,7 @@ class TestUpdateCommand:
         self, service: CommandService, cmd_repo: AsyncMock
     ) -> None:
         cmd_repo.update.return_value = None
-        data = CommandUpdate(name="x")
+        data = CommandUpdateDTO(changes=(("name", "x"),))
         with pytest.raises(CommandNotFoundError):
             await service.update_command(uuid.uuid4(), data)
 
@@ -162,7 +180,7 @@ class TestExecuteCommand:
 
         result = await service.execute_command(
             command_id,
-            CommandExecuteRequest(node_id=node_id, params={}),
+            CommandExecuteRequestDTO(node_id=node_id),
         )
 
         assert result.exit_code == 0
@@ -192,7 +210,7 @@ class TestExecuteCommand:
             connector_factory=factory,
         )
 
-        data = CommandExecuteRequest(node_id=orm_node.id, params={})
+        data = CommandExecuteRequestDTO(node_id=orm_node.id)
         result = await service.execute_command(orm_cmd.id, data)
         assert result.stdout == "ok"
         assert result.exit_code == 0
@@ -208,7 +226,7 @@ class TestExecuteCommand:
             node_repository=node_repo,
             connector_factory=Mock(),
         )
-        data = CommandExecuteRequest(node_id=uuid.uuid4(), params={})
+        data = CommandExecuteRequestDTO(node_id=uuid.uuid4())
         with pytest.raises(CommandNotFoundError):
             await service.execute_command(uuid.uuid4(), data)
 
@@ -227,7 +245,7 @@ class TestExecuteCommand:
             connector_factory=Mock(),
         )
 
-        data = CommandExecuteRequest(node_id=uuid.uuid4(), params={})
+        data = CommandExecuteRequestDTO(node_id=uuid.uuid4())
         with pytest.raises(NodeNotFoundError):
             await service.execute_command(orm_cmd.id, data)
 
@@ -254,7 +272,7 @@ class TestExecuteCommand:
             connector_factory=factory,
         )
 
-        data = CommandExecuteRequest(node_id=orm_node.id, params={})
+        data = CommandExecuteRequestDTO(node_id=orm_node.id)
         with pytest.raises(ConnectionFailedError):
             await service.execute_command(orm_cmd.id, data)
 
@@ -285,7 +303,10 @@ class TestExecuteCommand:
             connector_factory=factory,
         )
 
-        data = CommandExecuteRequest(node_id=orm_node.id, params={"service": "nginx"})
+        data = CommandExecuteRequestDTO(
+            node_id=orm_node.id,
+            params=(("service", "nginx"),),
+        )
         result = await service.execute_command(orm_cmd.id, data)
         assert result.exit_code == 0
         connector.execute_command.assert_called_once_with("systemctl restart nginx")

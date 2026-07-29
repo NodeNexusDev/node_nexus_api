@@ -8,6 +8,13 @@ from app.application.dto.command_execution import (
     CommandRequestDTO,
     CommandResultDTO,
 )
+from app.application.dto.command_management import (
+    CommandCreateDTO,
+    CommandExecuteRequestDTO,
+    CommandParameterDTO,
+    CommandUpdateDTO,
+    CommandViewDTO,
+)
 from app.application.dto.node_connection import NodeConnectionDTO
 from app.application.dto.node_management import (
     NodeCreateDTO,
@@ -30,8 +37,13 @@ __all__ = [
     "BulkCommandRequestDTO",
     "BulkCommandResultDTO",
     "CommandExecutionDTO",
+    "CommandCreateDTO",
+    "CommandExecuteRequestDTO",
+    "CommandParameterDTO",
     "CommandRequestDTO",
     "CommandResultDTO",
+    "CommandUpdateDTO",
+    "CommandViewDTO",
     "CpuMetricsDTO",
     "NodeConnectionDTO",
     "NodeCreateDTO",

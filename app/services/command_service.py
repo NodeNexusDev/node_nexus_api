@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 from uuid import UUID
 
 if TYPE_CHECKING:
@@ -14,6 +14,14 @@ if TYPE_CHECKING:
 
 import structlog
 
+from app.application.dto.command_execution import CommandResultDTO
+from app.application.dto.command_management import (
+    CommandCreateDTO,
+    CommandExecuteRequestDTO,
+    CommandParameterDTO,
+    CommandUpdateDTO,
+    CommandViewDTO,
+)
 from app.core.exceptions import (
     CommandNotFoundError,
     ConnectionFailedError,
@@ -22,13 +30,6 @@ from app.core.exceptions import (
 from app.core.ssh_utils import decrypt_value, get_connector_factory
 from app.core.template import render_command
 from app.repositories.command_repo import CommandRepository
-from app.schemas.command import (
-    CommandCreate,
-    CommandExecuteRequest,
-    CommandResponse,
-    CommandResult,
-    CommandUpdate,
-)
 
 audit = structlog.get_logger("audit")
 
@@ -61,7 +62,7 @@ class CommandService:
         if self._audit:
             await self._audit.log(action=action, node_id=node_id, details=details)
 
-    async def get_command(self, command_id: UUID) -> CommandResponse:
+    async def get_command(self, command_id: UUID) -> CommandViewDTO:
         """Get a command by ID."""
         command = await self._repository.get_by_id(command_id)
         if command is None:
@@ -70,26 +71,43 @@ class CommandService:
 
     async def get_all_commands(
         self, page: int = 1, size: int = 20, tags: list[str] | None = None
-    ) -> tuple[list[CommandResponse], int]:
+    ) -> tuple[list[CommandViewDTO], int]:
         """Get all commands with total count."""
         skip = (page - 1) * size
         commands = await self._repository.get_all(skip=skip, limit=size, tags=tags)
         total = await self._repository.count(tags=tags)
         return [self._to_response(c) for c in commands], total
 
-    async def create_command(self, data: CommandCreate) -> CommandResponse:
+    async def create_command(self, data: CommandCreateDTO) -> CommandViewDTO:
         """Create a new command template."""
-        raw = data.model_dump()
+        raw = {
+            "name": data.name,
+            "description": data.description,
+            "command": data.command,
+            "parameters": [
+                self._parameter_to_dict(parameter) for parameter in data.parameters
+            ],
+            "tags": list(data.tags),
+        }
         command = await self._repository.create(raw)
         audit.info("command.create.ok", command_id=str(command.id), name=data.name)
         await self._log("create", details={"entity": "command", "name": data.name})
         return self._to_response(command)
 
     async def update_command(
-        self, command_id: UUID, data: CommandUpdate
-    ) -> CommandResponse:
+        self, command_id: UUID, data: CommandUpdateDTO
+    ) -> CommandViewDTO:
         """Update an existing command template."""
-        update_data = data.model_dump(exclude_unset=True)
+        update_data: dict[str, object] = dict(data.changes)
+        parameters = update_data.get("parameters")
+        if isinstance(parameters, tuple):
+            parameter_dtos = cast(tuple[CommandParameterDTO, ...], parameters)
+            update_data["parameters"] = [
+                self._parameter_to_dict(parameter) for parameter in parameter_dtos
+            ]
+        tags = update_data.get("tags")
+        if isinstance(tags, tuple):
+            update_data["tags"] = list(tags)
         command = await self._repository.update(command_id, update_data)
         if command is None:
             raise CommandNotFoundError(f"Command {command_id} not found")
@@ -108,8 +126,8 @@ class CommandService:
         return True
 
     async def execute_command(
-        self, command_id: UUID, data: CommandExecuteRequest
-    ) -> CommandResult:
+        self, command_id: UUID, data: CommandExecuteRequestDTO
+    ) -> CommandResultDTO:
         """Execute a command template on a node."""
         command = (
             await self._command_reader.get_template(command_id)
@@ -120,7 +138,7 @@ class CommandService:
             raise CommandNotFoundError(f"Command {command_id} not found")
 
         parameters = list(command.parameters) if command.parameters else []
-        rendered = render_command(command.command, parameters, data.params)
+        rendered = render_command(command.command, parameters, dict(data.params))
 
         node = (
             await self._node_reader.get_connection(data.node_id)
@@ -154,7 +172,7 @@ class CommandService:
                 node_id=data.node_id,
                 details={"command_id": str(command_id), "exit_code": exit_code},
             )
-            return CommandResult(
+            return CommandResultDTO(
                 stdout=stdout,
                 stderr=stderr,
                 exit_code=exit_code,
@@ -176,15 +194,27 @@ class CommandService:
             ) from exc
 
     @staticmethod
-    def _to_response(command: Any) -> CommandResponse:
-        parameters = command.parameters if command.parameters else []
-        return CommandResponse(
+    def _to_response(command: Any) -> CommandViewDTO:
+        parameters = tuple(
+            CommandParameterDTO(**parameter) for parameter in (command.parameters or ())
+        )
+        return CommandViewDTO(
             id=command.id,
             name=command.name,
             description=command.description,
             command=command.command,
             parameters=parameters,
-            tags=command.tags or [],
+            tags=tuple(command.tags or ()),
             created_at=command.created_at,
             updated_at=command.updated_at,
         )
+
+    @staticmethod
+    def _parameter_to_dict(parameter: CommandParameterDTO) -> dict[str, Any]:
+        return {
+            "name": parameter.name,
+            "type": parameter.type,
+            "required": parameter.required,
+            "default": parameter.default,
+            "description": parameter.description,
+        }

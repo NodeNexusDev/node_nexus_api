@@ -7,9 +7,18 @@ from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
 from fastapi import APIRouter, Query, Security
 
 from app.api.deps import get_current_api_key, require_write_scope
+from app.application.dto.command_execution import CommandResultDTO
+from app.application.dto.command_management import (
+    CommandCreateDTO,
+    CommandExecuteRequestDTO,
+    CommandParameterDTO,
+    CommandUpdateDTO,
+    CommandViewDTO,
+)
 from app.schemas.command import (
     CommandCreate,
     CommandExecuteRequest,
+    CommandParameter,
     CommandResponse,
     CommandResult,
     CommandUpdate,
@@ -20,6 +29,38 @@ from app.services.command_service import CommandService
 audit = structlog.get_logger("audit")
 
 router = APIRouter(prefix="/commands", tags=["commands"], route_class=DishkaRoute)
+
+
+def _parameter_dto(parameter: CommandParameter) -> CommandParameterDTO:
+    return CommandParameterDTO(
+        name=parameter.name,
+        type=parameter.type,
+        required=parameter.required,
+        default=parameter.default,
+        description=parameter.description,
+    )
+
+
+def _command_response(command: CommandViewDTO) -> CommandResponse:
+    return CommandResponse(
+        id=command.id,
+        name=command.name,
+        description=command.description,
+        command=command.command,
+        parameters=[
+            CommandParameter(
+                name=parameter.name,
+                type=parameter.type,
+                required=parameter.required,
+                default=parameter.default,
+                description=parameter.description,
+            )
+            for parameter in command.parameters
+        ],
+        tags=list(command.tags),
+        created_at=command.created_at,
+        updated_at=command.updated_at,
+    )
 
 
 @router.get("/", response_model=PaginatedResponse[CommandResponse])
@@ -37,7 +78,12 @@ async def get_commands(
     commands, total = await service.get_all_commands(
         page=page, size=size, tags=tag_list
     )
-    return PaginatedResponse(items=commands, total=total, page=page, size=size)
+    return PaginatedResponse(
+        items=[_command_response(command) for command in commands],
+        total=total,
+        page=page,
+        size=size,
+    )
 
 
 @router.get("/{command_id}", response_model=CommandResponse)
@@ -49,7 +95,7 @@ async def get_command(
 ) -> CommandResponse:
     """Get a command by ID."""
     audit.info("api.commands.get", command_id=str(command_id))
-    return await service.get_command(command_id)
+    return _command_response(await service.get_command(command_id))
 
 
 @router.post("/", response_model=CommandResponse, status_code=201)
@@ -61,7 +107,16 @@ async def create_command(
 ) -> CommandResponse:
     """Create a new command template."""
     audit.info("api.commands.create", name=data.name)
-    return await service.create_command(data)
+    result = await service.create_command(
+        CommandCreateDTO(
+            name=data.name,
+            description=data.description,
+            command=data.command,
+            parameters=tuple(_parameter_dto(item) for item in data.parameters),
+            tags=tuple(data.tags),
+        )
+    )
+    return _command_response(result)
 
 
 @router.put("/{command_id}", response_model=CommandResponse)
@@ -74,7 +129,18 @@ async def update_command(
 ) -> CommandResponse:
     """Update an existing command template."""
     audit.info("api.commands.update", command_id=str(command_id))
-    return await service.update_command(command_id, data)
+    changes = data.model_dump(exclude_unset=True)
+    if isinstance(changes.get("parameters"), list):
+        changes["parameters"] = tuple(
+            CommandParameterDTO(**parameter) for parameter in changes["parameters"]
+        )
+    if isinstance(changes.get("tags"), list):
+        changes["tags"] = tuple(changes["tags"])
+    result = await service.update_command(
+        command_id,
+        CommandUpdateDTO(changes=tuple(changes.items())),
+    )
+    return _command_response(result)
 
 
 @router.delete("/{command_id}", status_code=204)
@@ -103,4 +169,15 @@ async def execute_command(
         command_id=str(command_id),
         node_id=str(data.node_id),
     )
-    return await service.execute_command(command_id, data)
+    result: CommandResultDTO = await service.execute_command(
+        command_id,
+        CommandExecuteRequestDTO(
+            node_id=data.node_id,
+            params=tuple(data.params.items()),
+        ),
+    )
+    return CommandResult(
+        stdout=result.stdout,
+        stderr=result.stderr,
+        exit_code=result.exit_code,
+    )

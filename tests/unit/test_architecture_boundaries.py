@@ -184,6 +184,16 @@ def test_node_bulk_command_workers_do_not_depend_on_persistence() -> None:
     assert not violations
 
 
+def test_command_service_does_not_depend_on_transport_schemas() -> None:
+    """Commands application logic must not import HTTP schemas."""
+    imports = _imports_in_file(APP_ROOT / "services" / "command_service.py")
+    assert not [
+        module
+        for module in imports
+        if module == "app.schemas" or module.startswith("app.schemas.")
+    ]
+
+
 def test_models_are_persistence_only() -> None:
     """ORM models may only depend on other ORM model modules."""
     violations = [

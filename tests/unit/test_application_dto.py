@@ -12,6 +12,10 @@ from app.application.dto.command_execution import (
     CommandRequestDTO,
     CommandResultDTO,
 )
+from app.application.dto.command_management import (
+    CommandCreateDTO,
+    CommandUpdateDTO,
+)
 from app.application.dto.node_connection import NodeConnectionDTO
 from app.application.dto.node_management import NodeCreateDTO, NodeUpdateDTO
 from app.application.dto.node_metrics import (
@@ -79,6 +83,16 @@ def test_command_boundary_dtos_are_immutable() -> None:
     assert result.exit_code == 0
     with pytest.raises(AttributeError):
         request.command = "whoami"  # type: ignore[misc]
+
+
+def test_command_management_dtos_are_immutable_and_preserve_null() -> None:
+    create = CommandCreateDTO(name="uptime", command="uptime", tags=("ops",))
+    update = CommandUpdateDTO(changes=(("description", None),))
+
+    assert create.tags == ("ops",)
+    assert dict(update.changes) == {"description": None}
+    with pytest.raises(AttributeError):
+        create.name = "changed"  # type: ignore[misc]
 
 
 def test_bulk_command_dtos_use_immutable_collections() -> None:
