@@ -20,7 +20,9 @@ from app.schemas.docker import (
     DockerStats,
     DockerVolume,
 )
-from app.services.docker_service import DockerService
+from app.services.docker.container_service import DockerContainerService
+from app.services.docker.image_service import DockerImageService
+from app.services.docker.resource_service import DockerResourceService
 
 audit = structlog.get_logger("audit")
 router = APIRouter(
@@ -32,7 +34,7 @@ router = APIRouter(
 @inject
 async def list_containers(
     node_id: uuid.UUID,
-    service: FromDishka[DockerService],
+    service: FromDishka[DockerContainerService],
     all: bool = Query(False, description="Show stopped containers"),
     _key: str = Security(get_current_api_key),
 ) -> list[DockerContainer]:
@@ -49,7 +51,7 @@ async def list_containers(
 async def get_container(
     node_id: uuid.UUID,
     container_id: str,
-    service: FromDishka[DockerService],
+    service: FromDishka[DockerContainerService],
     _key: str = Security(get_current_api_key),
 ) -> DockerContainerInspect:
     """Get container details."""
@@ -66,7 +68,7 @@ async def get_container(
 async def start_container(
     node_id: uuid.UUID,
     container_id: str,
-    service: FromDishka[DockerService],
+    service: FromDishka[DockerContainerService],
     _key: str = Security(require_write_scope),
 ) -> None:
     """Start a container."""
@@ -82,7 +84,7 @@ async def start_container(
 async def stop_container(
     node_id: uuid.UUID,
     container_id: str,
-    service: FromDishka[DockerService],
+    service: FromDishka[DockerContainerService],
     timeout: int = Query(10, ge=1, le=300),
     _key: str = Security(require_write_scope),
 ) -> None:
@@ -99,7 +101,7 @@ async def stop_container(
 async def restart_container(
     node_id: uuid.UUID,
     container_id: str,
-    service: FromDishka[DockerService],
+    service: FromDishka[DockerContainerService],
     timeout: int = Query(10, ge=1, le=300),
     _key: str = Security(require_write_scope),
 ) -> None:
@@ -116,7 +118,7 @@ async def restart_container(
 async def remove_container(
     node_id: uuid.UUID,
     container_id: str,
-    service: FromDishka[DockerService],
+    service: FromDishka[DockerContainerService],
     force: bool = Query(False),
     _key: str = Security(require_write_scope),
 ) -> None:
@@ -133,7 +135,7 @@ async def remove_container(
 async def get_logs(
     node_id: uuid.UUID,
     container_id: str,
-    service: FromDishka[DockerService],
+    service: FromDishka[DockerContainerService],
     tail: int = Query(100, ge=1, le=10000),
     since: str | None = Query(None),
     _key: str = Security(get_current_api_key),
@@ -152,7 +154,7 @@ async def exec_command(
     node_id: uuid.UUID,
     container_id: str,
     data: DockerExecRequest,
-    service: FromDishka[DockerService],
+    service: FromDishka[DockerContainerService],
     _key: str = Security(require_write_scope),
 ) -> DockerExecResult:
     """Execute a command in a container."""
@@ -173,7 +175,7 @@ async def exec_command(
 @inject
 async def list_images(
     node_id: uuid.UUID,
-    service: FromDishka[DockerService],
+    service: FromDishka[DockerImageService],
     _key: str = Security(get_current_api_key),
 ) -> list[DockerImage]:
     """List images on a Docker node."""
@@ -189,7 +191,7 @@ async def list_images(
 async def pull_image(
     node_id: uuid.UUID,
     data: DockerImagePullRequest,
-    service: FromDishka[DockerService],
+    service: FromDishka[DockerImageService],
     _key: str = Security(require_write_scope),
 ) -> DockerPullResult:
     """Pull a Docker image."""
@@ -203,7 +205,7 @@ async def pull_image(
 async def get_stats(
     node_id: uuid.UUID,
     container_id: str,
-    service: FromDishka[DockerService],
+    service: FromDishka[DockerContainerService],
     _key: str = Security(get_current_api_key),
 ) -> DockerStats:
     """Get container stats."""
@@ -219,7 +221,7 @@ async def get_stats(
 @inject
 async def list_networks(
     node_id: uuid.UUID,
-    service: FromDishka[DockerService],
+    service: FromDishka[DockerResourceService],
     _key: str = Security(get_current_api_key),
 ) -> list[DockerNetwork]:
     """List Docker networks."""
@@ -234,7 +236,7 @@ async def list_networks(
 @inject
 async def list_volumes(
     node_id: uuid.UUID,
-    service: FromDishka[DockerService],
+    service: FromDishka[DockerResourceService],
     _key: str = Security(get_current_api_key),
 ) -> list[DockerVolume]:
     """List Docker volumes."""

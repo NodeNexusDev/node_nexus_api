@@ -11,6 +11,7 @@ from httpx2 import ASGITransport, AsyncClient
 
 from app.api.v1.docker_bulk import router as docker_bulk_router
 from app.schemas.docker import BulkDockerNodeResult, BulkDockerResponse
+from app.services.docker.bulk_service import DockerBulkService
 from app.services.docker_service import DockerService
 from tests.unit.conftest import MockAuthServiceProvider, _mock_settings
 
@@ -21,7 +22,7 @@ def _create_test_app(service: DockerService | AsyncMock) -> FastAPI:
 
     class MockServiceProvider(Provider):
         @provide(scope=Scope.REQUEST)
-        def get_service(self) -> DockerService:
+        def get_service(self) -> DockerBulkService:
             return service
 
     container = make_async_container(MockServiceProvider(), MockAuthServiceProvider())

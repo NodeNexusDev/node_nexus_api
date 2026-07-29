@@ -34,6 +34,9 @@ from app.schemas.docker import (
     DockerStats,
     DockerVolume,
 )
+from app.services.docker.container_service import DockerContainerService
+from app.services.docker.image_service import DockerImageService
+from app.services.docker.resource_service import DockerResourceService
 from app.services.docker_service import DockerService
 from tests.unit.conftest import MockAuthServiceProvider, _mock_settings
 
@@ -148,7 +151,15 @@ def _create_test_app(service: DockerService | AsyncMock) -> FastAPI:
 
     class MockServiceProvider(Provider):
         @provide(scope=Scope.REQUEST)
-        def get_service(self) -> DockerService:
+        def get_container_service(self) -> DockerContainerService:
+            return service
+
+        @provide(scope=Scope.REQUEST)
+        def get_image_service(self) -> DockerImageService:
+            return service
+
+        @provide(scope=Scope.REQUEST)
+        def get_resource_service(self) -> DockerResourceService:
             return service
 
     container = make_async_container(MockServiceProvider(), MockAuthServiceProvider())

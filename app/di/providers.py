@@ -59,6 +59,11 @@ from app.services.audit_service import AuditService, RequiredAuditWriter
 from app.services.command_execution_service import CommandExecutionService
 from app.services.command_management_service import CommandManagementService
 from app.services.config_service import ConfigService
+from app.services.docker.bulk_service import DockerBulkService
+from app.services.docker.command_runner import DockerCommandRunner
+from app.services.docker.container_service import DockerContainerService
+from app.services.docker.image_service import DockerImageService
+from app.services.docker.resource_service import DockerResourceService
 from app.services.docker_service import DockerService
 from app.services.health_service import HealthService
 from app.services.node_bulk_command_service import NodeBulkCommandService
@@ -508,6 +513,37 @@ class ServiceProvider(Provider):
             node_reader=node_reader,
             runtime=runtime,
         )
+
+    @provide(scope=Scope.APP)
+    def get_docker_command_runner(
+        self,
+        node_reader: NodeConnectionReader,
+        runtime: DockerRuntime,
+    ) -> DockerCommandRunner:
+        """Compose target resolution with the Docker runtime capability."""
+        return DockerCommandRunner(node_reader=node_reader, runtime=runtime)
+
+    @provide(scope=Scope.REQUEST)
+    def get_docker_container_service(
+        self, runner: DockerCommandRunner, audit_service: AuditService
+    ) -> DockerContainerService:
+        return DockerContainerService(runner, audit_service)
+
+    @provide(scope=Scope.REQUEST)
+    def get_docker_image_service(
+        self, runner: DockerCommandRunner, audit_service: AuditService
+    ) -> DockerImageService:
+        return DockerImageService(runner, audit_service)
+
+    @provide(scope=Scope.REQUEST)
+    def get_docker_resource_service(
+        self, runner: DockerCommandRunner, audit_service: AuditService
+    ) -> DockerResourceService:
+        return DockerResourceService(runner, audit_service)
+
+    @provide(scope=Scope.REQUEST)
+    def get_docker_bulk_service(self, runner: DockerCommandRunner) -> DockerBulkService:
+        return DockerBulkService(runner)
 
     @provide(scope=Scope.REQUEST)
     def get_health_service(
