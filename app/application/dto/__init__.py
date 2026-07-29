@@ -1,5 +1,14 @@
 """Internal data-transfer objects for application boundaries."""
 
+from app.application.dto.api_key import (
+    APIKeyAuthDTO,
+    APIKeyCreateDTO,
+    APIKeyCreateResultDTO,
+    APIKeyPageDTO,
+    APIKeyPersistenceDTO,
+    APIKeyUpdateDTO,
+    APIKeyViewDTO,
+)
 from app.application.dto.audit import AuditEventDTO
 from app.application.dto.command_execution import (
     BulkCommandRequestDTO,
@@ -80,6 +89,13 @@ from app.application.dto.script_management import (
 )
 
 __all__ = [
+    "APIKeyAuthDTO",
+    "APIKeyCreateDTO",
+    "APIKeyCreateResultDTO",
+    "APIKeyPageDTO",
+    "APIKeyPersistenceDTO",
+    "APIKeyUpdateDTO",
+    "APIKeyViewDTO",
     "AuditEventDTO",
     "BulkCommandRequestDTO",
     "BulkCommandResultDTO",
