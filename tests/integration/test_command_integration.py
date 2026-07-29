@@ -3,7 +3,7 @@
 import uuid
 from collections.abc import AsyncGenerator, AsyncIterable
 from typing import Any
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest_asyncio
 from dishka import Provider, Scope, make_async_container, provide
@@ -26,6 +26,7 @@ from app.api.v1.health import router as health_router
 from app.application.services.api_key_authentication import APIKeyAuthenticationService
 from app.core.exceptions import DomainError
 from app.models.base import Base
+from app.services.command_execution_service import CommandExecutionService
 from app.services.command_management_service import CommandManagementService
 
 MASTER_KEY = "test-master-key"
@@ -80,6 +81,20 @@ class IntegrationDbProvider(Provider):
         return CommandManagementService(
             reader=gateway,
             writer=gateway,
+        )
+
+    @provide(scope=Scope.REQUEST)
+    def get_execution_service(
+        self,
+        gateway: SqlAlchemyCommandGateway,
+    ) -> CommandExecutionService:
+        node_reader = AsyncMock()
+        node_reader.get_connection.return_value = None
+        return CommandExecutionService(
+            command_reader=gateway,
+            node_reader=node_reader,
+            credential_cipher=MagicMock(),
+            connector_factory=MagicMock(),
         )
 
     @provide(scope=Scope.REQUEST)
