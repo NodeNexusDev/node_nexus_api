@@ -74,6 +74,10 @@ class JobSchedulerPort(Protocol):
         """Return whether this replica currently owns scheduled execution."""
         ...
 
+    def mark_restored(self, *, failed: int) -> None:
+        """Publish the outcome of initial persistent-state restoration."""
+        ...
+
     def validate(self, cron: str, timezone: str) -> None:
         """Validate adapter-specific trigger syntax without mutating runtime."""
         ...

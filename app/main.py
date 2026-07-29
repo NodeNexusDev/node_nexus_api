@@ -2,7 +2,6 @@
 
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from functools import partial
 from importlib.metadata import PackageNotFoundError
 from importlib.metadata import version as pkg_version
 
@@ -30,9 +29,7 @@ from app.api.v1.health import router as health_router
 from app.api.v1.nodes import router as nodes_router
 from app.api.v1.scripts import router as scripts_router
 from app.api.v1.websocket import router as ws_router
-from app.application.services.schedule_reconciliation import (
-    ScheduleReconciliationService,
-)
+from app.application.services.schedule_restorer import ScheduleRestorer
 from app.application.services.scheduled_script_executor import (
     ScheduledScriptExecutor,
 )
@@ -73,21 +70,6 @@ async def _cleanup_audit_logs() -> None:
         logger.warning("audit.cleanup.startup.failed")
 
 
-async def _restore_schedules(
-    reconciler: ScheduleReconciliationService,
-    scheduler: ScriptScheduler,
-) -> tuple[int, int]:
-    """Restore persistent schedules through the application use case."""
-    result = await reconciler.reconcile()
-    scheduler.mark_restored(failed=result.failed)
-    logger.info(
-        "scheduler.restore.completed",
-        restored=result.restored,
-        failed=result.failed,
-    )
-    return result.restored, result.failed
-
-
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Application lifespan manager."""
@@ -102,18 +84,27 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         logger.info("migrations.skipped", reason="AUTO_MIGRATE is disabled")
     scheduler = await container.get(ScriptScheduler)
     scheduled_executor = await container.get(ScheduledScriptExecutor)
-    reconciler = await container.get(ScheduleReconciliationService)
+    restorer = await container.get(ScheduleRestorer)
     from app.adapters.persistence.audit_outbox_worker import AuditOutboxWorker
 
     await container.get(AuditOutboxWorker)
     scheduler.configure_executor(scheduled_executor.execute)
     if settings.SCHEDULER_ENABLED:
-        restore = partial(_restore_schedules, reconciler, scheduler)
+
+        async def restore() -> tuple[int, int]:
+            result = await restorer.run()
+            logger.info(
+                "scheduler.restore.completed",
+                restored=result.restored,
+                failed=result.failed,
+            )
+            return result.restored, result.failed
+
         scheduler.configure_reconciler(restore)
         await restore()
         scheduler.start_reconciliation()
     else:
-        scheduler.mark_restored(failed=0)
+        restorer.mark_disabled()
     await _cleanup_audit_logs()
 
     try:

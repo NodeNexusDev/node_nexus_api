@@ -72,6 +72,7 @@ from app.application.services.schedule_management import (
 from app.application.services.schedule_reconciliation import (
     ScheduleReconciliationService,
 )
+from app.application.services.schedule_restorer import ScheduleRestorer
 from app.application.services.scheduled_script_executor import (
     ScheduledScriptExecutor,
 )
@@ -731,6 +732,15 @@ class SchedulerProvider(Provider):
     ) -> ScheduleReconciliationService:
         """Compose persistent-to-runtime schedule reconciliation."""
         return ScheduleReconciliationService(reader, writer, scheduler)
+
+    @provide(scope=Scope.APP)
+    def get_schedule_restorer(
+        self,
+        reconciler: ScheduleReconciliationService,
+        scheduler: JobSchedulerPort,
+    ) -> ScheduleRestorer:
+        """Get the persistent-to-runtime schedule restoration job."""
+        return ScheduleRestorer(reconciler, scheduler)
 
     @provide(scope=Scope.APP)
     def get_job_scheduler(self, scheduler: ScriptScheduler) -> ApschedulerJobScheduler:

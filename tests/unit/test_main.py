@@ -2,11 +2,7 @@
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from app.main import (
-    _cleanup_audit_logs,
-    _restore_schedules,
-    lifespan,
-)
+from app.main import _cleanup_audit_logs, lifespan
 
 
 class TestCleanupAuditLogs:
@@ -22,14 +18,6 @@ class TestCleanupAuditLogs:
 
 
 class TestRuntimeBackgroundJobs:
-    async def test_restore_publishes_scheduler_state(self) -> None:
-        reconciler = AsyncMock()
-        reconciler.reconcile.return_value = MagicMock(restored=3, failed=1)
-        scheduler = MagicMock()
-
-        assert await _restore_schedules(reconciler, scheduler) == (3, 1)
-        scheduler.mark_restored.assert_called_once_with(failed=1)
-
     @patch("app.main.container")
     async def test_cleanup_calls_service(self, mock_container: MagicMock) -> None:
         """Cleanup resolves and runs its application job."""
@@ -47,7 +35,6 @@ class TestRuntimeBackgroundJobs:
 
 
 class TestLifespan:
-    @patch("app.main._restore_schedules", new_callable=AsyncMock)
     @patch("app.main.container")
     @patch("app.main.configure_logging")
     @patch("app.main.get_settings")
@@ -56,28 +43,39 @@ class TestLifespan:
         mock_get_settings: MagicMock,
         mock_configure: MagicMock,
         mock_container: MagicMock,
-        mock_restore: AsyncMock,
     ) -> None:
         mock_get_settings.return_value = MagicMock(
             LOG_LEVEL="info", DEBUG=False, AUDIT_LOG_RETENTION_DAYS=0
         )
         mock_container.close = AsyncMock()
-        mock_scheduler = MagicMock()
-        mock_scheduler.run = AsyncMock()
-        mock_container.get = AsyncMock(return_value=mock_scheduler)
+        migration_runner = MagicMock(run=AsyncMock())
+        scheduler = MagicMock()
+        executor = MagicMock()
+        restorer = MagicMock()
+        restorer.run = AsyncMock(return_value=MagicMock(restored=2, failed=0))
+        cleanup = MagicMock(run=AsyncMock(return_value=0))
+        mock_container.get = AsyncMock(
+            side_effect=[
+                migration_runner,
+                scheduler,
+                executor,
+                restorer,
+                MagicMock(),
+                cleanup,
+            ]
+        )
 
         from fastapi import FastAPI
 
         app = FastAPI()
         async with lifespan(app):
             mock_configure.assert_called_once_with(log_level="info", debug=False)
-            mock_scheduler.run.assert_awaited_once()
+            migration_runner.run.assert_awaited_once()
 
         mock_container.close.assert_awaited_once()
-        mock_scheduler.configure_executor.assert_called_once()
-        mock_restore.assert_awaited_once()
+        scheduler.configure_executor.assert_called_once_with(executor.execute)
+        restorer.run.assert_awaited_once()
 
-    @patch("app.main._restore_schedules", new_callable=AsyncMock)
     @patch("app.main._cleanup_audit_logs", new_callable=AsyncMock)
     @patch("app.main.container")
     @patch("app.main.configure_logging")
@@ -88,16 +86,25 @@ class TestLifespan:
         mock_configure: MagicMock,
         mock_container: MagicMock,
         mock_cleanup: AsyncMock,
-        mock_restore: AsyncMock,
     ) -> None:
         """Lifespan calls _cleanup_audit_logs."""
         mock_get_settings.return_value = MagicMock(
             LOG_LEVEL="info", DEBUG=False, AUDIT_LOG_RETENTION_DAYS=90
         )
         mock_container.close = AsyncMock()
-        dependency = MagicMock()
-        dependency.run = AsyncMock()
-        mock_container.get = AsyncMock(return_value=dependency)
+        migration_runner = MagicMock(run=AsyncMock())
+        scheduler = MagicMock()
+        restorer = MagicMock()
+        restorer.run = AsyncMock(return_value=MagicMock(restored=0, failed=0))
+        mock_container.get = AsyncMock(
+            side_effect=[
+                migration_runner,
+                scheduler,
+                MagicMock(),
+                restorer,
+                MagicMock(),
+            ]
+        )
 
         from fastapi import FastAPI
 
@@ -106,7 +113,7 @@ class TestLifespan:
             pass
 
         mock_cleanup.assert_called_once()
-        mock_restore.assert_awaited_once()
+        restorer.run.assert_awaited_once()
 
 
 class TestDomainErrorHandler:

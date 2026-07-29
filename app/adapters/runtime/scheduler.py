@@ -22,6 +22,9 @@ class ApschedulerJobScheduler:
     def owns_execution(self) -> bool:
         return self._scheduler.owns_execution
 
+    def mark_restored(self, *, failed: int) -> None:
+        self._scheduler.mark_restored(failed=failed)
+
     def validate(self, cron: str, timezone: str) -> None:
         CronTrigger.from_crontab(cron, timezone=ZoneInfo(timezone))
 
