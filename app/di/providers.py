@@ -16,6 +16,7 @@ from app.adapters.persistence.node_management import (
     SqlAlchemyNodeManagementGateway,
 )
 from app.adapters.persistence.node_reader import ScopedNodeConnectionReader
+from app.adapters.persistence.schedule import SqlAlchemyScheduleGateway
 from app.adapters.persistence.script_gateway import (
     ScopedScriptDefinitionReader,
     ScopedScriptExecutionWriter,
@@ -34,6 +35,7 @@ from app.application.ports.node_management import (
 )
 from app.application.ports.node_reader import NodeConnectionReader, NodeStatusWriter
 from app.application.ports.remote_command import RemoteConnectorFactory
+from app.application.ports.schedule import ScheduleReader, ScheduleWriter
 from app.application.ports.script_persistence import (
     ScriptDefinitionReader,
     ScriptExecutionReader,
@@ -232,6 +234,23 @@ class RepositoryProvider(Provider):
         self, gateway: SqlAlchemyNodeManagementGateway
     ) -> NodeStatusWriter:
         """Bind the node status writer port."""
+        return gateway
+
+    @provide(scope=Scope.APP)
+    def get_schedule_gateway(
+        self, sessionmaker: async_sessionmaker[AsyncSession]
+    ) -> SqlAlchemyScheduleGateway:
+        """Get the short-scope persistent schedule gateway."""
+        return SqlAlchemyScheduleGateway(sessionmaker)
+
+    @provide(scope=Scope.APP)
+    def get_schedule_reader(self, gateway: SqlAlchemyScheduleGateway) -> ScheduleReader:
+        """Bind persistent schedule reads."""
+        return gateway
+
+    @provide(scope=Scope.APP)
+    def get_schedule_writer(self, gateway: SqlAlchemyScheduleGateway) -> ScheduleWriter:
+        """Bind persistent schedule writes."""
         return gateway
 
     @provide(scope=Scope.REQUEST)
