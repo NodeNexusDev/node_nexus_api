@@ -24,8 +24,8 @@ from app.schemas.node import (
 )
 from app.services.node_bulk_command_service import NodeBulkCommandService
 from app.services.node_command_service import NodeCommandService
+from app.services.node_management_service import NodeManagementService
 from app.services.node_metrics_service import NodeMetricsService
-from app.services.node_service import NodeService
 from tests.unit.conftest import MockAuthServiceProvider, _mock_settings
 
 
@@ -47,7 +47,7 @@ def _make_node(**overrides: Any) -> NodeResponse:
     return NodeResponse(**defaults)
 
 
-def _create_test_app(service: NodeService | AsyncMock) -> FastAPI:
+def _create_test_app(service: NodeManagementService | AsyncMock) -> FastAPI:
     app = FastAPI()
     app.add_exception_handler(DomainError, domain_error_handler)
     app.include_router(health_router)
@@ -55,7 +55,7 @@ def _create_test_app(service: NodeService | AsyncMock) -> FastAPI:
 
     class MockServiceProvider(Provider):
         @provide(scope=Scope.REQUEST)
-        def get_service(self) -> NodeService:
+        def get_service(self) -> NodeManagementService:
             return service
 
         @provide(scope=Scope.REQUEST)
@@ -77,7 +77,7 @@ def _create_test_app(service: NodeService | AsyncMock) -> FastAPI:
 
 @pytest.fixture
 def mock_service() -> AsyncMock:
-    return AsyncMock(spec=NodeService)
+    return AsyncMock()
 
 
 @pytest.fixture

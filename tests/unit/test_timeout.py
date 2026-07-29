@@ -12,24 +12,24 @@ from httpx2 import ASGITransport, AsyncClient
 from app.api.middleware import TimeoutMiddleware
 from app.api.v1.health import router as health_router
 from app.api.v1.nodes import router as nodes_router
-from app.services.node_service import NodeService
+from app.services.node_management_service import NodeManagementService
 from tests.unit.conftest import MockAuthServiceProvider, _mock_settings
 
 
-def _create_test_app(node_service: NodeService | AsyncMock) -> FastAPI:
-    """Create a test app with mocked NodeService and TimeoutMiddleware."""
+def _create_test_app(node_service: NodeManagementService | AsyncMock) -> FastAPI:
+    """Create a test app with mocked NodeManagementService and TimeoutMiddleware."""
     app = FastAPI()
     app.include_router(health_router)
     app.include_router(nodes_router, prefix="/api/v1")
     app.add_middleware(TimeoutMiddleware, timeout=1)
 
-    class MockNodeServiceProvider(Provider):
+    class MockNodeManagementServiceProvider(Provider):
         @provide(scope=Scope.REQUEST)
-        def get_service(self) -> NodeService:
+        def get_service(self) -> NodeManagementService:
             return node_service
 
     container = make_async_container(
-        MockNodeServiceProvider(), MockAuthServiceProvider()
+        MockNodeManagementServiceProvider(), MockAuthServiceProvider()
     )
     setup_dishka(container, app)
     return app
@@ -37,13 +37,13 @@ def _create_test_app(node_service: NodeService | AsyncMock) -> FastAPI:
 
 @pytest.fixture
 def mock_service() -> AsyncMock:
-    """Create a mock NodeService."""
-    return AsyncMock(spec=NodeService)
+    """Create a mock NodeManagementService."""
+    return AsyncMock(spec=NodeManagementService)
 
 
 @pytest.fixture
 async def client(mock_service: AsyncMock) -> AsyncGenerator[AsyncClient]:
-    """Create an async test client with mocked NodeService and short timeout."""
+    """Create a client with mocked node management and a short timeout."""
     app = _create_test_app(mock_service)
     with patch("app.api.deps.get_settings", return_value=_mock_settings("test-master")):
         async with AsyncClient(

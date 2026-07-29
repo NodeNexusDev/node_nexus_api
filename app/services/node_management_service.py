@@ -7,12 +7,7 @@ from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 if TYPE_CHECKING:
-    from app.application.ports.node_reader import NodeConnectionReader
-    from app.core.connectors.base import ConnectorFactory
     from app.services.audit_service import AuditService
-    from app.services.node_bulk_command_service import NodeBulkCommandService
-    from app.services.node_command_service import NodeCommandService
-    from app.services.node_metrics_service import NodeMetricsService
 
 import structlog
 from sqlalchemy.exc import IntegrityError
@@ -21,12 +16,7 @@ from app.core.exceptions import NodeNameConflictError, NodeNotFoundError
 from app.core.security import encrypt
 from app.repositories.node_repo import NodeRepository
 from app.schemas.node import (
-    BulkCommandRequest,
-    BulkCommandResult,
-    CommandRequest,
-    CommandResult,
     NodeCreate,
-    NodeMetrics,
     NodeResponse,
     NodeUpdate,
     TagAdd,
@@ -38,26 +28,16 @@ audit = structlog.get_logger("audit")
 _SENSITIVE_FIELDS = ("password", "ssh_key")
 
 
-class NodeService:
-    """Service for node operations."""
+class NodeManagementService:
+    """Manage node persistence, tags, and pagination."""
 
     def __init__(
         self,
         repository: NodeRepository,
         audit_service: AuditService | None = None,
-        connector_factory: ConnectorFactory | None = None,
-        node_reader: NodeConnectionReader | None = None,
-        command_service: NodeCommandService | None = None,
-        bulk_command_service: NodeBulkCommandService | None = None,
-        metrics_service: NodeMetricsService | None = None,
-    ):
+    ) -> None:
         self._repository = repository
-        self._node_reader = node_reader
         self._audit = audit_service
-        self._connector_factory = connector_factory
-        self._command_service = command_service
-        self._bulk_command_service = bulk_command_service
-        self._metrics_service = metrics_service
 
     async def _log(
         self,
@@ -204,29 +184,3 @@ class NodeService:
             value = data.get(field)
             if isinstance(value, str) and value:
                 data[field] = encrypt(value)
-
-    async def check_connectivity(self, node_id: UUID) -> NodeResponse:
-        """Delegate the legacy façade call to the single-node command service."""
-        if self._command_service is None:
-            raise RuntimeError("NodeCommandService is not configured")
-        return await self._command_service.check_connectivity(node_id)
-
-    async def execute_command(
-        self, node_id: UUID, data: CommandRequest
-    ) -> CommandResult:
-        """Delegate the legacy façade call to the single-node command service."""
-        if self._command_service is None:
-            raise RuntimeError("NodeCommandService is not configured")
-        return await self._command_service.execute_command(node_id, data)
-
-    async def get_node_metrics(self, node_id: UUID) -> NodeMetrics:
-        """Delegate the legacy façade call to the metrics service."""
-        if self._metrics_service is None:
-            raise RuntimeError("NodeMetricsService is not configured")
-        return await self._metrics_service.collect(node_id)
-
-    async def bulk_execute_command(self, data: BulkCommandRequest) -> BulkCommandResult:
-        """Delegate the legacy façade call to the bulk command service."""
-        if self._bulk_command_service is None:
-            raise RuntimeError("NodeBulkCommandService is not configured")
-        return await self._bulk_command_service.execute(data)

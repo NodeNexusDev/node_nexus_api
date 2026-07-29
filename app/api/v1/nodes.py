@@ -23,8 +23,8 @@ from app.schemas.node import (
 )
 from app.services.node_bulk_command_service import NodeBulkCommandService
 from app.services.node_command_service import NodeCommandService
+from app.services.node_management_service import NodeManagementService
 from app.services.node_metrics_service import NodeMetricsService
-from app.services.node_service import NodeService
 
 audit = structlog.get_logger("audit")
 
@@ -34,7 +34,7 @@ router = APIRouter(prefix="/nodes", tags=["nodes"], route_class=DishkaRoute)
 @router.get("/")
 @inject
 async def get_nodes(
-    service: FromDishka[NodeService],
+    service: FromDishka[NodeManagementService],
     page: int = Query(1, ge=1),
     size: int = Query(20, ge=1, le=100),
     tags: str | None = Query(None, description="Comma-separated tags (AND)"),
@@ -76,7 +76,7 @@ async def get_nodes(
 @router.get("/tags")
 @inject
 async def get_all_tags(
-    service: FromDishka[NodeService],
+    service: FromDishka[NodeManagementService],
     _key: str = Security(get_current_api_key),
 ) -> list[str]:
     """Get all unique tags across all nodes."""
@@ -88,7 +88,7 @@ async def get_all_tags(
 @inject
 async def get_node(
     node_id: uuid.UUID,
-    service: FromDishka[NodeService],
+    service: FromDishka[NodeManagementService],
     _key: str = Security(get_current_api_key),
 ) -> NodeResponse:
     """Get a node by ID."""
@@ -100,7 +100,7 @@ async def get_node(
 @inject
 async def create_node(
     data: NodeCreate,
-    service: FromDishka[NodeService],
+    service: FromDishka[NodeManagementService],
     _key: str = Security(require_write_scope),
 ) -> NodeResponse:
     """Create a new node."""
@@ -113,7 +113,7 @@ async def create_node(
 async def update_node(
     node_id: uuid.UUID,
     data: NodeUpdate,
-    service: FromDishka[NodeService],
+    service: FromDishka[NodeManagementService],
     _key: str = Security(require_write_scope),
 ) -> NodeResponse:
     """Update an existing node."""
@@ -125,7 +125,7 @@ async def update_node(
 @inject
 async def delete_node(
     node_id: uuid.UUID,
-    service: FromDishka[NodeService],
+    service: FromDishka[NodeManagementService],
     _key: str = Security(require_write_scope),
 ) -> None:
     """Delete a node."""
@@ -198,7 +198,7 @@ async def get_node_metrics(
 async def add_tag(
     node_id: uuid.UUID,
     data: TagAdd,
-    service: FromDishka[NodeService],
+    service: FromDishka[NodeManagementService],
     _key: str = Security(require_write_scope),
 ) -> NodeResponse:
     """Add a tag to a node."""
@@ -211,7 +211,7 @@ async def add_tag(
 async def remove_tag(
     node_id: uuid.UUID,
     data: TagRemove,
-    service: FromDishka[NodeService],
+    service: FromDishka[NodeManagementService],
     _key: str = Security(require_write_scope),
 ) -> NodeResponse:
     """Remove a tag from a node."""

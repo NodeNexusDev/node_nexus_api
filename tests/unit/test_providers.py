@@ -26,7 +26,7 @@ from app.services.command_service import CommandService
 from app.services.config_service import ConfigService
 from app.services.docker_service import DockerService
 from app.services.health_service import HealthService
-from app.services.node_service import NodeService
+from app.services.node_management_service import NodeManagementService
 from app.services.schedule_service import ScheduleService
 from app.services.script_service import ScriptService
 
@@ -155,16 +155,14 @@ def test_service_provider_resolves() -> None:
         factory,
         node_reader,
     )
-    node_svc = svc_provider.get_node_service(
+    assert node_command_svc is not None
+    assert node_bulk_command_svc is not None
+    assert node_metrics_svc is not None
+    node_svc = svc_provider.get_node_management_service(
         node_repo,
         audit_svc,
-        factory,
-        node_reader,
-        node_command_svc,
-        node_bulk_command_svc,
-        node_metrics_svc,
     )
-    assert isinstance(node_svc, NodeService)
+    assert isinstance(node_svc, NodeManagementService)
 
     cmd_svc = svc_provider.get_command_service(
         cmd_repo,

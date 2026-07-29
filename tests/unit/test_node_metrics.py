@@ -21,8 +21,8 @@ from app.schemas.node import (
     NodeMetrics,
     NodeResponse,
 )
+from app.services.node_management_service import NodeManagementService
 from app.services.node_metrics_service import NodeMetricsService
-from app.services.node_service import NodeService
 from tests.unit.conftest import MockAuthServiceProvider, _mock_settings
 
 
@@ -63,14 +63,14 @@ def _make_node_metrics(**overrides: Any) -> NodeMetrics:
     return NodeMetrics(**defaults)
 
 
-def _create_test_app(service: NodeService | AsyncMock) -> FastAPI:
+def _create_test_app(service: NodeManagementService | AsyncMock) -> FastAPI:
     app = FastAPI()
     app.add_exception_handler(DomainError, domain_error_handler)
     app.include_router(nodes_router, prefix="/api/v1")
 
     class MockServiceProvider(Provider):
         @provide(scope=Scope.REQUEST)
-        def get_service(self) -> NodeService:
+        def get_service(self) -> NodeManagementService:
             return service
 
         @provide(scope=Scope.REQUEST)
@@ -84,7 +84,7 @@ def _create_test_app(service: NodeService | AsyncMock) -> FastAPI:
 
 @pytest.fixture
 def mock_service() -> AsyncMock:
-    return AsyncMock(spec=NodeService)
+    return AsyncMock()
 
 
 @pytest.fixture
@@ -222,7 +222,7 @@ class TestNodeMetricsSchema:
         assert disk.total_bytes == 1000
 
 
-# --- NodeService.get_node_metrics tests ---
+# --- NodeMetricsService tests ---
 
 
 class MockAsyncContextManager:
@@ -241,14 +241,11 @@ class MockAsyncContextManager:
         return getattr(self._connector, name)
 
 
-class TestNodeServiceGetMetrics:
+class TestNodeMetricsService:
     @pytest.mark.asyncio
     async def test_get_node_metrics_success(self) -> None:
         """get_node_metrics returns metrics from SSH."""
-        from app.services.node_service import NodeService
-
         mock_repo = AsyncMock()
-        mock_audit = AsyncMock()
         mock_factory = MagicMock()
 
         # Mock node
@@ -282,36 +279,11 @@ class TestNodeServiceGetMetrics:
         mock_connector.execute_command = mock_execute
         mock_factory.create_ssh.return_value = MockAsyncContextManager(mock_connector)
 
-        service = NodeService(
+        service = NodeMetricsService(
             repository=mock_repo,
-            audit_service=mock_audit,
             connector_factory=mock_factory,
-            metrics_service=NodeMetricsService(
-                repository=mock_repo,
-                connector_factory=mock_factory,
-            ),
         )
-
-        # Mock get_node to return NodeResponse
-        from app.schemas.node import NodeResponse
-
-        mock_response = NodeResponse(
-            id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
-            name="server1",
-            host="10.0.0.1",
-            port=22,
-            connection_type="ssh",
-            status="active",
-            username="root",
-            docker_host=None,
-            tags=[],
-            created_at=datetime.now(UTC),
-            updated_at=datetime.now(UTC),
-        )
-        # Patch get_node to return mock_response
-        service.get_node = AsyncMock(return_value=mock_response)
-
-        metrics = await service.get_node_metrics(
+        metrics = await service.collect(
             uuid.UUID("00000000-0000-0000-0000-000000000001")
         )
 
@@ -327,10 +299,8 @@ class TestNodeServiceGetMetrics:
     async def test_get_node_metrics_connection_error(self) -> None:
         """get_node_metrics raises ConnectionFailedError on SSH error."""
         from app.core.exceptions import ConnectionFailedError
-        from app.services.node_service import NodeService
 
         mock_repo = AsyncMock()
-        mock_audit = AsyncMock()
         mock_factory = MagicMock()
 
         mock_node = MagicMock()
@@ -347,34 +317,10 @@ class TestNodeServiceGetMetrics:
         mock_connector.execute_command.side_effect = Exception("Connection failed")
         mock_factory.create_ssh.return_value = MockAsyncContextManager(mock_connector)
 
-        service = NodeService(
+        service = NodeMetricsService(
             repository=mock_repo,
-            audit_service=mock_audit,
             connector_factory=mock_factory,
-            metrics_service=NodeMetricsService(
-                repository=mock_repo,
-                connector_factory=mock_factory,
-            ),
         )
-
-        from app.schemas.node import NodeResponse
-
-        mock_response = NodeResponse(
-            id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
-            name="server1",
-            host="10.0.0.1",
-            port=22,
-            connection_type="ssh",
-            status="active",
-            username="root",
-            docker_host=None,
-            tags=[],
-            created_at=datetime.now(UTC),
-            updated_at=datetime.now(UTC),
-        )
-        service.get_node = AsyncMock(return_value=mock_response)
 
         with pytest.raises(ConnectionFailedError):
-            await service.get_node_metrics(
-                uuid.UUID("00000000-0000-0000-0000-000000000001")
-            )
+            await service.collect(uuid.UUID("00000000-0000-0000-0000-000000000001"))

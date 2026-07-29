@@ -9,7 +9,6 @@ from app.core.connectors.ssh import SSHConnector
 from app.models.node import NodeModel
 from app.schemas.node import CommandRequest
 from app.services.node_command_service import NodeCommandService
-from app.services.node_service import NodeService
 from tests.integration_ssh.conftest import SSHServer
 
 
@@ -90,12 +89,7 @@ async def test_service_check_connectivity(ssh_server: SSHServer) -> None:
     repo.update.return_value = orm_node
 
     factory = _make_connector_factory(ssh_server)
-    command_service = NodeCommandService(repository=repo, connector_factory=factory)
-    service = NodeService(
-        repository=repo,
-        connector_factory=factory,
-        command_service=command_service,
-    )
+    service = NodeCommandService(repository=repo, connector_factory=factory)
 
     result = await service.check_connectivity(orm_node.id)
 
@@ -109,12 +103,7 @@ async def test_service_execute_command(ssh_server: SSHServer) -> None:
     repo.get_by_id.return_value = orm_node
 
     factory = _make_connector_factory(ssh_server)
-    command_service = NodeCommandService(repository=repo, connector_factory=factory)
-    service = NodeService(
-        repository=repo,
-        connector_factory=factory,
-        command_service=command_service,
-    )
+    service = NodeCommandService(repository=repo, connector_factory=factory)
 
     result = await service.execute_command(
         orm_node.id, CommandRequest(command="echo works")

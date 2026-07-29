@@ -11,7 +11,7 @@ from app.core.exceptions import NodeNotFoundError
 from app.models.node import NodeModel
 from app.repositories.node_repo import NodeRepository
 from app.schemas.node import NodeCreate, TagAdd, TagRemove
-from app.services.node_service import NodeService
+from app.services.node_management_service import NodeManagementService
 
 
 def _make_orm_node(**overrides: Any) -> NodeModel:
@@ -40,12 +40,14 @@ def repo() -> AsyncMock:
 
 
 @pytest.fixture
-def service(repo: AsyncMock) -> NodeService:
-    return NodeService(repository=repo)
+def service(repo: AsyncMock) -> NodeManagementService:
+    return NodeManagementService(repository=repo)
 
 
 class TestGetNodesByTags:
-    async def test_filters_by_tags(self, service: NodeService, repo: AsyncMock) -> None:
+    async def test_filters_by_tags(
+        self, service: NodeManagementService, repo: AsyncMock
+    ) -> None:
         nodes = [_make_orm_node(tags=["prod", "web"])]
         repo.get_by_tags.return_value = nodes
         repo.count_by_tags.return_value = 1
@@ -53,7 +55,9 @@ class TestGetNodesByTags:
         assert len(result_nodes) == 1
         assert total == 1
 
-    async def test_empty_result(self, service: NodeService, repo: AsyncMock) -> None:
+    async def test_empty_result(
+        self, service: NodeManagementService, repo: AsyncMock
+    ) -> None:
         repo.get_by_tags.return_value = []
         repo.count_by_tags.return_value = 0
         result_nodes, total = await service.get_nodes_by_tags(["nonexistent"])
@@ -63,14 +67,14 @@ class TestGetNodesByTags:
 
 class TestGetAllTags:
     async def test_returns_unique_tags(
-        self, service: NodeService, repo: AsyncMock
+        self, service: NodeManagementService, repo: AsyncMock
     ) -> None:
         repo.get_all_tags.return_value = ["prod", "staging", "web"]
         tags = await service.get_all_tags()
         assert tags == ["prod", "staging", "web"]
 
     async def test_empty_when_no_tags(
-        self, service: NodeService, repo: AsyncMock
+        self, service: NodeManagementService, repo: AsyncMock
     ) -> None:
         repo.get_all_tags.return_value = []
         tags = await service.get_all_tags()
@@ -79,7 +83,7 @@ class TestGetAllTags:
 
 class TestAddTag:
     async def test_adds_tag_to_node(
-        self, service: NodeService, repo: AsyncMock
+        self, service: NodeManagementService, repo: AsyncMock
     ) -> None:
         node = _make_orm_node(tags=[])
         updated_node = _make_orm_node(tags=["prod"])
@@ -90,7 +94,7 @@ class TestAddTag:
         repo.update.assert_called_once_with(node.id, {"tags": ["prod"]})
 
     async def test_does_not_duplicate_tag(
-        self, service: NodeService, repo: AsyncMock
+        self, service: NodeManagementService, repo: AsyncMock
     ) -> None:
         node = _make_orm_node(tags=["prod"])
         repo.get_by_id.return_value = node
@@ -98,7 +102,9 @@ class TestAddTag:
         assert result.tags == ["prod"]
         repo.update.assert_not_called()
 
-    async def test_node_not_found(self, service: NodeService, repo: AsyncMock) -> None:
+    async def test_node_not_found(
+        self, service: NodeManagementService, repo: AsyncMock
+    ) -> None:
         repo.get_by_id.return_value = None
         with pytest.raises(NodeNotFoundError):
             await service.add_tag(uuid.uuid4(), TagAdd(tag="prod"))
@@ -106,7 +112,7 @@ class TestAddTag:
 
 class TestRemoveTag:
     async def test_removes_tag_from_node(
-        self, service: NodeService, repo: AsyncMock
+        self, service: NodeManagementService, repo: AsyncMock
     ) -> None:
         node = _make_orm_node(tags=["prod", "web"])
         updated_node = _make_orm_node(tags=["web"])
@@ -117,7 +123,7 @@ class TestRemoveTag:
         repo.update.assert_called_once_with(node.id, {"tags": ["web"]})
 
     async def test_noop_when_tag_absent(
-        self, service: NodeService, repo: AsyncMock
+        self, service: NodeManagementService, repo: AsyncMock
     ) -> None:
         node = _make_orm_node(tags=["web"])
         repo.get_by_id.return_value = node
@@ -125,7 +131,9 @@ class TestRemoveTag:
         assert result.tags == ["web"]
         repo.update.assert_not_called()
 
-    async def test_node_not_found(self, service: NodeService, repo: AsyncMock) -> None:
+    async def test_node_not_found(
+        self, service: NodeManagementService, repo: AsyncMock
+    ) -> None:
         repo.get_by_id.return_value = None
         with pytest.raises(NodeNotFoundError):
             await service.remove_tag(uuid.uuid4(), TagRemove(tag="prod"))
@@ -133,7 +141,7 @@ class TestRemoveTag:
 
 class TestTagsInCreate:
     async def test_create_with_tags(
-        self, service: NodeService, repo: AsyncMock
+        self, service: NodeManagementService, repo: AsyncMock
     ) -> None:
         node = _make_orm_node(tags=["prod", "web"])
         repo.create.return_value = node
@@ -149,7 +157,7 @@ class TestTagsInCreate:
         assert call_data["tags"] == ["prod", "web"]
 
     async def test_create_without_tags(
-        self, service: NodeService, repo: AsyncMock
+        self, service: NodeManagementService, repo: AsyncMock
     ) -> None:
         node = _make_orm_node(tags=[])
         repo.create.return_value = node

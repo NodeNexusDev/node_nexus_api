@@ -37,8 +37,8 @@ from app.services.docker_service import DockerService
 from app.services.health_service import HealthService
 from app.services.node_bulk_command_service import NodeBulkCommandService
 from app.services.node_command_service import NodeCommandService
+from app.services.node_management_service import NodeManagementService
 from app.services.node_metrics_service import NodeMetricsService
-from app.services.node_service import NodeService
 from app.services.schedule_service import ScheduleService
 from app.services.script_service import ScriptService
 
@@ -236,25 +236,15 @@ class ServiceProvider(Provider):
         return RequiredAuditWriter(sessionmaker)
 
     @provide(scope=Scope.REQUEST)
-    def get_node_service(
+    def get_node_management_service(
         self,
         repository: NodeRepository,
         audit_service: AuditService,
-        connector_factory: SSHConnectorFactory,
-        node_reader: ScopedNodeConnectionReader,
-        command_service: NodeCommandService,
-        bulk_command_service: NodeBulkCommandService,
-        metrics_service: NodeMetricsService,
-    ) -> NodeService:
-        """Get node service."""
-        return NodeService(
+    ) -> NodeManagementService:
+        """Get the node management service."""
+        return NodeManagementService(
             repository=repository,
             audit_service=audit_service,
-            connector_factory=connector_factory,
-            node_reader=node_reader,
-            command_service=command_service,
-            bulk_command_service=bulk_command_service,
-            metrics_service=metrics_service,
         )
 
     @provide(scope=Scope.REQUEST)

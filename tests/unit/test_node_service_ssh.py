@@ -1,4 +1,4 @@
-"""Unit tests for NodeService SSH integration."""
+"""Unit tests for focused node SSH services."""
 
 import uuid
 from unittest.mock import AsyncMock, MagicMock
@@ -11,7 +11,6 @@ from app.repositories.node_repo import NodeRepository
 from app.schemas.node import CommandRequest
 from app.services.node_bulk_command_service import NodeBulkCommandService
 from app.services.node_command_service import NodeCommandService
-from app.services.node_service import NodeService
 from tests.unit.conftest import make_orm_node, make_response
 
 
@@ -32,19 +31,10 @@ def mock_factory() -> MagicMock:
 
 
 @pytest.fixture
-def service(repo: AsyncMock, mock_factory: MagicMock) -> NodeService:
-    command_service = NodeCommandService(
+def service(repo: AsyncMock, mock_factory: MagicMock) -> NodeCommandService:
+    return NodeCommandService(
         repository=repo,
         connector_factory=mock_factory,
-    )
-    return NodeService(
-        repository=repo,
-        connector_factory=mock_factory,
-        command_service=command_service,
-        bulk_command_service=NodeBulkCommandService(
-            repository=repo,
-            connector_factory=mock_factory,
-        ),
     )
 
 
@@ -63,7 +53,7 @@ class TestEncryption:
 
 class TestCheckConnectivity:
     async def test_sets_active_on_success(
-        self, service: NodeService, repo: AsyncMock, mock_factory: MagicMock
+        self, service: NodeCommandService, repo: AsyncMock, mock_factory: MagicMock
     ) -> None:
         node_response = make_response()
         orm_node = make_orm_node(id=node_response.id)
@@ -83,7 +73,7 @@ class TestCheckConnectivity:
         )
 
     async def test_sets_unreachable_on_failure(
-        self, service: NodeService, repo: AsyncMock, mock_factory: MagicMock
+        self, service: NodeCommandService, repo: AsyncMock, mock_factory: MagicMock
     ) -> None:
         node_response = make_response()
         orm_node = make_orm_node(id=node_response.id)
@@ -98,7 +88,9 @@ class TestCheckConnectivity:
 
         assert result.status == "unreachable"
 
-    async def test_node_not_found(self, service: NodeService, repo: AsyncMock) -> None:
+    async def test_node_not_found(
+        self, service: NodeCommandService, repo: AsyncMock
+    ) -> None:
         repo.get_by_id.return_value = None
         with pytest.raises(NodeNotFoundError):
             await service.check_connectivity(uuid.uuid4())
@@ -106,7 +98,7 @@ class TestCheckConnectivity:
 
 class TestExecuteCommand:
     async def test_returns_result(
-        self, service: NodeService, repo: AsyncMock, mock_factory: MagicMock
+        self, service: NodeCommandService, repo: AsyncMock, mock_factory: MagicMock
     ) -> None:
         node_response = make_response()
         orm_node = make_orm_node(id=node_response.id)
@@ -125,7 +117,7 @@ class TestExecuteCommand:
         mock_connector.execute_command.assert_called_once_with("uptime")
 
     async def test_raises_on_connection_error(
-        self, service: NodeService, repo: AsyncMock, mock_factory: MagicMock
+        self, service: NodeCommandService, repo: AsyncMock, mock_factory: MagicMock
     ) -> None:
         node_response = make_response()
         orm_node = make_orm_node(id=node_response.id)
@@ -139,7 +131,9 @@ class TestExecuteCommand:
                 node_response.id, CommandRequest(command="ls")
             )
 
-    async def test_node_not_found(self, service: NodeService, repo: AsyncMock) -> None:
+    async def test_node_not_found(
+        self, service: NodeCommandService, repo: AsyncMock
+    ) -> None:
         repo.get_by_id.return_value = None
         with pytest.raises(NodeNotFoundError):
             await service.execute_command(uuid.uuid4(), CommandRequest(command="ls"))
@@ -147,7 +141,7 @@ class TestExecuteCommand:
 
 class TestCheckConnectivityConnectionFailed:
     async def test_sets_unreachable_on_connection_failed(
-        self, service: NodeService, repo: AsyncMock, mock_factory: MagicMock
+        self, service: NodeCommandService, repo: AsyncMock, mock_factory: MagicMock
     ) -> None:
         node_response = make_response()
         orm_node = make_orm_node(id=node_response.id)
@@ -168,7 +162,7 @@ class TestCheckConnectivityConnectionFailed:
 
 class TestExecuteCommandConnectionFailed:
     async def test_raises_connection_failed(
-        self, service: NodeService, repo: AsyncMock, mock_factory: MagicMock
+        self, service: NodeCommandService, repo: AsyncMock, mock_factory: MagicMock
     ) -> None:
         node_response = make_response()
         orm_node = make_orm_node(id=node_response.id)
@@ -187,7 +181,7 @@ class TestExecuteCommandConnectionFailed:
 
 class TestBulkExecuteConnectionFailed:
     async def test_returns_error_result(
-        self, service: NodeService, repo: AsyncMock, mock_factory: MagicMock
+        self, service: NodeCommandService, repo: AsyncMock, mock_factory: MagicMock
     ) -> None:
         orm_node = make_orm_node()
         repo.get_by_id.return_value = orm_node
@@ -197,7 +191,11 @@ class TestBulkExecuteConnectionFailed:
             side_effect=ConnectionFailedError("Connection refused")
         )
 
-        result = await service._bulk_command_service._execute_on_single_node(
+        bulk_service = NodeBulkCommandService(
+            repository=repo,
+            connector_factory=mock_factory,
+        )
+        result = await bulk_service._execute_on_single_node(
             orm_node,
             "echo hi",
         )

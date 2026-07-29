@@ -23,7 +23,7 @@ from app.models.base import Base
 from app.repositories.api_key_repo import APIKeyRepository
 from app.repositories.node_repo import NodeRepository
 from app.services.api_key_service import APIKeyService
-from app.services.node_service import NodeService
+from app.services.node_management_service import NodeManagementService
 
 MASTER_KEY = "test-master-key-123"
 
@@ -68,8 +68,8 @@ class IntegrationAuthProvider(Provider):
         return APIKeyService(repository=repo)
 
     @provide(scope=Scope.REQUEST)
-    def get_node_service(self, repo: NodeRepository) -> NodeService:
-        return NodeService(repository=repo)
+    def get_node_service(self, repo: NodeRepository) -> NodeManagementService:
+        return NodeManagementService(repository=repo)
 
 
 def _mock_settings(master_key: str = "") -> MagicMock:
