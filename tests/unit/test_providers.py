@@ -118,6 +118,11 @@ def test_connector_provider_resolves() -> None:
     factory = provider.get_ssh_connector_factory(settings)
     assert isinstance(factory, SSHConnectorFactory)
     assert factory._known_hosts_path == "/tmp/known_hosts"
+    runtime = provider.get_docker_runtime(
+        factory,
+        provider.get_credential_cipher(),
+    )
+    assert runtime is not None
 
 
 def test_service_provider_resolves() -> None:

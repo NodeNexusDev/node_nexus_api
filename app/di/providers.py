@@ -21,11 +21,13 @@ from app.adapters.persistence.script_gateway import (
     ScopedScriptExecutionWriter,
     SqlAlchemyScriptGateway,
 )
+from app.adapters.runtime.docker import SshDockerRuntime
 from app.adapters.security import AesGcmCredentialCipher
 from app.application.ports.audit_sink import AuditEventSink
 from app.application.ports.command_management import CommandReader, CommandWriter
 from app.application.ports.command_reader import CommandTemplateReader
 from app.application.ports.credential_cipher import CredentialCipher
+from app.application.ports.docker_runtime import DockerRuntime
 from app.application.ports.node_management import (
     NodeManagementReader,
     NodeManagementWriter,
@@ -295,6 +297,15 @@ class ConnectorProvider(Provider):
     def get_credential_cipher(self) -> CredentialCipher:
         """Bind credential protection to the configured AES-GCM adapter."""
         return AesGcmCredentialCipher()
+
+    @provide(scope=Scope.APP)
+    def get_docker_runtime(
+        self,
+        connector_factory: RemoteConnectorFactory,
+        credential_cipher: CredentialCipher,
+    ) -> DockerRuntime:
+        """Bind Docker CLI execution to the SSH runtime adapter."""
+        return SshDockerRuntime(connector_factory, credential_cipher)
 
 
 class ServiceProvider(Provider):

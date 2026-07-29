@@ -4,6 +4,7 @@ from app.application.ports.audit_sink import AuditEventSink
 from app.application.ports.audit_writer import AuditWriter
 from app.application.ports.command_management import CommandReader, CommandWriter
 from app.application.ports.credential_cipher import CredentialCipher
+from app.application.ports.docker_runtime import DockerRuntime
 from app.application.ports.node_management import (
     NodeManagementReader,
     NodeManagementWriter,
@@ -27,6 +28,7 @@ __all__ = [
     "CommandReader",
     "CommandWriter",
     "CredentialCipher",
+    "DockerRuntime",
     "NodeConnectionReader",
     "NodeManagementReader",
     "NodeManagementWriter",
