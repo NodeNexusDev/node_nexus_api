@@ -129,6 +129,17 @@ class SqlAlchemyNodeManagementGateway:
             await session.flush()
             return True
 
+    async def update_node_status(
+        self, node_id: UUID, status: str
+    ) -> NodeViewDTO | None:
+        """Persist connectivity status in one short transaction."""
+        async with self._sessionmaker.begin() as session:
+            node = await NodeRepository(session).update(
+                node_id,
+                {"status": status},
+            )
+            return self._to_view(node) if node is not None else None
+
     @staticmethod
     def _to_view(node: NodeModel) -> NodeViewDTO:
         """Map an ORM node to public-safe application data."""

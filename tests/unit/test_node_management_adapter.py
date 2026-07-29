@@ -150,3 +150,26 @@ async def test_delete_node_uses_adapter_owned_transaction() -> None:
     assert deleted is True
     session.delete.assert_awaited_once_with(node)
     session.flush.assert_awaited_once_with()
+
+
+async def test_update_node_status_uses_short_transaction() -> None:
+    factory, _ = _sessionmaker()
+    node = make_orm_node(status="unreachable")
+
+    with patch(
+        "app.adapters.persistence.node_management.NodeRepository"
+    ) as repository_type:
+        repository = repository_type.return_value
+        repository.update = AsyncMock(return_value=node)
+        result = await SqlAlchemyNodeManagementGateway(factory).update_node_status(
+            node.id,
+            "unreachable",
+        )
+
+    assert result is not None
+    assert result.status == "unreachable"
+    factory.begin.assert_called_once_with()
+    repository.update.assert_awaited_once_with(
+        node.id,
+        {"status": "unreachable"},
+    )

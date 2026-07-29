@@ -140,10 +140,11 @@ def test_service_provider_resolves() -> None:
     assert isinstance(audit_svc, AuditService)
 
     node_command_svc = svc_provider.get_node_command_service(
-        node_repo,
         audit_svc,
         factory,
         node_reader,
+        MagicMock(),
+        credential_cipher,
     )
     node_bulk_command_svc = svc_provider.get_node_bulk_command_service(
         node_repo,

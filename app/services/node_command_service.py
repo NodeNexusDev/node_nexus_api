@@ -8,7 +8,11 @@ from uuid import UUID
 import structlog
 
 if TYPE_CHECKING:
-    from app.application.ports.node_reader import NodeConnectionReader
+    from app.application.ports.credential_cipher import CredentialCipher
+    from app.application.ports.node_reader import (
+        NodeConnectionReader,
+        NodeStatusWriter,
+    )
     from app.core.connectors.base import ConnectorFactory
     from app.services.audit_service import AuditService
 
@@ -16,8 +20,7 @@ from app.application.dto.command_execution import CommandRequestDTO, CommandResu
 from app.application.dto.node_view import NodeViewDTO
 from app.core.connectors.ssh import command_fingerprint
 from app.core.exceptions import ConnectionFailedError, NodeNotFoundError
-from app.core.ssh_utils import decrypt_value, get_connector_factory
-from app.repositories.node_repo import NodeRepository
+from app.core.ssh_utils import get_connector_factory
 
 audit = structlog.get_logger("audit")
 
@@ -27,13 +30,15 @@ class NodeCommandService:
 
     def __init__(
         self,
-        repository: NodeRepository,
+        node_reader: NodeConnectionReader,
+        status_writer: NodeStatusWriter,
+        credential_cipher: CredentialCipher,
         audit_service: AuditService | None = None,
         connector_factory: ConnectorFactory | None = None,
-        node_reader: NodeConnectionReader | None = None,
     ) -> None:
-        self._repository = repository
         self._node_reader = node_reader
+        self._status_writer = status_writer
+        self._credential_cipher = credential_cipher
         self._audit = audit_service
         self._connector_factory = connector_factory
 
@@ -48,11 +53,7 @@ class NodeCommandService:
 
     async def check_connectivity(self, node_id: UUID) -> NodeViewDTO:
         """Check SSH connectivity and update the persisted node status."""
-        node = (
-            await self._node_reader.get_connection(node_id)
-            if self._node_reader
-            else await self._repository.get_by_id(node_id)
-        )
+        node = await self._node_reader.get_connection(node_id)
         if node is None:
             raise NodeNotFoundError(f"Node {node_id} not found")
 
@@ -60,8 +61,8 @@ class NodeCommandService:
             host=node.host,
             port=node.port,
             username=node.username,
-            password=decrypt_value(node.password),
-            ssh_key=decrypt_value(node.ssh_key),
+            password=self._credential_cipher.decrypt(node.password),
+            ssh_key=self._credential_cipher.decrypt(node.ssh_key),
         )
 
         try:
@@ -86,32 +87,16 @@ class NodeCommandService:
             )
 
         await self._log("check", node_id, {"status": new_status})
-        updated = await self._repository.update(node_id, {"status": new_status})
+        updated = await self._status_writer.update_node_status(node_id, new_status)
         if updated is None:  # defensive: the node existed when the use case started
             raise NodeNotFoundError(f"Node {node_id} not found")
-        return NodeViewDTO(
-            id=updated.id,
-            name=updated.name,
-            host=updated.host,
-            port=updated.port,
-            connection_type=updated.connection_type,
-            status=updated.status,
-            username=updated.username,
-            docker_host=updated.docker_host,
-            tags=tuple(updated.tags or ()),
-            created_at=updated.created_at,
-            updated_at=updated.updated_at,
-        )
+        return updated
 
     async def execute_command(
         self, node_id: UUID, data: CommandRequestDTO
     ) -> CommandResultDTO:
         """Execute a command on one node through SSH."""
-        node = (
-            await self._node_reader.get_connection(node_id)
-            if self._node_reader
-            else await self._repository.get_by_id(node_id)
-        )
+        node = await self._node_reader.get_connection(node_id)
         if node is None:
             raise NodeNotFoundError(f"Node {node_id} not found")
 
@@ -119,8 +104,8 @@ class NodeCommandService:
             "host": node.host,
             "port": node.port,
             "username": node.username,
-            "password": decrypt_value(node.password),
-            "ssh_key": decrypt_value(node.ssh_key),
+            "password": self._credential_cipher.decrypt(node.password),
+            "ssh_key": self._credential_cipher.decrypt(node.ssh_key),
         }
         if data.timeout is not None:
             connector_kwargs["timeout"] = data.timeout

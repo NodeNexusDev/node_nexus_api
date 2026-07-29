@@ -25,6 +25,7 @@ from app.application.ports.node_management import (
     NodeManagementReader,
     NodeManagementWriter,
 )
+from app.application.ports.node_reader import NodeConnectionReader, NodeStatusWriter
 from app.application.services.streaming_command_service import StreamingCommandService
 from app.core.config import Settings, get_settings
 from app.core.connectors.ssh import SSHConnectorFactory
@@ -111,6 +112,13 @@ class RepositoryProvider(Provider):
         return ScopedNodeConnectionReader(sessionmaker)
 
     @provide(scope=Scope.APP)
+    def get_node_connection_reader(
+        self, reader: ScopedNodeConnectionReader
+    ) -> NodeConnectionReader:
+        """Bind the node connection reader port."""
+        return reader
+
+    @provide(scope=Scope.APP)
     def get_node_management_gateway(
         self, sessionmaker: async_sessionmaker[AsyncSession]
     ) -> SqlAlchemyNodeManagementGateway:
@@ -129,6 +137,13 @@ class RepositoryProvider(Provider):
         self, gateway: SqlAlchemyNodeManagementGateway
     ) -> NodeManagementWriter:
         """Bind the node management writer port."""
+        return gateway
+
+    @provide(scope=Scope.APP)
+    def get_node_status_writer(
+        self, gateway: SqlAlchemyNodeManagementGateway
+    ) -> NodeStatusWriter:
+        """Bind the node status writer port."""
         return gateway
 
     @provide(scope=Scope.REQUEST)
@@ -227,17 +242,19 @@ class ServiceProvider(Provider):
     @provide(scope=Scope.REQUEST)
     def get_node_command_service(
         self,
-        repository: NodeRepository,
         audit_service: AuditService,
         connector_factory: SSHConnectorFactory,
-        node_reader: ScopedNodeConnectionReader,
+        node_reader: NodeConnectionReader,
+        status_writer: NodeStatusWriter,
+        credential_cipher: CredentialCipher,
     ) -> NodeCommandService:
         """Get the single-node SSH command service."""
         return NodeCommandService(
-            repository=repository,
             audit_service=audit_service,
             connector_factory=connector_factory,
             node_reader=node_reader,
+            status_writer=status_writer,
+            credential_cipher=credential_cipher,
         )
 
     @provide(scope=Scope.REQUEST)

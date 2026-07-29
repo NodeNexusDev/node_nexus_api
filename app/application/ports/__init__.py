@@ -6,7 +6,7 @@ from app.application.ports.node_management import (
     NodeManagementReader,
     NodeManagementWriter,
 )
-from app.application.ports.node_reader import NodeConnectionReader
+from app.application.ports.node_reader import NodeConnectionReader, NodeStatusWriter
 
 __all__ = [
     "AuditWriter",
@@ -14,4 +14,5 @@ __all__ = [
     "NodeConnectionReader",
     "NodeManagementReader",
     "NodeManagementWriter",
+    "NodeStatusWriter",
 ]

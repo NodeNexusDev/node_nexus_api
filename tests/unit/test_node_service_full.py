@@ -30,7 +30,11 @@ def service(repo: AsyncMock) -> NodeManagementService:
     service = NodeManagementService(
         reader=repo, writer=repo, credential_cipher=AesGcmCredentialCipher()
     )
-    command_service = NodeCommandService(repository=repo)
+    command_service = NodeCommandService(
+        node_reader=repo,
+        status_writer=repo,
+        credential_cipher=AesGcmCredentialCipher(),
+    )
     bulk_service = NodeBulkCommandService(repository=repo)
     service.check_connectivity = command_service.check_connectivity
     service.execute_command = command_service.execute_command
@@ -208,7 +212,7 @@ class TestCheckConnectivityEdgeCases:
     async def test_node_not_found(
         self, service: NodeManagementService, repo: AsyncMock
     ) -> None:
-        repo.get_by_id.return_value = None
+        repo.get_connection.return_value = None
         with pytest.raises(NodeNotFoundError):
             await service.check_connectivity(uuid.uuid4())
 
@@ -217,7 +221,7 @@ class TestExecuteCommandEdgeCases:
     async def test_node_not_found(
         self, service: NodeManagementService, repo: AsyncMock
     ) -> None:
-        repo.get_by_id.return_value = None
+        repo.get_connection.return_value = None
         with pytest.raises(NodeNotFoundError):
             from app.schemas.node import CommandRequest
 

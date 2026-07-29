@@ -124,6 +124,27 @@ def test_node_management_use_case_depends_on_application_ports() -> None:
     assert not violations
 
 
+def test_node_command_use_case_does_not_depend_on_persistence() -> None:
+    """Single-node remote commands must use application persistence ports."""
+    forbidden = (
+        "app.adapters",
+        "app.models",
+        "app.repositories",
+        "app.schemas",
+        "sqlalchemy",
+    )
+    violations = [
+        module
+        for module in _imports_in_file(
+            APP_ROOT / "services" / "node_command_service.py"
+        )
+        if any(
+            module == prefix or module.startswith(f"{prefix}.") for prefix in forbidden
+        )
+    ]
+    assert not violations
+
+
 def test_models_are_persistence_only() -> None:
     """ORM models may only depend on other ORM model modules."""
     violations = [
