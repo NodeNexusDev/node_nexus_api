@@ -5,10 +5,10 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from app.application.dto.command_execution import CommandRequestDTO
 from app.core.exceptions import ConnectionFailedError, NodeNotFoundError
 from app.core.security import decrypt, encrypt
 from app.repositories.node_repo import NodeRepository
-from app.schemas.node import CommandRequest
 from app.services.node_bulk_command_service import NodeBulkCommandService
 from app.services.node_command_service import NodeCommandService
 from tests.unit.conftest import make_orm_node, make_response
@@ -108,7 +108,7 @@ class TestExecuteCommand:
         mock_connector.execute_command.return_value = ("uptime\n12:00", "", 0)
 
         result = await service.execute_command(
-            node_response.id, CommandRequest(command="uptime")
+            node_response.id, CommandRequestDTO(command="uptime")
         )
 
         assert result.stdout == "uptime\n12:00"
@@ -128,7 +128,7 @@ class TestExecuteCommand:
 
         with pytest.raises(ConnectionFailedError):
             await service.execute_command(
-                node_response.id, CommandRequest(command="ls")
+                node_response.id, CommandRequestDTO(command="ls")
             )
 
     async def test_node_not_found(
@@ -136,7 +136,10 @@ class TestExecuteCommand:
     ) -> None:
         repo.get_by_id.return_value = None
         with pytest.raises(NodeNotFoundError):
-            await service.execute_command(uuid.uuid4(), CommandRequest(command="ls"))
+            await service.execute_command(
+                uuid.uuid4(),
+                CommandRequestDTO(command="ls"),
+            )
 
 
 class TestCheckConnectivityConnectionFailed:
@@ -175,7 +178,7 @@ class TestExecuteCommandConnectionFailed:
 
         with pytest.raises(ConnectionFailedError):
             await service.execute_command(
-                node_response.id, CommandRequest(command="ls")
+                node_response.id, CommandRequestDTO(command="ls")
             )
 
 

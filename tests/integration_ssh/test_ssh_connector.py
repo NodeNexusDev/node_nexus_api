@@ -5,9 +5,9 @@ from datetime import UTC, datetime
 from typing import Any
 from unittest.mock import AsyncMock, Mock
 
+from app.application.dto.command_execution import CommandRequestDTO
 from app.core.connectors.ssh import SSHConnector
 from app.models.node import NodeModel
-from app.schemas.node import CommandRequest
 from app.services.node_command_service import NodeCommandService
 from tests.integration_ssh.conftest import SSHServer
 
@@ -106,7 +106,7 @@ async def test_service_execute_command(ssh_server: SSHServer) -> None:
     service = NodeCommandService(repository=repo, connector_factory=factory)
 
     result = await service.execute_command(
-        orm_node.id, CommandRequest(command="echo works")
+        orm_node.id, CommandRequestDTO(command="echo works")
     )
 
     assert result.stdout.strip() == "works"

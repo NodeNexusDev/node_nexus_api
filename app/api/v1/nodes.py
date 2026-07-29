@@ -7,6 +7,7 @@ from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
 from fastapi import APIRouter, HTTPException, Query, Security
 
 from app.api.deps import get_current_api_key, require_write_scope
+from app.application.dto.command_execution import CommandRequestDTO
 from app.schemas.common import CursorPage, decode_cursor
 from app.schemas.node import (
     BulkCommandRequest,
@@ -178,7 +179,15 @@ async def execute_command(
 ) -> CommandResult:
     """Execute a command on a node via SSH."""
     audit.info("api.nodes.execute", node_id=str(node_id), command=data.command)
-    return await service.execute_command(node_id, data)
+    result = await service.execute_command(
+        node_id,
+        CommandRequestDTO(command=data.command, timeout=data.timeout),
+    )
+    return CommandResult(
+        stdout=result.stdout,
+        stderr=result.stderr,
+        exit_code=result.exit_code,
+    )
 
 
 @router.get("/{node_id}/metrics", response_model=NodeMetrics)

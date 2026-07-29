@@ -5,6 +5,23 @@ from uuid import UUID
 
 
 @dataclass(frozen=True, slots=True)
+class CommandRequestDTO:
+    """Transport-independent command execution input."""
+
+    command: str
+    timeout: int | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class CommandResultDTO:
+    """Transport-independent result of a single-node command."""
+
+    stdout: str
+    stderr: str
+    exit_code: int
+
+
+@dataclass(frozen=True, slots=True)
 class CommandExecutionDTO:
     """Transport-independent result of a command executed on one node."""
 

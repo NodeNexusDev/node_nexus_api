@@ -2,6 +2,9 @@
 
 import uuid
 
+import pytest
+
+from app.application.dto.command_execution import CommandRequestDTO, CommandResultDTO
 from app.application.dto.node_connection import NodeConnectionDTO
 from app.application.ports.node_reader import NodeConnectionReader
 from app.models.node import NodeModel
@@ -24,6 +27,16 @@ def test_node_connection_dto_hides_secrets_from_repr() -> None:
 
     assert "plain-password" not in representation
     assert "private-key" not in representation
+
+
+def test_command_boundary_dtos_are_immutable() -> None:
+    request = CommandRequestDTO(command="uptime", timeout=30)
+    result = CommandResultDTO(stdout="ok", stderr="", exit_code=0)
+
+    assert request.command == "uptime"
+    assert result.exit_code == 0
+    with pytest.raises(AttributeError):
+        request.command = "whoami"  # type: ignore[misc]
 
 
 def test_node_repository_maps_connection_dto() -> None:

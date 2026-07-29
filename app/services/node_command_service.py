@@ -12,11 +12,12 @@ if TYPE_CHECKING:
     from app.core.connectors.base import ConnectorFactory
     from app.services.audit_service import AuditService
 
+from app.application.dto.command_execution import CommandRequestDTO, CommandResultDTO
 from app.core.connectors.ssh import command_fingerprint
 from app.core.exceptions import ConnectionFailedError, NodeNotFoundError
 from app.core.ssh_utils import decrypt_value, get_connector_factory
 from app.repositories.node_repo import NodeRepository
-from app.schemas.node import CommandRequest, CommandResult, NodeResponse
+from app.schemas.node import NodeResponse
 
 audit = structlog.get_logger("audit")
 
@@ -89,8 +90,8 @@ class NodeCommandService:
         return NodeResponse.model_validate(updated)
 
     async def execute_command(
-        self, node_id: UUID, data: CommandRequest
-    ) -> CommandResult:
+        self, node_id: UUID, data: CommandRequestDTO
+    ) -> CommandResultDTO:
         """Execute a command on one node through SSH."""
         node = (
             await self._node_reader.get_connection(node_id)
@@ -135,7 +136,7 @@ class NodeCommandService:
                 node_id,
                 {"command": data.command, "exit_code": exit_code},
             )
-            return CommandResult(
+            return CommandResultDTO(
                 stdout=stdout,
                 stderr=stderr,
                 exit_code=exit_code,
