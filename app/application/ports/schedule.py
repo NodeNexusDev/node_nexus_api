@@ -66,6 +66,14 @@ class ScheduleWriter(Protocol):
 class JobSchedulerPort(Protocol):
     """Apply and inspect ephemeral runtime jobs."""
 
+    def is_ready(self) -> bool:
+        """Return whether initial persistent reconciliation succeeded."""
+        ...
+
+    def owns_execution(self) -> bool:
+        """Return whether this replica currently owns scheduled execution."""
+        ...
+
     def validate(self, cron: str, timezone: str) -> None:
         """Validate adapter-specific trigger syntax without mutating runtime."""
         ...

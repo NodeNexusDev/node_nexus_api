@@ -16,6 +16,12 @@ class ApschedulerJobScheduler:
     def __init__(self, scheduler: ScriptScheduler) -> None:
         self._scheduler = scheduler
 
+    def is_ready(self) -> bool:
+        return self._scheduler.ready
+
+    def owns_execution(self) -> bool:
+        return self._scheduler.owns_execution
+
     def validate(self, cron: str, timezone: str) -> None:
         CronTrigger.from_crontab(cron, timezone=ZoneInfo(timezone))
 

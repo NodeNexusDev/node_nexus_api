@@ -57,3 +57,11 @@ def test_remove_and_inspect_map_runtime_state() -> None:
 
     assert adapter.remove(script_id) is True
     assert adapter.inspect()[0].next_run_at == next_run
+
+
+def test_exposes_readiness_and_ownership_without_concrete_type() -> None:
+    scheduler = MagicMock(ready=True, owns_execution=False)
+    adapter = ApschedulerJobScheduler(scheduler)
+
+    assert adapter.is_ready() is True
+    assert adapter.owns_execution() is False

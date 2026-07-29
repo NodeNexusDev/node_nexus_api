@@ -1,6 +1,6 @@
 """Health check service."""
 
-from app.core.scheduler import ScriptScheduler
+from app.application.ports.schedule import JobSchedulerPort
 from app.repositories.health_repo import HealthRepository
 
 
@@ -10,7 +10,7 @@ class HealthService:
     def __init__(
         self,
         repository: HealthRepository,
-        scheduler: ScriptScheduler | None = None,
+        scheduler: JobSchedulerPort | None = None,
         *,
         scheduler_enabled: bool = False,
     ) -> None:
@@ -31,5 +31,5 @@ class HealthService:
         return (
             not self._scheduler_enabled
             or self._scheduler is not None
-            and self._scheduler.ready
+            and self._scheduler.is_ready()
         )

@@ -574,7 +574,7 @@ class ServiceProvider(Provider):
     def get_health_service(
         self,
         repository: HealthRepository,
-        scheduler: ScriptScheduler,
+        scheduler: JobSchedulerPort,
         settings: Settings,
     ) -> HealthService:
         """Get health check service."""
