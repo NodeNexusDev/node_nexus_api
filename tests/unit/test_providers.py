@@ -84,7 +84,9 @@ def test_repository_provider_resolves() -> None:
         provider.get_script_execution_repository(session), ScriptExecutionRepository
     )
     assert isinstance(provider.get_api_key_repository(session), APIKeyRepository)
-    assert isinstance(provider.get_health_repository(session), HealthRepository)
+    health_repository = provider.get_health_repository(session)
+    assert isinstance(health_repository, HealthRepository)
+    assert provider.get_database_health_probe(health_repository) is health_repository
     assert provider.get_scoped_script_reader(MagicMock()) is not None
     execution_writer = provider.get_scoped_execution_writer(MagicMock())
     assert execution_writer is not None

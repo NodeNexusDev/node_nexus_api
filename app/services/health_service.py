@@ -1,7 +1,7 @@
 """Health check service."""
 
+from app.application.ports.health import DatabaseHealthProbe
 from app.application.ports.schedule import JobSchedulerPort
-from app.repositories.health_repo import HealthRepository
 
 
 class HealthService:
@@ -9,7 +9,7 @@ class HealthService:
 
     def __init__(
         self,
-        repository: HealthRepository,
+        repository: DatabaseHealthProbe,
         scheduler: JobSchedulerPort | None = None,
         *,
         scheduler_enabled: bool = False,

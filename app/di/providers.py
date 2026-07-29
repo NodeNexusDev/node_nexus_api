@@ -30,6 +30,7 @@ from app.application.ports.command_management import CommandReader, CommandWrite
 from app.application.ports.command_reader import CommandTemplateReader
 from app.application.ports.credential_cipher import CredentialCipher
 from app.application.ports.docker_runtime import DockerRuntime
+from app.application.ports.health import DatabaseHealthProbe
 from app.application.ports.node_management import (
     NodeManagementReader,
     NodeManagementWriter,
@@ -302,6 +303,13 @@ class RepositoryProvider(Provider):
         """Get health check repository."""
         return HealthRepository(session)
 
+    @provide(scope=Scope.REQUEST)
+    def get_database_health_probe(
+        self, repository: HealthRepository
+    ) -> DatabaseHealthProbe:
+        """Bind database readiness checks to the persistence adapter."""
+        return repository
+
 
 class ConnectorProvider(Provider):
     """Connector providers."""
@@ -573,7 +581,7 @@ class ServiceProvider(Provider):
     @provide(scope=Scope.REQUEST)
     def get_health_service(
         self,
-        repository: HealthRepository,
+        repository: DatabaseHealthProbe,
         scheduler: JobSchedulerPort,
         settings: Settings,
     ) -> HealthService:
