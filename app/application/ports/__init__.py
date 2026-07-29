@@ -2,6 +2,7 @@
 
 from app.application.ports.audit_sink import AuditEventSink
 from app.application.ports.audit_writer import AuditWriter
+from app.application.ports.command_management import CommandReader, CommandWriter
 from app.application.ports.credential_cipher import CredentialCipher
 from app.application.ports.node_management import (
     NodeManagementReader,
@@ -16,6 +17,8 @@ from app.application.ports.remote_command import (
 __all__ = [
     "AuditEventSink",
     "AuditWriter",
+    "CommandReader",
+    "CommandWriter",
     "CredentialCipher",
     "NodeConnectionReader",
     "NodeManagementReader",

@@ -17,6 +17,8 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
+from app.adapters.persistence.command_management import SqlAlchemyCommandGateway
+from app.adapters.security import AesGcmCredentialCipher
 from app.api.error_mapping import domain_error_handler
 from app.api.v1.commands import router as commands_router
 from app.api.v1.health import router as health_router
@@ -24,7 +26,6 @@ from app.core.exceptions import DomainError
 from app.models.base import Base
 from app.repositories.api_key_repo import APIKeyRepository
 from app.repositories.command_repo import CommandRepository
-from app.repositories.node_repo import NodeRepository
 from app.services.api_key_service import APIKeyService
 from app.services.command_service import CommandService
 
@@ -64,9 +65,9 @@ class IntegrationDbProvider(Provider):
     def get_command_repo(self, session: AsyncSession) -> CommandRepository:
         return CommandRepository(session)
 
-    @provide(scope=Scope.REQUEST)
-    def get_node_repo(self, session: AsyncSession) -> NodeRepository:
-        return NodeRepository(session)
+    @provide(scope=Scope.APP)
+    def get_command_gateway(self) -> SqlAlchemyCommandGateway:
+        return SqlAlchemyCommandGateway(self._sm)
 
     @provide(scope=Scope.REQUEST)
     def get_api_key_repo(self, session: AsyncSession) -> APIKeyRepository:
@@ -75,12 +76,15 @@ class IntegrationDbProvider(Provider):
     @provide(scope=Scope.REQUEST)
     def get_service(
         self,
-        command_repo: CommandRepository,
-        node_repo: NodeRepository,
+        gateway: SqlAlchemyCommandGateway,
     ) -> CommandService:
         return CommandService(
-            repository=command_repo,
-            node_repository=node_repo,
+            reader=gateway,
+            writer=gateway,
+            command_reader=gateway,
+            node_reader=MagicMock(),
+            credential_cipher=AesGcmCredentialCipher(),
+            connector_factory=MagicMock(),
         )
 
     @provide(scope=Scope.REQUEST)

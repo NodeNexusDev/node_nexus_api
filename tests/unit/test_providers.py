@@ -92,6 +92,10 @@ def test_repository_provider_resolves() -> None:
     assert provider.get_scoped_execution_writer(MagicMock()) is not None
     assert provider.get_scoped_command_reader(MagicMock()) is not None
     assert provider.get_scoped_node_reader(MagicMock()) is not None
+    gateway = provider.get_command_management_gateway(MagicMock())
+    assert provider.get_command_management_reader(gateway) is gateway
+    assert provider.get_command_management_writer(gateway) is gateway
+    assert provider.get_command_template_reader(gateway) is gateway
 
 
 def test_connector_provider_resolves() -> None:
@@ -169,12 +173,13 @@ def test_service_provider_resolves() -> None:
     assert isinstance(node_svc, NodeManagementService)
 
     cmd_svc = svc_provider.get_command_service(
-        cmd_repo,
-        node_repo,
+        MagicMock(),
+        MagicMock(),
         audit_svc,
         factory,
         command_reader,
         node_reader,
+        credential_cipher,
     )
     assert isinstance(cmd_svc, CommandService)
 

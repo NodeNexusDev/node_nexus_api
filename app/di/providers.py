@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
+from app.adapters.persistence.command_management import SqlAlchemyCommandGateway
 from app.adapters.persistence.command_reader import ScopedCommandTemplateReader
 from app.adapters.persistence.node_management import (
     SqlAlchemyNodeManagementGateway,
@@ -21,6 +22,8 @@ from app.adapters.persistence.script_gateway import (
 )
 from app.adapters.security import AesGcmCredentialCipher
 from app.application.ports.audit_sink import AuditEventSink
+from app.application.ports.command_management import CommandReader, CommandWriter
+from app.application.ports.command_reader import CommandTemplateReader
 from app.application.ports.credential_cipher import CredentialCipher
 from app.application.ports.node_management import (
     NodeManagementReader,
@@ -105,6 +108,34 @@ class RepositoryProvider(Provider):
     ) -> ScopedCommandTemplateReader:
         """Get a command reader that owns a short session per operation."""
         return ScopedCommandTemplateReader(sessionmaker)
+
+    @provide(scope=Scope.APP)
+    def get_command_management_gateway(
+        self, sessionmaker: async_sessionmaker[AsyncSession]
+    ) -> SqlAlchemyCommandGateway:
+        """Get the short-scope command management gateway."""
+        return SqlAlchemyCommandGateway(sessionmaker)
+
+    @provide(scope=Scope.APP)
+    def get_command_management_reader(
+        self, gateway: SqlAlchemyCommandGateway
+    ) -> CommandReader:
+        """Bind the command management reader port."""
+        return gateway
+
+    @provide(scope=Scope.APP)
+    def get_command_management_writer(
+        self, gateway: SqlAlchemyCommandGateway
+    ) -> CommandWriter:
+        """Bind the command management writer port."""
+        return gateway
+
+    @provide(scope=Scope.APP)
+    def get_command_template_reader(
+        self, gateway: SqlAlchemyCommandGateway
+    ) -> CommandTemplateReader:
+        """Bind command execution templates to the management gateway."""
+        return gateway
 
     @provide(scope=Scope.APP)
     def get_scoped_node_reader(
@@ -320,21 +351,23 @@ class ServiceProvider(Provider):
     @provide(scope=Scope.REQUEST)
     def get_command_service(
         self,
-        repository: CommandRepository,
-        node_repository: NodeRepository,
-        audit_service: AuditService,
-        connector_factory: SSHConnectorFactory,
-        command_reader: ScopedCommandTemplateReader,
-        node_reader: ScopedNodeConnectionReader,
+        reader: CommandReader,
+        writer: CommandWriter,
+        audit_service: AuditEventSink,
+        connector_factory: RemoteConnectorFactory,
+        command_reader: CommandTemplateReader,
+        node_reader: NodeConnectionReader,
+        credential_cipher: CredentialCipher,
     ) -> CommandService:
         """Get command service."""
         return CommandService(
-            repository=repository,
-            node_repository=node_repository,
+            reader=reader,
+            writer=writer,
             audit_service=audit_service,
             connector_factory=connector_factory,
             command_reader=command_reader,
             node_reader=node_reader,
+            credential_cipher=credential_cipher,
         )
 
     @provide(scope=Scope.REQUEST)

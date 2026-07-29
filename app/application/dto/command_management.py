@@ -58,3 +58,20 @@ class CommandExecuteRequestDTO:
 
     node_id: UUID
     params: tuple[tuple[str, Any], ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class CommandListQueryDTO:
+    """Immutable command list query."""
+
+    offset: int
+    limit: int
+    tags: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class CommandPageDTO:
+    """Command page returned by persistence."""
+
+    items: tuple[CommandViewDTO, ...]
+    total: int
