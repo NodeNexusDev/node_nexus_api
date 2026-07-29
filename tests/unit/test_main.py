@@ -51,14 +51,14 @@ class TestRunMigrations:
 
 class TestCleanupAuditLogs:
     @patch("app.main.container")
-    @patch("app.main.get_settings")
-    async def test_cleanup_disabled_when_days_zero(
-        self, mock_get_settings: MagicMock, mock_container: MagicMock
+    async def test_cleanup_runs_application_job(
+        self, mock_container: MagicMock
     ) -> None:
-        """Cleanup is skipped when AUDIT_LOG_RETENTION_DAYS <= 0."""
-        mock_get_settings.return_value = MagicMock(AUDIT_LOG_RETENTION_DAYS=0)
+        job = AsyncMock()
+        job.run.return_value = 0
+        mock_container.get = AsyncMock(return_value=job)
         await _cleanup_audit_logs()
-        mock_container.assert_not_called()
+        job.run.assert_awaited_once()
 
 
 class TestRuntimeBackgroundJobs:
@@ -71,48 +71,18 @@ class TestRuntimeBackgroundJobs:
         scheduler.mark_restored.assert_called_once_with(failed=1)
 
     @patch("app.main.container")
-    @patch("app.main.get_settings")
-    async def test_cleanup_disabled_when_negative(
-        self, mock_get_settings: MagicMock, mock_container: MagicMock
-    ) -> None:
-        """Cleanup is skipped when AUDIT_LOG_RETENTION_DAYS < 0."""
-        mock_get_settings.return_value = MagicMock(AUDIT_LOG_RETENTION_DAYS=-1)
+    async def test_cleanup_calls_service(self, mock_container: MagicMock) -> None:
+        """Cleanup resolves and runs its application job."""
+        job = AsyncMock()
+        job.run.return_value = 5
+        mock_container.get = AsyncMock(return_value=job)
         await _cleanup_audit_logs()
-        mock_container.assert_not_called()
+        job.run.assert_awaited_once()
 
     @patch("app.main.container")
-    @patch("app.main.get_settings")
-    async def test_cleanup_calls_service(
-        self, mock_get_settings: MagicMock, mock_container: MagicMock
-    ) -> None:
-        """Cleanup calls audit_service.cleanup_old_logs."""
-        mock_get_settings.return_value = MagicMock(AUDIT_LOG_RETENTION_DAYS=90)
-        mock_audit_service = AsyncMock()
-        mock_audit_service.cleanup_old_logs.return_value = 5
-
-        mock_req_container = AsyncMock()
-        mock_req_container.get = AsyncMock(return_value=mock_audit_service)
-        mock_container.return_value.__aenter__ = AsyncMock(
-            return_value=mock_req_container
-        )
-        mock_container.return_value.__aexit__ = AsyncMock(return_value=False)
-
-        await _cleanup_audit_logs()
-        mock_audit_service.cleanup_old_logs.assert_called_once_with(90)
-
-    @patch("app.main.container")
-    @patch("app.main.get_settings")
-    async def test_cleanup_handles_exception(
-        self, mock_get_settings: MagicMock, mock_container: MagicMock
-    ) -> None:
+    async def test_cleanup_handles_exception(self, mock_container: MagicMock) -> None:
         """Cleanup handles exceptions gracefully."""
-        mock_get_settings.return_value = MagicMock(AUDIT_LOG_RETENTION_DAYS=90)
-        mock_container.return_value.__aenter__ = AsyncMock(
-            side_effect=Exception("db error")
-        )
-        mock_container.return_value.__aexit__ = AsyncMock(return_value=False)
-
-        # Should not raise
+        mock_container.get = AsyncMock(side_effect=Exception("db error"))
         await _cleanup_audit_logs()
 
 

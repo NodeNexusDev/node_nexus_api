@@ -62,6 +62,7 @@ from app.application.services.api_key_authentication import (
     APIKeyAuthenticationService,
 )
 from app.application.services.api_key_management import APIKeyManagementService
+from app.application.services.audit_cleanup_job import AuditCleanupJob
 from app.application.services.audit_event_service import AuditEventService
 from app.application.services.audit_log_service import AuditLogService
 from app.application.services.schedule_management import (
@@ -479,6 +480,15 @@ class ServiceProvider(Provider):
     ) -> AuditLogService:
         """Get audit-log query and retention use cases."""
         return AuditLogService(reader, writer)
+
+    @provide(scope=Scope.APP)
+    def get_audit_cleanup_job(
+        self,
+        writer: AuditLogWriter,
+        settings: Settings,
+    ) -> AuditCleanupJob:
+        """Get the startup audit-retention job."""
+        return AuditCleanupJob(writer, settings.AUDIT_LOG_RETENTION_DAYS)
 
     @provide(scope=Scope.REQUEST)
     def get_node_management_service(

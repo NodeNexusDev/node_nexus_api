@@ -84,24 +84,13 @@ async def _run_migrations() -> None:
 
 async def _cleanup_audit_logs() -> None:
     """Cleanup old audit logs on startup."""
-    settings = get_settings()
-    if settings.AUDIT_LOG_RETENTION_DAYS <= 0:
-        return
-
     try:
-        async with container() as request_container:
-            from app.application.services.audit_log_service import AuditLogService
+        from app.application.services.audit_cleanup_job import AuditCleanupJob
 
-            audit_service = await request_container.get(AuditLogService)
-            deleted = await audit_service.cleanup_old_logs(
-                settings.AUDIT_LOG_RETENTION_DAYS
-            )
-            if deleted > 0:
-                logger.info(
-                    "audit.cleanup.startup",
-                    deleted=deleted,
-                    retention_days=settings.AUDIT_LOG_RETENTION_DAYS,
-                )
+        job = await container.get(AuditCleanupJob)
+        deleted = await job.run()
+        if deleted > 0:
+            logger.info("audit.cleanup.startup", deleted=deleted)
     except Exception:
         logger.warning("audit.cleanup.startup.failed")
 
