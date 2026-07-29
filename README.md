@@ -25,15 +25,6 @@ docker compose up -d --build
 
 Set strong `SECRET_KEY` and `MASTER_API_KEY` values before exposing the service.
 
-## Documentation
-
-- [English documentation](docs/en/index.md)
-- [Документация на русском](docs/ru/index.md)
-- Runtime API contract: `/docs`, `/redoc`, and `/openapi.json`
-
-The in-process scheduler is single-owner and non-persistent. See the operations
-guide before deploying multiple API replicas.
-
 ## License
 
 [MIT](LICENSE)
