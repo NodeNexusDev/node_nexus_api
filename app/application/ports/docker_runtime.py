@@ -7,13 +7,13 @@ from app.application.dto.node_connection import NodeConnectionDTO
 
 
 class DockerRuntime(Protocol):
-    """Execute Docker CLI arguments against an immutable node target."""
+    """Execute ready Docker CLI commands against immutable node targets."""
 
     async def execute(
         self,
         target: NodeConnectionDTO,
-        docker_args: str,
+        command: str,
         timeout: int = 30,
     ) -> DockerExecResultDTO:
-        """Execute Docker CLI arguments and return the process result."""
+        """Execute a command produced by the pure Docker command builder."""
         ...

@@ -7,7 +7,6 @@ from typing import TYPE_CHECKING
 from app.application.dto.docker import DockerExecResultDTO
 from app.application.dto.node_connection import NodeConnectionDTO
 from app.core.exceptions import ConnectionFailedError
-from app.services.docker.command_builder import build_docker_command
 
 if TYPE_CHECKING:
     from app.application.ports.credential_cipher import CredentialCipher
@@ -28,11 +27,10 @@ class SshDockerRuntime:
     async def execute(
         self,
         target: NodeConnectionDTO,
-        docker_args: str,
+        command: str,
         timeout: int = 30,
     ) -> DockerExecResultDTO:
         """Execute Docker CLI arguments on one target."""
-        command = build_docker_command(target, docker_args)
         connector = self._connector_factory.create_ssh(
             host=target.host,
             port=target.port,

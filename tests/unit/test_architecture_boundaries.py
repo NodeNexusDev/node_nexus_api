@@ -250,6 +250,25 @@ def test_legacy_script_service_is_removed() -> None:
     assert not (APP_ROOT / "services" / "script_service.py").exists()
 
 
+def test_docker_command_runner_uses_only_application_ports() -> None:
+    """Docker runner must not know repositories, crypto, or SSH implementations."""
+    imports = _imports_in_file(APP_ROOT / "services" / "docker" / "command_runner.py")
+    forbidden = (
+        "app.adapters",
+        "app.core.connectors",
+        "app.core.security",
+        "app.core.ssh_utils",
+        "app.repositories",
+    )
+    assert not [
+        module
+        for module in imports
+        if any(
+            module == prefix or module.startswith(f"{prefix}.") for prefix in forbidden
+        )
+    ]
+
+
 def test_models_are_persistence_only() -> None:
     """ORM models may only depend on other ORM model modules."""
     violations = [

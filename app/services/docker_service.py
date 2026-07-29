@@ -6,11 +6,14 @@ from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 if TYPE_CHECKING:
+    from app.application.ports.docker_runtime import DockerRuntime
     from app.application.ports.node_reader import NodeConnectionReader
     from app.core.connectors.base import ConnectorFactory
     from app.repositories.node_repo import NodeRepository
     from app.services.audit_service import AuditService
 
+from app.adapters.runtime.docker import SshDockerRuntime
+from app.adapters.security import AesGcmCredentialCipher
 from app.schemas.docker import (
     BulkDockerResponse,
     DockerContainer,
@@ -40,12 +43,21 @@ class DockerService:
         audit_service: AuditService | None = None,
         connector_factory: ConnectorFactory | None = None,
         node_reader: NodeConnectionReader | None = None,
+        runtime: DockerRuntime | None = None,
     ) -> None:
         self._audit = audit_service
+        resolved_reader = node_reader or _RepositoryNodeReader(repository)
+        resolved_runtime = runtime
+        if resolved_runtime is None:
+            if connector_factory is None:
+                raise RuntimeError("DockerRuntime not configured")
+            resolved_runtime = SshDockerRuntime(
+                connector_factory,
+                AesGcmCredentialCipher(),
+            )
         self._runner = DockerCommandRunner(
-            repository=repository,
-            connector_factory=connector_factory,
-            node_reader=node_reader,
+            node_reader=resolved_reader,
+            runtime=resolved_runtime,
         )
         self._containers = DockerContainerService(self._runner, audit_service)
         self._images = DockerImageService(self._runner, audit_service)
@@ -170,3 +182,19 @@ class DockerService:
         self, node_ids: list[str], container_id: str, command: str, timeout: int = 30
     ) -> BulkDockerResponse:
         return await self._bulk.bulk_exec(node_ids, container_id, command, timeout)
+
+
+class _RepositoryNodeReader:
+    """Temporary compatibility adapter for legacy facade callers."""
+
+    def __init__(self, repository: NodeRepository) -> None:
+        self._repository = repository
+
+    async def get_connection(self, node_id: UUID) -> Any:
+        return await self._repository.get_by_id(node_id)
+
+    async def get_connections_by_ids(self, node_ids: list[UUID]) -> list[Any]:
+        return await self._repository.get_connections_by_ids(node_ids)
+
+    async def get_connections_by_tags(self, tags: list[str]) -> list[Any]:
+        return await self._repository.get_connections_by_tags(tags)

@@ -30,12 +30,11 @@ async def test_runtime_builds_and_executes_docker_command() -> None:
     cipher = Mock()
     cipher.decrypt.side_effect = lambda value: value
 
-    result = await SshDockerRuntime(factory, cipher).execute(_target(), "ps")
+    command = "DOCKER_HOST=unix:///var/run/docker.sock docker ps"
+    result = await SshDockerRuntime(factory, cipher).execute(_target(), command)
 
     assert result.stdout == "output"
-    command = connector.execute_command.await_args.args[0]
-    assert "DOCKER_HOST=" in command
-    assert "docker ps" in command
+    connector.execute_command.assert_awaited_once_with(command)
 
 
 async def test_runtime_maps_connector_failure() -> None:

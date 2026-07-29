@@ -224,8 +224,12 @@ def test_service_provider_resolves() -> None:
     api_key_svc = svc_provider.get_api_key_service(api_key_repo)
     assert isinstance(api_key_svc, APIKeyService)
 
+    docker_runtime = conn_provider.get_docker_runtime(factory, credential_cipher)
     docker_svc = svc_provider.get_docker_service(
-        node_repo, audit_svc, factory, node_reader
+        node_repo,
+        audit_svc,
+        node_reader,
+        docker_runtime,
     )
     assert isinstance(docker_svc, DockerService)
 

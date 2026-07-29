@@ -498,15 +498,15 @@ class ServiceProvider(Provider):
         self,
         repository: NodeRepository,
         audit_service: AuditService,
-        connector_factory: SSHConnectorFactory,
-        node_reader: ScopedNodeConnectionReader,
+        node_reader: NodeConnectionReader,
+        runtime: DockerRuntime,
     ) -> DockerService:
         """Get Docker service."""
         return DockerService(
             repository=repository,
             audit_service=audit_service,
-            connector_factory=connector_factory,
             node_reader=node_reader,
+            runtime=runtime,
         )
 
     @provide(scope=Scope.REQUEST)
