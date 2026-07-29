@@ -158,12 +158,12 @@ class RepositoryProvider(Provider):
         """Get the short-scope API-key persistence gateway."""
         return SqlAlchemyAPIKeyGateway(sessionmaker)
 
-    @provide(scope=Scope.APP)
+    @provide(scope=Scope.APP, provides=APIKeyReader)
     def get_api_key_reader(self, gateway: SqlAlchemyAPIKeyGateway) -> APIKeyReader:
         """Bind API-key authentication and management reads."""
         return gateway
 
-    @provide(scope=Scope.APP)
+    @provide(scope=Scope.APP, provides=APIKeyWriter)
     def get_api_key_writer(self, gateway: SqlAlchemyAPIKeyGateway) -> APIKeyWriter:
         """Bind API-key mutations and usage writes."""
         return gateway
@@ -175,7 +175,7 @@ class RepositoryProvider(Provider):
         """Get a writer that commits execution transitions independently."""
         return ScopedScriptExecutionWriter(sessionmaker)
 
-    @provide(scope=Scope.APP)
+    @provide(scope=Scope.APP, provides=ScriptExecutionWriter)
     def get_script_execution_writer(
         self, writer: ScopedScriptExecutionWriter
     ) -> ScriptExecutionWriter:
@@ -189,24 +189,24 @@ class RepositoryProvider(Provider):
         """Get the short-scope script persistence gateway."""
         return SqlAlchemyScriptGateway(sessionmaker)
 
-    @provide(scope=Scope.APP)
+    @provide(scope=Scope.APP, provides=ScriptReader)
     def get_script_reader(self, gateway: SqlAlchemyScriptGateway) -> ScriptReader:
         """Bind the script reader port."""
         return gateway
 
-    @provide(scope=Scope.APP)
+    @provide(scope=Scope.APP, provides=ScriptWriter)
     def get_script_writer(self, gateway: SqlAlchemyScriptGateway) -> ScriptWriter:
         """Bind the script writer port."""
         return gateway
 
-    @provide(scope=Scope.APP)
+    @provide(scope=Scope.APP, provides=ScriptExecutionReader)
     def get_script_execution_reader(
         self, gateway: SqlAlchemyScriptGateway
     ) -> ScriptExecutionReader:
         """Bind the execution history reader port."""
         return gateway
 
-    @provide(scope=Scope.APP)
+    @provide(scope=Scope.APP, provides=ScriptDefinitionReader)
     def get_script_definition_reader(
         self, gateway: SqlAlchemyScriptGateway
     ) -> ScriptDefinitionReader:
@@ -227,21 +227,21 @@ class RepositoryProvider(Provider):
         """Get the short-scope command management gateway."""
         return SqlAlchemyCommandGateway(sessionmaker)
 
-    @provide(scope=Scope.APP)
+    @provide(scope=Scope.APP, provides=CommandReader)
     def get_command_management_reader(
         self, gateway: SqlAlchemyCommandGateway
     ) -> CommandReader:
         """Bind the command management reader port."""
         return gateway
 
-    @provide(scope=Scope.APP)
+    @provide(scope=Scope.APP, provides=CommandWriter)
     def get_command_management_writer(
         self, gateway: SqlAlchemyCommandGateway
     ) -> CommandWriter:
         """Bind the command management writer port."""
         return gateway
 
-    @provide(scope=Scope.APP)
+    @provide(scope=Scope.APP, provides=CommandTemplateReader)
     def get_command_template_reader(
         self, gateway: SqlAlchemyCommandGateway
     ) -> CommandTemplateReader:
@@ -255,7 +255,7 @@ class RepositoryProvider(Provider):
         """Get a node reader that owns a short session per operation."""
         return ScopedNodeConnectionReader(sessionmaker)
 
-    @provide(scope=Scope.APP)
+    @provide(scope=Scope.APP, provides=NodeConnectionReader)
     def get_node_connection_reader(
         self, reader: ScopedNodeConnectionReader
     ) -> NodeConnectionReader:
@@ -269,21 +269,21 @@ class RepositoryProvider(Provider):
         """Get the short-scope node management gateway."""
         return SqlAlchemyNodeManagementGateway(sessionmaker)
 
-    @provide(scope=Scope.APP)
+    @provide(scope=Scope.APP, provides=NodeManagementReader)
     def get_node_management_reader(
         self, gateway: SqlAlchemyNodeManagementGateway
     ) -> NodeManagementReader:
         """Bind the node management reader port."""
         return gateway
 
-    @provide(scope=Scope.APP)
+    @provide(scope=Scope.APP, provides=NodeManagementWriter)
     def get_node_management_writer(
         self, gateway: SqlAlchemyNodeManagementGateway
     ) -> NodeManagementWriter:
         """Bind the node management writer port."""
         return gateway
 
-    @provide(scope=Scope.APP)
+    @provide(scope=Scope.APP, provides=NodeStatusWriter)
     def get_node_status_writer(
         self, gateway: SqlAlchemyNodeManagementGateway
     ) -> NodeStatusWriter:
@@ -297,12 +297,12 @@ class RepositoryProvider(Provider):
         """Get the short-scope persistent schedule gateway."""
         return SqlAlchemyScheduleGateway(sessionmaker)
 
-    @provide(scope=Scope.APP)
+    @provide(scope=Scope.APP, provides=ScheduleReader)
     def get_schedule_reader(self, gateway: SqlAlchemyScheduleGateway) -> ScheduleReader:
         """Bind persistent schedule reads."""
         return gateway
 
-    @provide(scope=Scope.APP)
+    @provide(scope=Scope.APP, provides=ScheduleWriter)
     def get_schedule_writer(self, gateway: SqlAlchemyScheduleGateway) -> ScheduleWriter:
         """Bind persistent schedule writes."""
         return gateway
@@ -319,14 +319,14 @@ class RepositoryProvider(Provider):
         """Get the persistent audit-log gateway."""
         return SqlAlchemyAuditLogGateway(sessionmaker)
 
-    @provide(scope=Scope.APP)
+    @provide(scope=Scope.APP, provides=AuditLogReader)
     def get_audit_log_reader(
         self, gateway: SqlAlchemyAuditLogGateway
     ) -> AuditLogReader:
         """Bind audit-log queries."""
         return gateway
 
-    @provide(scope=Scope.APP)
+    @provide(scope=Scope.APP, provides=AuditLogWriter)
     def get_audit_log_writer(
         self, gateway: SqlAlchemyAuditLogGateway
     ) -> AuditLogWriter:
@@ -362,19 +362,19 @@ class RepositoryProvider(Provider):
         """Get the coordinated configuration persistence gateway."""
         return SqlAlchemyConfigGateway(sessionmaker)
 
-    @provide(scope=Scope.APP)
+    @provide(scope=Scope.APP, provides=ConfigurationExporter)
     def get_configuration_exporter(
         self, gateway: SqlAlchemyConfigGateway
     ) -> ConfigurationExporter:
         return gateway
 
-    @provide(scope=Scope.APP)
+    @provide(scope=Scope.APP, provides=ConfigurationImporter)
     def get_configuration_importer(
         self, gateway: SqlAlchemyConfigGateway
     ) -> ConfigurationImporter:
         return gateway
 
-    @provide(scope=Scope.REQUEST)
+    @provide(scope=Scope.REQUEST, provides=DatabaseHealthProbe)
     def get_database_health_probe(
         self, repository: HealthRepository
     ) -> DatabaseHealthProbe:
@@ -393,19 +393,19 @@ class ConnectorProvider(Provider):
             strict_host_key_checking=settings.SSH_STRICT_HOST_KEY_CHECKING,
         )
 
-    @provide(scope=Scope.APP)
+    @provide(scope=Scope.APP, provides=RemoteConnectorFactory)
     def get_remote_connector_factory(
         self, factory: SSHConnectorFactory
     ) -> RemoteConnectorFactory:
         """Bind remote command sessions to the SSH adapter."""
         return factory
 
-    @provide(scope=Scope.APP)
+    @provide(scope=Scope.APP, provides=CredentialCipher)
     def get_credential_cipher(self) -> CredentialCipher:
         """Bind credential protection to the configured AES-GCM adapter."""
         return AesGcmCredentialCipher()
 
-    @provide(scope=Scope.APP)
+    @provide(scope=Scope.APP, provides=DockerRuntime)
     def get_docker_runtime(
         self,
         connector_factory: RemoteConnectorFactory,
@@ -487,7 +487,7 @@ class ServiceProvider(Provider):
             required_outbox=required_outbox,
         )
 
-    @provide(scope=Scope.REQUEST)
+    @provide(scope=Scope.REQUEST, provides=AuditEventSink)
     def get_audit_event_sink(self, audit_service: AuditEventService) -> AuditEventSink:
         """Bind Node use cases to the application audit port."""
         return audit_service
@@ -767,7 +767,7 @@ class SchedulerProvider(Provider):
         """Adapt the managed APScheduler runtime to the application port."""
         return ApschedulerJobScheduler(scheduler)
 
-    @provide(scope=Scope.APP)
+    @provide(scope=Scope.APP, provides=JobSchedulerPort)
     def get_job_scheduler_port(
         self, scheduler: ApschedulerJobScheduler
     ) -> JobSchedulerPort:

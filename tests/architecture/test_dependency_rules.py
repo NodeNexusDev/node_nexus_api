@@ -134,3 +134,60 @@ def test_app_resources_define_lifecycle_finalizers() -> None:
     source = (APP_ROOT / "di" / "providers.py").read_text(encoding="utf-8")
     assert "await engine.dispose()" in source
     assert "await scheduler.stop()" in source
+
+
+def test_application_ports_have_explicit_dishka_bindings() -> None:
+    """Composition root must identify port registrations explicitly."""
+    path = APP_ROOT / "di" / "providers.py"
+    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    port_factories = {
+        "get_api_key_reader",
+        "get_api_key_writer",
+        "get_script_execution_writer",
+        "get_script_reader",
+        "get_script_writer",
+        "get_script_execution_reader",
+        "get_script_definition_reader",
+        "get_command_management_reader",
+        "get_command_management_writer",
+        "get_command_template_reader",
+        "get_node_connection_reader",
+        "get_node_management_reader",
+        "get_node_management_writer",
+        "get_node_status_writer",
+        "get_schedule_reader",
+        "get_schedule_writer",
+        "get_audit_log_reader",
+        "get_audit_log_writer",
+        "get_configuration_exporter",
+        "get_configuration_importer",
+        "get_database_health_probe",
+        "get_remote_connector_factory",
+        "get_credential_cipher",
+        "get_docker_runtime",
+        "get_audit_event_sink",
+        "get_job_scheduler_port",
+    }
+    factories = {
+        node.name: node
+        for node in ast.walk(tree)
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+        and node.name in port_factories
+    }
+
+    missing = []
+    for name in sorted(port_factories):
+        factory = factories.get(name)
+        if factory is None:
+            missing.append(f"{name}: factory missing")
+            continue
+        has_explicit_binding = any(
+            isinstance(decorator, ast.Call)
+            and getattr(decorator.func, "id", "") == "provide"
+            and any(keyword.arg == "provides" for keyword in decorator.keywords)
+            for decorator in factory.decorator_list
+        )
+        if not has_explicit_binding:
+            missing.append(f"{name}: provides=Port missing")
+
+    assert not missing, "Implicit port bindings:\n" + "\n".join(missing)
