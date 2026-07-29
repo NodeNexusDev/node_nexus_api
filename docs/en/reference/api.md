@@ -12,6 +12,7 @@ endpoint documents otherwise. Protected operations require `X-API-Key`.
 
 Runtime contract links:
 
+- [Interactive API reference](openapi.html)
 - Swagger UI: `/docs`
 - ReDoc: `/redoc`
 - OpenAPI JSON: `/openapi.json`

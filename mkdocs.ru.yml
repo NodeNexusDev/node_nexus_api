@@ -30,10 +30,12 @@ nav:
   - Руководства:
       - guides/index.md
       - Аутентификация: guides/authentication.md
+      - Управление API-ключами: guides/api-keys.md
       - Ноды: guides/nodes.md
       - Команды: guides/commands.md
       - Скрипты: guides/scripts.md
       - Docker: guides/docker.md
+      - Журнал аудита: guides/audit-log.md
       - WebSocket: guides/websocket.md
       - Импорт и экспорт: guides/configuration-import-export.md
       - Решение проблем: guides/troubleshooting.md
@@ -75,6 +77,7 @@ nav:
   - Справочник:
       - reference/index.md
       - HTTP API: reference/api.md
+      - Интерактивный API: reference/openapi.html
       - Конфигурация: reference/configuration.md
       - Каталог ошибок: reference/error-catalog.md
       - Совместимость: reference/compatibility.md

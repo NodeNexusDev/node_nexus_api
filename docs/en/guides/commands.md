@@ -11,3 +11,36 @@ Command templates define named parameters and can be tagged. Create the
 template, execute it against a node with parameter values, and inspect each
 result's exit code, stdout, and stderr. Parameters are validated before remote
 execution; never build an untrusted shell fragment outside the template model.
+
+## Create and execute a template
+
+```bash
+curl --fail-with-body -X POST "${NODE_NEXUS_URL}/api/v1/commands/" \
+  -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "name": "disk-usage",
+    "command": "df -h {{ mount }}",
+    "parameters": [{
+      "name": "mount",
+      "type": "string",
+      "required": true,
+      "description": "Absolute mount path"
+    }],
+    "tags": ["diagnostics"]
+  }'
+```
+
+Save the returned UUID, then execute the template:
+
+```bash
+curl --fail-with-body -X POST \
+  "${NODE_NEXUS_URL}/api/v1/commands/${COMMAND_ID}/execute" \
+  -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
+  -H 'Content-Type: application/json' \
+  -d "{\"node_id\": \"${NODE_ID}\", \"params\": {\"mount\": \"/\"}}"
+```
+
+An `exit_code` of zero indicates success. Preserve `stderr` because utilities
+can write warnings there. Parameters support `string`, `integer`, and `boolean`;
+a missing required value fails before SSH execution.
