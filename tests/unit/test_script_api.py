@@ -15,6 +15,7 @@ from httpx2 import ASGITransport, AsyncClient
 from app.api.error_mapping import domain_error_handler
 from app.api.v1.health import router as health_router
 from app.api.v1.scripts import router as scripts_router
+from app.application.services.script_execution_service import ScriptExecutionService
 from app.core.exceptions import (
     CommandNotFoundError,
     ConnectionFailedError,
@@ -28,7 +29,6 @@ from app.schemas.script import (
     ScriptResponse,
     ScriptStepResult,
 )
-from app.services.script_execution_service import ScriptExecutionService
 from app.services.script_history_service import ScriptHistoryService
 from app.services.script_management_service import ScriptManagementService
 from tests.unit.conftest import MockAuthServiceProvider, _mock_settings

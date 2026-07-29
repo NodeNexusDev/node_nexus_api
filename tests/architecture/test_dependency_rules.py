@@ -13,7 +13,18 @@ FORBIDDEN_IMPORTS: dict[str, tuple[str, ...]] = {
     "repositories": ("app.api", "app.services"),
     "services": ("app.api",),
     "api": ("app.repositories", "app.models", "app.di.container"),
-    "application": ("fastapi", "sqlalchemy"),
+    "application": (
+        "app.api",
+        "app.schemas",
+        "app.models",
+        "app.repositories",
+        "app.adapters",
+        "app.di",
+        "app.services",
+        "fastapi",
+        "sqlalchemy",
+        "dishka",
+    ),
 }
 
 

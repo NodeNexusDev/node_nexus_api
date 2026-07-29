@@ -10,8 +10,8 @@ from app.application.dto.command_template import CommandTemplateDTO
 from app.application.dto.node_connection import NodeConnectionDTO
 from app.application.dto.script_definition import ScriptDefinitionDTO
 from app.application.dto.script_execution import ScriptExecutionRequestDTO
+from app.application.services.script_execution_service import ScriptExecutionService
 from app.core.exceptions import NodeNotFoundError, ScriptNotFoundError
-from app.services.script_execution_service import ScriptExecutionService
 
 
 def _node(node_id: uuid.UUID) -> NodeConnectionDTO:

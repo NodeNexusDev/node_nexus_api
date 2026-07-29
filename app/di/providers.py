@@ -77,6 +77,7 @@ from app.application.services.schedule_restorer import ScheduleRestorer
 from app.application.services.scheduled_script_executor import (
     ScheduledScriptExecutor,
 )
+from app.application.services.script_execution_service import ScriptExecutionService
 from app.application.services.streaming_command_service import StreamingCommandService
 from app.core.config import Settings, get_settings
 from app.core.connectors.ssh import SSHConnectorFactory
@@ -99,7 +100,6 @@ from app.services.node_bulk_command_service import NodeBulkCommandService
 from app.services.node_command_service import NodeCommandService
 from app.services.node_management_service import NodeManagementService
 from app.services.node_metrics_service import NodeMetricsService
-from app.services.script_execution_service import ScriptExecutionService
 from app.services.script_history_service import ScriptHistoryService
 from app.services.script_management_service import ScriptManagementService
 

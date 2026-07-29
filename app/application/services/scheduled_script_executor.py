@@ -6,7 +6,7 @@ from uuid import UUID
 
 from app.application.dto.script_execution import ScriptExecutionRequestDTO
 from app.application.ports.schedule import ScheduleWriter
-from app.services.script_execution_service import ScriptExecutionService
+from app.application.services.script_execution_service import ScriptExecutionService
 
 
 class ScheduledScriptExecutor:

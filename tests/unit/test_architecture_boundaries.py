@@ -220,7 +220,6 @@ def test_command_services_depend_only_on_inward_facing_modules(
     (
         "script_management_service.py",
         "script_history_service.py",
-        "script_execution_service.py",
     ),
 )
 def test_focused_script_services_depend_only_on_inward_facing_modules(

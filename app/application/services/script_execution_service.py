@@ -1,4 +1,4 @@
-"""Transaction-safe script execution orchestration."""
+"""Transaction-safe script execution application use case."""
 
 from __future__ import annotations
 
