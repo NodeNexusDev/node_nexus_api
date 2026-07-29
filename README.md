@@ -3,6 +3,8 @@
 REST API for centrally managing server nodes, SSH commands, reusable scripts,
 and remote Docker resources.
 
+**[Documentation](https://nodenexusdev.github.io/node_nexus_api/)**
+
 ## Features
 
 - Node inventory, tags, search, pagination, SSH checks, and system metrics
