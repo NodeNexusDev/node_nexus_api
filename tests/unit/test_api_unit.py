@@ -22,6 +22,9 @@ from app.schemas.node import (
     CommandResult,
     NodeResponse,
 )
+from app.services.node_bulk_command_service import NodeBulkCommandService
+from app.services.node_command_service import NodeCommandService
+from app.services.node_metrics_service import NodeMetricsService
 from app.services.node_service import NodeService
 from tests.unit.conftest import MockAuthServiceProvider, _mock_settings
 
@@ -53,6 +56,18 @@ def _create_test_app(service: NodeService | AsyncMock) -> FastAPI:
     class MockServiceProvider(Provider):
         @provide(scope=Scope.REQUEST)
         def get_service(self) -> NodeService:
+            return service
+
+        @provide(scope=Scope.REQUEST)
+        def get_command_service(self) -> NodeCommandService:
+            return service
+
+        @provide(scope=Scope.REQUEST)
+        def get_bulk_command_service(self) -> NodeBulkCommandService:
+            return service
+
+        @provide(scope=Scope.REQUEST)
+        def get_metrics_service(self) -> NodeMetricsService:
             return service
 
     container = make_async_container(MockServiceProvider(), MockAuthServiceProvider())

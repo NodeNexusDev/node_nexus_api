@@ -27,6 +27,7 @@ from app.repositories.node_repo import NodeRepository
 from app.services.api_key_service import APIKeyService
 from app.services.node_bulk_command_service import NodeBulkCommandService
 from app.services.node_command_service import NodeCommandService
+from app.services.node_metrics_service import NodeMetricsService
 from app.services.node_service import NodeService
 
 MASTER_KEY = "test-master-key"
@@ -79,6 +80,10 @@ class IntegrationDbProvider(Provider):
         repo: NodeRepository,
     ) -> NodeBulkCommandService:
         return NodeBulkCommandService(repository=repo)
+
+    @provide(scope=Scope.REQUEST)
+    def get_node_metrics_service(self, repo: NodeRepository) -> NodeMetricsService:
+        return NodeMetricsService(repository=repo)
 
     @provide(scope=Scope.REQUEST)
     def get_service(

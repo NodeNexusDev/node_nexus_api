@@ -21,6 +21,9 @@ from app.schemas.node import (
     TagAdd,
     TagRemove,
 )
+from app.services.node_bulk_command_service import NodeBulkCommandService
+from app.services.node_command_service import NodeCommandService
+from app.services.node_metrics_service import NodeMetricsService
 from app.services.node_service import NodeService
 
 audit = structlog.get_logger("audit")
@@ -134,7 +137,7 @@ async def delete_node(
 @inject
 async def bulk_execute_command(
     data: BulkCommandRequest,
-    service: FromDishka[NodeService],
+    service: FromDishka[NodeBulkCommandService],
     _key: str = Security(require_write_scope),
 ) -> BulkCommandResult:
     """Execute a command on multiple nodes by IDs and/or tags."""
@@ -154,7 +157,7 @@ async def bulk_execute_command(
 @inject
 async def check_node(
     node_id: uuid.UUID,
-    service: FromDishka[NodeService],
+    service: FromDishka[NodeCommandService],
     _key: str = Security(require_write_scope),
 ) -> NodeResponse:
     """Check SSH connectivity to a node."""
@@ -170,7 +173,7 @@ async def check_node(
 async def execute_command(
     node_id: uuid.UUID,
     data: CommandRequest,
-    service: FromDishka[NodeService],
+    service: FromDishka[NodeCommandService],
     _key: str = Security(require_write_scope),
 ) -> CommandResult:
     """Execute a command on a node via SSH."""
@@ -182,7 +185,7 @@ async def execute_command(
 @inject
 async def get_node_metrics(
     node_id: uuid.UUID,
-    service: FromDishka[NodeService],
+    service: FromDishka[NodeMetricsService],
     _key: str = Security(get_current_api_key),
 ) -> NodeMetrics:
     """Get system metrics from a node (CPU, memory, disk)."""

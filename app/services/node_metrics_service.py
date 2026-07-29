@@ -92,6 +92,10 @@ class NodeMetricsService:
                 f"Failed to collect metrics from node {node_id}: {exc}"
             ) from exc
 
+    async def get_node_metrics(self, node_id: UUID) -> NodeMetrics:
+        """Expose the stable node API use-case name."""
+        return await self.collect(node_id)
+
     @staticmethod
     async def _collect_cpu(connector) -> tuple[float, int]:  # noqa: ANN001
         cpu_stdout, _, _ = await connector.execute_command(

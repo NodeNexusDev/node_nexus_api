@@ -71,6 +71,13 @@ class NodeBulkCommandService:
             failed=len(results) - succeeded,
         )
 
+    async def bulk_execute_command(
+        self,
+        data: BulkCommandRequest,
+    ) -> BulkCommandResult:
+        """Expose the stable node API use-case name."""
+        return await self.execute(data)
+
     async def _resolve_targets(self, data: BulkCommandRequest) -> list[Any]:
         """Resolve target nodes from IDs and tags before concurrent work."""
         nodes_by_ids = None

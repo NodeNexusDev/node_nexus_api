@@ -73,6 +73,10 @@ def _create_test_app(service: NodeService | AsyncMock) -> FastAPI:
         def get_service(self) -> NodeService:
             return service
 
+        @provide(scope=Scope.REQUEST)
+        def get_metrics_service(self) -> NodeMetricsService:
+            return service
+
     container = make_async_container(MockServiceProvider(), MockAuthServiceProvider())
     setup_dishka(container, app)
     return app
