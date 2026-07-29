@@ -4,6 +4,11 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from app.adapters.persistence.dao.command import CommandRepository
+from app.adapters.persistence.dao.health import HealthRepository
+from app.adapters.persistence.dao.node import NodeRepository
+from app.adapters.persistence.dao.script import ScriptRepository
+from app.adapters.persistence.dao.script_execution import ScriptExecutionRepository
 from app.application.services.api_key_authentication import (
     APIKeyAuthenticationService,
 )
@@ -19,11 +24,6 @@ from app.di.providers import (
     SchedulerProvider,
     ServiceProvider,
 )
-from app.repositories.command_repo import CommandRepository
-from app.repositories.health_repo import HealthRepository
-from app.repositories.node_repo import NodeRepository
-from app.repositories.script_execution_repo import ScriptExecutionRepository
-from app.repositories.script_repo import ScriptRepository
 from app.services.command_execution_service import CommandExecutionService
 from app.services.command_management_service import CommandManagementService
 from app.services.config_service import ConfigService

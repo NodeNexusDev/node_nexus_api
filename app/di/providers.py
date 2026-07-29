@@ -21,6 +21,11 @@ from app.adapters.persistence.audit import (
 from app.adapters.persistence.audit_outbox_worker import AuditOutboxWorker
 from app.adapters.persistence.command_management import SqlAlchemyCommandGateway
 from app.adapters.persistence.command_reader import ScopedCommandTemplateReader
+from app.adapters.persistence.dao.command import CommandRepository
+from app.adapters.persistence.dao.health import HealthRepository
+from app.adapters.persistence.dao.node import NodeRepository
+from app.adapters.persistence.dao.script import ScriptRepository
+from app.adapters.persistence.dao.script_execution import ScriptExecutionRepository
 from app.adapters.persistence.node_management import (
     SqlAlchemyNodeManagementGateway,
 )
@@ -82,11 +87,6 @@ from app.application.services.streaming_command_service import StreamingCommandS
 from app.core.config import Settings, get_settings
 from app.core.connectors.ssh import SSHConnectorFactory
 from app.core.scheduler import ScriptScheduler
-from app.repositories.command_repo import CommandRepository
-from app.repositories.health_repo import HealthRepository
-from app.repositories.node_repo import NodeRepository
-from app.repositories.script_execution_repo import ScriptExecutionRepository
-from app.repositories.script_repo import ScriptRepository
 from app.services.command_execution_service import CommandExecutionService
 from app.services.command_management_service import CommandManagementService
 from app.services.config_service import ConfigService

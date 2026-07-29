@@ -6,11 +6,11 @@ from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 if TYPE_CHECKING:
+    from app.adapters.persistence.dao.node import NodeRepository
     from app.application.ports.audit_sink import AuditEventSink
     from app.application.ports.docker_runtime import DockerRuntime
     from app.application.ports.node_reader import NodeConnectionReader
     from app.core.connectors.base import ConnectorFactory
-    from app.repositories.node_repo import NodeRepository
 
 from app.adapters.runtime.docker import SshDockerRuntime
 from app.adapters.security import AesGcmCredentialCipher

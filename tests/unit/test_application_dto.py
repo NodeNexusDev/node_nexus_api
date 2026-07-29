@@ -5,6 +5,7 @@ from datetime import UTC, datetime
 
 import pytest
 
+from app.adapters.persistence.dao.node import NodeRepository
 from app.application.dto.command_execution import (
     BulkCommandRequestDTO,
     BulkCommandResultDTO,
@@ -26,7 +27,6 @@ from app.application.dto.node_metrics import (
 from app.application.dto.node_view import NodeViewDTO
 from app.application.ports.node_reader import NodeConnectionReader
 from app.models.node import NodeModel
-from app.repositories.node_repo import NodeRepository
 
 
 def test_node_connection_dto_hides_secrets_from_repr() -> None:

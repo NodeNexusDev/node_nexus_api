@@ -6,6 +6,8 @@ from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest_asyncio
+from app.repositories.api_key_repo import APIKeyRepository
+from app.services.api_key_service import APIKeyService
 from dishka import Provider, Scope, make_async_container, provide
 from dishka.integrations.fastapi import setup_dishka
 from fastapi import FastAPI
@@ -17,6 +19,7 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
+from app.adapters.persistence.dao.node import NodeRepository
 from app.adapters.persistence.node_management import SqlAlchemyNodeManagementGateway
 from app.adapters.persistence.node_reader import ScopedNodeConnectionReader
 from app.adapters.security import AesGcmCredentialCipher
@@ -25,9 +28,6 @@ from app.api.v1.health import router as health_router
 from app.api.v1.nodes import router as nodes_router
 from app.core.exceptions import DomainError
 from app.models.base import Base
-from app.repositories.api_key_repo import APIKeyRepository
-from app.repositories.node_repo import NodeRepository
-from app.services.api_key_service import APIKeyService
 from app.services.node_bulk_command_service import NodeBulkCommandService
 from app.services.node_command_service import NodeCommandService
 from app.services.node_management_service import NodeManagementService

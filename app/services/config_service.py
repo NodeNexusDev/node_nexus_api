@@ -6,9 +6,9 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from app.repositories.command_repo import CommandRepository
-    from app.repositories.node_repo import NodeRepository
-    from app.repositories.script_repo import ScriptRepository
+    from app.adapters.persistence.dao.command import CommandRepository
+    from app.adapters.persistence.dao.node import NodeRepository
+    from app.adapters.persistence.dao.script import ScriptRepository
 
 from app.core.exceptions import UnsupportedConfigFormatError
 from app.schemas.config import (

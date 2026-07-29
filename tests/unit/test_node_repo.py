@@ -14,8 +14,8 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
+from app.adapters.persistence.dao.node import NodeRepository
 from app.models.base import Base
-from app.repositories.node_repo import NodeRepository
 
 
 @pytest_asyncio.fixture

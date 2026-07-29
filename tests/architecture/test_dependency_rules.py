@@ -114,6 +114,11 @@ def test_legacy_generic_repository_contract_is_removed() -> None:
     assert not (APP_ROOT / "repositories" / "base.py").exists()
 
 
+def test_legacy_repository_namespace_is_removed() -> None:
+    """All SQLAlchemy DAOs belong to the outbound persistence adapter."""
+    assert not list((APP_ROOT / "repositories").glob("*.py"))
+
+
 @pytest.mark.parametrize(
     "relative_path",
     ["api/v1/websocket.py", "core/scheduler.py"],

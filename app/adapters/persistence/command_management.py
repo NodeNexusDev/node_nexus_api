@@ -5,6 +5,7 @@ from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from app.adapters.persistence.dao.command import CommandRepository
 from app.application.dto.command_management import (
     CommandCreateDTO,
     CommandListQueryDTO,
@@ -15,7 +16,6 @@ from app.application.dto.command_management import (
 )
 from app.application.dto.command_template import CommandTemplateDTO
 from app.models.command import CommandModel
-from app.repositories.command_repo import CommandRepository
 
 
 class SqlAlchemyCommandGateway:

@@ -5,6 +5,7 @@ from uuid import UUID
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from app.adapters.persistence.dao.node import NodeRepository
 from app.application.dto.node_management import (
     NodeCreateDTO,
     NodeCursorPageDTO,
@@ -16,7 +17,6 @@ from app.application.dto.node_management import (
 from app.application.dto.node_view import NodeViewDTO
 from app.core.exceptions import NodeNameConflictError
 from app.models.node import NodeModel
-from app.repositories.node_repo import NodeRepository
 
 
 class SqlAlchemyNodeManagementGateway:

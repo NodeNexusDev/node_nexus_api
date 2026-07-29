@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from app.repositories.health_repo import HealthRepository
+from app.adapters.persistence.dao.health import HealthRepository
 
 
 class TestHealthRepositoryPing:

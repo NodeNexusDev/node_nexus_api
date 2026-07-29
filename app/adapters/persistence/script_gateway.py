@@ -5,6 +5,8 @@ from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from app.adapters.persistence.dao.script import ScriptRepository
+from app.adapters.persistence.dao.script_execution import ScriptExecutionRepository
 from app.application.dto.script_definition import ScriptDefinitionDTO
 from app.application.dto.script_execution import (
     ScriptExecutionDTO,
@@ -22,8 +24,6 @@ from app.application.dto.script_management import (
 )
 from app.models.script import ScriptModel
 from app.models.script_execution import ScriptExecutionModel
-from app.repositories.script_execution_repo import ScriptExecutionRepository
-from app.repositories.script_repo import ScriptRepository
 
 
 class ScopedScriptDefinitionReader:

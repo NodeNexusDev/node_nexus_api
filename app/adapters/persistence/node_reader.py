@@ -4,8 +4,8 @@ from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from app.adapters.persistence.dao.node import NodeRepository
 from app.application.dto.node_connection import NodeConnectionDTO
-from app.repositories.node_repo import NodeRepository
 
 
 class ScopedNodeConnectionReader:

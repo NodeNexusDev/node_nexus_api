@@ -1,4 +1,4 @@
-"""Script execution repository."""
+"""Internal SQLAlchemy DAO for script executions."""
 
 from typing import Any
 from uuid import UUID

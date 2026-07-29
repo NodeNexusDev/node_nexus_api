@@ -1,4 +1,4 @@
-"""Health check repository."""
+"""Internal SQLAlchemy DAO for database health checks."""
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession

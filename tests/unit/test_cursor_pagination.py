@@ -13,9 +13,9 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
+from app.adapters.persistence.dao.node import NodeRepository
 from app.models.base import Base
 from app.models.node import NodeModel
-from app.repositories.node_repo import NodeRepository
 from app.schemas.common import CursorPage, decode_cursor, encode_cursor
 
 
