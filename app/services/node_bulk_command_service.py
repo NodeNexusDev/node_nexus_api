@@ -11,7 +11,7 @@ if TYPE_CHECKING:
     from app.application.dto.node_connection import NodeConnectionDTO
     from app.application.ports.credential_cipher import CredentialCipher
     from app.application.ports.node_reader import NodeConnectionReader
-    from app.core.connectors.base import ConnectorFactory
+    from app.application.ports.remote_command import RemoteConnectorFactory
     from app.services.audit_service import AuditService
 
 from app.application.dto.command_execution import (
@@ -20,7 +20,6 @@ from app.application.dto.command_execution import (
     CommandExecutionDTO,
 )
 from app.core.exceptions import ConnectionFailedError, NodeNotFoundError
-from app.core.ssh_utils import get_connector_factory
 
 audit = structlog.get_logger("audit")
 
@@ -32,8 +31,8 @@ class NodeBulkCommandService:
         self,
         node_reader: NodeConnectionReader,
         credential_cipher: CredentialCipher,
+        connector_factory: RemoteConnectorFactory,
         audit_service: AuditService | None = None,
-        connector_factory: ConnectorFactory | None = None,
     ) -> None:
         self._node_reader = node_reader
         self._credential_cipher = credential_cipher
@@ -112,7 +111,7 @@ class NodeBulkCommandService:
         command: str,
     ) -> CommandExecutionDTO:
         """Execute on one node and always return a result."""
-        connector = get_connector_factory(self._connector_factory).create_ssh(
+        connector = self._connector_factory.create_ssh(
             host=node.host,
             port=node.port,
             username=node.username,

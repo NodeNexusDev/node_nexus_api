@@ -1,7 +1,7 @@
 """Full coverage tests for NodeManagementService."""
 
 import uuid
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -34,10 +34,12 @@ def service(repo: AsyncMock) -> NodeManagementService:
         node_reader=repo,
         status_writer=repo,
         credential_cipher=AesGcmCredentialCipher(),
+        connector_factory=MagicMock(),
     )
     bulk_service = NodeBulkCommandService(
         node_reader=repo,
         credential_cipher=AesGcmCredentialCipher(),
+        connector_factory=MagicMock(),
     )
     service.check_connectivity = command_service.check_connectivity
     service.execute_command = command_service.execute_command

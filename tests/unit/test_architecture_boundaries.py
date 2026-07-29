@@ -92,11 +92,20 @@ def test_repositories_do_not_depend_on_transport_or_services() -> None:
 
 def test_node_metrics_use_case_depends_on_persistence_port() -> None:
     """Remote metrics collection must not depend on repository implementations."""
+    forbidden = (
+        "app.core.connectors",
+        "app.core.security",
+        "app.core.ssh_utils",
+        "app.repositories",
+    )
     violations = [
         module
-        for path, module in _imports_in("services")
-        if path.name == "node_metrics_service.py"
-        and (module == "app.repositories" or module.startswith("app.repositories."))
+        for module in _imports_in_file(
+            APP_ROOT / "services" / "node_metrics_service.py"
+        )
+        if any(
+            module == prefix or module.startswith(f"{prefix}.") for prefix in forbidden
+        )
     ]
     assert not violations
 
@@ -131,6 +140,9 @@ def test_node_command_use_case_does_not_depend_on_persistence() -> None:
         "app.models",
         "app.repositories",
         "app.schemas",
+        "app.core.connectors",
+        "app.core.security",
+        "app.core.ssh_utils",
         "sqlalchemy",
     )
     violations = [
@@ -152,6 +164,9 @@ def test_node_bulk_command_workers_do_not_depend_on_persistence() -> None:
         "app.models",
         "app.repositories",
         "app.schemas",
+        "app.core.connectors",
+        "app.core.security",
+        "app.core.ssh_utils",
         "sqlalchemy",
     )
     violations = [

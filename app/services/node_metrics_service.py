@@ -8,8 +8,12 @@ from uuid import UUID
 import structlog
 
 if TYPE_CHECKING:
+    from app.application.ports.credential_cipher import CredentialCipher
     from app.application.ports.node_reader import NodeConnectionReader
-    from app.core.connectors.base import ConnectorFactory
+    from app.application.ports.remote_command import (
+        RemoteCommandSession,
+        RemoteConnectorFactory,
+    )
 
 from app.application.dto.node_metrics import (
     CpuMetricsDTO,
@@ -17,7 +21,6 @@ from app.application.dto.node_metrics import (
     UsageMetricsDTO,
 )
 from app.core.exceptions import ConnectionFailedError, NodeNotFoundError
-from app.core.ssh_utils import decrypt_value, get_connector_factory
 
 audit = structlog.get_logger("audit")
 
@@ -28,10 +31,12 @@ class NodeMetricsService:
     def __init__(
         self,
         node_reader: NodeConnectionReader,
-        connector_factory: ConnectorFactory | None = None,
+        credential_cipher: CredentialCipher,
+        connector_factory: RemoteConnectorFactory,
     ) -> None:
         self._connector_factory = connector_factory
         self._node_reader = node_reader
+        self._credential_cipher = credential_cipher
 
     async def collect(self, node_id: UUID) -> NodeMetricsDTO:
         """Collect current system metrics from a node."""
@@ -39,12 +44,12 @@ class NodeMetricsService:
         if node is None:
             raise NodeNotFoundError(f"Node {node_id} not found")
 
-        connector = get_connector_factory(self._connector_factory).create_ssh(
+        connector = self._connector_factory.create_ssh(
             host=node.host,
             port=node.port,
             username=node.username,
-            password=decrypt_value(node.password),
-            ssh_key=decrypt_value(node.ssh_key),
+            password=self._credential_cipher.decrypt(node.password),
+            ssh_key=self._credential_cipher.decrypt(node.ssh_key),
         )
 
         try:
@@ -94,7 +99,7 @@ class NodeMetricsService:
         return await self.collect(node_id)
 
     @staticmethod
-    async def _collect_cpu(connector) -> tuple[float, int]:  # noqa: ANN001
+    async def _collect_cpu(connector: RemoteCommandSession) -> tuple[float, int]:
         cpu_stdout, _, _ = await connector.execute_command(
             "top -bn1 | grep 'Cpu(s)' | awk '{print $2}'"
         )
@@ -105,7 +110,7 @@ class NodeMetricsService:
 
     @staticmethod
     async def _collect_usage(
-        connector,  # noqa: ANN001
+        connector: RemoteCommandSession,
         command: str,
     ) -> tuple[int, int, float]:
         stdout, _, _ = await connector.execute_command(command)

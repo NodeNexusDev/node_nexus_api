@@ -1,7 +1,6 @@
 """SSH connector implementation."""
 
 import asyncio
-import hashlib
 from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import Any
@@ -9,6 +8,7 @@ from typing import Any
 import asyncssh
 import structlog
 
+from app.application.command_policy import command_fingerprint
 from app.core.connectors.base import BaseConnector, StreamEvent
 from app.core.exceptions import ConnectionFailedError
 
@@ -16,11 +16,6 @@ logger = structlog.get_logger()  # operational: flow, performance
 audit = structlog.get_logger("audit")  # security: access, commands, failures
 _ALLOWED_SIGNALS = frozenset({"SIGINT", "SIGTERM", "SIGHUP"})
 _STREAM_QUEUE_SIZE = 128
-
-
-def command_fingerprint(command: str) -> str:
-    """Return a stable non-reversible identifier for a command."""
-    return hashlib.sha256(command.encode()).hexdigest()
 
 
 class SSHConnector(BaseConnector):

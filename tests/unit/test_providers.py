@@ -155,6 +155,7 @@ def test_service_provider_resolves() -> None:
     node_metrics_svc = svc_provider.get_node_metrics_service(
         factory,
         node_reader,
+        credential_cipher,
     )
     assert node_command_svc is not None
     assert node_bulk_command_svc is not None

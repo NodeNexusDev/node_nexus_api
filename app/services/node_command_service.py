@@ -13,14 +13,13 @@ if TYPE_CHECKING:
         NodeConnectionReader,
         NodeStatusWriter,
     )
-    from app.core.connectors.base import ConnectorFactory
+    from app.application.ports.remote_command import RemoteConnectorFactory
     from app.services.audit_service import AuditService
 
+from app.application.command_policy import command_fingerprint
 from app.application.dto.command_execution import CommandRequestDTO, CommandResultDTO
 from app.application.dto.node_view import NodeViewDTO
-from app.core.connectors.ssh import command_fingerprint
 from app.core.exceptions import ConnectionFailedError, NodeNotFoundError
-from app.core.ssh_utils import get_connector_factory
 
 audit = structlog.get_logger("audit")
 
@@ -33,8 +32,8 @@ class NodeCommandService:
         node_reader: NodeConnectionReader,
         status_writer: NodeStatusWriter,
         credential_cipher: CredentialCipher,
+        connector_factory: RemoteConnectorFactory,
         audit_service: AuditService | None = None,
-        connector_factory: ConnectorFactory | None = None,
     ) -> None:
         self._node_reader = node_reader
         self._status_writer = status_writer
@@ -57,7 +56,7 @@ class NodeCommandService:
         if node is None:
             raise NodeNotFoundError(f"Node {node_id} not found")
 
-        connector = get_connector_factory(self._connector_factory).create_ssh(
+        connector = self._connector_factory.create_ssh(
             host=node.host,
             port=node.port,
             username=node.username,
@@ -110,9 +109,7 @@ class NodeCommandService:
         if data.timeout is not None:
             connector_kwargs["timeout"] = data.timeout
 
-        connector = get_connector_factory(self._connector_factory).create_ssh(
-            **connector_kwargs
-        )
+        connector = self._connector_factory.create_ssh(**connector_kwargs)
         if self._audit:
             await self._audit.log_required(
                 "execute.requested",

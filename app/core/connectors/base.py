@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from types import TracebackType
-from typing import Protocol
+from typing import Protocol, Self
 
 
 @dataclass(frozen=True, slots=True)
@@ -61,7 +61,7 @@ class BaseConnector(ABC):
             f"{type(self).__name__} does not support process signals"
         )
 
-    async def __aenter__(self) -> "BaseConnector":
+    async def __aenter__(self) -> Self:
         """Enter async context manager."""
         await self.connect()
         return self

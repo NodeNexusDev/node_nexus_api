@@ -7,6 +7,10 @@ from app.application.ports.node_management import (
     NodeManagementWriter,
 )
 from app.application.ports.node_reader import NodeConnectionReader, NodeStatusWriter
+from app.application.ports.remote_command import (
+    RemoteCommandSession,
+    RemoteConnectorFactory,
+)
 
 __all__ = [
     "AuditWriter",
@@ -15,4 +19,6 @@ __all__ = [
     "NodeManagementReader",
     "NodeManagementWriter",
     "NodeStatusWriter",
+    "RemoteCommandSession",
+    "RemoteConnectorFactory",
 ]

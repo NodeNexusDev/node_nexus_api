@@ -80,6 +80,7 @@ class IntegrationDbProvider(Provider):
             node_reader=ScopedNodeConnectionReader(self._sm),
             status_writer=gateway,
             credential_cipher=AesGcmCredentialCipher(),
+            connector_factory=MagicMock(),
         )
 
     @provide(scope=Scope.REQUEST)
@@ -87,11 +88,16 @@ class IntegrationDbProvider(Provider):
         return NodeBulkCommandService(
             node_reader=ScopedNodeConnectionReader(self._sm),
             credential_cipher=AesGcmCredentialCipher(),
+            connector_factory=MagicMock(),
         )
 
     @provide(scope=Scope.REQUEST)
-    def get_node_metrics_service(self, repo: NodeRepository) -> NodeMetricsService:
-        return NodeMetricsService(node_reader=repo)
+    def get_node_metrics_service(self) -> NodeMetricsService:
+        return NodeMetricsService(
+            node_reader=ScopedNodeConnectionReader(self._sm),
+            credential_cipher=AesGcmCredentialCipher(),
+            connector_factory=MagicMock(),
+        )
 
     @provide(scope=Scope.REQUEST)
     def get_service(self) -> NodeManagementService:

@@ -11,6 +11,7 @@ from dishka.integrations.fastapi import setup_dishka
 from fastapi import FastAPI
 from httpx2 import ASGITransport, AsyncClient
 
+from app.adapters.security import AesGcmCredentialCipher
 from app.api.error_mapping import domain_error_handler
 from app.api.v1.nodes import router as nodes_router
 from app.core.exceptions import ConnectionFailedError, DomainError, NodeNotFoundError
@@ -281,6 +282,7 @@ class TestNodeMetricsService:
 
         service = NodeMetricsService(
             node_reader=mock_repo,
+            credential_cipher=AesGcmCredentialCipher(),
             connector_factory=mock_factory,
         )
         metrics = await service.collect(
@@ -319,6 +321,7 @@ class TestNodeMetricsService:
 
         service = NodeMetricsService(
             node_reader=mock_repo,
+            credential_cipher=AesGcmCredentialCipher(),
             connector_factory=mock_factory,
         )
 

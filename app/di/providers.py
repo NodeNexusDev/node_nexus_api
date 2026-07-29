@@ -26,6 +26,7 @@ from app.application.ports.node_management import (
     NodeManagementWriter,
 )
 from app.application.ports.node_reader import NodeConnectionReader, NodeStatusWriter
+from app.application.ports.remote_command import RemoteConnectorFactory
 from app.application.services.streaming_command_service import StreamingCommandService
 from app.core.config import Settings, get_settings
 from app.core.connectors.ssh import SSHConnectorFactory
@@ -203,6 +204,13 @@ class ConnectorProvider(Provider):
         )
 
     @provide(scope=Scope.APP)
+    def get_remote_connector_factory(
+        self, factory: SSHConnectorFactory
+    ) -> RemoteConnectorFactory:
+        """Bind remote command sessions to the SSH adapter."""
+        return factory
+
+    @provide(scope=Scope.APP)
     def get_credential_cipher(self) -> CredentialCipher:
         """Bind credential protection to the configured AES-GCM adapter."""
         return AesGcmCredentialCipher()
@@ -214,20 +222,22 @@ class ServiceProvider(Provider):
     @provide(scope=Scope.REQUEST)
     def get_node_metrics_service(
         self,
-        connector_factory: SSHConnectorFactory,
+        connector_factory: RemoteConnectorFactory,
         node_reader: ScopedNodeConnectionReader,
+        credential_cipher: CredentialCipher,
     ) -> NodeMetricsService:
         """Get the node metrics service."""
         return NodeMetricsService(
             connector_factory=connector_factory,
             node_reader=node_reader,
+            credential_cipher=credential_cipher,
         )
 
     @provide(scope=Scope.REQUEST)
     def get_node_bulk_command_service(
         self,
         audit_service: AuditService,
-        connector_factory: SSHConnectorFactory,
+        connector_factory: RemoteConnectorFactory,
         node_reader: NodeConnectionReader,
         credential_cipher: CredentialCipher,
     ) -> NodeBulkCommandService:
@@ -243,7 +253,7 @@ class ServiceProvider(Provider):
     def get_node_command_service(
         self,
         audit_service: AuditService,
-        connector_factory: SSHConnectorFactory,
+        connector_factory: RemoteConnectorFactory,
         node_reader: NodeConnectionReader,
         status_writer: NodeStatusWriter,
         credential_cipher: CredentialCipher,
