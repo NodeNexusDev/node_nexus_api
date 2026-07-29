@@ -191,3 +191,36 @@ def test_application_ports_have_explicit_dishka_bindings() -> None:
             missing.append(f"{name}: provides=Port missing")
 
     assert not missing, "Implicit port bindings:\n" + "\n".join(missing)
+
+
+@pytest.mark.parametrize(
+    "relative_path",
+    (
+        "application/services/script_execution_service.py",
+        "services/node_bulk_command_service.py",
+        "services/docker/bulk_service.py",
+    ),
+)
+def test_concurrent_remote_workers_cannot_import_persistence_state(
+    relative_path: str,
+) -> None:
+    """Concurrent worker modules receive DTOs, never sessions, DAOs, or ORM."""
+    path = APP_ROOT / relative_path
+    source = path.read_text(encoding="utf-8")
+    imports = _imports(path)
+    forbidden = (
+        "sqlalchemy",
+        "app.models",
+        "app.repositories",
+        "app.adapters.persistence",
+    )
+
+    assert "asyncio.gather" in source
+    assert not [
+        imported
+        for imported in imports
+        if any(
+            imported == prefix or imported.startswith(f"{prefix}.")
+            for prefix in forbidden
+        )
+    ]
