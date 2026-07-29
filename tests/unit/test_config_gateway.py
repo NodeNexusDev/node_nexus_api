@@ -1,8 +1,17 @@
 """Tests for the coordinated SQLAlchemy configuration adapter."""
 
+from collections.abc import AsyncGenerator
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+import pytest_asyncio
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import (
+    AsyncEngine,
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
 
 from app.adapters.persistence.config import SqlAlchemyConfigGateway
 from app.application.dto.config import (
@@ -11,6 +20,17 @@ from app.application.dto.config import (
     NodeConfigDTO,
     ScriptConfigDTO,
 )
+from app.models.base import Base
+from app.models.node import NodeModel
+
+
+@pytest_asyncio.fixture
+async def engine() -> AsyncGenerator[AsyncEngine]:
+    database = create_async_engine("sqlite+aiosqlite:///:memory:")
+    async with database.begin() as connection:
+        await connection.run_sync(Base.metadata.create_all)
+    yield database
+    await database.dispose()
 
 
 def _sessionmaker_for_export() -> tuple[MagicMock, MagicMock]:
@@ -164,3 +184,36 @@ async def test_import_exception_leaves_transaction_context() -> None:
     exit_args = transaction.__aexit__.await_args.args
     assert exit_args[0] is RuntimeError
     node_repository.create.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_import_rolls_back_earlier_writes_on_later_failure(
+    engine: AsyncEngine,
+) -> None:
+    """The specialized import boundary is atomic across entity types."""
+    sessionmaker = async_sessionmaker(
+        engine,
+        class_=AsyncSession,
+        expire_on_commit=False,
+    )
+    command_repository = AsyncMock()
+    command_repository.get_all.return_value = []
+    command_repository.create.side_effect = RuntimeError("command write failed")
+    data = ConfigTransferDTO(
+        nodes=(NodeConfigDTO("rolled-back", "10.0.0.1", 22, "ssh"),),
+        commands=(CommandConfigDTO("failure", "false"),),
+    )
+
+    with (
+        patch(
+            "app.adapters.persistence.config.CommandRepository",
+            return_value=command_repository,
+        ),
+        pytest.raises(RuntimeError, match="command write failed"),
+    ):
+        await SqlAlchemyConfigGateway(sessionmaker).import_config(data)
+
+    async with sessionmaker() as session:
+        persisted_nodes = list((await session.execute(select(NodeModel))).scalars())
+
+    assert persisted_nodes == []
