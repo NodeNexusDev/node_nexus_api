@@ -8,6 +8,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from app.application.services.config_service import ConfigService
 from app.core.scheduler import ScriptScheduler
 from app.schemas.config import (
     CommandExport,
@@ -16,7 +17,6 @@ from app.schemas.config import (
     NodeExport,
     ScriptExport,
 )
-from app.services.config_service import ConfigService
 
 # ============================================================
 # Telemetry (59% → higher)

@@ -4,6 +4,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from app.application.services.config_service import ConfigService
 from app.schemas.config import (
     CONFIG_FORMAT_VERSION,
     CommandExport,
@@ -13,7 +14,6 @@ from app.schemas.config import (
     NodeExport,
     ScriptExport,
 )
-from app.services.config_service import ConfigService
 
 
 def _make_node_model(**overrides):
@@ -71,7 +71,7 @@ class TestConfigExport:
         assert len(result.scripts) == 1
         assert result.format_version == CONFIG_FORMAT_VERSION
         assert result.application_version
-        assert result.version == "0.5.0"
+        assert result.legacy_version == "0.5.0"
         assert result.exported_at is not None
 
     @pytest.mark.asyncio
@@ -105,9 +105,9 @@ class TestConfigExport:
         svc = ConfigService(node_repo, cmd_repo, script_repo)
         result = await svc.export_all()
 
-        assert result.nodes == []
-        assert result.commands == []
-        assert result.scripts == []
+        assert result.nodes == ()
+        assert result.commands == ()
+        assert result.scripts == ()
 
 
 class TestConfigImport:
@@ -139,7 +139,7 @@ class TestConfigImport:
         assert result.nodes_created == 1
         assert result.commands_created == 1
         assert result.scripts_created == 1
-        assert result.errors == []
+        assert result.errors == ()
         node_repo.create.assert_called_once()
         cmd_repo.create.assert_called_once()
         script_repo.create.assert_called_once()
@@ -190,7 +190,7 @@ class TestConfigImport:
         assert result.nodes_created == 0
         assert result.commands_created == 0
         assert result.scripts_created == 0
-        assert result.errors == []
+        assert result.errors == ()
 
     @pytest.mark.asyncio
     async def test_unknown_major_is_rejected_before_repository_access(self):

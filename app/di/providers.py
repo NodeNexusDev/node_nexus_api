@@ -77,6 +77,7 @@ from app.application.services.api_key_management import APIKeyManagementService
 from app.application.services.audit_cleanup_job import AuditCleanupJob
 from app.application.services.audit_event_service import AuditEventService
 from app.application.services.audit_log_service import AuditLogService
+from app.application.services.config_service import ConfigService
 from app.application.services.schedule_management import (
     ScheduleManagementService,
 )
@@ -94,7 +95,6 @@ from app.core.connectors.ssh import SSHConnectorFactory
 from app.core.scheduler import ScriptScheduler
 from app.services.command_execution_service import CommandExecutionService
 from app.services.command_management_service import CommandManagementService
-from app.services.config_service import ConfigService
 from app.services.docker.bulk_service import DockerBulkService
 from app.services.docker.command_runner import DockerCommandRunner
 from app.services.docker.container_service import DockerContainerService

@@ -1,6 +1,7 @@
 """Tests for config export/import API endpoints via test client."""
 
 from collections.abc import AsyncGenerator
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -10,8 +11,8 @@ from fastapi import FastAPI
 from httpx2 import ASGITransport, AsyncClient
 
 from app.api.v1.config import router as config_router
-from app.schemas.config import ConfigExport, ImportResult
-from app.services.config_service import ConfigService
+from app.application.dto.config import ConfigImportResultDTO, ConfigTransferDTO
+from app.application.services.config_service import ConfigService
 from tests.unit.conftest import MockAuthServiceProvider, _mock_settings
 
 
@@ -51,8 +52,11 @@ async def client(mock_service: AsyncMock) -> AsyncGenerator[AsyncClient]:
 class TestConfigExportAPI:
     async def test_export_config(self, client: AsyncClient, mock_service: AsyncMock):
         """GET /api/v1/config/export returns export data."""
-        mock_service.export_all.return_value = ConfigExport(
-            exported_at="2026-01-01T00:00:00Z"
+        mock_service.export_all.return_value = ConfigTransferDTO(
+            exported_at=datetime(2026, 1, 1, tzinfo=UTC),
+            format_version="1.0",
+            application_version="test",
+            legacy_version="0.5.0",
         )
         resp = await client.get("/api/v1/config/export")
         assert resp.status_code == 200
@@ -67,7 +71,7 @@ class TestConfigExportAPI:
 class TestConfigImportAPI:
     async def test_import_config(self, client: AsyncClient, mock_service: AsyncMock):
         """POST /api/v1/config/import imports data."""
-        mock_service.import_config.return_value = ImportResult(nodes_created=2)
+        mock_service.import_config.return_value = ConfigImportResultDTO(nodes_created=2)
         resp = await client.post(
             "/api/v1/config/import",
             json={"nodes": [], "commands": [], "scripts": []},
@@ -80,7 +84,7 @@ class TestConfigImportAPI:
         self, client: AsyncClient, mock_service: AsyncMock
     ):
         """POST /api/v1/config/import with empty payload."""
-        mock_service.import_config.return_value = ImportResult()
+        mock_service.import_config.return_value = ConfigImportResultDTO()
         resp = await client.post(
             "/api/v1/config/import",
             json={},

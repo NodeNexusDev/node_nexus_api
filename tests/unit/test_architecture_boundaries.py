@@ -296,7 +296,9 @@ def test_docker_use_cases_do_not_depend_on_transport_or_infrastructure() -> None
 
 def test_config_service_depends_on_persistence_ports() -> None:
     """Configuration orchestration must not know SQLAlchemy DAO implementations."""
-    imports = _imports_in_file(APP_ROOT / "services" / "config_service.py")
+    imports = _imports_in_file(
+        APP_ROOT / "application" / "services" / "config_service.py"
+    )
     forbidden = ("app.adapters", "app.models", "app.repositories", "sqlalchemy")
     assert not [
         module

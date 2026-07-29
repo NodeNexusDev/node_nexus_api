@@ -13,6 +13,7 @@ from app.application.services.api_key_authentication import (
 )
 from app.application.services.api_key_management import APIKeyManagementService
 from app.application.services.audit_log_service import AuditLogService
+from app.application.services.config_service import ConfigService
 from app.application.services.schedule_management import ScheduleManagementService
 from app.application.services.script_execution_service import ScriptExecutionService
 from app.application.services.streaming_command_service import StreamingCommandService
@@ -20,7 +21,6 @@ from app.core.config import Settings
 from app.di.providers import AppProvider
 from app.services.command_execution_service import CommandExecutionService
 from app.services.command_management_service import CommandManagementService
-from app.services.config_service import ConfigService
 from app.services.docker.bulk_service import DockerBulkService
 from app.services.docker.container_service import DockerContainerService
 from app.services.docker.image_service import DockerImageService

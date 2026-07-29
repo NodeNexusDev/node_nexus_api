@@ -1,26 +1,28 @@
-"""Config service for export/import operations."""
+"""Configuration export and import application use cases."""
 
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import TypeVar
+from importlib.metadata import PackageNotFoundError, version
+from typing import TypeVar, cast
 
+from app.application.dto.config import (
+    CONFIG_FORMAT_VERSION,
+    LEGACY_CONFIG_VERSION,
+    CommandConfigDTO,
+    ConfigImportResultDTO,
+    ConfigTransferDTO,
+    NodeConfigDTO,
+    ScriptConfigDTO,
+)
 from app.application.ports.config_persistence import (
     CommandConfigStore,
     ConfigRecordReader,
     NodeConfigStore,
     ScriptConfigStore,
 )
+from app.application.types import PersistenceObject
 from app.core.exceptions import UnsupportedConfigFormatError
-from app.schemas.config import (
-    CONFIG_FORMAT_VERSION,
-    CommandExport,
-    ConfigExport,
-    ConfigImport,
-    ImportResult,
-    NodeExport,
-    ScriptExport,
-)
 
 RecordT = TypeVar("RecordT")
 
@@ -50,47 +52,50 @@ class ConfigService:
             if len(batch) < batch_size:
                 return items
 
-    async def export_all(self) -> ConfigExport:
+    async def export_all(self) -> ConfigTransferDTO:
         """Export all nodes, commands, and scripts."""
         nodes = await self._load_all(self._node_repo)
         commands = await self._load_all(self._command_repo)
         scripts = await self._load_all(self._script_repo)
 
-        return ConfigExport(
+        return ConfigTransferDTO(
+            format_version=CONFIG_FORMAT_VERSION,
+            application_version=_application_version(),
+            legacy_version=LEGACY_CONFIG_VERSION,
             exported_at=datetime.now(UTC),
-            nodes=[
-                NodeExport(
+            nodes=tuple(
+                NodeConfigDTO(
                     name=n.name,
                     host=n.host,
                     port=n.port,
                     connection_type=n.connection_type,
                     username=n.username,
-                    tags=n.tags or [],
+                    tags=tuple(n.tags or ()),
                 )
                 for n in nodes
-            ],
-            commands=[
-                CommandExport(
+            ),
+            commands=tuple(
+                CommandConfigDTO(
                     name=c.name,
                     description=c.description,
                     command=c.command,
-                    parameters=c.parameters,
-                    tags=c.tags or [],
+                    parameters=tuple(c.parameters or ()),
+                    tags=tuple(c.tags or ()),
                 )
                 for c in commands
-            ],
-            scripts=[
-                ScriptExport(
+            ),
+            scripts=tuple(
+                ScriptConfigDTO(
                     name=s.name,
                     description=s.description,
-                    steps=s.steps or [],
-                    tags=s.tags or [],
+                    steps=tuple(s.steps or ()),
+                    tags=tuple(s.tags or ()),
                 )
                 for s in scripts
-            ],
+            ),
         )
 
-    async def import_config(self, data: ConfigImport) -> ImportResult:
+    async def import_config(self, data: ConfigTransferDTO) -> ConfigImportResultDTO:
         """Import configuration atomically, skipping duplicate names."""
         if data.format_version is not None:
             received_major = data.format_version.split(".", maxsplit=1)[0]
@@ -100,7 +105,8 @@ class ConfigService:
                     "Unsupported configuration format "
                     f"{data.format_version}; supported major is {supported_major}"
                 )
-        result = ImportResult()
+        nodes_created = commands_created = scripts_created = 0
+        errors: list[str] = []
         existing_node_names = {
             item.name
             for item in (await self._load_all(self._node_repo) if data.nodes else [])
@@ -120,30 +126,68 @@ class ConfigService:
 
         for node_data in data.nodes:
             if node_data.name in existing_node_names:
-                result.errors.append(f"Node '{node_data.name}' already exists, skipped")
+                errors.append(f"Node '{node_data.name}' already exists, skipped")
                 continue
-            await self._node_repo.create(node_data.model_dump())
+            await self._node_repo.create(
+                {
+                    "name": node_data.name,
+                    "host": node_data.host,
+                    "port": node_data.port,
+                    "connection_type": node_data.connection_type,
+                    "username": node_data.username,
+                    "tags": list(node_data.tags),
+                }
+            )
             existing_node_names.add(node_data.name)
-            result.nodes_created += 1
+            nodes_created += 1
 
         for cmd_data in data.commands:
             if cmd_data.name in existing_command_names:
-                result.errors.append(
-                    f"Command '{cmd_data.name}' already exists, skipped"
-                )
+                errors.append(f"Command '{cmd_data.name}' already exists, skipped")
                 continue
-            await self._command_repo.create(cmd_data.model_dump())
+            await self._command_repo.create(
+                cast(
+                    PersistenceObject,
+                    {
+                        "name": cmd_data.name,
+                        "description": cmd_data.description,
+                        "command": cmd_data.command,
+                        "parameters": list(cmd_data.parameters or ()),
+                        "tags": list(cmd_data.tags),
+                    },
+                )
+            )
             existing_command_names.add(cmd_data.name)
-            result.commands_created += 1
+            commands_created += 1
 
         for script_data in data.scripts:
             if script_data.name in existing_script_names:
-                result.errors.append(
-                    f"Script '{script_data.name}' already exists, skipped"
-                )
+                errors.append(f"Script '{script_data.name}' already exists, skipped")
                 continue
-            await self._script_repo.create(script_data.model_dump())
+            await self._script_repo.create(
+                cast(
+                    PersistenceObject,
+                    {
+                        "name": script_data.name,
+                        "description": script_data.description,
+                        "steps": list(script_data.steps),
+                        "tags": list(script_data.tags),
+                    },
+                )
+            )
             existing_script_names.add(script_data.name)
-            result.scripts_created += 1
+            scripts_created += 1
 
-        return result
+        return ConfigImportResultDTO(
+            nodes_created=nodes_created,
+            commands_created=commands_created,
+            scripts_created=scripts_created,
+            errors=tuple(errors),
+        )
+
+
+def _application_version() -> str:
+    try:
+        return version("node-nexus-api")
+    except PackageNotFoundError:
+        return "unknown"
