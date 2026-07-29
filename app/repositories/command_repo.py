@@ -62,4 +62,5 @@ class CommandRepository(IRepository[CommandModel]):
             return False
         await self._session.delete(command)
         await self._session.flush()
+        await self._session.commit()
         return True

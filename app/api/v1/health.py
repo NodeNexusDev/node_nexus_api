@@ -38,14 +38,23 @@ async def readiness_check(
     No authentication required (for Kubernetes readiness probes).
     """
     db_ok = await service.check_db()
-    if db_ok:
+    scheduler_ok = service.check_scheduler()
+    if db_ok and scheduler_ok:
         return Response(
-            content='{"status": "ready", "checks": {"database": "ok"}}',
+            content=(
+                '{"status": "ready", "checks": {"database": "ok", "scheduler": "ok"}}'
+            ),
             status_code=200,
             media_type="application/json",
         )
+    database_state = "ok" if db_ok else "error"
+    scheduler_state = "ok" if scheduler_ok else "degraded"
     return Response(
-        content='{"status": "not_ready", "checks": {"database": "error"}}',
+        content=(
+            f'{{"status": "not_ready", "checks": '
+            f'{{"database": "{database_state}", '
+            f'"scheduler": "{scheduler_state}"}}}}'
+        ),
         status_code=503,
         media_type="application/json",
     )

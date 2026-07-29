@@ -81,11 +81,11 @@ class APIKeyRepository:
         model = result.scalar_one()
         model.is_active = False
         await self._session.flush()
+        await self._session.commit()
 
-    async def update_last_used(self, key_id: uuid.UUID) -> None:
-        result = await self._session.execute(
-            select(APIKeyModel).where(APIKeyModel.id == key_id)
-        )
-        model = result.scalar_one()
-        model.last_used_at = datetime.now(UTC)
+    async def update_last_used(
+        self, model: APIKeyModel, used_at: datetime | None = None
+    ) -> None:
+        """Update an already-loaded key without a second database lookup."""
+        model.last_used_at = used_at or datetime.now(UTC)
         await self._session.flush()

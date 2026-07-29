@@ -1,11 +1,15 @@
 """E2E tests for the full application stack."""
 
+import time
 from datetime import UTC, datetime
 from uuid import uuid4
 
 import httpx2 as httpx
 import pytest
+from pytest_docker.plugin import Services
+from sqlalchemy.ext.asyncio import create_async_engine
 
+from app.core.scheduler import ScriptScheduler
 from app.schemas.common import encode_cursor
 from tests.e2e.conftest import ServicePorts
 
@@ -46,6 +50,30 @@ def _create_ssh_node(e2e_client: httpx.Client, **overrides) -> dict:
     resp = e2e_client.post("/api/v1/nodes/", json=data)
     assert resp.status_code == 201
     return resp.json()
+
+
+def _wait_for_audit(
+    client: httpx.Client,
+    *,
+    query: str = "",
+    action: str | None = None,
+    minimum_total: int = 1,
+    timeout: float = 5.0,
+) -> dict:
+    """Poll the deliberately eventually-consistent transactional outbox."""
+    deadline = time.monotonic() + timeout
+    while True:
+        response = client.get(f"/api/v1/audit/{query}")
+        assert response.status_code == 200
+        data = response.json()
+        actions = {item["action"] for item in data["items"]}
+        if data["total"] >= minimum_total and (action is None or action in actions):
+            return data
+        if time.monotonic() >= deadline:
+            raise AssertionError(
+                f"audit event was not delivered: action={action}, query={query}"
+            )
+        time.sleep(0.1)
 
 
 def test_health(e2e_client: httpx.Client) -> None:
@@ -280,23 +308,22 @@ def test_audit_logs_track_crud_operations(e2e_client: httpx.Client) -> None:
     node_id = node["id"]
 
     # create action recorded
-    resp = e2e_client.get(f"/api/v1/audit/?node_id={node_id}")
-    actions = [log["action"] for log in resp.json()["items"]]
+    data = _wait_for_audit(e2e_client, query=f"?node_id={node_id}", action="create")
+    actions = [log["action"] for log in data["items"]]
     assert "create" in actions
 
     # update action recorded
     e2e_client.put(f"/api/v1/nodes/{node_id}", json={"name": "audit-crud-upd"})
-    resp = e2e_client.get(f"/api/v1/audit/?node_id={node_id}")
-    actions = [log["action"] for log in resp.json()["items"]]
+    data = _wait_for_audit(e2e_client, query=f"?node_id={node_id}", action="update")
+    actions = [log["action"] for log in data["items"]]
     assert "update" in actions
 
     # delete action recorded — ON DELETE SET NULL nullifies node_id,
     # so query by action instead of node_id.
     total_before = e2e_client.get("/api/v1/audit/").json()["total"]
     e2e_client.delete(f"/api/v1/nodes/{node_id}")
-    resp = e2e_client.get("/api/v1/audit/")
-    assert resp.json()["total"] >= total_before
-    all_actions = [log["action"] for log in resp.json()["items"]]
+    data = _wait_for_audit(e2e_client, action="delete", minimum_total=total_before + 1)
+    all_actions = [log["action"] for log in data["items"]]
     assert "delete" in all_actions
 
 
@@ -317,9 +344,8 @@ def test_delete_creates_audit_log_and_removes_node(
 
     # audit entry exists (ON DELETE SET NULL nullifies node_id,
     # so verify total grew and a "delete" action appeared)
-    resp = e2e_client.get("/api/v1/audit/")
-    assert resp.json()["total"] >= total_before
-    all_actions = [log["action"] for log in resp.json()["items"]]
+    data = _wait_for_audit(e2e_client, action="delete", minimum_total=total_before + 1)
+    all_actions = [log["action"] for log in data["items"]]
     assert "delete" in all_actions
 
 
@@ -648,11 +674,8 @@ def test_script_execute_node_not_found(e2e_client: httpx.Client) -> None:
         f"/api/v1/scripts/{script['id']}/execute",
         json={"node_ids": [str(uuid4())], "params": {}},
     )
-    # Script execution returns 200 with per-node failure status
-    assert resp.status_code == 200
-    batch = resp.json()
-    assert len(batch["results"]) == 1
-    assert batch["results"][0]["status"] == "failed"
+    # All targets are validated before any remote side effect.
+    assert resp.status_code == 404
 
 
 def test_script_executions_history(e2e_client: httpx.Client) -> None:
@@ -944,9 +967,11 @@ def test_audit_log_combined_filters(e2e_client: httpx.Client) -> None:
     node = _create_node(e2e_client, name="audit-combined")
     node_id = node["id"]
 
-    resp = e2e_client.get(f"/api/v1/audit/?node_id={node_id}&action=create")
-    assert resp.status_code == 200
-    data = resp.json()
+    data = _wait_for_audit(
+        e2e_client,
+        query=f"?node_id={node_id}&action=create",
+        action="create",
+    )
     assert data["total"] >= 1
     for log in data["items"]:
         assert log["action"] == "create"
@@ -2024,6 +2049,25 @@ def test_script_schedule_nonexistent(e2e_client: httpx.Client) -> None:
         json={"cron": "0 9 * * *", "node_ids": [str(uuid4())]},
     )
     assert resp.status_code == 404
+
+
+async def test_second_scheduler_replica_cannot_acquire_ownership(
+    docker_ip: str,
+    docker_services: Services,
+) -> None:
+    """The running API owns the advisory lock, so a contender is rejected."""
+    database_port = docker_services.port_for("db", 5432)
+    engine = create_async_engine(
+        f"postgresql+asyncpg://postgres:postgres@{docker_ip}:{database_port}"
+        "/node_nexus_e2e"
+    )
+    contender = ScriptScheduler()
+    try:
+        assert await contender.acquire_ownership(engine) is False
+        assert contender.owns_execution is False
+    finally:
+        await contender.stop()
+        await engine.dispose()
 
 
 def test_script_schedule_invalid_cron(e2e_client: httpx.Client) -> None:

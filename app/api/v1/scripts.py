@@ -14,7 +14,6 @@ from app.core.exceptions import (
     ScriptNotFoundError,
     TemplateRenderError,
 )
-from app.core.scheduler import ScriptScheduler
 from app.schemas.node import PaginatedResponse
 from app.schemas.scheduler import ScheduledJob, ScheduleRequest, ScheduleResponse
 from app.schemas.script import (
@@ -25,6 +24,7 @@ from app.schemas.script import (
     ScriptUpdate,
 )
 from app.schemas.script_execution import ScriptExecutionResponse
+from app.services.schedule_service import ScheduleService
 from app.services.script_service import ScriptService
 
 audit = structlog.get_logger("audit")
@@ -168,8 +168,7 @@ async def get_executions(
 async def schedule_script(
     script_id: uuid.UUID,
     data: ScheduleRequest,
-    service: FromDishka[ScriptService],
-    scheduler: FromDishka[ScriptScheduler],
+    schedule_service: FromDishka[ScheduleService],
     _key: str = Security(require_write_scope),
 ) -> ScheduleResponse:
     """Schedule a script to run periodically via cron expression.
@@ -182,18 +181,11 @@ async def schedule_script(
         cron=data.cron,
         node_ids=[str(n) for n in data.node_ids],
     )
-    try:
-        await service.get_script(script_id)  # Validate script exists
-    except ScriptNotFoundError:
-        raise HTTPException(status_code=404, detail="Script not found")
-
-    try:
-        scheduler.schedule_script(script_id, data.cron, data.node_ids)
-    except ValueError as e:
-        raise HTTPException(status_code=422, detail=f"Invalid cron expression: {e}")
+    schedule = await schedule_service.create_or_update(script_id, data)
     return ScheduleResponse(
         script_id=str(script_id),
-        cron=data.cron,
+        cron=schedule.cron,
+        timezone=schedule.timezone,
         message="Script scheduled successfully",
     )
 
@@ -202,15 +194,12 @@ async def schedule_script(
 @inject
 async def unschedule_script(
     script_id: uuid.UUID,
-    service: FromDishka[ScriptService],
-    scheduler: FromDishka[ScriptScheduler],
+    schedule_service: FromDishka[ScheduleService],
     _key: str = Security(require_write_scope),
 ) -> dict:
     """Remove a scheduled script."""
     audit.info("api.scripts.unschedule", script_id=str(script_id))
-    removed = scheduler.unschedule_script(script_id)
-    if not removed:
-        raise HTTPException(status_code=404, detail="No schedule found for script")
+    await schedule_service.delete(script_id)
     return {"message": "Script unscheduled", "script_id": str(script_id)}
 
 
@@ -218,13 +207,9 @@ async def unschedule_script(
 @inject
 async def get_schedule(
     script_id: uuid.UUID,
-    service: FromDishka[ScriptService],
-    scheduler: FromDishka[ScriptScheduler],
+    schedule_service: FromDishka[ScheduleService],
     _key: str = Security(require_write_scope),
 ) -> ScheduledJob | None:
     """Get the schedule for a script."""
     audit.info("api.scripts.get_schedule", script_id=str(script_id))
-    info = scheduler.get_schedule(script_id)
-    if info is None:
-        raise HTTPException(status_code=404, detail="No schedule found for script")
-    return ScheduledJob(**info)
+    return await schedule_service.get(script_id)

@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from app.schemas.config import (
+    CONFIG_FORMAT_VERSION,
     CommandExport,
     ConfigExport,
     ConfigImport,
@@ -68,6 +69,8 @@ class TestConfigExport:
         assert len(result.nodes) == 2
         assert len(result.commands) == 1
         assert len(result.scripts) == 1
+        assert result.format_version == CONFIG_FORMAT_VERSION
+        assert result.application_version
         assert result.version == "0.5.0"
         assert result.exported_at is not None
 
@@ -190,6 +193,22 @@ class TestConfigImport:
         assert result.errors == []
 
     @pytest.mark.asyncio
+    async def test_unknown_major_is_rejected_before_repository_access(self):
+        from app.core.exceptions import UnsupportedConfigFormatError
+
+        node_repo = AsyncMock()
+        cmd_repo = AsyncMock()
+        script_repo = AsyncMock()
+        svc = ConfigService(node_repo, cmd_repo, script_repo)
+
+        with pytest.raises(UnsupportedConfigFormatError):
+            await svc.import_config(ConfigImport(format_version="2.0"))
+
+        node_repo.get_all.assert_not_called()
+        cmd_repo.get_all.assert_not_called()
+        script_repo.get_all.assert_not_called()
+
+    @pytest.mark.asyncio
     async def test_import_preloads_once_and_skips_payload_duplicates(self):
         """Duplicate detection is linear and includes earlier payload items."""
         node_repo = AsyncMock()
@@ -234,6 +253,8 @@ class TestConfigSchemas:
             ],
         )
         d = data.model_dump()
+        assert d["format_version"] == CONFIG_FORMAT_VERSION
+        assert d["application_version"]
         assert d["version"] == "0.5.0"
         assert len(d["nodes"]) == 1
 

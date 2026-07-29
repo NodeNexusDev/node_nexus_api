@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from app.di.providers import (
+    ConfigProvider,
     ConnectorProvider,
     DbProvider,
     RepositoryProvider,
@@ -14,15 +15,19 @@ from app.di.providers import (
 from app.repositories.api_key_repo import APIKeyRepository
 from app.repositories.audit_repo import AuditLogRepository
 from app.repositories.command_repo import CommandRepository
+from app.repositories.health_repo import HealthRepository
 from app.repositories.node_repo import NodeRepository
 from app.repositories.script_execution_repo import ScriptExecutionRepository
 from app.repositories.script_repo import ScriptRepository
+from app.repositories.script_schedule_repo import ScriptScheduleRepository
 from app.services.api_key_service import APIKeyService
 from app.services.audit_service import AuditService
 from app.services.command_service import CommandService
 from app.services.config_service import ConfigService
 from app.services.docker_service import DockerService
+from app.services.health_service import HealthService
 from app.services.node_service import NodeService
+from app.services.schedule_service import ScheduleService
 from app.services.script_service import ScriptService
 
 
@@ -56,7 +61,10 @@ def test_db_provider_builds_sessionmaker_from_engine() -> None:
 @pytest.mark.asyncio
 async def test_scheduler_provider_manages_lifecycle() -> None:
     provider = SchedulerProvider()
-    resource = provider.get_script_scheduler()
+    engine = MagicMock()
+    engine.dialect.name = "sqlite"
+    settings = MagicMock(SCHEDULER_ENABLED=True)
+    resource = provider.get_script_scheduler(engine, settings)
 
     scheduler = await anext(resource)
     assert scheduler._scheduler.running is True
@@ -76,13 +84,26 @@ def test_repository_provider_resolves() -> None:
         provider.get_script_execution_repository(session), ScriptExecutionRepository
     )
     assert isinstance(provider.get_api_key_repository(session), APIKeyRepository)
+    assert isinstance(
+        provider.get_script_schedule_repository(session), ScriptScheduleRepository
+    )
+    assert isinstance(provider.get_health_repository(session), HealthRepository)
+    assert provider.get_scoped_script_reader(MagicMock()) is not None
+    assert provider.get_scoped_execution_writer(MagicMock()) is not None
+    assert provider.get_scoped_command_reader(MagicMock()) is not None
+    assert provider.get_scoped_node_reader(MagicMock()) is not None
 
 
 def test_connector_provider_resolves() -> None:
     from app.core.connectors.ssh import SSHConnectorFactory
 
     provider = ConnectorProvider()
-    assert isinstance(provider.get_ssh_connector_factory(), SSHConnectorFactory)
+    settings = MagicMock()
+    settings.SSH_KNOWN_HOSTS_PATH = "/tmp/known_hosts"
+    settings.SSH_STRICT_HOST_KEY_CHECKING = True
+    factory = provider.get_ssh_connector_factory(settings)
+    assert isinstance(factory, SSHConnectorFactory)
+    assert factory._known_hosts_path == "/tmp/known_hosts"
 
 
 def test_service_provider_resolves() -> None:
@@ -104,13 +125,17 @@ def test_service_provider_resolves() -> None:
     script_repo = repo_provider.get_script_repository(session)
     exec_repo = repo_provider.get_script_execution_repository(session)
     api_key_repo = repo_provider.get_api_key_repository(session)
-    factory = conn_provider.get_ssh_connector_factory()
+    settings = MagicMock()
+    settings.SSH_KNOWN_HOSTS_PATH = "/tmp/known_hosts"
+    settings.SSH_STRICT_HOST_KEY_CHECKING = False
+    factory = conn_provider.get_ssh_connector_factory(settings)
     node_reader = ScopedNodeConnectionReader(MagicMock())
     command_reader = ScopedCommandTemplateReader(MagicMock())
     script_reader = ScopedScriptDefinitionReader(MagicMock())
     execution_writer = ScopedScriptExecutionWriter(MagicMock())
 
-    audit_svc = svc_provider.get_audit_service(audit_repo)
+    required_writer = svc_provider.get_required_audit_writer(MagicMock())
+    audit_svc = svc_provider.get_audit_service(audit_repo, required_writer)
     assert isinstance(audit_svc, AuditService)
 
     node_svc = svc_provider.get_node_service(node_repo, audit_svc, factory, node_reader)
@@ -150,3 +175,62 @@ def test_service_provider_resolves() -> None:
 
     config_svc = svc_provider.get_config_service(node_repo, cmd_repo, script_repo)
     assert isinstance(config_svc, ConfigService)
+
+    scheduler = MagicMock()
+    health = svc_provider.get_health_service(
+        repo_provider.get_health_repository(session),
+        scheduler,
+        MagicMock(SCHEDULER_ENABLED=True),
+    )
+    assert isinstance(health, HealthService)
+    schedule = svc_provider.get_schedule_service(
+        repo_provider.get_script_schedule_repository(session),
+        script_repo,
+        node_repo,
+        scheduler,
+    )
+    assert isinstance(schedule, ScheduleService)
+    assert svc_provider.get_streaming_command_service(node_reader, factory) is not None
+
+
+async def test_db_session_provider_manages_transaction() -> None:
+    provider = DbProvider()
+    session = MagicMock()
+    session_context = AsyncMock()
+    session_context.__aenter__.return_value = session
+    transaction = AsyncMock()
+    session.begin.return_value = transaction
+    factory = MagicMock(return_value=session_context)
+
+    resource = provider.get_session(factory)
+    assert await anext(resource) is session
+    await resource.aclose()
+    transaction.__aexit__.assert_awaited_once()
+
+
+async def test_disabled_scheduler_provider_does_not_start() -> None:
+    provider = SchedulerProvider()
+    resource = provider.get_script_scheduler(
+        MagicMock(), MagicMock(SCHEDULER_ENABLED=False)
+    )
+    scheduler = await anext(resource)
+    assert scheduler._scheduler.running is False
+    await resource.aclose()
+
+
+async def test_audit_worker_provider_lifecycle() -> None:
+    provider = SchedulerProvider()
+    worker = MagicMock()
+    worker.stop = AsyncMock()
+    with patch("app.di.providers.AuditOutboxWorker", return_value=worker):
+        resource = provider.get_audit_outbox_worker(MagicMock())
+        assert await anext(resource) is worker
+        await resource.aclose()
+    worker.start.assert_called_once()
+    worker.stop.assert_awaited_once()
+
+
+def test_config_provider_returns_cached_settings() -> None:
+    expected = MagicMock()
+    with patch("app.di.providers.get_settings", return_value=expected):
+        assert ConfigProvider().get_settings() is expected

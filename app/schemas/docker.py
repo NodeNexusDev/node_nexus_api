@@ -39,7 +39,6 @@ class DockerContainerConfig(BaseModel):
 
     image: str | None = None
     cmd: list[str] | None = None
-    env: list[str] | None = None
     hostname: str | None = None
 
 

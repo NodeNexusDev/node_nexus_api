@@ -1,14 +1,26 @@
 """SSH connector implementation."""
 
+import asyncio
+import hashlib
 from collections.abc import AsyncIterator
+from pathlib import Path
+from typing import Any
 
 import asyncssh
 import structlog
 
-from app.core.connectors.base import BaseConnector
+from app.core.connectors.base import BaseConnector, StreamEvent
+from app.core.exceptions import ConnectionFailedError
 
 logger = structlog.get_logger()  # operational: flow, performance
 audit = structlog.get_logger("audit")  # security: access, commands, failures
+_ALLOWED_SIGNALS = frozenset({"SIGINT", "SIGTERM", "SIGHUP"})
+_STREAM_QUEUE_SIZE = 128
+
+
+def command_fingerprint(command: str) -> str:
+    """Return a stable non-reversible identifier for a command."""
+    return hashlib.sha256(command.encode()).hexdigest()
 
 
 class SSHConnector(BaseConnector):
@@ -23,6 +35,7 @@ class SSHConnector(BaseConnector):
         ssh_key: str | None = None,
         timeout: int = 30,
         known_hosts: str | None = None,
+        strict_host_key_checking: bool = True,
     ):
         self._host = host
         self._port = port
@@ -31,7 +44,9 @@ class SSHConnector(BaseConnector):
         self._ssh_key = ssh_key
         self._timeout = timeout
         self._known_hosts = known_hosts
+        self._strict_host_key_checking = strict_host_key_checking
         self._connection: asyncssh.SSHClientConnection | None = None
+        self._active_process: Any | None = None
 
     async def connect(self) -> None:
         """Establish SSH connection.
@@ -40,6 +55,15 @@ class SSHConnector(BaseConnector):
         Password auth is used otherwise.
         """
         logger.debug("ssh.connect.start", host=self._host, port=self._port)
+        if self._strict_host_key_checking and (
+            not self._known_hosts or not Path(self._known_hosts).is_file()
+        ):
+            audit.warning(
+                "ssh.host_key.configuration_invalid",
+                host=self._host,
+                port=self._port,
+            )
+            raise ConnectionFailedError("SSH host verification is unavailable")
 
         kwargs: dict[str, object] = {
             "port": self._port,
@@ -61,9 +85,9 @@ class SSHConnector(BaseConnector):
                 "ssh.connect.failed",
                 host=self._host,
                 port=self._port,
-                error=str(exc),
+                error_type=type(exc).__name__,
             )
-            raise
+            raise ConnectionFailedError("SSH connection failed") from exc
 
     async def disconnect(self) -> None:
         """Close SSH connection."""
@@ -82,15 +106,24 @@ class SSHConnector(BaseConnector):
         if not self._connection:
             raise RuntimeError("Not connected")
 
-        logger.debug("ssh.command.start", host=self._host, command=command)
+        fingerprint = command_fingerprint(command)
+        logger.debug(
+            "ssh.command.start",
+            host=self._host,
+            command_length=len(command),
+            command_fingerprint=fingerprint,
+        )
         try:
             result = await self._connection.run(command, timeout=self._timeout)
             exit_code = result.exit_status or 0
             audit.info(
                 "ssh.command.ok",
                 host=self._host,
-                command=command,
+                command_length=len(command),
+                command_fingerprint=fingerprint,
                 exit_code=exit_code,
+                stdout_length=len(str(result.stdout)),
+                stderr_length=len(str(result.stderr)),
             )
             return (
                 str(result.stdout),
@@ -101,10 +134,11 @@ class SSHConnector(BaseConnector):
             audit.error(
                 "ssh.command.failed",
                 host=self._host,
-                command=command,
-                error=str(exc),
+                command_length=len(command),
+                command_fingerprint=fingerprint,
+                error_type=type(exc).__name__,
             )
-            raise
+            raise ConnectionFailedError("SSH command failed") from exc
 
     async def execute_command_streaming(self, command: str) -> AsyncIterator[str]:
         """Execute a command and yield stdout chunks as they arrive.
@@ -114,7 +148,13 @@ class SSHConnector(BaseConnector):
         if not self._connection:
             raise RuntimeError("Not connected")
 
-        logger.debug("ssh.stream.start", host=self._host, command=command)
+        fingerprint = command_fingerprint(command)
+        logger.debug(
+            "ssh.stream.start",
+            host=self._host,
+            command_length=len(command),
+            command_fingerprint=fingerprint,
+        )
         try:
             async with self._connection.create_process(command) as process:
                 async for line in process.stdout:
@@ -125,21 +165,80 @@ class SSHConnector(BaseConnector):
                 audit.info(
                     "ssh.stream.ok",
                     host=self._host,
-                    command=command,
+                    command_length=len(command),
+                    command_fingerprint=fingerprint,
                     exit_code=exit_code,
                 )
         except asyncssh.Error as exc:
             audit.error(
                 "ssh.stream.failed",
                 host=self._host,
-                command=command,
-                error=str(exc),
+                command_length=len(command),
+                command_fingerprint=fingerprint,
+                error_type=type(exc).__name__,
             )
-            raise
+            raise ConnectionFailedError("SSH streaming command failed") from exc
+
+    async def execute_command_streaming_events(
+        self, command: str
+    ) -> AsyncIterator[StreamEvent]:
+        """Stream stdout/stderr separately and finish with the real exit status."""
+        if not self._connection:
+            raise RuntimeError("Not connected")
+        queue: asyncio.Queue[StreamEvent] = asyncio.Queue(_STREAM_QUEUE_SIZE)
+        process = await self._connection.create_process(command)
+        self._active_process = process
+
+        async def pump(stream: Any, event_type: str) -> None:
+            async for chunk in stream:
+                await queue.put(StreamEvent(type=event_type, data=str(chunk)))
+
+        async def wait_for_exit() -> None:
+            await process.wait()
+            await queue.put(
+                StreamEvent(type="exit", exit_code=process.exit_status or 0)
+            )
+
+        tasks = [
+            asyncio.create_task(pump(process.stdout, "stdout")),
+            asyncio.create_task(pump(process.stderr, "stderr")),
+            asyncio.create_task(wait_for_exit()),
+        ]
+        try:
+            while True:
+                event = await queue.get()
+                yield event
+                if event.type == "exit":
+                    break
+        finally:
+            for task in tasks:
+                if not task.done():
+                    task.cancel()
+            await asyncio.gather(*tasks, return_exceptions=True)
+            if getattr(process, "exit_status", None) is None:
+                process.terminate()
+            self._active_process = None
+
+    async def send_signal(self, signal: str) -> None:
+        """Send an allowlisted signal to the active SSH process."""
+        if signal not in _ALLOWED_SIGNALS:
+            raise ValueError("Signal is not allowed")
+        if self._active_process is None:
+            raise RuntimeError("No active process")
+        self._active_process.send_signal(signal)
 
 
 class SSHConnectorFactory:
     """Factory for creating SSH connectors."""
+
+    def __init__(
+        self,
+        *,
+        known_hosts_path: str = "/app/.ssh/known_hosts",
+        strict_host_key_checking: bool = True,
+    ) -> None:
+        self._known_hosts_path = known_hosts_path
+        self._strict_host_key_checking = strict_host_key_checking
 
     def create_ssh(
         self,
@@ -155,4 +254,8 @@ class SSHConnectorFactory:
             username=username,
             password=password,
             ssh_key=ssh_key,
+            known_hosts=(
+                self._known_hosts_path if self._strict_host_key_checking else None
+            ),
+            strict_host_key_checking=self._strict_host_key_checking,
         )

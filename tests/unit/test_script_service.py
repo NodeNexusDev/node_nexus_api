@@ -11,6 +11,7 @@ from app.application.dto.node_connection import NodeConnectionDTO
 from app.application.dto.script_definition import ScriptDefinitionDTO
 from app.core.exceptions import (
     CommandNotFoundError,
+    NodeNotFoundError,
     ScriptNotFoundError,
     TemplateRenderError,
 )
@@ -364,8 +365,8 @@ class TestExecuteScript:
         )
 
         data = ScriptExecuteRequest(node_ids=[uuid.uuid4()], params={})
-        result = await service_with_factory.execute_script(orm_script.id, data)
-        assert result.results[0].status == "failed"
+        with pytest.raises(NodeNotFoundError):
+            await service_with_factory.execute_script(orm_script.id, data)
 
     async def test_connector_error(
         self,

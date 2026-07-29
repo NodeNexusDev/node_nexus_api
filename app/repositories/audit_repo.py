@@ -1,5 +1,6 @@
 """Audit log repository implementation."""
 
+import uuid
 from datetime import datetime
 from typing import Any, cast
 from uuid import UUID
@@ -9,6 +10,7 @@ from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.audit_log import AuditLogModel
+from app.models.audit_outbox import AuditOutboxModel
 
 
 class AuditLogRepository:
@@ -18,11 +20,21 @@ class AuditLogRepository:
         self._session = session
 
     async def create(self, data: dict[str, Any]) -> AuditLogModel:
-        """Create an audit log entry."""
-        log = AuditLogModel(**data)
-        self._session.add(log)
+        """Create a durable outbox event in the caller's transaction."""
+        event_id = data.pop("id", None) or uuid.uuid4()
+        payload = {
+            **data,
+            "node_id": str(data["node_id"]) if data.get("node_id") else None,
+        }
+        outbox = AuditOutboxModel(id=event_id, payload=payload, status="pending")
+        log = AuditLogModel(id=event_id, **data)
+        self._session.add(outbox)
         await self._session.flush()
         return log
+
+    async def commit(self) -> None:
+        """Commit an obligatory pre-side-effect outbox event."""
+        await self._session.commit()
 
     async def get_all(
         self,

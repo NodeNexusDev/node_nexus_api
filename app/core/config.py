@@ -28,6 +28,13 @@ class Settings(BaseSettings):
     # Encryption
     ENCRYPTION_SALT: str = "node-nexus-ssh-v1"  # Override in production via .env
 
+    # SSH host verification
+    SSH_STRICT_HOST_KEY_CHECKING: bool = True
+    SSH_KNOWN_HOSTS_PATH: str = "/app/.ssh/known_hosts"
+
+    # Persistent scheduler
+    SCHEDULER_ENABLED: bool = True
+
     # Request timeout
     REQUEST_TIMEOUT: int = 300  # seconds
 

@@ -1,8 +1,17 @@
 """Tests for script scheduler."""
 
+import asyncio
+from datetime import UTC, datetime
+from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
 import pytest
+from apscheduler.events import (
+    EVENT_JOB_MAX_INSTANCES,
+    EVENT_JOB_MISSED,
+    JobExecutionEvent,
+    JobSubmissionEvent,
+)
 
 from app.core.scheduler import ScriptScheduler
 from app.schemas.scheduler import ScheduledJob, ScheduleRequest, ScheduleResponse
@@ -79,17 +88,17 @@ class TestScriptScheduler:
         """Default job callback delegates to the configured executor."""
         script_id = uuid4()
         node_ids = [uuid4()]
-        calls: list[tuple[object, object]] = []
+        calls: list[tuple[object, object, object]] = []
 
-        async def executor(received_script_id, received_node_ids):
-            calls.append((received_script_id, received_node_ids))
+        async def executor(received_script_id, received_node_ids, received_params):
+            calls.append((received_script_id, received_node_ids, received_params))
 
         scheduler = ScriptScheduler()
         scheduler.configure_executor(executor)
 
         await scheduler._execute_scheduled_script(script_id, node_ids)
 
-        assert calls == [(script_id, node_ids)]
+        assert calls == [(script_id, node_ids, {})]
 
     @pytest.mark.asyncio
     async def test_missing_executor_is_explicit(self):
@@ -100,6 +109,121 @@ class TestScriptScheduler:
             RuntimeError, match="Scheduled script executor is not configured"
         ):
             await scheduler._execute_scheduled_script(uuid4(), [uuid4()])
+
+    async def test_postgresql_ownership_lock_is_acquired_and_released(self):
+        scheduler = ScriptScheduler()
+        engine = MagicMock()
+        engine.dialect.name = "postgresql"
+        connection = AsyncMock()
+        connection.scalar.return_value = True
+        engine.connect = AsyncMock(return_value=connection)
+
+        assert await scheduler.acquire_ownership(engine) is True
+        assert scheduler._owns_execution is True
+        await scheduler.stop()
+
+        connection.execute.assert_awaited_once()
+        connection.close.assert_awaited_once()
+
+    async def test_postgresql_ownership_rejection_closes_connection(self):
+        scheduler = ScriptScheduler()
+        engine = MagicMock()
+        engine.dialect.name = "postgresql"
+        connection = AsyncMock()
+        connection.scalar.return_value = False
+        engine.connect = AsyncMock(return_value=connection)
+
+        assert await scheduler.acquire_ownership(engine) is False
+        assert scheduler._owns_execution is False
+        connection.close.assert_awaited_once()
+
+    async def test_reconciliation_updates_readiness(self):
+        scheduler = ScriptScheduler()
+        scheduler.configure_reconciler(AsyncMock(return_value=(2, 0)))
+        with patch(
+            "app.core.scheduler.asyncio.sleep",
+            AsyncMock(side_effect=asyncio.CancelledError),
+        ):
+            with pytest.raises(asyncio.CancelledError):
+                await scheduler._reconcile_loop(0)
+        assert scheduler.ready is True
+
+    async def test_reconciliation_failure_sets_degraded(self):
+        scheduler = ScriptScheduler()
+        scheduler.configure_reconciler(AsyncMock(side_effect=RuntimeError("db")))
+        with patch(
+            "app.core.scheduler.asyncio.sleep",
+            AsyncMock(side_effect=asyncio.CancelledError),
+        ):
+            with pytest.raises(asyncio.CancelledError):
+                await scheduler._reconcile_loop(0)
+        assert scheduler.ready is False
+
+    async def test_stop_cancels_reconciliation_task(self):
+        scheduler = ScriptScheduler()
+        scheduler.configure_reconciler(AsyncMock(return_value=(0, 0)))
+        scheduler.start_reconciliation(3600)
+        assert scheduler._reconciliation_task is not None
+        await scheduler.stop()
+        assert scheduler._reconciliation_task is None
+
+    async def test_ownership_monitor_recovers_lost_connection(self):
+        scheduler = ScriptScheduler()
+        connection = AsyncMock()
+        connection.execute.side_effect = RuntimeError("lost")
+        scheduler._owner_connection = connection
+        engine = MagicMock()
+        with patch(
+            "app.core.scheduler.asyncio.sleep",
+            AsyncMock(side_effect=asyncio.CancelledError),
+        ):
+            with pytest.raises(asyncio.CancelledError):
+                await scheduler._monitor_ownership(engine)
+        assert scheduler.owns_execution is False
+        assert scheduler._owner_connection is None
+
+    async def test_job_is_skipped_without_ownership(self):
+        scheduler = ScriptScheduler()
+        executor = AsyncMock()
+        scheduler.configure_executor(executor)
+        scheduler._owns_execution = False
+        await scheduler._execute_scheduled_script(uuid4(), [uuid4()])
+        executor.assert_not_awaited()
+
+    async def test_job_failure_is_propagated(self):
+        scheduler = ScriptScheduler()
+        scheduler.configure_executor(AsyncMock(side_effect=ValueError("failed")))
+        with pytest.raises(ValueError, match="failed"):
+            await scheduler._execute_scheduled_script(uuid4(), [uuid4()])
+
+    def test_next_run_time(self):
+        scheduler = ScriptScheduler()
+        script_id = uuid4()
+        scheduler.schedule_script(script_id, "0 9 * * *", [])
+        assert scheduler.get_next_run_time(script_id) is None
+        job = scheduler._scheduler.get_job(str(script_id))
+        job.next_run_time = datetime.now(UTC)
+        assert scheduler.get_next_run_time(script_id) is not None
+
+    def test_records_misfire_and_overlap_events(self):
+        scheduler = ScriptScheduler()
+        scheduled = datetime.now(UTC)
+        scheduler._record_scheduler_event(
+            JobExecutionEvent(
+                EVENT_JOB_MISSED,
+                "job",
+                "default",
+                scheduled,
+            )
+        )
+        scheduler._record_scheduler_event(
+            JobSubmissionEvent(
+                EVENT_JOB_MAX_INSTANCES,
+                "job",
+                "default",
+                [scheduled],
+            )
+        )
 
 
 class TestSchedulerSchemas:
@@ -119,8 +243,14 @@ class TestSchedulerSchemas:
     def test_scheduled_job(self):
         """ScheduledJob schema."""
         job = ScheduledJob(
-            script_id="abc",
+            id=uuid4(),
+            script_id=uuid4(),
             cron="0 9 * * *",
-            next_run_time="2026-01-01T09:00:00",
+            timezone="UTC",
+            node_ids=[],
+            params={},
+            enabled=True,
+            misfire_grace_seconds=60,
+            operational_state="registered",
         )
-        assert job.script_id == "abc"
+        assert job.timezone == "UTC"

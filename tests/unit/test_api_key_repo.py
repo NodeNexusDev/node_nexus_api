@@ -30,8 +30,7 @@ async def session(
 ) -> AsyncGenerator[AsyncSession]:
     sm = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
     async with sm() as s:
-        async with s.begin():
-            yield s
+        yield s
 
 
 @pytest.fixture
@@ -107,7 +106,7 @@ async def test_revoke(repo: APIKeyRepository) -> None:
 async def test_update_last_used(repo: APIKeyRepository) -> None:
     model = await repo.create(name="k1", key_hash="h1", key_prefix="nnk_1111")
     assert model.last_used_at is None
-    await repo.update_last_used(model.id)
+    await repo.update_last_used(model)
     refreshed = await repo.get_by_key_hash("h1")
     assert refreshed is not None
     assert refreshed.last_used_at is not None

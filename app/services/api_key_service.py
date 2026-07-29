@@ -2,7 +2,8 @@
 
 import secrets
 import uuid
-from datetime import UTC, datetime
+from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
 
 from app.core.exceptions import (
     APIKeyExpiredError,
@@ -17,6 +18,17 @@ KEY_PREFIX_LENGTH = 8
 KEY_RANDOM_LENGTH = 48
 KEY_TOTAL_LENGTH = KEY_PREFIX_LENGTH + KEY_RANDOM_LENGTH
 KEY_FORMAT = "nnk_"
+LAST_USED_UPDATE_INTERVAL = timedelta(minutes=5)
+
+
+@dataclass(frozen=True, slots=True)
+class AuthenticatedPrincipal:
+    """Immutable authentication result shared by authorization boundaries."""
+
+    key_id: uuid.UUID | None
+    key_prefix: str
+    scope: str
+    key_type: str = "managed"
 
 
 def generate_api_key() -> tuple[str, str, str]:
@@ -56,8 +68,8 @@ class APIKeyService:
             created_at=model.created_at,
         )
 
-    async def validate_api_key(self, plain_key: str) -> None:
-        """Validate an API key. Raises if invalid, revoked, or expired."""
+    async def validate_api_key(self, plain_key: str) -> AuthenticatedPrincipal:
+        """Validate an API key and return its authorization principal."""
         key_hash = hash_api_key(plain_key)
         model = await self._repo.get_by_key_hash(key_hash)
         if model is None:
@@ -66,7 +78,15 @@ class APIKeyService:
             raise APIKeyRevokedError("API key has been revoked")
         if model.expires_at is not None and model.expires_at < datetime.now(UTC):
             raise APIKeyExpiredError("API key has expired")
-        await self._repo.update_last_used(model.id)
+        now = datetime.now(UTC)
+        last_used_at = getattr(model, "last_used_at", None)
+        if last_used_at is None or now - last_used_at >= LAST_USED_UPDATE_INTERVAL:
+            await self._repo.update_last_used(model, now)
+        return AuthenticatedPrincipal(
+            key_id=model.id,
+            key_prefix=getattr(model, "key_prefix", plain_key[:KEY_PREFIX_LENGTH]),
+            scope=getattr(model, "scope", "read-write"),
+        )
 
     async def get_api_key_scope(self, plain_key: str) -> str:
         """Get the scope of an API key.

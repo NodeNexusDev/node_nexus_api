@@ -105,7 +105,8 @@ class TestValidateApiKey:
         orm_model = _make_api_key_model()
         repo.get_by_key_hash.return_value = orm_model
         await service.validate_api_key("nnk_validkey123")
-        repo.update_last_used.assert_called_once_with(orm_model.id)
+        repo.update_last_used.assert_called_once()
+        assert repo.update_last_used.call_args.args[0] is orm_model
 
     async def test_invalid(self, service: APIKeyService, repo: AsyncMock) -> None:
         repo.get_by_key_hash.return_value = None

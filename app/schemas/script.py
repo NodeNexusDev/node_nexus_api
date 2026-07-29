@@ -62,9 +62,12 @@ class ScriptStepResult(BaseModel):
 
     step_index: int
     label: str
-    command: str
+    command_fingerprint: str
     stdout: str
     stderr: str
+    stdout_bytes: int
+    stderr_bytes: int
+    truncated: bool = False
     exit_code: int
 
 

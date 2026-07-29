@@ -231,4 +231,5 @@ class NodeRepository(IRepository[NodeModel]):
             return False
         await self._session.delete(node)
         await self._session.flush()
+        await self._session.commit()
         return True

@@ -29,8 +29,11 @@ published database port are not production defaults.
 6. Request `/api/v1/nodes/?page=1&size=1` with a valid key.
 7. Shift traffic gradually while monitoring errors, timeouts, and database health.
 
-Use one scheduler-owning process. Schedules are in memory, disappear on restart,
-and are not coordinated between replicas.
+Keep `SCHEDULER_ENABLED=true` on eligible replicas. PostgreSQL persists
+schedules and its advisory lock elects one execution owner. Every replica may
+serve schedule API requests; only the lock owner runs jobs. Mount a reviewed
+OpenSSH `known_hosts` file at `SSH_KNOWN_HOSTS_PATH`; do not disable strict host
+verification in production.
 
 ## Rollback
 

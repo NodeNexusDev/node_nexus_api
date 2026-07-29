@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+import hashlib
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
@@ -43,6 +45,17 @@ from app.schemas.script import (
 from app.schemas.script_execution import ScriptExecutionResponse
 
 audit = structlog.get_logger("audit")
+_SCRIPT_NODE_CONCURRENCY = 5
+_MAX_PERSISTED_OUTPUT_BYTES = 65_536
+
+
+def _bounded_output(value: str) -> tuple[str, int, bool]:
+    """Bound persisted output by bytes while preserving valid Unicode."""
+    raw = value.encode()
+    if len(raw) <= _MAX_PERSISTED_OUTPUT_BYTES:
+        return value, len(raw), False
+    truncated = raw[:_MAX_PERSISTED_OUTPUT_BYTES].decode(errors="ignore")
+    return truncated, len(raw), True
 
 
 class ScriptService:
@@ -156,31 +169,32 @@ class ScriptService:
 
         steps = [ScriptStep(**s) for s in script.steps]
 
-        node_results: list[ScriptNodeResult] = []
+        nodes: dict[UUID, Any] = {}
         for node_id in data.node_ids:
-            try:
-                result = await self._execute_on_node(
-                    script_id, steps, node_id, data.params
-                )
-                node_results.append(result)
-            except Exception as exc:
-                audit.error(
-                    "script.execute.node_failed",
-                    script_id=str(script_id),
-                    node_id=str(node_id),
-                    error_type=type(exc).__name__,
-                    error=str(exc),
-                )
-                node_results.append(
-                    ScriptNodeResult(
-                        execution_id=UUID(int=0),
-                        node_id=node_id,
-                        node_name="unknown",
-                        status="failed",
-                        steps=[],
-                    )
+            node = (
+                await self._node_reader.get_connection(node_id)
+                if self._node_reader
+                else await self._node_repository.get_by_id(node_id)
+            )
+            if node is None:
+                raise NodeNotFoundError(f"Node {node_id} not found")
+            nodes[node_id] = node
+
+        semaphore = asyncio.Semaphore(_SCRIPT_NODE_CONCURRENCY)
+
+        async def execute_target(node_id: UUID) -> ScriptNodeResult:
+            async with semaphore:
+                return await self._execute_on_node(
+                    script_id,
+                    steps,
+                    node_id,
+                    data.params,
+                    node=nodes[node_id],
                 )
 
+        node_results = await asyncio.gather(
+            *(execute_target(node_id) for node_id in data.node_ids)
+        )
         return ScriptExecutionBatchResult(
             script_id=script_id,
             results=node_results,
@@ -192,20 +206,23 @@ class ScriptService:
         steps: list[ScriptStep],
         node_id: UUID,
         params: dict[str, Any],
+        *,
+        node: Any | None = None,
     ) -> ScriptNodeResult:
         """Execute all script steps on a single node."""
-        node = (
-            await self._node_reader.get_connection(node_id)
-            if self._node_reader
-            else await self._node_repository.get_by_id(node_id)
-        )
+        if node is None:
+            node = (
+                await self._node_reader.get_connection(node_id)
+                if self._node_reader
+                else await self._node_repository.get_by_id(node_id)
+            )
         if node is None:
             raise NodeNotFoundError(f"Node {node_id} not found")
 
         execution_data = {
             "script_id": script_id,
             "node_id": node_id,
-            "params": params,
+            "params": None,
             "status": "running",
             "steps": [],
             "started_at": datetime.now(UTC),
@@ -250,12 +267,23 @@ class ScriptService:
                         stderr = str(resolution_error)
                         exit_code = 1
 
+                    safe_stdout, stdout_bytes, stdout_truncated = _bounded_output(
+                        stdout
+                    )
+                    safe_stderr, stderr_bytes, stderr_truncated = _bounded_output(
+                        stderr
+                    )
                     step_result = {
                         "step_index": idx,
                         "label": step.label,
-                        "command": command_str,
-                        "stdout": stdout,
-                        "stderr": stderr,
+                        "command_fingerprint": hashlib.sha256(
+                            command_str.encode()
+                        ).hexdigest(),
+                        "stdout": safe_stdout,
+                        "stderr": safe_stderr,
+                        "stdout_bytes": stdout_bytes,
+                        "stderr_bytes": stderr_bytes,
+                        "truncated": stdout_truncated or stderr_truncated,
                         "exit_code": exit_code,
                     }
                     step_results.append(step_result)
@@ -272,11 +300,11 @@ class ScriptService:
             )
         except Exception as exc:
             final_status = "failed"
-            audit.error(
+            audit.exception(
                 "script.execute.failed",
                 script_id=str(script_id),
                 node_id=str(node_id),
-                error=str(exc),
+                error_type=type(exc).__name__,
             )
         finally:
             update_data = {

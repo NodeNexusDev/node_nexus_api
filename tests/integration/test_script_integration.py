@@ -317,12 +317,9 @@ async def test_execute_script_node_not_found(
         f"/api/v1/scripts/{script['id']}/execute",
         json={"node_ids": [str(uuid.uuid4())], "params": {}},
     )
-    # Script execution returns 200 with per-node failure status
-    # (asyncio.gather with return_exceptions=True)
-    assert resp.status_code == 200
-    batch = resp.json()
-    assert len(batch["results"]) == 1
-    assert batch["results"][0]["status"] == "failed"
+    # All targets are validated before any remote side effect.
+    assert resp.status_code == 404
+    assert resp.json()["detail"].endswith("not found")
 
 
 async def test_execute_script_validation_error(

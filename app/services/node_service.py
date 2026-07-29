@@ -15,6 +15,7 @@ if TYPE_CHECKING:
 import structlog
 from sqlalchemy.exc import IntegrityError
 
+from app.core.connectors.ssh import command_fingerprint
 from app.core.exceptions import (
     ConnectionFailedError,
     NodeNameConflictError,
@@ -282,6 +283,12 @@ class NodeService:
             **connector_kwargs,
         )
 
+        if self._audit:
+            await self._audit.log_required(
+                "execute.requested",
+                node_id=node_id,
+                details={"command_fingerprint": command_fingerprint(data.command)},
+            )
         try:
             async with connector:
                 stdout, stderr, exit_code = await connector.execute_command(

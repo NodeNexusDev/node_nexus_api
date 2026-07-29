@@ -12,6 +12,8 @@ scheduler, and cleans expired audit records. Telemetry and HTTP middleware are
 configured when the app is created. Shutdown closes the Dishka container,
 database engine, and application-scoped resources.
 
-Request-scoped dependencies must never escape their scope. Scheduled jobs create
-a fresh scope. The scheduler stores jobs in memory, has no leader election, and
-must have one owner in a multi-replica deployment.
+Request-scoped dependencies must never escape their scope. Startup acquires a
+PostgreSQL advisory lock and rebuilds APScheduler jobs from persistent
+`script_schedules`; scheduled jobs create a fresh scope. A non-owner replica
+serves HTTP but never executes jobs. Losing process ownership does not lose
+schedule definitions.

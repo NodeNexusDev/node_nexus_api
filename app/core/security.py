@@ -11,6 +11,8 @@ from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 
 from app.core.config import get_settings
 
+ENCRYPTION_PREFIX = "enc:v1:"
+
 
 def hash_api_key(plain_key: str) -> str:
     """Hash an API key with SHA-256 for storage and lookup."""
@@ -31,18 +33,22 @@ def _derive_key() -> bytes:
 
 
 def encrypt(plaintext: str) -> str:
-    """Encrypt a string with AES-256-GCM. Returns base64(nonce:ciphertext:tag)."""
+    """Encrypt a string with AES-256-GCM using the current versioned format."""
     key = _derive_key()
     nonce = os.urandom(12)
     aesgcm = AESGCM(key)
     ct = aesgcm.encrypt(nonce, plaintext.encode(), None)
-    return base64.b64encode(nonce + ct).decode()
+    payload = base64.b64encode(nonce + ct).decode()
+    return f"{ENCRYPTION_PREFIX}{payload}"
 
 
 def decrypt(token: str) -> str:
-    """Decrypt a string encrypted with `encrypt`."""
+    """Decrypt current or legacy unprefixed AES-256-GCM ciphertext."""
     key = _derive_key()
-    raw = base64.b64decode(token)
+    payload = token.removeprefix(ENCRYPTION_PREFIX)
+    raw = base64.b64decode(payload, validate=True)
+    if len(raw) < 28:
+        raise ValueError("Encrypted payload is too short")
     nonce, ct = raw[:12], raw[12:]
     aesgcm = AESGCM(key)
     return aesgcm.decrypt(nonce, ct, None).decode()

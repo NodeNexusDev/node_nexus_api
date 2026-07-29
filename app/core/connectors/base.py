@@ -2,8 +2,18 @@
 
 from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator
+from dataclasses import dataclass
 from types import TracebackType
 from typing import Protocol
+
+
+@dataclass(frozen=True, slots=True)
+class StreamEvent:
+    """One version-independent remote process stream event."""
+
+    type: str
+    data: str | None = None
+    exit_code: int | None = None
 
 
 class BaseConnector(ABC):
@@ -36,6 +46,20 @@ class BaseConnector(ABC):
         # Make this an async generator for correct type narrowing
         # (ty infers async def without yield as Coroutine, not AsyncIterator)
         yield  # type: ignore[unreachable]
+
+    async def execute_command_streaming_events(
+        self, command: str
+    ) -> AsyncIterator[StreamEvent]:
+        """Stream typed events, with a compatibility fallback for connectors."""
+        async for chunk in self.execute_command_streaming(command):
+            yield StreamEvent(type="stdout", data=chunk)
+        yield StreamEvent(type="exit", exit_code=0)
+
+    async def send_signal(self, signal: str) -> None:
+        """Send a signal to the active process when supported."""
+        raise NotImplementedError(
+            f"{type(self).__name__} does not support process signals"
+        )
 
     async def __aenter__(self) -> "BaseConnector":
         """Enter async context manager."""

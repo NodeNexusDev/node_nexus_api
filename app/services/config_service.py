@@ -10,7 +10,9 @@ if TYPE_CHECKING:
     from app.repositories.node_repo import NodeRepository
     from app.repositories.script_repo import ScriptRepository
 
+from app.core.exceptions import UnsupportedConfigFormatError
 from app.schemas.config import (
+    CONFIG_FORMAT_VERSION,
     CommandExport,
     ConfigExport,
     ConfigImport,
@@ -85,6 +87,14 @@ class ConfigService:
 
     async def import_config(self, data: ConfigImport) -> ImportResult:
         """Import configuration atomically, skipping duplicate names."""
+        if data.format_version is not None:
+            received_major = data.format_version.split(".", maxsplit=1)[0]
+            supported_major = CONFIG_FORMAT_VERSION.split(".", maxsplit=1)[0]
+            if received_major != supported_major:
+                raise UnsupportedConfigFormatError(
+                    "Unsupported configuration format "
+                    f"{data.format_version}; supported major is {supported_major}"
+                )
         result = ImportResult()
         existing_node_names = {
             item.name

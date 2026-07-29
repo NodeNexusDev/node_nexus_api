@@ -19,6 +19,9 @@ source_revision: "2026-07-29"
 | `CORS_ORIGINS` | `http://localhost:3000` | Разрешённые browser origins |
 | `MASTER_API_KEY` | пусто | Bootstrap read-write key |
 | `ENCRYPTION_SALT` | `node-nexus-ssh-v1` | Salt derivation шифрования |
+| `SSH_STRICT_HOST_KEY_CHECKING` | `true` | Обязательная проверка host key SSH-сервера |
+| `SSH_KNOWN_HOSTS_PATH` | `/app/.ssh/known_hosts` | Путь к файлу OpenSSH `known_hosts` |
+| `SCHEDULER_ENABLED` | `true` | Включить выполнение персистентных расписаний |
 | `REQUEST_TIMEOUT` | `300` | Global timeout в секундах |
 | `RATE_LIMIT_REQUESTS` | `100` | Requests на process-local window |
 | `RATE_LIMIT_WINDOW` | `60` | Rate-limit window в секундах |

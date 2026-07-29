@@ -17,6 +17,10 @@ class ConnectionFailedError(DomainError):
     """Raised when a connection to a node fails."""
 
 
+class CredentialDecryptionError(DomainError):
+    """Raised when an encrypted credential cannot be decrypted safely."""
+
+
 class CommandNotFoundError(DomainError):
     """Raised when a command template is not found."""
 
@@ -71,3 +75,27 @@ class DockerValidationError(DockerError):
 
 class RequestTimeoutError(DomainError):
     """Raised when a request exceeds the configured timeout."""
+
+
+class UnsupportedConfigFormatError(DomainError):
+    """Raised when an imported configuration format is not supported."""
+
+
+class ScheduleValidationError(DomainError):
+    """Raised when schedule input is invalid."""
+
+
+class ScheduleNotFoundError(DomainError):
+    """Raised when a persistent schedule is not found."""
+
+
+class SchedulerOwnershipError(DomainError):
+    """Raised when this replica does not own scheduler execution."""
+
+
+class SchedulePersistenceError(DomainError):
+    """Raised when schedule persistence or registration fails."""
+
+
+class AuditWriteError(DomainError):
+    """Raised when an obligatory audit event cannot be persisted."""

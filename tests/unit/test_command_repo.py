@@ -33,8 +33,7 @@ async def engine() -> AsyncGenerator[AsyncEngine]:
 async def session(engine: AsyncEngine) -> AsyncGenerator[AsyncSession]:
     sm = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
     async with sm() as s:
-        async with s.begin():
-            yield s
+        yield s
 
 
 @pytest.fixture

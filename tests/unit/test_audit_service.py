@@ -44,8 +44,27 @@ class TestAuditLog:
     async def test_log_handles_exception(
         self, service: AuditService, repo: AsyncMock
     ) -> None:
+        from app.core.exceptions import AuditWriteError
+
         repo.create.side_effect = Exception("db error")
-        await service.log("create")
+        with pytest.raises(AuditWriteError):
+            await service.log("create")
+
+    async def test_required_log_commits_before_return(
+        self, service: AuditService, repo: AsyncMock
+    ) -> None:
+        await service.log_required("execute.requested", node_id=uuid.uuid4())
+        repo.create.assert_awaited_once()
+        repo.commit.assert_awaited_once()
+
+    async def test_required_log_commit_failure_is_fatal(
+        self, service: AuditService, repo: AsyncMock
+    ) -> None:
+        from app.core.exceptions import AuditWriteError
+
+        repo.commit.side_effect = RuntimeError("database")
+        with pytest.raises(AuditWriteError):
+            await service.log_required("execute.requested")
 
     async def test_get_logs(self, service: AuditService, repo: AsyncMock) -> None:
         log = _make_log()
@@ -114,3 +133,18 @@ class TestAuditLog:
         await service.log("create")
         call_data = repo.create.call_args[0][0]
         assert call_data["details"] is None
+
+    async def test_log_removes_sensitive_details(
+        self, service: AuditService, repo: AsyncMock
+    ) -> None:
+        await service.log(
+            "execute",
+            details={
+                "command": "echo canary-secret",
+                "params": {"secret": "canary-secret"},
+                "exit_code": 0,
+            },
+        )
+        call_data = repo.create.call_args[0][0]
+        assert call_data["details"] == '{"exit_code": 0}'
+        assert "canary-secret" not in call_data["details"]
