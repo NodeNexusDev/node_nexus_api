@@ -9,6 +9,11 @@ from app.application.dto.command_execution import (
     CommandResultDTO,
 )
 from app.application.dto.node_connection import NodeConnectionDTO
+from app.application.dto.node_metrics import (
+    CpuMetricsDTO,
+    NodeMetricsDTO,
+    UsageMetricsDTO,
+)
 
 __all__ = [
     "AuditEventDTO",
@@ -17,5 +22,8 @@ __all__ = [
     "CommandExecutionDTO",
     "CommandRequestDTO",
     "CommandResultDTO",
+    "CpuMetricsDTO",
     "NodeConnectionDTO",
+    "NodeMetricsDTO",
+    "UsageMetricsDTO",
 ]

@@ -11,10 +11,14 @@ if TYPE_CHECKING:
     from app.application.ports.node_reader import NodeConnectionReader
     from app.core.connectors.base import ConnectorFactory
 
+from app.application.dto.node_metrics import (
+    CpuMetricsDTO,
+    NodeMetricsDTO,
+    UsageMetricsDTO,
+)
 from app.core.exceptions import ConnectionFailedError, NodeNotFoundError
 from app.core.ssh_utils import decrypt_value, get_connector_factory
 from app.repositories.node_repo import NodeRepository
-from app.schemas.node import CpuMetrics, DiskMetrics, MemoryMetrics, NodeMetrics
 
 audit = structlog.get_logger("audit")
 
@@ -32,7 +36,7 @@ class NodeMetricsService:
         self._connector_factory = connector_factory
         self._node_reader = node_reader
 
-    async def collect(self, node_id: UUID) -> NodeMetrics:
+    async def collect(self, node_id: UUID) -> NodeMetricsDTO:
         """Collect current system metrics from a node."""
         node = (
             await self._node_reader.get_connection(node_id)
@@ -64,14 +68,14 @@ class NodeMetricsService:
                 uptime_stdout, _, _ = await connector.execute_command("uptime -s")
 
             audit.info("node.metrics.collected", node_id=str(node_id))
-            return NodeMetrics(
-                cpu=CpuMetrics(usage_percent=cpu_usage, cores=cores),
-                memory=MemoryMetrics(
+            return NodeMetricsDTO(
+                cpu=CpuMetricsDTO(usage_percent=cpu_usage, cores=cores),
+                memory=UsageMetricsDTO(
                     total_bytes=mem_total,
                     used_bytes=mem_used,
                     percent=round(mem_percent, 2),
                 ),
-                disk=DiskMetrics(
+                disk=UsageMetricsDTO(
                     total_bytes=disk_total,
                     used_bytes=disk_used,
                     percent=round(disk_percent, 2),
@@ -92,7 +96,7 @@ class NodeMetricsService:
                 f"Failed to collect metrics from node {node_id}: {exc}"
             ) from exc
 
-    async def get_node_metrics(self, node_id: UUID) -> NodeMetrics:
+    async def get_node_metrics(self, node_id: UUID) -> NodeMetricsDTO:
         """Expose the stable node API use-case name."""
         return await self.collect(node_id)
 

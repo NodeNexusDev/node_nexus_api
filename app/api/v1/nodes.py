@@ -18,6 +18,9 @@ from app.schemas.node import (
     BulkNodeResult,
     CommandRequest,
     CommandResult,
+    CpuMetrics,
+    DiskMetrics,
+    MemoryMetrics,
     NodeCreate,
     NodeMetrics,
     NodeResponse,
@@ -225,7 +228,24 @@ async def get_node_metrics(
 ) -> NodeMetrics:
     """Get system metrics from a node (CPU, memory, disk)."""
     audit.info("api.nodes.metrics", node_id=str(node_id))
-    return await service.get_node_metrics(node_id)
+    result = await service.get_node_metrics(node_id)
+    return NodeMetrics(
+        cpu=CpuMetrics(
+            usage_percent=result.cpu.usage_percent,
+            cores=result.cpu.cores,
+        ),
+        memory=MemoryMetrics(
+            total_bytes=result.memory.total_bytes,
+            used_bytes=result.memory.used_bytes,
+            percent=result.memory.percent,
+        ),
+        disk=DiskMetrics(
+            total_bytes=result.disk.total_bytes,
+            used_bytes=result.disk.used_bytes,
+            percent=result.disk.percent,
+        ),
+        uptime_since=result.uptime_since,
+    )
 
 
 @router.post("/{node_id}/tags", response_model=NodeResponse)

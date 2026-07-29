@@ -12,6 +12,11 @@ from app.application.dto.command_execution import (
     CommandResultDTO,
 )
 from app.application.dto.node_connection import NodeConnectionDTO
+from app.application.dto.node_metrics import (
+    CpuMetricsDTO,
+    NodeMetricsDTO,
+    UsageMetricsDTO,
+)
 from app.application.ports.node_reader import NodeConnectionReader
 from app.models.node import NodeModel
 from app.repositories.node_repo import NodeRepository
@@ -70,6 +75,19 @@ def test_bulk_command_dtos_use_immutable_collections() -> None:
 
     assert request.node_ids == (node_id,)
     assert result.results[0].node_id == node_id
+
+
+def test_node_metrics_dto_is_immutable() -> None:
+    metrics = NodeMetricsDTO(
+        cpu=CpuMetricsDTO(usage_percent=25.0, cores=4),
+        memory=UsageMetricsDTO(total_bytes=100, used_bytes=50, percent=50.0),
+        disk=UsageMetricsDTO(total_bytes=200, used_bytes=100, percent=50.0),
+        uptime_since="2026-07-29 10:00:00",
+    )
+
+    assert metrics.cpu.cores == 4
+    with pytest.raises(AttributeError):
+        metrics.uptime_since = "changed"  # type: ignore[misc]
 
 
 def test_node_repository_maps_connection_dto() -> None:
