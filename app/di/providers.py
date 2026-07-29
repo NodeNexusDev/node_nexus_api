@@ -23,6 +23,7 @@ from app.adapters.persistence.script_gateway import (
     SqlAlchemyScriptGateway,
 )
 from app.adapters.runtime.docker import SshDockerRuntime
+from app.adapters.runtime.scheduler import ApschedulerJobScheduler
 from app.adapters.security import AesGcmCredentialCipher
 from app.application.ports.audit_sink import AuditEventSink
 from app.application.ports.command_management import CommandReader, CommandWriter
@@ -35,7 +36,11 @@ from app.application.ports.node_management import (
 )
 from app.application.ports.node_reader import NodeConnectionReader, NodeStatusWriter
 from app.application.ports.remote_command import RemoteConnectorFactory
-from app.application.ports.schedule import ScheduleReader, ScheduleWriter
+from app.application.ports.schedule import (
+    JobSchedulerPort,
+    ScheduleReader,
+    ScheduleWriter,
+)
 from app.application.ports.script_persistence import (
     ScriptDefinitionReader,
     ScriptExecutionReader,
@@ -603,6 +608,18 @@ class ConfigProvider(Provider):
 
 class SchedulerProvider(Provider):
     """Scheduler providers."""
+
+    @provide(scope=Scope.APP)
+    def get_job_scheduler(self, scheduler: ScriptScheduler) -> ApschedulerJobScheduler:
+        """Adapt the managed APScheduler runtime to the application port."""
+        return ApschedulerJobScheduler(scheduler)
+
+    @provide(scope=Scope.APP)
+    def get_job_scheduler_port(
+        self, scheduler: ApschedulerJobScheduler
+    ) -> JobSchedulerPort:
+        """Bind runtime schedule operations."""
+        return scheduler
 
     @provide(scope=Scope.APP)
     async def get_script_scheduler(
