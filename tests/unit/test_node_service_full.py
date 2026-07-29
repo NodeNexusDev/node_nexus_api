@@ -10,6 +10,7 @@ from app.core.exceptions import NodeNameConflictError, NodeNotFoundError
 from app.core.security import decrypt, encrypt
 from app.repositories.node_repo import NodeRepository
 from app.schemas.node import BulkCommandRequest, NodeCreate, NodeUpdate
+from app.services.node_bulk_command_service import NodeBulkCommandService
 from app.services.node_command_service import NodeCommandService
 from app.services.node_service import NodeService
 from tests.unit.conftest import make_orm_node
@@ -25,6 +26,7 @@ def service(repo: AsyncMock) -> NodeService:
     return NodeService(
         repository=repo,
         command_service=NodeCommandService(repository=repo),
+        bulk_command_service=NodeBulkCommandService(repository=repo),
     )
 
 
@@ -247,7 +249,7 @@ class TestBulkExecuteCommand:
 
         factory = MagicMock()
         factory.create_ssh.return_value = connector
-        service._connector_factory = factory
+        service._bulk_command_service._connector_factory = factory
 
         result = await service.bulk_execute_command(
             BulkCommandRequest(command="uptime", node_ids=[n1.id, n2.id])
@@ -280,7 +282,7 @@ class TestBulkExecuteCommand:
 
         factory = MagicMock()
         factory.create_ssh.return_value = connector
-        service._connector_factory = factory
+        service._bulk_command_service._connector_factory = factory
 
         result = await service.bulk_execute_command(
             BulkCommandRequest(command="uptime", node_ids=[n1.id, n2.id])
@@ -311,7 +313,7 @@ class TestBulkExecuteCommand:
 
         factory = MagicMock()
         factory.create_ssh.return_value = connector
-        service._connector_factory = factory
+        service._bulk_command_service._connector_factory = factory
 
         result = await service.bulk_execute_command(
             BulkCommandRequest(command="uptime", node_ids=[n1.id])
@@ -333,7 +335,7 @@ class TestBulkExecuteCommand:
 
         factory = MagicMock()
         factory.create_ssh.return_value = connector
-        service._connector_factory = factory
+        service._bulk_command_service._connector_factory = factory
 
         result = await service.bulk_execute_command(
             BulkCommandRequest(command="uptime", tags=["prod"])
@@ -360,7 +362,7 @@ class TestBulkExecuteCommand:
 
         factory = MagicMock()
         factory.create_ssh.return_value = connector
-        service._connector_factory = factory
+        service._bulk_command_service._connector_factory = factory
 
         result = await service.bulk_execute_command(
             BulkCommandRequest(command="uptime", node_ids=[n1.id, n2.id], tags=["prod"])

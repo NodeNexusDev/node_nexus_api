@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
@@ -11,6 +10,7 @@ if TYPE_CHECKING:
     from app.application.ports.node_reader import NodeConnectionReader
     from app.core.connectors.base import ConnectorFactory
     from app.services.audit_service import AuditService
+    from app.services.node_bulk_command_service import NodeBulkCommandService
     from app.services.node_command_service import NodeCommandService
 
 import structlog
@@ -27,7 +27,6 @@ from app.repositories.node_repo import NodeRepository
 from app.schemas.node import (
     BulkCommandRequest,
     BulkCommandResult,
-    BulkNodeResult,
     CommandRequest,
     CommandResult,
     CpuMetrics,
@@ -56,12 +55,14 @@ class NodeService:
         connector_factory: ConnectorFactory | None = None,
         node_reader: NodeConnectionReader | None = None,
         command_service: NodeCommandService | None = None,
+        bulk_command_service: NodeBulkCommandService | None = None,
     ):
         self._repository = repository
         self._node_reader = node_reader
         self._audit = audit_service
         self._connector_factory = connector_factory
         self._command_service = command_service
+        self._bulk_command_service = bulk_command_service
 
     async def _log(
         self,
@@ -326,122 +327,7 @@ class NodeService:
             ) from exc
 
     async def bulk_execute_command(self, data: BulkCommandRequest) -> BulkCommandResult:
-        """Execute a command on multiple nodes in parallel."""
-        # Resolve target nodes
-        target_nodes = await self._resolve_targets(data)
-
-        if not target_nodes:
-            raise NodeNotFoundError("No nodes matched the given criteria")
-
-        # Execute on all nodes in parallel
-        tasks = [
-            self._execute_on_single_node(node, data.command) for node in target_nodes
-        ]
-        results = await asyncio.gather(*tasks)
-
-        # Persist audit records outside the concurrent SSH tasks. AuditService uses
-        # the request-scoped session, which must never be shared by asyncio tasks.
-        for result in results:
-            succeeded = result.exit_code == 0
-            details: dict[str, Any] = {
-                "command": data.command,
-                "exit_code": result.exit_code,
-            }
-            if not succeeded:
-                details["error"] = result.stderr
-            await self._log(
-                "bulk_execute" if succeeded else "bulk_execute_failed",
-                node_id=result.node_id,
-                details=details,
-            )
-
-        succeeded = sum(1 for r in results if r.exit_code == 0)
-        return BulkCommandResult(
-            command=data.command,
-            results=results,
-            total=len(results),
-            succeeded=succeeded,
-            failed=len(results) - succeeded,
-        )
-
-    async def _resolve_targets(self, data: BulkCommandRequest) -> list[Any]:
-        """Resolve target nodes from IDs and/or tags."""
-        nodes_by_ids = None
-        if data.node_ids:
-            nodes_by_ids = (
-                await self._node_reader.get_connections_by_ids(data.node_ids)
-                if self._node_reader
-                else await self._repository.get_by_ids(data.node_ids)
-            )
-
-        nodes_by_tags = None
-        if data.tags:
-            nodes_by_tags = (
-                await self._node_reader.get_connections_by_tags(data.tags)
-                if self._node_reader
-                else await self._repository.get_by_tags(data.tags)
-            )
-
-        if nodes_by_ids is not None and nodes_by_tags is not None:
-            tag_ids = {n.id for n in nodes_by_tags}
-            return [n for n in nodes_by_ids if n.id in tag_ids]
-        if nodes_by_ids is not None:
-            return nodes_by_ids
-        return nodes_by_tags or []
-
-    async def _execute_on_single_node(self, node: Any, command: str) -> BulkNodeResult:
-        """Execute a command on a single node, returning result (never raises)."""
-        password = decrypt_value(node.password)
-        ssh_key = decrypt_value(node.ssh_key)
-        connector = get_connector_factory(self._connector_factory).create_ssh(
-            host=node.host,
-            port=node.port,
-            username=node.username,
-            password=password,
-            ssh_key=ssh_key,
-        )
-
-        try:
-            async with connector:
-                stdout, stderr, exit_code = await connector.execute_command(command)
-            audit.info(
-                "node.bulk.executed",
-                node_id=str(node.id),
-                command=command,
-            )
-            return BulkNodeResult(
-                node_id=node.id,
-                node_name=node.name,
-                stdout=stdout,
-                stderr=stderr,
-                exit_code=exit_code,
-            )
-        except ConnectionFailedError as exc:
-            audit.error(
-                "node.bulk.execute.failed",
-                node_id=str(node.id),
-                command=command,
-                error=str(exc),
-            )
-            return BulkNodeResult(
-                node_id=node.id,
-                node_name=node.name,
-                stdout="",
-                stderr=str(exc),
-                exit_code=1,
-            )
-        except Exception as exc:
-            audit.error(
-                "node.bulk.execute.unexpected_error",
-                node_id=str(node.id),
-                command=command,
-                error_type=type(exc).__name__,
-                error=str(exc),
-            )
-            return BulkNodeResult(
-                node_id=node.id,
-                node_name=node.name,
-                stdout="",
-                stderr=str(exc),
-                exit_code=1,
-            )
+        """Delegate the legacy façade call to the bulk command service."""
+        if self._bulk_command_service is None:
+            raise RuntimeError("NodeBulkCommandService is not configured")
+        return await self._bulk_command_service.execute(data)

@@ -9,6 +9,7 @@ from app.core.exceptions import ConnectionFailedError, NodeNotFoundError
 from app.core.security import decrypt, encrypt
 from app.repositories.node_repo import NodeRepository
 from app.schemas.node import CommandRequest
+from app.services.node_bulk_command_service import NodeBulkCommandService
 from app.services.node_command_service import NodeCommandService
 from app.services.node_service import NodeService
 from tests.unit.conftest import make_orm_node, make_response
@@ -40,6 +41,10 @@ def service(repo: AsyncMock, mock_factory: MagicMock) -> NodeService:
         repository=repo,
         connector_factory=mock_factory,
         command_service=command_service,
+        bulk_command_service=NodeBulkCommandService(
+            repository=repo,
+            connector_factory=mock_factory,
+        ),
     )
 
 
@@ -192,7 +197,10 @@ class TestBulkExecuteConnectionFailed:
             side_effect=ConnectionFailedError("Connection refused")
         )
 
-        result = await service._execute_on_single_node(orm_node, "echo hi")
+        result = await service._bulk_command_service._execute_on_single_node(
+            orm_node,
+            "echo hi",
+        )
 
         assert result.exit_code == 1
         assert result.stdout == ""

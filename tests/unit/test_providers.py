@@ -144,12 +144,19 @@ def test_service_provider_resolves() -> None:
         factory,
         node_reader,
     )
+    node_bulk_command_svc = svc_provider.get_node_bulk_command_service(
+        node_repo,
+        audit_svc,
+        factory,
+        node_reader,
+    )
     node_svc = svc_provider.get_node_service(
         node_repo,
         audit_svc,
         factory,
         node_reader,
         node_command_svc,
+        node_bulk_command_svc,
     )
     assert isinstance(node_svc, NodeService)
 

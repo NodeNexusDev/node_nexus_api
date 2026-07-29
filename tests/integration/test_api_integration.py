@@ -25,6 +25,7 @@ from app.models.base import Base
 from app.repositories.api_key_repo import APIKeyRepository
 from app.repositories.node_repo import NodeRepository
 from app.services.api_key_service import APIKeyService
+from app.services.node_bulk_command_service import NodeBulkCommandService
 from app.services.node_command_service import NodeCommandService
 from app.services.node_service import NodeService
 
@@ -73,12 +74,24 @@ class IntegrationDbProvider(Provider):
         return NodeCommandService(repository=repo)
 
     @provide(scope=Scope.REQUEST)
+    def get_node_bulk_command_service(
+        self,
+        repo: NodeRepository,
+    ) -> NodeBulkCommandService:
+        return NodeBulkCommandService(repository=repo)
+
+    @provide(scope=Scope.REQUEST)
     def get_service(
         self,
         repo: NodeRepository,
         command_service: NodeCommandService,
+        bulk_command_service: NodeBulkCommandService,
     ) -> NodeService:
-        return NodeService(repository=repo, command_service=command_service)
+        return NodeService(
+            repository=repo,
+            command_service=command_service,
+            bulk_command_service=bulk_command_service,
+        )
 
     @provide(scope=Scope.REQUEST)
     def get_api_key_service(self, repo: APIKeyRepository) -> APIKeyService:
