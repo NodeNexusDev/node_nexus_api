@@ -173,7 +173,10 @@ async def list_images(
 ) -> list[DockerImage]:
     """List images on a Docker node."""
     audit.info("api.docker.images.list", node_id=str(node_id))
-    return await service.list_images(node_id)
+    return [
+        DockerImage.model_validate(item, from_attributes=True)
+        for item in await service.list_images(node_id)
+    ]
 
 
 @router.post("/images/pull")
@@ -186,7 +189,8 @@ async def pull_image(
 ) -> DockerPullResult:
     """Pull a Docker image."""
     audit.info("api.docker.images.pull", node_id=str(node_id), image=data.image)
-    return await service.pull_image(node_id, data.image, timeout=data.timeout)
+    result = await service.pull_image(node_id, data.image, timeout=data.timeout)
+    return DockerPullResult.model_validate(result, from_attributes=True)
 
 
 @router.get("/containers/{container_id}/stats")
@@ -214,7 +218,10 @@ async def list_networks(
 ) -> list[DockerNetwork]:
     """List Docker networks."""
     audit.info("api.docker.networks.list", node_id=str(node_id))
-    return await service.list_networks(node_id)
+    return [
+        DockerNetwork.model_validate(item, from_attributes=True)
+        for item in await service.list_networks(node_id)
+    ]
 
 
 @router.get("/volumes")
@@ -226,4 +233,7 @@ async def list_volumes(
 ) -> list[DockerVolume]:
     """List Docker volumes."""
     audit.info("api.docker.volumes.list", node_id=str(node_id))
-    return await service.list_volumes(node_id)
+    return [
+        DockerVolume.model_validate(item, from_attributes=True)
+        for item in await service.list_volumes(node_id)
+    ]

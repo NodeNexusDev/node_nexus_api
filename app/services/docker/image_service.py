@@ -10,9 +10,9 @@ if TYPE_CHECKING:
 
 import structlog
 
+from app.application.dto.docker import DockerImageDTO, DockerPullResultDTO
 from app.core.docker_validation import validate_image_name
 from app.core.exceptions import ConnectionFailedError
-from app.schemas.docker import DockerImage, DockerPullResult
 from app.services.docker.command_runner import DockerCommandRunner
 from app.services.docker.error_mapper import raise_for_docker_error
 from app.services.docker.parsers import parse_json_lines
@@ -29,7 +29,7 @@ class DockerImageService:
         self._runner = runner
         self._audit = audit_service
 
-    async def list_images(self, node_id: UUID) -> list[DockerImage]:
+    async def list_images(self, node_id: UUID) -> list[DockerImageDTO]:
         node = await self._runner.get_target(node_id)
         cmd = self._runner.build_command(node, "images --format '{{json .}}'")
         stdout, stderr, exit_code = await self._runner.execute(node, cmd)
@@ -42,11 +42,20 @@ class DockerImageService:
                 node_id=node_id,
                 details={"count": len(items)},
             )
-        return [DockerImage.model_validate(item) for item in items]
+        return [
+            DockerImageDTO(
+                repository=item["Repository"],
+                tag=item["Tag"],
+                id=item["ID"],
+                size=item["Size"],
+                created_at=item["CreatedAt"],
+            )
+            for item in items
+        ]
 
     async def pull_image(
         self, node_id: UUID, image: str, *, timeout: int = 300
-    ) -> DockerPullResult:
+    ) -> DockerPullResultDTO:
         validated = validate_image_name(image)
         node = await self._runner.get_target(node_id)
         cmd = self._runner.build_command(node, f"pull {validated}")
@@ -71,7 +80,7 @@ class DockerImageService:
                     node_id=node_id,
                     details={"image": validated, "success": False},
                 )
-            return DockerPullResult(image=validated, output=str(exc), success=False)
+            return DockerPullResultDTO(image=validated, output=str(exc), success=False)
         raise_for_docker_error(stderr, exit_code)
         success = exit_code == 0
         output = stdout if success else stderr
@@ -86,4 +95,4 @@ class DockerImageService:
                 node_id=node_id,
                 details={"image": validated, "success": success},
             )
-        return DockerPullResult(image=validated, output=output, success=success)
+        return DockerPullResultDTO(image=validated, output=output, success=success)

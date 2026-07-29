@@ -14,16 +14,18 @@ if TYPE_CHECKING:
 
 from app.adapters.runtime.docker import SshDockerRuntime
 from app.adapters.security import AesGcmCredentialCipher
+from app.application.dto.docker import (
+    DockerImageDTO,
+    DockerNetworkDTO,
+    DockerPullResultDTO,
+    DockerVolumeDTO,
+)
 from app.schemas.docker import (
     BulkDockerResponse,
     DockerContainer,
     DockerContainerInspect,
     DockerExecResult,
-    DockerImage,
-    DockerNetwork,
-    DockerPullResult,
     DockerStats,
-    DockerVolume,
 )
 from app.services.docker.bulk_service import DockerBulkService
 from app.services.docker.command_runner import DockerCommandRunner
@@ -153,18 +155,18 @@ class DockerService:
     async def get_stats(self, node_id: UUID, container_id: str) -> DockerStats:
         return await self._containers.get_stats(node_id, container_id)
 
-    async def list_images(self, node_id: UUID) -> list[DockerImage]:
+    async def list_images(self, node_id: UUID) -> list[DockerImageDTO]:
         return await self._images.list_images(node_id)
 
     async def pull_image(
         self, node_id: UUID, image: str, *, timeout: int = 300
-    ) -> DockerPullResult:
+    ) -> DockerPullResultDTO:
         return await self._images.pull_image(node_id, image, timeout=timeout)
 
-    async def list_networks(self, node_id: UUID) -> list[DockerNetwork]:
+    async def list_networks(self, node_id: UUID) -> list[DockerNetworkDTO]:
         return await self._resources.list_networks(node_id)
 
-    async def list_volumes(self, node_id: UUID) -> list[DockerVolume]:
+    async def list_volumes(self, node_id: UUID) -> list[DockerVolumeDTO]:
         return await self._resources.list_volumes(node_id)
 
     async def bulk_container_action(
