@@ -273,6 +273,7 @@ def test_production_composition_does_not_import_docker_facade() -> None:
     """Composition root must expose focused Docker use cases only."""
     imports = _imports_in_file(APP_ROOT / "di" / "providers.py")
     assert "app.services.docker_service" not in imports
+    assert not (APP_ROOT / "services" / "docker_service.py").exists()
 
 
 def test_models_are_persistence_only() -> None:

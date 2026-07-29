@@ -17,7 +17,7 @@ from app.core.exceptions import (
     NodeNotFoundError,
 )
 from app.repositories.node_repo import NodeRepository
-from app.services.docker_service import DockerService
+from tests.docker_test_facade import DockerService
 from tests.unit.conftest import make_orm_node
 
 

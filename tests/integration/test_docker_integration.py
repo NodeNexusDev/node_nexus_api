@@ -9,7 +9,7 @@ import pytest
 
 from app.core.connectors.ssh import SSHConnector
 from app.models.node import NodeModel
-from app.services.docker_service import DockerService
+from tests.docker_test_facade import DockerService
 from tests.integration.conftest import DockerSSHServer
 
 

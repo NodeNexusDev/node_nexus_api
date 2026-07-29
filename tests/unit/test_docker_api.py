@@ -37,7 +37,7 @@ from app.schemas.docker import (
 from app.services.docker.container_service import DockerContainerService
 from app.services.docker.image_service import DockerImageService
 from app.services.docker.resource_service import DockerResourceService
-from app.services.docker_service import DockerService
+from tests.docker_test_facade import DockerService
 from tests.unit.conftest import MockAuthServiceProvider, _mock_settings
 
 NODE_ID = uuid.uuid4()

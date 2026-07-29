@@ -81,12 +81,10 @@ def test_docker_router_delegates_domain_errors_to_global_handler() -> None:
     }
 
 
-def test_docker_facade_remains_a_small_compatibility_layer() -> None:
-    """Prevent domain logic and legacy implementations returning to the facade."""
+def test_docker_facade_is_removed_from_production() -> None:
+    """Prevent the compatibility facade from returning to application code."""
     path = APP_ROOT / "services" / "docker_service.py"
-    source = path.read_text(encoding="utf-8")
-    assert len(source.splitlines()) <= 200
-    assert "_legacy_" not in source
+    assert not path.exists()
 
 
 @pytest.mark.parametrize(

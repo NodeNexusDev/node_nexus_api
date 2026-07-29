@@ -1,4 +1,4 @@
-"""Compatibility facade for focused Docker application services."""
+"""Test-only composition facade for focused Docker application services."""
 
 from __future__ import annotations
 
