@@ -35,7 +35,10 @@ def service(repo: AsyncMock) -> NodeManagementService:
         status_writer=repo,
         credential_cipher=AesGcmCredentialCipher(),
     )
-    bulk_service = NodeBulkCommandService(repository=repo)
+    bulk_service = NodeBulkCommandService(
+        node_reader=repo,
+        credential_cipher=AesGcmCredentialCipher(),
+    )
     service.check_connectivity = command_service.check_connectivity
     service.execute_command = command_service.execute_command
     service.bulk_execute_command = bulk_service.bulk_execute_command
@@ -270,7 +273,7 @@ class TestBulkExecuteCommand:
 
         n1 = make_orm_node(name="n1")
         n2 = make_orm_node(name="n2")
-        repo.get_by_ids.return_value = [n1, n2]
+        repo.get_connections_by_ids.return_value = [n1, n2]
 
         connector = AsyncMock()
         connector.execute_command.return_value = ("ok", "", 0)
@@ -296,7 +299,7 @@ class TestBulkExecuteCommand:
 
         n1 = make_orm_node(name="n1")
         n2 = make_orm_node(name="n2")
-        repo.get_by_ids.return_value = [n1, n2]
+        repo.get_connections_by_ids.return_value = [n1, n2]
 
         call_count = 0
 
@@ -326,7 +329,7 @@ class TestBulkExecuteCommand:
     async def test_no_nodes_raises(
         self, service: NodeManagementService, repo: AsyncMock
     ) -> None:
-        repo.get_by_ids.return_value = []
+        repo.get_connections_by_ids.return_value = []
         with pytest.raises(NodeNotFoundError):
             await service.bulk_execute_command(
                 BulkCommandRequestDTO(command="ls", node_ids=[uuid.uuid4()])
@@ -338,7 +341,7 @@ class TestBulkExecuteCommand:
         from unittest.mock import AsyncMock, MagicMock
 
         n1 = make_orm_node(name="n1")
-        repo.get_by_ids.return_value = [n1]
+        repo.get_connections_by_ids.return_value = [n1]
 
         connector = AsyncMock()
         connector.execute_command.side_effect = OSError("Connection refused")
@@ -362,7 +365,7 @@ class TestBulkExecuteCommand:
         from unittest.mock import AsyncMock, MagicMock
 
         n1 = make_orm_node(name="n1")
-        repo.get_by_tags.return_value = [n1]
+        repo.get_connections_by_tags.return_value = [n1]
 
         connector = AsyncMock()
         connector.execute_command.return_value = ("ok", "", 0)
@@ -377,7 +380,7 @@ class TestBulkExecuteCommand:
             BulkCommandRequestDTO(command="uptime", tags=["prod"])
         )
         assert result.total == 1
-        repo.get_by_tags.assert_called_once_with(["prod"])
+        repo.get_connections_by_tags.assert_called_once_with(["prod"])
 
     async def test_resolve_by_both_ids_and_tags(
         self, service: NodeManagementService, repo: AsyncMock
@@ -388,8 +391,8 @@ class TestBulkExecuteCommand:
         n2 = make_orm_node(name="n2")
         n3 = make_orm_node(name="n3")
         # node_ids returns n1, n2; tags returns n1, n3 → intersection = n1
-        repo.get_by_ids.return_value = [n1, n2]
-        repo.get_by_tags.return_value = [n1, n3]
+        repo.get_connections_by_ids.return_value = [n1, n2]
+        repo.get_connections_by_tags.return_value = [n1, n3]
 
         connector = AsyncMock()
         connector.execute_command.return_value = ("ok", "", 0)
@@ -413,7 +416,7 @@ class TestBulkExecuteCommand:
     async def test_resolve_by_tags_empty(
         self, service: NodeManagementService, repo: AsyncMock
     ) -> None:
-        repo.get_by_tags.return_value = []
+        repo.get_connections_by_tags.return_value = []
         with pytest.raises(NodeNotFoundError):
             await service.bulk_execute_command(
                 BulkCommandRequestDTO(command="ls", tags=["nonexistent"])
@@ -425,8 +428,8 @@ class TestBulkExecuteCommand:
         n1 = make_orm_node(name="n1")
         n2 = make_orm_node(name="n2")
         # No overlap between ids and tags
-        repo.get_by_ids.return_value = [n1]
-        repo.get_by_tags.return_value = [n2]
+        repo.get_connections_by_ids.return_value = [n1]
+        repo.get_connections_by_tags.return_value = [n2]
         with pytest.raises(NodeNotFoundError):
             await service.bulk_execute_command(
                 BulkCommandRequestDTO(command="ls", node_ids=[n1.id], tags=["prod"])

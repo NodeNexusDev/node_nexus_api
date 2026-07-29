@@ -147,10 +147,10 @@ def test_service_provider_resolves() -> None:
         credential_cipher,
     )
     node_bulk_command_svc = svc_provider.get_node_bulk_command_service(
-        node_repo,
         audit_svc,
         factory,
         node_reader,
+        credential_cipher,
     )
     node_metrics_svc = svc_provider.get_node_metrics_service(
         factory,

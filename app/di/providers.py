@@ -226,17 +226,17 @@ class ServiceProvider(Provider):
     @provide(scope=Scope.REQUEST)
     def get_node_bulk_command_service(
         self,
-        repository: NodeRepository,
         audit_service: AuditService,
         connector_factory: SSHConnectorFactory,
-        node_reader: ScopedNodeConnectionReader,
+        node_reader: NodeConnectionReader,
+        credential_cipher: CredentialCipher,
     ) -> NodeBulkCommandService:
         """Get the bulk SSH command service."""
         return NodeBulkCommandService(
-            repository=repository,
             audit_service=audit_service,
             connector_factory=connector_factory,
             node_reader=node_reader,
+            credential_cipher=credential_cipher,
         )
 
     @provide(scope=Scope.REQUEST)

@@ -8,6 +8,8 @@ from typing import TYPE_CHECKING, Any
 import structlog
 
 if TYPE_CHECKING:
+    from app.application.dto.node_connection import NodeConnectionDTO
+    from app.application.ports.credential_cipher import CredentialCipher
     from app.application.ports.node_reader import NodeConnectionReader
     from app.core.connectors.base import ConnectorFactory
     from app.services.audit_service import AuditService
@@ -18,8 +20,7 @@ from app.application.dto.command_execution import (
     CommandExecutionDTO,
 )
 from app.core.exceptions import ConnectionFailedError, NodeNotFoundError
-from app.core.ssh_utils import decrypt_value, get_connector_factory
-from app.repositories.node_repo import NodeRepository
+from app.core.ssh_utils import get_connector_factory
 
 audit = structlog.get_logger("audit")
 
@@ -29,13 +30,13 @@ class NodeBulkCommandService:
 
     def __init__(
         self,
-        repository: NodeRepository,
+        node_reader: NodeConnectionReader,
+        credential_cipher: CredentialCipher,
         audit_service: AuditService | None = None,
         connector_factory: ConnectorFactory | None = None,
-        node_reader: NodeConnectionReader | None = None,
     ) -> None:
-        self._repository = repository
         self._node_reader = node_reader
+        self._credential_cipher = credential_cipher
         self._audit = audit_service
         self._connector_factory = connector_factory
 
@@ -82,22 +83,20 @@ class NodeBulkCommandService:
         """Expose the stable node API use-case name."""
         return await self.execute(data)
 
-    async def _resolve_targets(self, data: BulkCommandRequestDTO) -> list[Any]:
+    async def _resolve_targets(
+        self, data: BulkCommandRequestDTO
+    ) -> list[NodeConnectionDTO]:
         """Resolve target nodes from IDs and tags before concurrent work."""
         nodes_by_ids = None
         if data.node_ids:
-            nodes_by_ids = (
-                await self._node_reader.get_connections_by_ids(list(data.node_ids))
-                if self._node_reader
-                else await self._repository.get_by_ids(list(data.node_ids))
+            nodes_by_ids = await self._node_reader.get_connections_by_ids(
+                list(data.node_ids)
             )
 
         nodes_by_tags = None
         if data.tags:
-            nodes_by_tags = (
-                await self._node_reader.get_connections_by_tags(list(data.tags))
-                if self._node_reader
-                else await self._repository.get_by_tags(list(data.tags))
+            nodes_by_tags = await self._node_reader.get_connections_by_tags(
+                list(data.tags)
             )
 
         if nodes_by_ids is not None and nodes_by_tags is not None:
@@ -109,7 +108,7 @@ class NodeBulkCommandService:
 
     async def _execute_on_single_node(
         self,
-        node: Any,
+        node: NodeConnectionDTO,
         command: str,
     ) -> CommandExecutionDTO:
         """Execute on one node and always return a result."""
@@ -117,8 +116,8 @@ class NodeBulkCommandService:
             host=node.host,
             port=node.port,
             username=node.username,
-            password=decrypt_value(node.password),
-            ssh_key=decrypt_value(node.ssh_key),
+            password=self._credential_cipher.decrypt(node.password),
+            ssh_key=self._credential_cipher.decrypt(node.ssh_key),
         )
 
         try:
@@ -151,7 +150,7 @@ class NodeBulkCommandService:
             return self._error_result(node, exc)
 
     @staticmethod
-    def _error_result(node: Any, exc: Exception) -> CommandExecutionDTO:
+    def _error_result(node: NodeConnectionDTO, exc: Exception) -> CommandExecutionDTO:
         return CommandExecutionDTO(
             node_id=node.id,
             node_name=node.name,

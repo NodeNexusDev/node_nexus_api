@@ -6,7 +6,11 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from app.adapters.security import AesGcmCredentialCipher
-from app.application.dto.command_execution import CommandRequestDTO
+from app.application.dto.command_execution import (
+    BulkCommandRequestDTO,
+    CommandRequestDTO,
+)
+from app.application.dto.node_connection import NodeConnectionDTO
 from app.core.exceptions import ConnectionFailedError, NodeNotFoundError
 from app.core.security import decrypt, encrypt
 from app.services.node_bulk_command_service import NodeBulkCommandService
@@ -230,7 +234,8 @@ class TestBulkExecuteConnectionFailed:
         )
 
         bulk_service = NodeBulkCommandService(
-            repository=repo,
+            node_reader=repo,
+            credential_cipher=AesGcmCredentialCipher(),
             connector_factory=mock_factory,
         )
         result = await bulk_service._execute_on_single_node(
@@ -241,3 +246,45 @@ class TestBulkExecuteConnectionFailed:
         assert result.exit_code == 1
         assert result.stdout == ""
         assert "Connection refused" in result.stderr
+
+
+class TestBulkCommandBoundaries:
+    async def test_resolves_dtos_before_starting_remote_workers(
+        self, mock_factory: MagicMock
+    ) -> None:
+        order: list[str] = []
+        node = NodeConnectionDTO(
+            id=uuid.uuid4(),
+            name="node",
+            host="10.0.0.1",
+            port=22,
+            connection_type="ssh",
+            username="root",
+        )
+        reader = AsyncMock()
+
+        async def resolve_nodes(_node_ids):  # noqa: ANN001
+            order.append("resolve")
+            return [node]
+
+        async def enter_connector():
+            order.append("remote")
+            return mock_factory.create_ssh.return_value
+
+        reader.get_connections_by_ids.side_effect = resolve_nodes
+        mock_factory.create_ssh.return_value.__aenter__.side_effect = enter_connector
+        service = NodeBulkCommandService(
+            node_reader=reader,
+            credential_cipher=AesGcmCredentialCipher(),
+            connector_factory=mock_factory,
+        )
+
+        result = await service.execute(
+            BulkCommandRequestDTO(
+                command="uptime",
+                node_ids=(node.id,),
+            )
+        )
+
+        assert order == ["resolve", "remote"]
+        assert result.results[0].node_id == node.id

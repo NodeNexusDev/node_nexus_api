@@ -83,11 +83,11 @@ class IntegrationDbProvider(Provider):
         )
 
     @provide(scope=Scope.REQUEST)
-    def get_node_bulk_command_service(
-        self,
-        repo: NodeRepository,
-    ) -> NodeBulkCommandService:
-        return NodeBulkCommandService(repository=repo)
+    def get_node_bulk_command_service(self) -> NodeBulkCommandService:
+        return NodeBulkCommandService(
+            node_reader=ScopedNodeConnectionReader(self._sm),
+            credential_cipher=AesGcmCredentialCipher(),
+        )
 
     @provide(scope=Scope.REQUEST)
     def get_node_metrics_service(self, repo: NodeRepository) -> NodeMetricsService:
