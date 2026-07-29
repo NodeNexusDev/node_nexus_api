@@ -6,6 +6,18 @@ from pathlib import Path
 APP_ROOT = Path(__file__).parents[2] / "app"
 
 
+def _imports_in_file(path: Path) -> list[str]:
+    """Collect all absolute imports from one Python file."""
+    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    imports: list[str] = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom) and node.module:
+            imports.append(node.module)
+        elif isinstance(node, ast.Import):
+            imports.extend(alias.name for alias in node.names)
+    return imports
+
+
 def _imports_in(package: str) -> list[tuple[Path, str]]:
     """Collect absolute app imports from one package."""
     imports: list[tuple[Path, str]] = []
@@ -85,6 +97,27 @@ def test_node_metrics_use_case_depends_on_persistence_port() -> None:
         for path, module in _imports_in("services")
         if path.name == "node_metrics_service.py"
         and (module == "app.repositories" or module.startswith("app.repositories."))
+    ]
+    assert not violations
+
+
+def test_node_management_use_case_depends_on_application_ports() -> None:
+    """Node management must not know transport or persistence implementations."""
+    forbidden = (
+        "app.adapters",
+        "app.models",
+        "app.repositories",
+        "app.schemas",
+        "sqlalchemy",
+    )
+    violations = [
+        module
+        for module in _imports_in_file(
+            APP_ROOT / "services" / "node_management_service.py"
+        )
+        if any(
+            module == prefix or module.startswith(f"{prefix}.") for prefix in forbidden
+        )
     ]
     assert not violations
 

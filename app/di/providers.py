@@ -11,10 +11,17 @@ from sqlalchemy.ext.asyncio import (
 )
 
 from app.adapters.persistence.command_reader import ScopedCommandTemplateReader
+from app.adapters.persistence.node_management import (
+    SqlAlchemyNodeManagementGateway,
+)
 from app.adapters.persistence.node_reader import ScopedNodeConnectionReader
 from app.adapters.persistence.script_gateway import (
     ScopedScriptDefinitionReader,
     ScopedScriptExecutionWriter,
+)
+from app.application.ports.node_management import (
+    NodeManagementReader,
+    NodeManagementWriter,
 )
 from app.application.services.streaming_command_service import StreamingCommandService
 from app.core.config import Settings, get_settings
@@ -100,6 +107,27 @@ class RepositoryProvider(Provider):
     ) -> ScopedNodeConnectionReader:
         """Get a node reader that owns a short session per operation."""
         return ScopedNodeConnectionReader(sessionmaker)
+
+    @provide(scope=Scope.APP)
+    def get_node_management_gateway(
+        self, sessionmaker: async_sessionmaker[AsyncSession]
+    ) -> SqlAlchemyNodeManagementGateway:
+        """Get the short-scope node management gateway."""
+        return SqlAlchemyNodeManagementGateway(sessionmaker)
+
+    @provide(scope=Scope.APP)
+    def get_node_management_reader(
+        self, gateway: SqlAlchemyNodeManagementGateway
+    ) -> NodeManagementReader:
+        """Bind the node management reader port."""
+        return gateway
+
+    @provide(scope=Scope.APP)
+    def get_node_management_writer(
+        self, gateway: SqlAlchemyNodeManagementGateway
+    ) -> NodeManagementWriter:
+        """Bind the node management writer port."""
+        return gateway
 
     @provide(scope=Scope.REQUEST)
     def get_node_repository(self, session: AsyncSession) -> NodeRepository:
@@ -236,12 +264,14 @@ class ServiceProvider(Provider):
     @provide(scope=Scope.REQUEST)
     def get_node_management_service(
         self,
-        repository: NodeRepository,
+        reader: NodeManagementReader,
+        writer: NodeManagementWriter,
         audit_service: AuditService,
     ) -> NodeManagementService:
         """Get the node management service."""
         return NodeManagementService(
-            repository=repository,
+            reader=reader,
+            writer=writer,
             audit_service=audit_service,
         )
 

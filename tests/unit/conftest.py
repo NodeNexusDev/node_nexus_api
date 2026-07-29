@@ -50,6 +50,26 @@ def make_orm_node(**overrides: Any) -> Any:
     return NodeModel(**defaults)
 
 
+def make_node_view(**overrides: Any) -> Any:
+    """Create a public-safe node DTO with defaults for testing."""
+    from app.application.dto.node_view import NodeViewDTO
+
+    node = make_orm_node(**overrides)
+    return NodeViewDTO(
+        id=node.id,
+        name=node.name,
+        host=node.host,
+        port=node.port,
+        connection_type=node.connection_type,
+        status=node.status,
+        username=node.username,
+        docker_host=node.docker_host,
+        tags=tuple(node.tags or ()),
+        created_at=node.created_at,
+        updated_at=node.updated_at,
+    )
+
+
 def make_orm_command(**overrides: Any) -> Any:
     """Create a CommandModel with defaults for testing."""
     import uuid

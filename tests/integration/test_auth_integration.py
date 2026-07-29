@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
+from app.adapters.persistence.node_management import SqlAlchemyNodeManagementGateway
 from app.api.v1.api_keys import router as api_keys_router
 from app.api.v1.health import router as health_router
 from app.api.v1.nodes import router as nodes_router
@@ -68,8 +69,9 @@ class IntegrationAuthProvider(Provider):
         return APIKeyService(repository=repo)
 
     @provide(scope=Scope.REQUEST)
-    def get_node_service(self, repo: NodeRepository) -> NodeManagementService:
-        return NodeManagementService(repository=repo)
+    def get_node_service(self) -> NodeManagementService:
+        gateway = SqlAlchemyNodeManagementGateway(self._sm)
+        return NodeManagementService(reader=gateway, writer=gateway)
 
 
 def _mock_settings(master_key: str = "") -> MagicMock:

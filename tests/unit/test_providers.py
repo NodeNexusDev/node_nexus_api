@@ -158,7 +158,8 @@ def test_service_provider_resolves() -> None:
     assert node_bulk_command_svc is not None
     assert node_metrics_svc is not None
     node_svc = svc_provider.get_node_management_service(
-        node_repo,
+        MagicMock(),
+        MagicMock(),
         audit_svc,
     )
     assert isinstance(node_svc, NodeManagementService)

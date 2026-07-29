@@ -65,6 +65,12 @@ def test_node_update_dto_preserves_explicit_null() -> None:
     assert dict(dto.changes) == {"username": None}
 
 
+def test_node_update_dto_hides_sensitive_changes_from_repr() -> None:
+    dto = NodeUpdateDTO(changes=(("password", "plain-password"),))
+
+    assert "plain-password" not in repr(dto)
+
+
 def test_command_boundary_dtos_are_immutable() -> None:
     request = CommandRequestDTO(command="uptime", timeout=30)
     result = CommandResultDTO(stdout="ok", stderr="", exit_code=0)

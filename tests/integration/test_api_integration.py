@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
+from app.adapters.persistence.node_management import SqlAlchemyNodeManagementGateway
 from app.api.error_mapping import domain_error_handler
 from app.api.v1.health import router as health_router
 from app.api.v1.nodes import router as nodes_router
@@ -86,8 +87,9 @@ class IntegrationDbProvider(Provider):
         return NodeMetricsService(node_reader=repo)
 
     @provide(scope=Scope.REQUEST)
-    def get_service(self, repo: NodeRepository) -> NodeManagementService:
-        return NodeManagementService(repository=repo)
+    def get_service(self) -> NodeManagementService:
+        gateway = SqlAlchemyNodeManagementGateway(self._sm)
+        return NodeManagementService(reader=gateway, writer=gateway)
 
     @provide(scope=Scope.REQUEST)
     def get_api_key_service(self, repo: APIKeyRepository) -> APIKeyService:
