@@ -44,6 +44,11 @@ from app.application.ports.audit_log import AuditLogReader, AuditLogWriter
 from app.application.ports.audit_sink import AuditEventSink
 from app.application.ports.command_management import CommandReader, CommandWriter
 from app.application.ports.command_reader import CommandTemplateReader
+from app.application.ports.config_persistence import (
+    CommandConfigStore,
+    NodeConfigStore,
+    ScriptConfigStore,
+)
 from app.application.ports.credential_cipher import CredentialCipher
 from app.application.ports.docker_runtime import DockerRuntime
 from app.application.ports.health import DatabaseHealthProbe
@@ -349,6 +354,22 @@ class RepositoryProvider(Provider):
     def get_health_repository(self, session: AsyncSession) -> HealthRepository:
         """Get health check repository."""
         return HealthRepository(session)
+
+    @provide(scope=Scope.REQUEST)
+    def get_node_config_store(self, repository: NodeRepository) -> NodeConfigStore:
+        return repository
+
+    @provide(scope=Scope.REQUEST)
+    def get_command_config_store(
+        self, repository: CommandRepository
+    ) -> CommandConfigStore:
+        return repository
+
+    @provide(scope=Scope.REQUEST)
+    def get_script_config_store(
+        self, repository: ScriptRepository
+    ) -> ScriptConfigStore:
+        return repository
 
     @provide(scope=Scope.REQUEST)
     def get_database_health_probe(
@@ -678,9 +699,9 @@ class ServiceProvider(Provider):
     @provide(scope=Scope.REQUEST)
     def get_config_service(
         self,
-        node_repository: NodeRepository,
-        command_repository: CommandRepository,
-        script_repository: ScriptRepository,
+        node_repository: NodeConfigStore,
+        command_repository: CommandConfigStore,
+        script_repository: ScriptConfigStore,
     ) -> ConfigService:
         """Get configuration import/export service."""
         return ConfigService(

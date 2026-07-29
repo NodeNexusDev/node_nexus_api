@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any
+from typing import TypeVar
 
-if TYPE_CHECKING:
-    from app.adapters.persistence.dao.command import CommandRepository
-    from app.adapters.persistence.dao.node import NodeRepository
-    from app.adapters.persistence.dao.script import ScriptRepository
-
+from app.application.ports.config_persistence import (
+    CommandConfigStore,
+    ConfigRecordReader,
+    NodeConfigStore,
+    ScriptConfigStore,
+)
 from app.core.exceptions import UnsupportedConfigFormatError
 from app.schemas.config import (
     CONFIG_FORMAT_VERSION,
@@ -21,24 +22,28 @@ from app.schemas.config import (
     ScriptExport,
 )
 
+RecordT = TypeVar("RecordT")
+
 
 class ConfigService:
     """Service for exporting and importing node/command/script configurations."""
 
     def __init__(
         self,
-        node_repository: NodeRepository,
-        command_repository: CommandRepository,
-        script_repository: ScriptRepository,
+        node_repository: NodeConfigStore,
+        command_repository: CommandConfigStore,
+        script_repository: ScriptConfigStore,
     ):
         self._node_repo = node_repository
         self._command_repo = command_repository
         self._script_repo = script_repository
 
     @staticmethod
-    async def _load_all(repository: Any, batch_size: int = 1000) -> list[Any]:
+    async def _load_all(
+        repository: ConfigRecordReader[RecordT], batch_size: int = 1000
+    ) -> list[RecordT]:
         """Load an unbounded collection through the repository pagination API."""
-        items: list[Any] = []
+        items: list[RecordT] = []
         while True:
             batch = await repository.get_all(skip=len(items), limit=batch_size)
             items.extend(batch)
