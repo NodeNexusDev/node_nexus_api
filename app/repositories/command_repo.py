@@ -7,10 +7,9 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.command import CommandModel
-from app.repositories.base import IRepository
 
 
-class CommandRepository(IRepository[CommandModel]):
+class CommandRepository:
     """Repository for command templates."""
 
     def __init__(self, session: AsyncSession) -> None:

@@ -109,6 +109,11 @@ def test_docker_facade_is_removed_from_production() -> None:
     assert not path.exists()
 
 
+def test_legacy_generic_repository_contract_is_removed() -> None:
+    """Persistence adapters must implement focused application ports."""
+    assert not (APP_ROOT / "repositories" / "base.py").exists()
+
+
 @pytest.mark.parametrize(
     "relative_path",
     ["api/v1/websocket.py", "core/scheduler.py"],

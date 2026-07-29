@@ -12,10 +12,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.dto.node_connection import NodeConnectionDTO
 from app.models.node import NodeModel
-from app.repositories.base import IRepository
 
 
-class NodeRepository(IRepository[NodeModel]):
+class NodeRepository:
     """Node repository for database operations."""
 
     def __init__(self, session: AsyncSession):
@@ -87,18 +86,6 @@ class NodeRepository(IRepository[NodeModel]):
             query = query.where(NodeModel.tags.op("@>")([tag]))
         result = await self._session.execute(query.offset(skip).limit(limit))
         return list(result.scalars().all())
-
-    async def count_by_tags(self, tags: list[str]) -> int:
-        """Count nodes that have ALL specified tags.
-
-        Uses PostgreSQL @> operator — not testable with SQLite.
-        """
-        # pragma: no cover — PostgreSQL-only operator (@>)
-        query = select(func.count(NodeModel.id))
-        for tag in tags:
-            query = query.where(NodeModel.tags.op("@>")([tag]))
-        result = await self._session.execute(query)
-        return result.scalar_one()
 
     async def get_all_tags(self) -> list[str]:
         """Get all unique tags across all nodes.

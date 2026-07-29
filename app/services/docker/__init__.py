@@ -1,1 +1,1 @@
-"""Focused Docker domain components used by the compatibility facade."""
+"""Focused Docker domain components."""

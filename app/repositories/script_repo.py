@@ -7,10 +7,9 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.script import ScriptModel
-from app.repositories.base import IRepository
 
 
-class ScriptRepository(IRepository[ScriptModel]):
+class ScriptRepository:
     """Repository for scripts."""
 
     def __init__(self, session: AsyncSession) -> None:
