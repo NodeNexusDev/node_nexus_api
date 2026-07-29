@@ -5,8 +5,14 @@ import uuid
 import pytest
 
 from app.application.dto.schedule import (
+    RuntimeJobViewDTO,
     RuntimeScheduleDTO,
     ScheduleRequestDTO,
+)
+from app.application.ports.schedule import (
+    JobSchedulerPort,
+    ScheduleReader,
+    ScheduleWriter,
 )
 
 
@@ -33,3 +39,10 @@ def test_runtime_schedule_is_immutable() -> None:
     )
     with pytest.raises(AttributeError):
         runtime.cron = "* * * * *"  # type: ignore[misc]
+
+
+def test_scheduler_contracts_are_exposed_without_infrastructure_types() -> None:
+    assert RuntimeJobViewDTO.__module__.startswith("app.application")
+    assert ScheduleReader.__module__.startswith("app.application")
+    assert ScheduleWriter.__module__.startswith("app.application")
+    assert JobSchedulerPort.__module__.startswith("app.application")

@@ -51,6 +51,14 @@ class RuntimeScheduleDTO:
 
 
 @dataclass(frozen=True, slots=True)
+class RuntimeJobViewDTO:
+    """Adapter-neutral view of one registered runtime job."""
+
+    script_id: UUID
+    next_run_at: datetime | None
+
+
+@dataclass(frozen=True, slots=True)
 class ScheduleReconciliationResultDTO:
     """Summary of rebuilding runtime jobs from persistent state."""
 

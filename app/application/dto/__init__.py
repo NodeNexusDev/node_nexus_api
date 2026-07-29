@@ -53,6 +53,7 @@ from app.application.dto.node_metrics import (
 )
 from app.application.dto.node_view import NodeViewDTO
 from app.application.dto.schedule import (
+    RuntimeJobViewDTO,
     RuntimeScheduleDTO,
     ScheduleReconciliationResultDTO,
     ScheduleRequestDTO,
@@ -121,6 +122,7 @@ __all__ = [
     "NodeUpdateDTO",
     "NodeViewDTO",
     "ResolvedScriptStepDTO",
+    "RuntimeJobViewDTO",
     "RuntimeScheduleDTO",
     "ScheduleReconciliationResultDTO",
     "ScheduleRequestDTO",

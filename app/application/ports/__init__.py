@@ -14,6 +14,11 @@ from app.application.ports.remote_command import (
     RemoteCommandSession,
     RemoteConnectorFactory,
 )
+from app.application.ports.schedule import (
+    JobSchedulerPort,
+    ScheduleReader,
+    ScheduleWriter,
+)
 from app.application.ports.script_persistence import (
     ScriptDefinitionReader,
     ScriptExecutionReader,
@@ -29,12 +34,15 @@ __all__ = [
     "CommandWriter",
     "CredentialCipher",
     "DockerRuntime",
+    "JobSchedulerPort",
     "NodeConnectionReader",
     "NodeManagementReader",
     "NodeManagementWriter",
     "NodeStatusWriter",
     "RemoteCommandSession",
     "RemoteConnectorFactory",
+    "ScheduleReader",
+    "ScheduleWriter",
     "ScriptDefinitionReader",
     "ScriptExecutionReader",
     "ScriptExecutionWriter",
