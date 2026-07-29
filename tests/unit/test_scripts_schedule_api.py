@@ -2,6 +2,7 @@
 
 from collections.abc import AsyncGenerator
 from unittest.mock import AsyncMock, patch
+from uuid import UUID
 
 import pytest
 from dishka import Provider, Scope, make_async_container, provide
@@ -11,16 +12,20 @@ from httpx2 import ASGITransport, AsyncClient
 
 from app.api.error_mapping import domain_error_handler
 from app.api.v1.scripts import router as scripts_router
+from app.application.dto.schedule import ScheduleViewDTO
+from app.application.services.schedule_management import (
+    ScheduleManagementService,
+)
 from app.core.exceptions import DomainError, ScheduleNotFoundError, ScriptNotFoundError
-from app.schemas.scheduler import ScheduledJob
-from app.services.schedule_service import ScheduleService
 from app.services.script_execution_service import ScriptExecutionService
 from app.services.script_history_service import ScriptHistoryService
 from app.services.script_management_service import ScriptManagementService
 from tests.unit.conftest import MockAuthServiceProvider, _mock_settings
 
 
-def _create_test_app(service: AsyncMock, schedule_service: ScheduleService) -> FastAPI:
+def _create_test_app(
+    service: AsyncMock, schedule_service: ScheduleManagementService
+) -> FastAPI:
     app = FastAPI()
     app.add_exception_handler(DomainError, domain_error_handler)
     app.include_router(scripts_router, prefix="/api/v1")
@@ -39,7 +44,7 @@ def _create_test_app(service: AsyncMock, schedule_service: ScheduleService) -> F
             return service
 
         @provide(scope=Scope.REQUEST)
-        def get_schedule_service(self) -> ScheduleService:
+        def get_schedule_service(self) -> ScheduleManagementService:
             return schedule_service
 
     container = make_async_container(MockServiceProvider(), MockAuthServiceProvider())
@@ -54,14 +59,14 @@ def mock_service() -> AsyncMock:
 
 @pytest.fixture
 def mock_schedule_service() -> AsyncMock:
-    service = AsyncMock(spec=ScheduleService)
-    service.create_or_update.return_value = ScheduledJob(
-        id="00000000-0000-0000-0000-000000000003",
-        script_id="00000000-0000-0000-0000-000000000001",
+    service = AsyncMock(spec=ScheduleManagementService)
+    service.create_or_update.return_value = ScheduleViewDTO(
+        id=UUID("00000000-0000-0000-0000-000000000003"),
+        script_id=UUID("00000000-0000-0000-0000-000000000001"),
         cron="0 9 * * *",
         timezone="UTC",
-        node_ids=["00000000-0000-0000-0000-000000000002"],
-        params={},
+        node_ids=(UUID("00000000-0000-0000-0000-000000000002"),),
+        params=(),
         enabled=True,
         misfire_grace_seconds=60,
         operational_state="registered",

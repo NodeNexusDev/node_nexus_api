@@ -48,6 +48,9 @@ from app.application.ports.script_persistence import (
     ScriptReader,
     ScriptWriter,
 )
+from app.application.services.schedule_management import (
+    ScheduleManagementService,
+)
 from app.application.services.streaming_command_service import StreamingCommandService
 from app.core.config import Settings, get_settings
 from app.core.connectors.ssh import SSHConnectorFactory
@@ -514,6 +517,24 @@ class ServiceProvider(Provider):
             credential_cipher=credential_cipher,
             connector_factory=connector_factory,
             audit_service=audit_service,
+        )
+
+    @provide(scope=Scope.REQUEST)
+    def get_schedule_management_service(
+        self,
+        reader: ScheduleReader,
+        writer: ScheduleWriter,
+        script_reader: ScriptReader,
+        node_reader: NodeManagementReader,
+        scheduler: JobSchedulerPort,
+    ) -> ScheduleManagementService:
+        """Get persistent schedule management orchestration."""
+        return ScheduleManagementService(
+            reader=reader,
+            writer=writer,
+            script_reader=script_reader,
+            node_reader=node_reader,
+            scheduler=scheduler,
         )
 
     @provide(scope=Scope.REQUEST)

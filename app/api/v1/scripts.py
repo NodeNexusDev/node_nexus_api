@@ -7,6 +7,7 @@ from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
 from fastapi import APIRouter, Query, Security
 
 from app.api.deps import get_current_api_key, require_write_scope
+from app.application.dto.schedule import ScheduleRequestDTO, ScheduleViewDTO
 from app.application.dto.script_execution import (
     ScriptExecutionBatchResultDTO,
     ScriptExecutionDTO,
@@ -17,6 +18,9 @@ from app.application.dto.script_management import (
     ScriptStepDTO,
     ScriptUpdateDTO,
     ScriptViewDTO,
+)
+from app.application.services.schedule_management import (
+    ScheduleManagementService,
 )
 from app.schemas.node import PaginatedResponse
 from app.schemas.scheduler import ScheduledJob, ScheduleRequest, ScheduleResponse
@@ -29,7 +33,6 @@ from app.schemas.script import (
     ScriptUpdate,
 )
 from app.schemas.script_execution import ScriptExecutionResponse
-from app.services.schedule_service import ScheduleService
 from app.services.script_execution_service import ScriptExecutionService
 from app.services.script_history_service import ScriptHistoryService
 from app.services.script_management_service import ScriptManagementService
@@ -95,6 +98,25 @@ def _execution_response(execution: ScriptExecutionDTO) -> ScriptExecutionRespons
         ],
         started_at=execution.started_at,
         finished_at=execution.finished_at,
+    )
+
+
+def _scheduled_job(schedule: ScheduleViewDTO) -> ScheduledJob:
+    return ScheduledJob(
+        id=schedule.id,
+        script_id=schedule.script_id,
+        cron=schedule.cron,
+        timezone=schedule.timezone,
+        node_ids=list(schedule.node_ids),
+        params=dict(schedule.params),
+        enabled=schedule.enabled,
+        misfire_grace_seconds=schedule.misfire_grace_seconds,
+        operational_state=schedule.operational_state,
+        last_error_type=schedule.last_error_type,
+        last_run_at=schedule.last_run_at,
+        last_success_at=schedule.last_success_at,
+        last_failure_at=schedule.last_failure_at,
+        next_run_at=schedule.next_run_at,
     )
 
 
@@ -268,7 +290,7 @@ async def get_executions(
 async def schedule_script(
     script_id: uuid.UUID,
     data: ScheduleRequest,
-    schedule_service: FromDishka[ScheduleService],
+    schedule_service: FromDishka[ScheduleManagementService],
     _key: str = Security(require_write_scope),
 ) -> ScheduleResponse:
     """Schedule a script to run periodically via cron expression.
@@ -281,7 +303,16 @@ async def schedule_script(
         cron=data.cron,
         node_ids=[str(n) for n in data.node_ids],
     )
-    schedule = await schedule_service.create_or_update(script_id, data)
+    schedule = await schedule_service.create_or_update(
+        script_id,
+        ScheduleRequestDTO(
+            cron=data.cron,
+            node_ids=tuple(data.node_ids),
+            params=tuple(data.params.items()),
+            timezone=data.timezone,
+            misfire_grace_seconds=data.misfire_grace_seconds,
+        ),
+    )
     return ScheduleResponse(
         script_id=str(script_id),
         cron=schedule.cron,
@@ -294,7 +325,7 @@ async def schedule_script(
 @inject
 async def unschedule_script(
     script_id: uuid.UUID,
-    schedule_service: FromDishka[ScheduleService],
+    schedule_service: FromDishka[ScheduleManagementService],
     _key: str = Security(require_write_scope),
 ) -> dict:
     """Remove a scheduled script."""
@@ -307,9 +338,9 @@ async def unschedule_script(
 @inject
 async def get_schedule(
     script_id: uuid.UUID,
-    schedule_service: FromDishka[ScheduleService],
+    schedule_service: FromDishka[ScheduleManagementService],
     _key: str = Security(require_write_scope),
 ) -> ScheduledJob | None:
     """Get the schedule for a script."""
     audit.info("api.scripts.get_schedule", script_id=str(script_id))
-    return await schedule_service.get(script_id)
+    return _scheduled_job(await schedule_service.get(script_id))
