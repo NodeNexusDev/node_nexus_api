@@ -8,10 +8,12 @@ from app.core.exceptions import (
     APIKeyExpiredError,
     APIKeyNotFoundError,
     APIKeyRevokedError,
+    AuditWriteError,
     AuthenticationError,
     CommandNotFoundError,
     ConnectionFailedError,
     ContainerNotFoundError,
+    CredentialDecryptionError,
     DockerDaemonError,
     DockerError,
     DockerValidationError,
@@ -20,9 +22,14 @@ from app.core.exceptions import (
     NodeNameConflictError,
     NodeNotFoundError,
     RequestTimeoutError,
+    ScheduleNotFoundError,
+    SchedulePersistenceError,
+    SchedulerOwnershipError,
+    ScheduleValidationError,
     ScriptNotFoundError,
     TagNotFoundError,
     TemplateRenderError,
+    UnsupportedConfigFormatError,
 )
 
 logger = structlog.get_logger()
@@ -38,6 +45,7 @@ DOMAIN_ERROR_STATUS: dict[type[DomainError], int] = {
     AuthenticationError: 401,
     TagNotFoundError: 404,
     ConnectionFailedError: 503,
+    CredentialDecryptionError: 503,
     TemplateRenderError: 422,
     ContainerNotFoundError: 404,
     ImageNotFoundError: 404,
@@ -45,6 +53,12 @@ DOMAIN_ERROR_STATUS: dict[type[DomainError], int] = {
     DockerValidationError: 422,
     DockerError: 502,
     RequestTimeoutError: 504,
+    UnsupportedConfigFormatError: 422,
+    ScheduleValidationError: 422,
+    ScheduleNotFoundError: 404,
+    SchedulerOwnershipError: 503,
+    SchedulePersistenceError: 503,
+    AuditWriteError: 503,
     DomainError: 422,
 }
 
@@ -72,6 +86,15 @@ async def domain_error_handler(request: Request, exc: Exception) -> JSONResponse
         path=request.url.path,
         error_type=type(exc).__name__,
         status_code=status_code,
-        detail=str(exc),
     )
-    return JSONResponse(status_code=status_code, content={"detail": str(exc)})
+    message = str(exc)
+    request_id = getattr(request.state, "request_id", None)
+    return JSONResponse(
+        status_code=status_code,
+        content={
+            "code": type(exc).__name__,
+            "message": message,
+            "request_id": request_id,
+            "detail": message,
+        },
+    )

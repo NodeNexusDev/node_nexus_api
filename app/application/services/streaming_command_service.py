@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 from uuid import UUID
 
 from app.application.ports.node_reader import NodeConnectionReader
-from app.core.connectors.base import BaseConnector, ConnectorFactory
+from app.core.connectors.base import BaseConnector, ConnectorFactory, StreamEvent
 from app.core.exceptions import NodeNotFoundError
 from app.core.ssh_utils import decrypt_value
 
@@ -19,6 +19,14 @@ class StreamingCommandSession:
     def execute(self, command: str) -> AsyncIterator[str]:
         """Stream command output."""
         return self._connector.execute_command_streaming(command)
+
+    def execute_events(self, command: str) -> AsyncIterator[StreamEvent]:
+        """Stream typed stdout, stderr, and exit events."""
+        return self._connector.execute_command_streaming_events(command)
+
+    async def send_signal(self, signal: str) -> None:
+        """Forward an allowed signal to the active remote process."""
+        await self._connector.send_signal(signal)
 
 
 class StreamingCommandService:

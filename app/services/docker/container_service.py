@@ -11,6 +11,7 @@ if TYPE_CHECKING:
 
 import structlog
 
+from app.core.connectors.ssh import command_fingerprint
 from app.core.docker_validation import validate_container_id
 from app.core.exceptions import ContainerNotFoundError
 from app.schemas.docker import (
@@ -40,6 +41,14 @@ class DockerContainerService:
     async def _log(self, action: str, node_id: UUID, details: dict[str, Any]) -> None:
         if self._audit:
             await self._audit.log(action=action, node_id=node_id, details=details)
+
+    async def _log_required(
+        self, action: str, node_id: UUID, details: dict[str, Any]
+    ) -> None:
+        if self._audit:
+            await self._audit.log_required(
+                action=action, node_id=node_id, details=details
+            )
 
     async def list_containers(
         self, node_id: UUID, *, all: bool = False
@@ -90,7 +99,6 @@ class DockerContainerService:
             config=DockerContainerConfig(
                 image=config.get("Image"),
                 cmd=config.get("Cmd"),
-                env=config.get("Env"),
                 hostname=config.get("Hostname"),
             ),
             network_settings=data.get("NetworkSettings"),
@@ -107,6 +115,11 @@ class DockerContainerService:
         validated_id = validate_container_id(container_id)
         node = await self._runner.get_target(node_id)
         cmd = self._runner.build_command(node, f"{args} {validated_id}")
+        await self._log_required(
+            f"docker.container.{action}.requested",
+            node_id,
+            {"container_id": validated_id},
+        )
         _, stderr, exit_code = await self._runner.execute(node, cmd)
         raise_for_docker_error(stderr, exit_code)
         event = f"docker.container.{action}"
@@ -182,6 +195,14 @@ class DockerContainerService:
         node = await self._runner.get_target(node_id)
         cmd = self._runner.build_command(
             node, f"exec {validated_id} sh -c {shlex.quote(command)}"
+        )
+        await self._log_required(
+            "docker.container.exec.requested",
+            node_id,
+            {
+                "container_id": validated_id,
+                "command_fingerprint": command_fingerprint(command),
+            },
         )
         stdout, stderr, exit_code = await self._runner.execute(node, cmd, timeout)
         event = (

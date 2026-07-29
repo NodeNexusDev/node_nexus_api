@@ -27,13 +27,16 @@ from app.repositories.health_repo import HealthRepository
 from app.repositories.node_repo import NodeRepository
 from app.repositories.script_execution_repo import ScriptExecutionRepository
 from app.repositories.script_repo import ScriptRepository
+from app.repositories.script_schedule_repo import ScriptScheduleRepository
 from app.services.api_key_service import APIKeyService
-from app.services.audit_service import AuditService
+from app.services.audit_outbox_worker import AuditOutboxWorker
+from app.services.audit_service import AuditService, RequiredAuditWriter
 from app.services.command_service import CommandService
 from app.services.config_service import ConfigService
 from app.services.docker_service import DockerService
 from app.services.health_service import HealthService
 from app.services.node_service import NodeService
+from app.services.schedule_service import ScheduleService
 from app.services.script_service import ScriptService
 
 
@@ -123,6 +126,13 @@ class RepositoryProvider(Provider):
         return ScriptExecutionRepository(session)
 
     @provide(scope=Scope.REQUEST)
+    def get_script_schedule_repository(
+        self, session: AsyncSession
+    ) -> ScriptScheduleRepository:
+        """Get persistent script schedule repository."""
+        return ScriptScheduleRepository(session)
+
+    @provide(scope=Scope.REQUEST)
     def get_api_key_repository(self, session: AsyncSession) -> APIKeyRepository:
         """Get API key repository."""
         return APIKeyRepository(session)
@@ -137,9 +147,12 @@ class ConnectorProvider(Provider):
     """Connector providers."""
 
     @provide(scope=Scope.APP)
-    def get_ssh_connector_factory(self) -> SSHConnectorFactory:
+    def get_ssh_connector_factory(self, settings: Settings) -> SSHConnectorFactory:
         """Get SSH connector factory."""
-        return SSHConnectorFactory()
+        return SSHConnectorFactory(
+            known_hosts_path=settings.SSH_KNOWN_HOSTS_PATH,
+            strict_host_key_checking=settings.SSH_STRICT_HOST_KEY_CHECKING,
+        )
 
 
 class ServiceProvider(Provider):
@@ -155,9 +168,23 @@ class ServiceProvider(Provider):
         return StreamingCommandService(node_reader, connector_factory)
 
     @provide(scope=Scope.REQUEST)
-    def get_audit_service(self, repository: AuditLogRepository) -> AuditService:
+    def get_audit_service(
+        self,
+        repository: AuditLogRepository,
+        required_writer: RequiredAuditWriter,
+    ) -> AuditService:
         """Get audit service."""
-        return AuditService(repository=repository)
+        return AuditService(
+            repository=repository,
+            required_writer=required_writer,
+        )
+
+    @provide(scope=Scope.APP)
+    def get_required_audit_writer(
+        self, sessionmaker: async_sessionmaker[AsyncSession]
+    ) -> RequiredAuditWriter:
+        """Get the independent writer for pre-side-effect audit intents."""
+        return RequiredAuditWriter(sessionmaker)
 
     @provide(scope=Scope.REQUEST)
     def get_node_service(
@@ -245,9 +272,18 @@ class ServiceProvider(Provider):
         )
 
     @provide(scope=Scope.REQUEST)
-    def get_health_service(self, repository: HealthRepository) -> HealthService:
+    def get_health_service(
+        self,
+        repository: HealthRepository,
+        scheduler: ScriptScheduler,
+        settings: Settings,
+    ) -> HealthService:
         """Get health check service."""
-        return HealthService(repository=repository)
+        return HealthService(
+            repository=repository,
+            scheduler=scheduler,
+            scheduler_enabled=settings.SCHEDULER_ENABLED,
+        )
 
     @provide(scope=Scope.REQUEST)
     def get_config_service(
@@ -261,6 +297,22 @@ class ServiceProvider(Provider):
             node_repository=node_repository,
             command_repository=command_repository,
             script_repository=script_repository,
+        )
+
+    @provide(scope=Scope.REQUEST)
+    def get_schedule_service(
+        self,
+        repository: ScriptScheduleRepository,
+        script_repository: ScriptRepository,
+        node_repository: NodeRepository,
+        scheduler: ScriptScheduler,
+    ) -> ScheduleService:
+        """Get the persistent schedule application service."""
+        return ScheduleService(
+            repository=repository,
+            script_repository=script_repository,
+            node_repository=node_repository,
+            scheduler=scheduler,
         )
 
 
@@ -277,14 +329,31 @@ class SchedulerProvider(Provider):
     """Scheduler providers."""
 
     @provide(scope=Scope.APP)
-    async def get_script_scheduler(self) -> AsyncIterable[ScriptScheduler]:
+    async def get_script_scheduler(
+        self, engine: AsyncEngine, settings: Settings
+    ) -> AsyncIterable[ScriptScheduler]:
         """Start and finalize the application-scoped script scheduler."""
         scheduler = ScriptScheduler()
-        await scheduler.start()
+        if settings.SCHEDULER_ENABLED:
+            await scheduler.acquire_ownership(engine)
+            scheduler.start_ownership_monitor(engine)
+            await scheduler.start()
         try:
             yield scheduler
         finally:
             await scheduler.stop()
+
+    @provide(scope=Scope.APP)
+    async def get_audit_outbox_worker(
+        self, sessionmaker: async_sessionmaker[AsyncSession]
+    ) -> AsyncIterable[AuditOutboxWorker]:
+        """Run durable audit delivery for the application lifetime."""
+        worker = AuditOutboxWorker(sessionmaker)
+        worker.start()
+        try:
+            yield worker
+        finally:
+            await worker.stop()
 
 
 class AppProvider(

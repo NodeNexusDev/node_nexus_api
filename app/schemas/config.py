@@ -1,8 +1,20 @@
 """Schemas for configuration export/import."""
 
 from datetime import datetime
+from importlib.metadata import PackageNotFoundError, version
 
 from pydantic import BaseModel, Field
+
+CONFIG_FORMAT_VERSION = "1.0"
+LEGACY_CONFIG_VERSION = "0.5.0"
+
+
+def application_version() -> str:
+    """Return the installed application package version."""
+    try:
+        return version("node-nexus-api")
+    except PackageNotFoundError:
+        return "unknown"
 
 
 class NodeExport(BaseModel):
@@ -38,7 +50,9 @@ class ScriptExport(BaseModel):
 class ConfigExport(BaseModel):
     """Full configuration export."""
 
-    version: str = "0.5.0"
+    format_version: str = CONFIG_FORMAT_VERSION
+    application_version: str = Field(default_factory=application_version)
+    version: str = LEGACY_CONFIG_VERSION
     exported_at: datetime
     nodes: list[NodeExport] = Field(default_factory=list)
     commands: list[CommandExport] = Field(default_factory=list)
@@ -48,6 +62,9 @@ class ConfigExport(BaseModel):
 class ConfigImport(BaseModel):
     """Configuration import payload."""
 
+    format_version: str | None = None
+    application_version: str | None = None
+    version: str | None = None
     nodes: list[NodeExport] = Field(default_factory=list)
     commands: list[CommandExport] = Field(default_factory=list)
     scripts: list[ScriptExport] = Field(default_factory=list)

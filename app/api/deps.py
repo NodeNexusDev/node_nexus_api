@@ -35,8 +35,8 @@ async def get_current_api_key(
         audit.info("auth.master_key_used")
         return "master"
 
-    await api_key_service.validate_api_key(api_key)
-    return api_key[:8]
+    principal = await api_key_service.validate_api_key(api_key)
+    return principal.key_prefix if principal is not None else api_key[:8]
 
 
 @inject
@@ -65,11 +65,15 @@ async def require_write_scope(
         audit.info("auth.master_key_used")
         return "master"
 
-    await api_key_service.validate_api_key(api_key)
-    scope = await api_key_service.get_api_key_scope(api_key)
-
+    principal = await api_key_service.validate_api_key(api_key)
+    scope = (
+        principal.scope
+        if principal is not None
+        else await api_key_service.get_api_key_scope(api_key)
+    )
+    key_prefix = principal.key_prefix if principal is not None else api_key[:8]
     if scope == "read-only":
-        audit.warning("auth.read_only_denied", key_prefix=api_key[:8])
+        audit.warning("auth.read_only_denied", key_prefix=key_prefix)
         raise HTTPException(status_code=403, detail="API key has read-only scope")
 
-    return api_key[:8]
+    return key_prefix

@@ -62,4 +62,5 @@ class ScriptRepository(IRepository[ScriptModel]):
             return False
         await self._session.delete(script)
         await self._session.flush()
+        await self._session.commit()
         return True

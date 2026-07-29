@@ -1,8 +1,9 @@
 """Schemas for script scheduling."""
 
+from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ScheduleRequest(BaseModel):
@@ -14,6 +15,9 @@ class ScheduleRequest(BaseModel):
         description="Cron expression (e.g., '0 9 * * *')",
     )
     node_ids: list[UUID] = Field(min_length=1, description="Target node IDs")
+    params: dict = Field(default_factory=dict)
+    timezone: str = Field(default="UTC", min_length=1, max_length=100)
+    misfire_grace_seconds: int = Field(default=60, ge=1, le=86400)
 
 
 class ScheduleResponse(BaseModel):
@@ -21,13 +25,26 @@ class ScheduleResponse(BaseModel):
 
     script_id: str
     cron: str
+    timezone: str = "UTC"
     message: str = "Script scheduled successfully"
 
 
 class ScheduledJob(BaseModel):
     """Information about a scheduled job."""
 
-    script_id: str
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    script_id: UUID
     cron: str
-    next_run_time: str | None = None
-    node_ids: list[str] = Field(default_factory=list)
+    timezone: str
+    node_ids: list[UUID] = Field(default_factory=list)
+    params: dict = Field(default_factory=dict)
+    enabled: bool
+    misfire_grace_seconds: int
+    operational_state: str
+    last_error_type: str | None = None
+    last_run_at: datetime | None = None
+    last_success_at: datetime | None = None
+    last_failure_at: datetime | None = None
+    next_run_at: datetime | None = None

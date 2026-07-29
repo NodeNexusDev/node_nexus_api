@@ -50,6 +50,12 @@ class DockerImageService:
         validated = validate_image_name(image)
         node = await self._runner.get_target(node_id)
         cmd = self._runner.build_command(node, f"pull {validated}")
+        if self._audit:
+            await self._audit.log_required(
+                action="docker.image.pull.requested",
+                node_id=node_id,
+                details={"image": validated},
+            )
         try:
             stdout, stderr, exit_code = await self._runner.execute(node, cmd, timeout)
         except ConnectionFailedError as exc:

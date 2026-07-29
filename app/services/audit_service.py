@@ -6,18 +6,57 @@ from typing import Any
 from uuid import UUID
 
 import structlog
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from app.core.exceptions import AuditWriteError
 from app.repositories.audit_repo import AuditLogRepository
 from app.schemas.audit_log import AuditLogResponse
 
 audit = structlog.get_logger("audit")
+_SENSITIVE_DETAIL_KEYS = {
+    "password",
+    "ssh_key",
+    "token",
+    "api_key",
+    "authorization",
+    "command",
+    "params",
+    "stdout",
+    "stderr",
+}
+
+
+def sanitize_audit_details(details: dict[str, Any]) -> dict[str, Any]:
+    """Remove sensitive runtime payloads from durable audit details."""
+    return {
+        key: value
+        for key, value in details.items()
+        if key.lower() not in _SENSITIVE_DETAIL_KEYS
+    }
+
+
+class RequiredAuditWriter:
+    """Persist obligatory intents in an independent short transaction."""
+
+    def __init__(self, sessionmaker: async_sessionmaker[AsyncSession]) -> None:
+        self._sessionmaker = sessionmaker
+
+    async def write(self, data: dict[str, Any]) -> None:
+        """Commit one outbox event without affecting the request transaction."""
+        async with self._sessionmaker() as session, session.begin():
+            await AuditLogRepository(session).create(data)
 
 
 class AuditService:
     """Service for audit log operations."""
 
-    def __init__(self, repository: AuditLogRepository):
+    def __init__(
+        self,
+        repository: AuditLogRepository,
+        required_writer: RequiredAuditWriter | None = None,
+    ):
         self._repository = repository
+        self._required_writer = required_writer
 
     async def log(
         self,
@@ -26,14 +65,15 @@ class AuditService:
         user: str | None = None,
         details: dict[str, Any] | None = None,
     ) -> None:
-        """Log an audit event (fire-and-forget)."""
+        """Persist an obligatory audit event in the request transaction."""
         try:
+            safe_details = sanitize_audit_details(details) if details else None
             await self._repository.create(
                 {
                     "node_id": node_id,
                     "action": action,
                     "user": user,
-                    "details": json.dumps(details) if details else None,
+                    "details": json.dumps(safe_details) if safe_details else None,
                 }
             )
             audit.debug(
@@ -41,8 +81,45 @@ class AuditService:
                 action=action,
                 node_id=str(node_id) if node_id else None,
             )
-        except Exception:
-            audit.warning("audit.log.failed", action=action, node_id=str(node_id))
+        except Exception as exc:
+            audit.error(
+                "audit.log.failed",
+                action=action,
+                node_id=str(node_id) if node_id else None,
+                error_type=type(exc).__name__,
+            )
+            raise AuditWriteError("Audit event could not be persisted") from exc
+
+    async def log_required(
+        self,
+        action: str,
+        node_id: UUID | None = None,
+        details: dict[str, Any] | None = None,
+    ) -> None:
+        """Durably commit an audit intent before an external side effect."""
+        try:
+            safe_details = sanitize_audit_details(details) if details else None
+            data = {
+                "node_id": node_id,
+                "action": action,
+                "user": None,
+                "details": json.dumps(safe_details) if safe_details else None,
+            }
+            if self._required_writer is not None:
+                await self._required_writer.write(data)
+            else:
+                await self._repository.create(data)
+                await self._repository.commit()
+        except Exception as exc:
+            audit.error(
+                "audit.required.commit_failed",
+                action=action,
+                node_id=str(node_id) if node_id else None,
+                error_type=type(exc).__name__,
+            )
+            raise AuditWriteError(
+                "Required audit event could not be committed"
+            ) from exc
 
     async def get_logs(
         self,

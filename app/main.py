@@ -63,11 +63,10 @@ def _run_migrations_sync() -> None:
     try:
         alembic_command.upgrade(alembic_cfg, "head")
     except Exception as exc:
-        logger.exception("migrations.failed", database=settings.DATABASE_URL)
+        logger.exception("migrations.failed", error_type=type(exc).__name__)
         raise RuntimeError(
-            f"Database migrations failed. "
-            f"Ensure the database is reachable and the schema is compatible. "
-            f"Original error: {exc}"
+            "Database migrations failed. Ensure the database is reachable "
+            "and the schema is compatible."
         ) from exc
 
 
@@ -100,17 +99,46 @@ async def _cleanup_audit_logs() -> None:
         logger.warning("audit.cleanup.startup.failed")
 
 
-async def _execute_scheduled_script(script_id, node_ids) -> None:  # noqa: ANN001
+async def _execute_scheduled_script(
+    script_id,
+    node_ids,
+    params,  # noqa: ANN001
+) -> None:
     """Execute one scheduled script in a fresh request scope."""
     from app.schemas.script import ScriptExecuteRequest
+    from app.services.schedule_service import ScheduleService
     from app.services.script_service import ScriptService
 
     async with container() as request_container:
         script_service = await request_container.get(ScriptService)
-        await script_service.execute_script(
-            script_id,
-            ScriptExecuteRequest(node_ids=node_ids, params={}),
+        schedule_service = await request_container.get(ScheduleService)
+        await schedule_service.mark_started(script_id)
+        try:
+            await script_service.execute_script(
+                script_id,
+                ScriptExecuteRequest(node_ids=node_ids, params=params),
+            )
+        except Exception as exc:
+            await schedule_service.mark_failed(script_id, type(exc).__name__)
+            raise
+        await schedule_service.mark_succeeded(script_id)
+
+
+async def _restore_schedules() -> tuple[int, int]:
+    """Restore persistent schedules in a short database scope."""
+    async with container() as request_container:
+        from app.services.schedule_service import ScheduleService
+
+        schedule_service = await request_container.get(ScheduleService)
+        restored, failed = await schedule_service.restore()
+        scheduler = await container.get(ScriptScheduler)
+        scheduler.mark_restored(failed=failed)
+        logger.info(
+            "scheduler.restore.completed",
+            restored=restored,
+            failed=failed,
         )
+        return restored, failed
 
 
 @asynccontextmanager
@@ -125,7 +153,16 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     else:
         logger.info("migrations.skipped", reason="AUTO_MIGRATE is disabled")
     scheduler = await container.get(ScriptScheduler)
+    from app.services.audit_outbox_worker import AuditOutboxWorker
+
+    await container.get(AuditOutboxWorker)
     scheduler.configure_executor(_execute_scheduled_script)
+    if settings.SCHEDULER_ENABLED:
+        scheduler.configure_reconciler(_restore_schedules)
+        await _restore_schedules()
+        scheduler.start_reconciliation()
+    else:
+        scheduler.mark_restored(failed=0)
     await _cleanup_audit_logs()
 
     try:
