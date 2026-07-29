@@ -1,8 +1,27 @@
 """OpenAPI contract quality checks."""
 
+import hashlib
+import json
+
 from httpx2 import ASGITransport, AsyncClient
 
 from app.main import app
+
+OPENAPI_CONTRACT_SHA256 = (
+    "0bfe906985525ae4bd2a98c6c9af7996ad6bc101e69d0076de242d1f27387cfc"
+)
+
+
+def test_openapi_schema_matches_reviewed_snapshot() -> None:
+    """Require an explicit review for every public HTTP contract change."""
+    canonical_schema = json.dumps(
+        app.openapi(),
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+    ).encode()
+
+    assert hashlib.sha256(canonical_schema).hexdigest() == OPENAPI_CONTRACT_SHA256
 
 
 def test_openapi_metadata_and_operation_ids_are_stable() -> None:
