@@ -4,12 +4,13 @@ import base64
 
 import pytest
 
-from app.core.security import decrypt, encrypt
+from app.core.security import ENCRYPTION_PREFIX, decrypt, encrypt
 
 
 class TestEncryptDecrypt:
     def test_empty_string(self) -> None:
         encrypted = encrypt("")
+        assert encrypted.startswith(ENCRYPTION_PREFIX)
         assert decrypt(encrypted) == ""
 
     def test_unicode_string(self) -> None:
@@ -38,8 +39,9 @@ class TestEncryptDecrypt:
 
     def test_decrypt_tampered_ciphertext(self) -> None:
         encrypted = encrypt("secret")
-        raw = base64.b64decode(encrypted)
-        tampered = base64.b64encode(raw[:-1] + b"\x00").decode()
+        payload = encrypted.removeprefix(ENCRYPTION_PREFIX)
+        raw = base64.b64decode(payload)
+        tampered = ENCRYPTION_PREFIX + base64.b64encode(raw[:-1] + b"\x00").decode()
         with pytest.raises(Exception):
             decrypt(tampered)
 

@@ -20,6 +20,7 @@ def _connector(ssh_server: DockerSSHServer) -> SSHConnector:
         username=ssh_server.username,
         password=ssh_server.password,
         known_hosts=None,
+        strict_host_key_checking=False,
     )
 
 

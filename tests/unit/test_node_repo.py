@@ -2,6 +2,8 @@
 
 import uuid
 from collections.abc import AsyncGenerator
+from datetime import UTC, datetime, timedelta
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 import pytest_asyncio
@@ -29,8 +31,7 @@ async def engine() -> AsyncGenerator[AsyncEngine]:
 async def session(engine: AsyncEngine) -> AsyncGenerator[AsyncSession]:
     sm = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
     async with sm() as s:
-        async with s.begin():
-            yield s
+        yield s
 
 
 @pytest.fixture
@@ -154,6 +155,68 @@ async def test_get_by_ids_no_match(repo: NodeRepository) -> None:
     await repo.create(_node_data())
     result = await repo.get_by_ids([uuid.uuid4()])
     assert result == []
+
+
+async def test_connection_dto_queries(repo: NodeRepository) -> None:
+    node = await repo.create(
+        _node_data(name="dto", username="root", password="encrypted")
+    )
+    connection = await repo.get_connection(node.id)
+    assert connection is not None
+    assert connection.username == "root"
+    assert await repo.get_connection(uuid.uuid4()) is None
+    assert len(await repo.get_connections_by_ids([node.id])) == 1
+
+
+async def test_connection_dtos_by_tags_delegates() -> None:
+    repository = NodeRepository(AsyncMock())
+    node = MagicMock()
+    node.id = uuid.uuid4()
+    node.name = "node"
+    node.host = "host"
+    node.port = 22
+    node.connection_type = "ssh"
+    node.username = None
+    node.password = None
+    node.ssh_key = None
+    node.docker_host = None
+    repository.get_by_tags = AsyncMock(return_value=[node])
+    assert len(await repository.get_connections_by_tags(["prod"])) == 1
+
+
+async def test_postgresql_tag_query_builders() -> None:
+    session = AsyncMock()
+    scalars = MagicMock()
+    scalars.all.return_value = []
+    result = MagicMock()
+    result.scalars.return_value = scalars
+    result.scalar_one.return_value = 0
+    result.all.return_value = [("web",), (None,), ("prod",)]
+    session.execute.return_value = result
+    repository = NodeRepository(session)
+
+    assert await repository.get_by_tags(["prod", "web"]) == []
+    assert await repository.count_by_tags(["prod"]) == 0
+    assert await repository.get_all_tags() == ["prod", "web"]
+    assert await repository.get_filtered(tags=["prod"]) == []
+    assert await repository.count_filtered(tags=["prod"]) == 0
+
+
+async def test_cursor_pagination_with_and_without_cursor(
+    repo: NodeRepository,
+) -> None:
+    first = await repo.create(_node_data(name="first"))
+    first.created_at = datetime.now(UTC) - timedelta(seconds=1)
+    second = await repo.create(_node_data(name="second"))
+    second.created_at = datetime.now(UTC)
+    await repo._session.flush()
+
+    page = await repo.get_list_cursor(limit=1)
+    assert len(page) == 2
+    next_page = await repo.get_list_cursor(
+        cursor=(second.created_at, second.id), limit=2
+    )
+    assert [node.name for node in next_page] == ["first"]
 
 
 # --- get_filtered / count_filtered ---

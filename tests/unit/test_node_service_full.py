@@ -162,6 +162,15 @@ class TestDecryptValue:
 
         assert decrypt_value("plain-text") == "plain-text"
 
+    def test_tampered_ciphertext_fails_closed(self) -> None:
+        from app.core.exceptions import CredentialDecryptionError
+        from app.core.ssh_utils import decrypt_value
+
+        token = encrypt("secret")
+        tampered = f"{token[:-1]}{'A' if token[-1] != 'A' else 'B'}"
+        with pytest.raises(CredentialDecryptionError):
+            decrypt_value(tampered)
+
 
 class TestCheckConnectivityEdgeCases:
     async def test_node_not_found(self, service: NodeService, repo: AsyncMock) -> None:

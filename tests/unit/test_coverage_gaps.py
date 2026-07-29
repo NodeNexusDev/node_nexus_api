@@ -333,7 +333,9 @@ class TestSSHStreaming:
 
         connector._connection = mock_conn
 
-        with pytest.raises(asyncssh.Error):
+        from app.core.exceptions import ConnectionFailedError
+
+        with pytest.raises(ConnectionFailedError):
             async for _ in connector.execute_command_streaming("ls"):
                 pass
 

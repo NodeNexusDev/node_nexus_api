@@ -57,6 +57,8 @@ class TestConfigExportAPI:
         resp = await client.get("/api/v1/config/export")
         assert resp.status_code == 200
         data = resp.json()
+        assert data["format_version"] == "1.0"
+        assert data["application_version"]
         assert data["version"] == "0.5.0"
         assert "exported_at" in data
 
