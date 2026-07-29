@@ -12,6 +12,7 @@ scheduler и очищает устаревший audit. Telemetry и HTTP middle
 вместе с app. Shutdown закрывает Dishka container, database engine и
 application-scoped resources.
 
-Request-scoped dependencies не выходят за свой scope. Scheduled jobs создают
-новый scope. Scheduler хранит jobs в памяти, не имеет leader election и в
-multi-replica deployment должен иметь одного owner.
+Request-scoped dependencies не выходят за свой scope. При startup приложение
+получает advisory lock PostgreSQL и восстанавливает APScheduler jobs из
+`script_schedules`; scheduled jobs создают новый scope. Реплика без ownership
+обслуживает HTTP, но не выполняет jobs. Потеря процесса не удаляет расписания.
