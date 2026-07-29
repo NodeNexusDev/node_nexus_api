@@ -1,6 +1,11 @@
 """Ports implemented by persistence and infrastructure adapters."""
 
 from app.application.ports.api_key import APIKeyReader, APIKeyWriter
+from app.application.ports.audit_log import (
+    AuditLogReader,
+    AuditLogWriter,
+    AuditOutboxPort,
+)
 from app.application.ports.audit_sink import AuditEventSink
 from app.application.ports.audit_writer import AuditWriter
 from app.application.ports.command_management import CommandReader, CommandWriter
@@ -33,6 +38,9 @@ __all__ = [
     "APIKeyReader",
     "APIKeyWriter",
     "AuditEventSink",
+    "AuditLogReader",
+    "AuditLogWriter",
+    "AuditOutboxPort",
     "AuditWriter",
     "CommandReader",
     "CommandWriter",

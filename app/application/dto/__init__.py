@@ -9,7 +9,12 @@ from app.application.dto.api_key import (
     APIKeyUpdateDTO,
     APIKeyViewDTO,
 )
-from app.application.dto.audit import AuditEventDTO
+from app.application.dto.audit import (
+    AuditEventDTO,
+    AuditLogDTO,
+    AuditLogPageDTO,
+    AuditLogQueryDTO,
+)
 from app.application.dto.command_execution import (
     BulkCommandRequestDTO,
     BulkCommandResultDTO,
@@ -97,6 +102,9 @@ __all__ = [
     "APIKeyUpdateDTO",
     "APIKeyViewDTO",
     "AuditEventDTO",
+    "AuditLogDTO",
+    "AuditLogPageDTO",
+    "AuditLogQueryDTO",
     "BulkCommandRequestDTO",
     "BulkCommandResultDTO",
     "BulkDockerNodeResultDTO",
