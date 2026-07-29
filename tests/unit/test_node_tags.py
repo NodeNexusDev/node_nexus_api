@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
+from app.adapters.security import AesGcmCredentialCipher
 from app.application.dto.node_management import (
     NodeCreateDTO,
     NodePageDTO,
@@ -22,7 +23,9 @@ def repo() -> AsyncMock:
 
 @pytest.fixture
 def service(repo: AsyncMock) -> NodeManagementService:
-    return NodeManagementService(reader=repo, writer=repo)
+    return NodeManagementService(
+        reader=repo, writer=repo, credential_cipher=AesGcmCredentialCipher()
+    )
 
 
 class TestGetNodesByTags:

@@ -18,6 +18,7 @@ from sqlalchemy.ext.asyncio import (
 )
 
 from app.adapters.persistence.node_management import SqlAlchemyNodeManagementGateway
+from app.adapters.security import AesGcmCredentialCipher
 from app.api.error_mapping import domain_error_handler
 from app.api.v1.health import router as health_router
 from app.api.v1.nodes import router as nodes_router
@@ -89,7 +90,9 @@ class IntegrationDbProvider(Provider):
     @provide(scope=Scope.REQUEST)
     def get_service(self) -> NodeManagementService:
         gateway = SqlAlchemyNodeManagementGateway(self._sm)
-        return NodeManagementService(reader=gateway, writer=gateway)
+        return NodeManagementService(
+            reader=gateway, writer=gateway, credential_cipher=AesGcmCredentialCipher()
+        )
 
     @provide(scope=Scope.REQUEST)
     def get_api_key_service(self, repo: APIKeyRepository) -> APIKeyService:

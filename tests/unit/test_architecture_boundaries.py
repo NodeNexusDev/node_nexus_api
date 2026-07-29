@@ -108,6 +108,8 @@ def test_node_management_use_case_depends_on_application_ports() -> None:
         "app.models",
         "app.repositories",
         "app.schemas",
+        "app.core.security",
+        "app.core.ssh_utils",
         "sqlalchemy",
     )
     violations = [

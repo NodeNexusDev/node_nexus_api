@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 if TYPE_CHECKING:
+    from app.application.ports.credential_cipher import CredentialCipher
     from app.application.ports.node_management import (
         NodeManagementReader,
         NodeManagementWriter,
@@ -26,7 +27,6 @@ from app.application.dto.node_management import (
 )
 from app.application.dto.node_view import NodeViewDTO
 from app.core.exceptions import NodeNotFoundError
-from app.core.security import encrypt
 
 audit = structlog.get_logger("audit")
 
@@ -40,10 +40,12 @@ class NodeManagementService:
         self,
         reader: NodeManagementReader,
         writer: NodeManagementWriter,
+        credential_cipher: CredentialCipher,
         audit_service: AuditService | None = None,
     ) -> None:
         self._reader = reader
         self._writer = writer
+        self._credential_cipher = credential_cipher
         self._audit = audit_service
 
     async def _log(
@@ -200,7 +202,10 @@ class NodeManagementService:
 
         return node
 
-    @staticmethod
-    def _encrypt_value(value: NodeUpdateValue) -> NodeUpdateValue:
+    def _encrypt_value(self, value: NodeUpdateValue) -> NodeUpdateValue:
         """Encrypt a non-empty sensitive string."""
-        return encrypt(value) if isinstance(value, str) and value else value
+        return (
+            self._credential_cipher.encrypt(value)
+            if isinstance(value, str) and value
+            else value
+        )

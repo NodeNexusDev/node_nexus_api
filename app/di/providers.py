@@ -19,6 +19,8 @@ from app.adapters.persistence.script_gateway import (
     ScopedScriptDefinitionReader,
     ScopedScriptExecutionWriter,
 )
+from app.adapters.security import AesGcmCredentialCipher
+from app.application.ports.credential_cipher import CredentialCipher
 from app.application.ports.node_management import (
     NodeManagementReader,
     NodeManagementWriter,
@@ -185,6 +187,11 @@ class ConnectorProvider(Provider):
             strict_host_key_checking=settings.SSH_STRICT_HOST_KEY_CHECKING,
         )
 
+    @provide(scope=Scope.APP)
+    def get_credential_cipher(self) -> CredentialCipher:
+        """Bind credential protection to the configured AES-GCM adapter."""
+        return AesGcmCredentialCipher()
+
 
 class ServiceProvider(Provider):
     """Service providers."""
@@ -266,12 +273,14 @@ class ServiceProvider(Provider):
         self,
         reader: NodeManagementReader,
         writer: NodeManagementWriter,
+        credential_cipher: CredentialCipher,
         audit_service: AuditService,
     ) -> NodeManagementService:
         """Get the node management service."""
         return NodeManagementService(
             reader=reader,
             writer=writer,
+            credential_cipher=credential_cipher,
             audit_service=audit_service,
         )
 

@@ -129,6 +129,7 @@ def test_service_provider_resolves() -> None:
     settings.SSH_KNOWN_HOSTS_PATH = "/tmp/known_hosts"
     settings.SSH_STRICT_HOST_KEY_CHECKING = False
     factory = conn_provider.get_ssh_connector_factory(settings)
+    credential_cipher = conn_provider.get_credential_cipher()
     node_reader = ScopedNodeConnectionReader(MagicMock())
     command_reader = ScopedCommandTemplateReader(MagicMock())
     script_reader = ScopedScriptDefinitionReader(MagicMock())
@@ -160,6 +161,7 @@ def test_service_provider_resolves() -> None:
     node_svc = svc_provider.get_node_management_service(
         MagicMock(),
         MagicMock(),
+        credential_cipher,
         audit_svc,
     )
     assert isinstance(node_svc, NodeManagementService)

@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import (
 )
 
 from app.adapters.persistence.node_management import SqlAlchemyNodeManagementGateway
+from app.adapters.security import AesGcmCredentialCipher
 from app.api.v1.api_keys import router as api_keys_router
 from app.api.v1.health import router as health_router
 from app.api.v1.nodes import router as nodes_router
@@ -71,7 +72,9 @@ class IntegrationAuthProvider(Provider):
     @provide(scope=Scope.REQUEST)
     def get_node_service(self) -> NodeManagementService:
         gateway = SqlAlchemyNodeManagementGateway(self._sm)
-        return NodeManagementService(reader=gateway, writer=gateway)
+        return NodeManagementService(
+            reader=gateway, writer=gateway, credential_cipher=AesGcmCredentialCipher()
+        )
 
 
 def _mock_settings(master_key: str = "") -> MagicMock:

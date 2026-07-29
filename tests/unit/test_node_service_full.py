@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
+from app.adapters.security import AesGcmCredentialCipher
 from app.application.dto.command_execution import BulkCommandRequestDTO
 from app.application.dto.node_management import (
     NodeCreateDTO,
@@ -26,7 +27,9 @@ def repo() -> AsyncMock:
 
 @pytest.fixture
 def service(repo: AsyncMock) -> NodeManagementService:
-    service = NodeManagementService(reader=repo, writer=repo)
+    service = NodeManagementService(
+        reader=repo, writer=repo, credential_cipher=AesGcmCredentialCipher()
+    )
     command_service = NodeCommandService(repository=repo)
     bulk_service = NodeBulkCommandService(repository=repo)
     service.check_connectivity = command_service.check_connectivity
@@ -436,6 +439,7 @@ class TestLogWithAudit:
         svc = NodeManagementService(
             reader=repo,
             writer=repo,
+            credential_cipher=AesGcmCredentialCipher(),
             audit_service=audit_mock,
         )
         await svc._log("test_action", node_id=uuid.uuid4(), details={"k": "v"})
