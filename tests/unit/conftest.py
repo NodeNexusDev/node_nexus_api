@@ -1,11 +1,15 @@
 """Shared test fixtures for unit tests."""
 
+import uuid
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 from dishka import Provider, Scope, provide
 
-from app.services.api_key_service import APIKeyService
+from app.application.services.api_key_authentication import (
+    APIKeyAuthenticationService,
+    AuthenticatedPrincipal,
+)
 
 
 def _mock_settings(master_key: str = "") -> MagicMock:
@@ -15,12 +19,16 @@ def _mock_settings(master_key: str = "") -> MagicMock:
 
 
 class MockAuthServiceProvider(Provider):
-    """Provider that returns a mock APIKeyService for auth tests."""
+    """Provider that returns a mock API-key authentication use case."""
 
     @provide(scope=Scope.REQUEST)
-    def get_api_key_service(self) -> APIKeyService:
-        mock = AsyncMock(spec=APIKeyService)
-        mock.validate_api_key.return_value = None
+    def get_api_key_service(self) -> APIKeyAuthenticationService:
+        mock = AsyncMock(spec=APIKeyAuthenticationService)
+        mock.authenticate.return_value = AuthenticatedPrincipal(
+            key_id=uuid.uuid4(),
+            key_prefix="nnk_test",
+            scope="read-write",
+        )
         return mock
 
 

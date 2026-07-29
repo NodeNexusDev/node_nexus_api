@@ -2,18 +2,22 @@
 
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
+from uuid import uuid4
 
 from dishka import Provider, Scope, make_async_container, provide
 from dishka.integrations.fastapi import setup_dishka
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from app.application.services.api_key_authentication import (
+    APIKeyAuthenticationService,
+    AuthenticatedPrincipal,
+)
 from app.core.exceptions import (
-    APIKeyNotFoundError,
     APIKeyRevokedError,
+    AuthenticationError,
     DomainError,
 )
-from app.services.api_key_service import APIKeyService
 
 
 def _mock_settings(master_key: str = "") -> MagicMock:
@@ -22,8 +26,16 @@ def _mock_settings(master_key: str = "") -> MagicMock:
     return settings
 
 
+def _principal(scope: str = "read-write") -> AuthenticatedPrincipal:
+    return AuthenticatedPrincipal(
+        key_id=uuid4(),
+        key_prefix="nnk_vali",
+        scope=scope,
+    )
+
+
 def _create_app_with_auth(
-    mock_service: APIKeyService | AsyncMock | None = None,
+    mock_service: APIKeyAuthenticationService | AsyncMock | None = None,
 ) -> FastAPI:
     import fastapi
     from fastapi.responses import JSONResponse
@@ -41,19 +53,19 @@ def _create_app_with_auth(
     @app.exception_handler(DomainError)
     async def _domain_error_handler(request: Any, exc: DomainError) -> JSONResponse:
         _error_status_map: dict[type[DomainError], int] = {
-            APIKeyNotFoundError: 401,
+            AuthenticationError: 401,
             APIKeyRevokedError: 401,
         }
         status_code = _error_status_map.get(type(exc), 422)
         return JSONResponse(status_code=status_code, content={"detail": str(exc)})
 
     if mock_service is None:
-        mock_service = AsyncMock(spec=APIKeyService)
-        mock_service.validate_api_key.return_value = None
+        mock_service = AsyncMock(spec=APIKeyAuthenticationService)
+        mock_service.authenticate.return_value = _principal()
 
     class MockServiceProvider(Provider):
         @provide(scope=Scope.REQUEST)
-        def get_service(self) -> APIKeyService:
+        def get_service(self) -> APIKeyAuthenticationService:
             return mock_service
 
     container = make_async_container(MockServiceProvider())
@@ -87,9 +99,7 @@ class TestAuthMasterKey:
         mock_get_settings.return_value = _mock_settings("")
 
         mock_service = AsyncMock()
-        mock_service.validate_api_key.side_effect = APIKeyNotFoundError(
-            "Invalid API key"
-        )
+        mock_service.authenticate.side_effect = AuthenticationError("Invalid API key")
 
         app = _create_app_with_auth(mock_service)
         client = TestClient(app, raise_server_exceptions=False)
@@ -103,9 +113,7 @@ class TestAuthInvalidKey:
         mock_get_settings.return_value = _mock_settings("")
 
         mock_service = AsyncMock()
-        mock_service.validate_api_key.side_effect = APIKeyNotFoundError(
-            "Invalid API key"
-        )
+        mock_service.authenticate.side_effect = AuthenticationError("Invalid API key")
 
         app = _create_app_with_auth(mock_service)
         client = TestClient(app, raise_server_exceptions=False)
@@ -120,7 +128,7 @@ class TestAuthRevokedKey:
         mock_get_settings.return_value = _mock_settings("")
 
         mock_service = AsyncMock()
-        mock_service.validate_api_key.side_effect = APIKeyRevokedError(
+        mock_service.authenticate.side_effect = APIKeyRevokedError(
             "API key has been revoked"
         )
 
@@ -137,7 +145,7 @@ class TestAuthValidKey:
         mock_get_settings.return_value = _mock_settings("")
 
         mock_service = AsyncMock()
-        mock_service.validate_api_key.return_value = None
+        mock_service.authenticate.return_value = _principal()
 
         app = _create_app_with_auth(mock_service)
         client = TestClient(app, raise_server_exceptions=False)
@@ -150,7 +158,7 @@ class TestAuthValidKey:
 
 
 def _create_app_with_write_scope(
-    mock_service: APIKeyService | AsyncMock | None = None,
+    mock_service: APIKeyAuthenticationService | AsyncMock | None = None,
 ) -> FastAPI:
     """Create app with require_write_scope dependency."""
     import fastapi
@@ -169,20 +177,19 @@ def _create_app_with_write_scope(
     @app.exception_handler(DomainError)
     async def _domain_error_handler(request: Any, exc: DomainError) -> JSONResponse:
         _error_status_map: dict[type[DomainError], int] = {
-            APIKeyNotFoundError: 401,
+            AuthenticationError: 401,
             APIKeyRevokedError: 401,
         }
         status_code = _error_status_map.get(type(exc), 422)
         return JSONResponse(status_code=status_code, content={"detail": str(exc)})
 
     if mock_service is None:
-        mock_service = AsyncMock(spec=APIKeyService)
-        mock_service.validate_api_key.return_value = None
-        mock_service.get_api_key_scope.return_value = "read-write"
+        mock_service = AsyncMock(spec=APIKeyAuthenticationService)
+        mock_service.authenticate.return_value = _principal()
 
     class MockServiceProvider(Provider):
         @provide(scope=Scope.REQUEST)
-        def get_service(self) -> APIKeyService:
+        def get_service(self) -> APIKeyAuthenticationService:
             return mock_service
 
     container = make_async_container(MockServiceProvider())
@@ -207,8 +214,7 @@ class TestScopeEnforcement:
         mock_get_settings.return_value = _mock_settings("")
 
         mock_service = AsyncMock()
-        mock_service.validate_api_key.return_value = None
-        mock_service.get_api_key_scope.return_value = "read-write"
+        mock_service.authenticate.return_value = _principal()
 
         app = _create_app_with_write_scope(mock_service)
         client = TestClient(app, raise_server_exceptions=False)
@@ -220,8 +226,7 @@ class TestScopeEnforcement:
         mock_get_settings.return_value = _mock_settings("")
 
         mock_service = AsyncMock()
-        mock_service.validate_api_key.return_value = None
-        mock_service.get_api_key_scope.return_value = "read-only"
+        mock_service.authenticate.return_value = _principal(scope="read-only")
 
         app = _create_app_with_write_scope(mock_service)
         client = TestClient(app, raise_server_exceptions=False)

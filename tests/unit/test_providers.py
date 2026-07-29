@@ -4,6 +4,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from app.application.services.api_key_authentication import (
+    APIKeyAuthenticationService,
+)
+from app.application.services.api_key_management import APIKeyManagementService
 from app.di.providers import (
     ConfigProvider,
     ConnectorProvider,
@@ -12,14 +16,12 @@ from app.di.providers import (
     SchedulerProvider,
     ServiceProvider,
 )
-from app.repositories.api_key_repo import APIKeyRepository
 from app.repositories.audit_repo import AuditLogRepository
 from app.repositories.command_repo import CommandRepository
 from app.repositories.health_repo import HealthRepository
 from app.repositories.node_repo import NodeRepository
 from app.repositories.script_execution_repo import ScriptExecutionRepository
 from app.repositories.script_repo import ScriptRepository
-from app.services.api_key_service import APIKeyService
 from app.services.audit_service import AuditService
 from app.services.command_execution_service import CommandExecutionService
 from app.services.command_management_service import CommandManagementService
@@ -83,7 +85,9 @@ def test_repository_provider_resolves() -> None:
     assert isinstance(
         provider.get_script_execution_repository(session), ScriptExecutionRepository
     )
-    assert isinstance(provider.get_api_key_repository(session), APIKeyRepository)
+    api_key_gateway = provider.get_api_key_gateway(MagicMock())
+    assert provider.get_api_key_reader(api_key_gateway) is api_key_gateway
+    assert provider.get_api_key_writer(api_key_gateway) is api_key_gateway
     health_repository = provider.get_health_repository(session)
     assert isinstance(health_repository, HealthRepository)
     assert provider.get_database_health_probe(health_repository) is health_repository
@@ -137,7 +141,6 @@ def test_service_provider_resolves() -> None:
     audit_repo = repo_provider.get_audit_repository(session)
     cmd_repo = repo_provider.get_command_repository(session)
     script_repo = repo_provider.get_script_repository(session)
-    api_key_repo = repo_provider.get_api_key_repository(session)
     settings = MagicMock()
     settings.SSH_KNOWN_HOSTS_PATH = "/tmp/known_hosts"
     settings.SSH_STRICT_HOST_KEY_CHECKING = False
@@ -217,8 +220,16 @@ def test_service_provider_resolves() -> None:
     )
     assert isinstance(script_execution_svc, ScriptExecutionService)
 
-    api_key_svc = svc_provider.get_api_key_service(api_key_repo)
-    assert isinstance(api_key_svc, APIKeyService)
+    api_key_reader = MagicMock()
+    api_key_writer = MagicMock()
+    assert isinstance(
+        svc_provider.get_api_key_authentication_service(api_key_reader, api_key_writer),
+        APIKeyAuthenticationService,
+    )
+    assert isinstance(
+        svc_provider.get_api_key_management_service(api_key_reader, api_key_writer),
+        APIKeyManagementService,
+    )
 
     config_svc = svc_provider.get_config_service(node_repo, cmd_repo, script_repo)
     assert isinstance(config_svc, ConfigService)

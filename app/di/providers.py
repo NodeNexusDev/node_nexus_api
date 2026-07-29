@@ -51,6 +51,10 @@ from app.application.ports.script_persistence import (
     ScriptReader,
     ScriptWriter,
 )
+from app.application.services.api_key_authentication import (
+    APIKeyAuthenticationService,
+)
+from app.application.services.api_key_management import APIKeyManagementService
 from app.application.services.schedule_management import (
     ScheduleManagementService,
 )
@@ -64,14 +68,12 @@ from app.application.services.streaming_command_service import StreamingCommandS
 from app.core.config import Settings, get_settings
 from app.core.connectors.ssh import SSHConnectorFactory
 from app.core.scheduler import ScriptScheduler
-from app.repositories.api_key_repo import APIKeyRepository
 from app.repositories.audit_repo import AuditLogRepository
 from app.repositories.command_repo import CommandRepository
 from app.repositories.health_repo import HealthRepository
 from app.repositories.node_repo import NodeRepository
 from app.repositories.script_execution_repo import ScriptExecutionRepository
 from app.repositories.script_repo import ScriptRepository
-from app.services.api_key_service import APIKeyService
 from app.services.audit_outbox_worker import AuditOutboxWorker
 from app.services.audit_service import AuditService, RequiredAuditWriter
 from app.services.command_execution_service import CommandExecutionService
@@ -311,11 +313,6 @@ class RepositoryProvider(Provider):
     ) -> ScriptExecutionRepository:
         """Get script execution repository."""
         return ScriptExecutionRepository(session)
-
-    @provide(scope=Scope.REQUEST)
-    def get_api_key_repository(self, session: AsyncSession) -> APIKeyRepository:
-        """Get API key repository."""
-        return APIKeyRepository(session)
 
     @provide(scope=Scope.REQUEST)
     def get_health_repository(self, session: AsyncSession) -> HealthRepository:
@@ -561,10 +558,23 @@ class ServiceProvider(Provider):
             scheduler=scheduler,
         )
 
-    @provide(scope=Scope.REQUEST)
-    def get_api_key_service(self, repository: APIKeyRepository) -> APIKeyService:
-        """Get API key service."""
-        return APIKeyService(repository=repository)
+    @provide(scope=Scope.APP)
+    def get_api_key_authentication_service(
+        self,
+        reader: APIKeyReader,
+        writer: APIKeyWriter,
+    ) -> APIKeyAuthenticationService:
+        """Get API-key authentication query use case."""
+        return APIKeyAuthenticationService(reader, writer)
+
+    @provide(scope=Scope.APP)
+    def get_api_key_management_service(
+        self,
+        reader: APIKeyReader,
+        writer: APIKeyWriter,
+    ) -> APIKeyManagementService:
+        """Get API-key management use cases."""
+        return APIKeyManagementService(reader, writer)
 
     @provide(scope=Scope.APP)
     def get_docker_command_runner(

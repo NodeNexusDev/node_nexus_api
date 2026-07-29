@@ -56,7 +56,9 @@ class FakeStreamingService:
 
 def _api_key_service() -> AsyncMock:
     service = AsyncMock()
-    service.validate_api_key.return_value = None
+    service.authenticate.return_value = SimpleNamespace(
+        scope="read-write", key_prefix="nnk_test"
+    )
     return service
 
 
@@ -71,13 +73,13 @@ class TestExecStreamFullCoverage:
     async def test_read_only_and_invalid_token_are_rejected(self) -> None:
         ws = _make_ws()
         service = _api_key_service()
-        service.validate_api_key.return_value = SimpleNamespace(
+        service.authenticate.return_value = SimpleNamespace(
             scope="read-only", key_prefix="nnk_test"
         )
         assert await _validate_ws_token(ws, "read-only", service) is False
-        service.validate_api_key.side_effect = ValueError("invalid")
+        service.authenticate.side_effect = ValueError("invalid")
         assert await _validate_ws_token(ws, "invalid", service) is False
-        service.validate_api_key.side_effect = RuntimeError("database")
+        service.authenticate.side_effect = RuntimeError("database")
         assert await _validate_ws_token(ws, "broken", service) is False
 
     async def test_missing_token(self) -> None:
