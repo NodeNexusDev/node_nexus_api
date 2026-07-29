@@ -37,6 +37,7 @@ from app.services.docker_service import DockerService
 from app.services.health_service import HealthService
 from app.services.node_bulk_command_service import NodeBulkCommandService
 from app.services.node_command_service import NodeCommandService
+from app.services.node_metrics_service import NodeMetricsService
 from app.services.node_service import NodeService
 from app.services.schedule_service import ScheduleService
 from app.services.script_service import ScriptService
@@ -161,6 +162,20 @@ class ServiceProvider(Provider):
     """Service providers."""
 
     @provide(scope=Scope.REQUEST)
+    def get_node_metrics_service(
+        self,
+        repository: NodeRepository,
+        connector_factory: SSHConnectorFactory,
+        node_reader: ScopedNodeConnectionReader,
+    ) -> NodeMetricsService:
+        """Get the node metrics service."""
+        return NodeMetricsService(
+            repository=repository,
+            connector_factory=connector_factory,
+            node_reader=node_reader,
+        )
+
+    @provide(scope=Scope.REQUEST)
     def get_node_bulk_command_service(
         self,
         repository: NodeRepository,
@@ -229,6 +244,7 @@ class ServiceProvider(Provider):
         node_reader: ScopedNodeConnectionReader,
         command_service: NodeCommandService,
         bulk_command_service: NodeBulkCommandService,
+        metrics_service: NodeMetricsService,
     ) -> NodeService:
         """Get node service."""
         return NodeService(
@@ -238,6 +254,7 @@ class ServiceProvider(Provider):
             node_reader=node_reader,
             command_service=command_service,
             bulk_command_service=bulk_command_service,
+            metrics_service=metrics_service,
         )
 
     @provide(scope=Scope.REQUEST)

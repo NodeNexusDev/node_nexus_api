@@ -21,6 +21,7 @@ from app.schemas.node import (
     NodeMetrics,
     NodeResponse,
 )
+from app.services.node_metrics_service import NodeMetricsService
 from app.services.node_service import NodeService
 from tests.unit.conftest import MockAuthServiceProvider, _mock_settings
 
@@ -281,6 +282,10 @@ class TestNodeServiceGetMetrics:
             repository=mock_repo,
             audit_service=mock_audit,
             connector_factory=mock_factory,
+            metrics_service=NodeMetricsService(
+                repository=mock_repo,
+                connector_factory=mock_factory,
+            ),
         )
 
         # Mock get_node to return NodeResponse
@@ -342,6 +347,10 @@ class TestNodeServiceGetMetrics:
             repository=mock_repo,
             audit_service=mock_audit,
             connector_factory=mock_factory,
+            metrics_service=NodeMetricsService(
+                repository=mock_repo,
+                connector_factory=mock_factory,
+            ),
         )
 
         from app.schemas.node import NodeResponse

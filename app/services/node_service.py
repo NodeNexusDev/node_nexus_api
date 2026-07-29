@@ -12,26 +12,19 @@ if TYPE_CHECKING:
     from app.services.audit_service import AuditService
     from app.services.node_bulk_command_service import NodeBulkCommandService
     from app.services.node_command_service import NodeCommandService
+    from app.services.node_metrics_service import NodeMetricsService
 
 import structlog
 from sqlalchemy.exc import IntegrityError
 
-from app.core.exceptions import (
-    ConnectionFailedError,
-    NodeNameConflictError,
-    NodeNotFoundError,
-)
+from app.core.exceptions import NodeNameConflictError, NodeNotFoundError
 from app.core.security import encrypt
-from app.core.ssh_utils import decrypt_value, get_connector_factory
 from app.repositories.node_repo import NodeRepository
 from app.schemas.node import (
     BulkCommandRequest,
     BulkCommandResult,
     CommandRequest,
     CommandResult,
-    CpuMetrics,
-    DiskMetrics,
-    MemoryMetrics,
     NodeCreate,
     NodeMetrics,
     NodeResponse,
@@ -56,6 +49,7 @@ class NodeService:
         node_reader: NodeConnectionReader | None = None,
         command_service: NodeCommandService | None = None,
         bulk_command_service: NodeBulkCommandService | None = None,
+        metrics_service: NodeMetricsService | None = None,
     ):
         self._repository = repository
         self._node_reader = node_reader
@@ -63,6 +57,7 @@ class NodeService:
         self._connector_factory = connector_factory
         self._command_service = command_service
         self._bulk_command_service = bulk_command_service
+        self._metrics_service = metrics_service
 
     async def _log(
         self,
@@ -225,106 +220,10 @@ class NodeService:
         return await self._command_service.execute_command(node_id, data)
 
     async def get_node_metrics(self, node_id: UUID) -> NodeMetrics:
-        """Get system metrics from a node via SSH."""
-        node = (
-            await self._node_reader.get_connection(node_id)
-            if self._node_reader
-            else await self._repository.get_by_id(node_id)
-        )
-        if node is None:
-            raise NodeNotFoundError(f"Node {node_id} not found")
-
-        password = decrypt_value(node.password)
-        ssh_key = decrypt_value(node.ssh_key)
-        connector = get_connector_factory(self._connector_factory).create_ssh(
-            host=node.host,
-            port=node.port,
-            username=node.username,
-            password=password,
-            ssh_key=ssh_key,
-        )
-
-        try:
-            async with connector:
-                # Get CPU info
-                cpu_cmd = "top -bn1 | grep 'Cpu(s)' | awk '{print $2}'"
-                cpu_stdout, _, _ = await connector.execute_command(cpu_cmd)
-                cpu_usage = float(cpu_stdout.strip()) if cpu_stdout.strip() else 0.0
-
-                cores_cmd = "nproc"
-                cores_stdout, _, _ = await connector.execute_command(cores_cmd)
-                cores = int(cores_stdout.strip()) if cores_stdout.strip() else 1
-
-                # Get memory info
-                mem_cmd = "free -b | awk '/Mem:/ {print $2, $3, $4}'"
-                mem_stdout, _, _ = await connector.execute_command(mem_cmd)
-                mem_parts = mem_stdout.strip().split()
-                if len(mem_parts) >= 3:
-                    mem_total = int(mem_parts[0])
-                    mem_used = int(mem_parts[1])
-                    mem_percent = (mem_used / mem_total * 100) if mem_total > 0 else 0.0
-                else:
-                    mem_total = 0
-                    mem_used = 0
-                    mem_percent = 0.0
-
-                # Get disk info
-                disk_cmd = "df -B1 / | awk 'NR==2 {print $2, $3, $4}'"
-                disk_stdout, _, _ = await connector.execute_command(disk_cmd)
-                disk_parts = disk_stdout.strip().split()
-                if len(disk_parts) >= 3:
-                    disk_total = int(disk_parts[0])
-                    disk_used = int(disk_parts[1])
-                    disk_percent = (
-                        (disk_used / disk_total * 100) if disk_total > 0 else 0.0
-                    )
-                else:
-                    disk_total = 0
-                    disk_used = 0
-                    disk_percent = 0.0
-
-                # Get uptime
-                uptime_cmd = "uptime -s"
-                uptime_stdout, _, _ = await connector.execute_command(uptime_cmd)
-                uptime_since = (
-                    uptime_stdout.strip() if uptime_stdout.strip() else "unknown"
-                )
-
-            audit.info(
-                "node.metrics.collected",
-                node_id=str(node_id),
-            )
-            return NodeMetrics(
-                cpu=CpuMetrics(usage_percent=cpu_usage, cores=cores),
-                memory=MemoryMetrics(
-                    total_bytes=mem_total,
-                    used_bytes=mem_used,
-                    percent=round(mem_percent, 2),
-                ),
-                disk=DiskMetrics(
-                    total_bytes=disk_total,
-                    used_bytes=disk_used,
-                    percent=round(disk_percent, 2),
-                ),
-                uptime_since=uptime_since,
-            )
-        except ConnectionFailedError as exc:
-            audit.error(
-                "node.metrics.failed",
-                node_id=str(node_id),
-                error=str(exc),
-            )
-            raise
-        except Exception as exc:
-            audit.error(
-                "node.metrics.unexpected_error",
-                node_id=str(node_id),
-                error_type=type(exc).__name__,
-                error=str(exc),
-            )
-            raise ConnectionFailedError(
-                f"Failed to collect metrics from node {node_id}: {exc}"
-            ) from exc
+        """Delegate the legacy façade call to the metrics service."""
+        if self._metrics_service is None:
+            raise RuntimeError("NodeMetricsService is not configured")
+        return await self._metrics_service.collect(node_id)
 
     async def bulk_execute_command(self, data: BulkCommandRequest) -> BulkCommandResult:
         """Delegate the legacy façade call to the bulk command service."""
