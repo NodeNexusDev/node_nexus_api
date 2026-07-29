@@ -2,16 +2,19 @@
 title: Модель транзакций
 status: stable
 translation_key: architecture.transaction-model
-source_revision: "2026-07-29"
+source_revision: "2026-07-30"
 ---
 
 # Модель транзакций
 
-Один request scope владеет одной async SQLAlchemy session. Граница service/use
-case владеет commit и rollback; repositories выполняют flush, если нужен
-identifier, но не делают самостоятельный commit.
+Request CRUD использует одну request-scoped SQLAlchemy session. Provider владеет
+commit и rollback; внутренние DAO выполняют flush без самостоятельного commit.
+APP-scoped gateway хранит `async_sessionmaker`, но не живую session.
 
-Короткий CRUD выполняется в одной transaction. Для SSH и Docker сначала
-читаются данные, завершается DB work, выполняется side effect, затем результат
-при необходимости сохраняется новой короткой transaction. Bulk operations
-возвращают частичные результаты без distributed rollback.
+Remote flow: `short read -> immutable DTO -> close session -> side effect ->
+short write`. Concurrent workers не получают session, DAO или ORM model. Bulk
+operations возвращают частичные результаты без distributed rollback.
+
+Multi-aggregate operation получает отдельную boundary только при бизнес-требовании
+atomicity. Config import владеет одной transaction для всего payload;
+универсального application Unit of Work нет.

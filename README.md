@@ -25,6 +25,14 @@ docker compose up -d --build
 
 Set strong `SECRET_KEY` and `MASTER_API_KEY` values before exposing the service.
 
+## Architecture
+
+Node Nexus follows Ports & Adapters. FastAPI and scheduler callbacks invoke
+application use cases through immutable DTOs; focused ports isolate SQLAlchemy,
+SSH, Docker, security, and scheduler implementations. Remote I/O never holds a
+database session. See the
+[architecture guide](https://nodenexusdev.github.io/node_nexus_api/en/architecture/).
+
 ## License
 
 [MIT](LICENSE)

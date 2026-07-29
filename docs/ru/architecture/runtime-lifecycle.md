@@ -2,17 +2,21 @@
 title: Runtime lifecycle
 status: stable
 translation_key: architecture.runtime-lifecycle
-source_revision: "2026-07-29"
+source_revision: "2026-07-30"
 ---
 
 # Runtime lifecycle
 
-Startup настраивает logging, опционально применяет миграции, инициализирует
-scheduler и очищает устаревший audit. Telemetry и HTTP middleware создаются
-вместе с app. Shutdown закрывает Dishka container, database engine и
-application-scoped resources.
+Lifecycle adapter настраивает logging, опционально применяет migrations,
+связывает scheduler callback с `ScheduledScriptExecutor`, восстанавливает
+persistent schedules и очищает устаревший audit. Durable audit outbox worker
+является APP resource. Telemetry и HTTP middleware создаются вместе с app.
 
-Request-scoped dependencies не выходят за свой scope. При startup приложение
-получает advisory lock PostgreSQL и восстанавливает APScheduler jobs из
-`script_schedules`; scheduled jobs создают новый scope. Реплика без ownership
-обслуживает HTTP, но не выполняет jobs. Потеря процесса не удаляет расписания.
+Request-scoped dependencies не выходят за свой scope. APP use cases используют
+sessionmaker-owned short persistence adapters. Scheduler ownership защищён
+PostgreSQL advisory lock, reconciliation восстанавливает APScheduler jobs из
+persistent schedules. Реплика без ownership обслуживает HTTP, но не выполняет
+jobs.
+
+При shutdown Dishka закрывает container; APP finalizers останавливают scheduler
+и audit worker и освобождают database engine.

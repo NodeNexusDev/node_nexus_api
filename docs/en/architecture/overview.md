@@ -2,20 +2,20 @@
 title: Architecture overview
 status: stable
 translation_key: architecture.overview
-source_revision: "2026-07-29"
+source_revision: "2026-07-30"
 ---
 
 # Architecture overview
 
-Node Nexus is a modular FastAPI application. HTTP and WebSocket adapters call
-application services; services coordinate repositories and external connectors;
-repositories own persistence access; Pydantic schemas and application DTOs are
-boundary values; SQLAlchemy models remain persistence details.
+Node Nexus uses Ports & Adapters. HTTP, WebSocket, and scheduler adapters call
+inbound application use cases. Use cases depend on immutable DTOs and focused
+ports. SQLAlchemy, SSH, Docker, security, and scheduler implementations are
+outbound adapters connected only by the Dishka composition root.
 
-Dishka creates application and request scopes. A request-scoped session is
-shared by repositories and services and committed at the use-case boundary.
-SSH and Docker are remote side effects and are never held inside long database
-transactions.
+Pydantic models are transport contracts and SQLAlchemy models are persistence
+details; neither crosses the application boundary. Dishka creates APP and
+REQUEST scopes. APP gateways own a sessionmaker, while request-transaction DAOs
+own a session. SSH and Docker side effects run after the read session closes.
 
-The current deployment model uses PostgreSQL and an in-process scheduler. API
-replicas are possible only when a single process owns scheduling.
+PostgreSQL is the system of record. The in-process scheduler uses advisory-lock
+ownership so non-owner replicas can serve HTTP without executing jobs.
