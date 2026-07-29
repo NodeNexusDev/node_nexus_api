@@ -11,7 +11,8 @@ from app.application.dto.command_execution import (
     BulkCommandRequestDTO,
     CommandRequestDTO,
 )
-from app.schemas.common import CursorPage, decode_cursor
+from app.application.dto.node_view import NodeViewDTO
+from app.schemas.common import CursorPage, decode_cursor, encode_cursor
 from app.schemas.node import (
     BulkCommandRequest,
     BulkCommandResult,
@@ -37,6 +38,23 @@ from app.services.node_metrics_service import NodeMetricsService
 audit = structlog.get_logger("audit")
 
 router = APIRouter(prefix="/nodes", tags=["nodes"], route_class=DishkaRoute)
+
+
+def _node_response(node: NodeViewDTO) -> NodeResponse:
+    """Map an application node view to the HTTP response schema."""
+    return NodeResponse(
+        id=node.id,
+        name=node.name,
+        host=node.host,
+        port=node.port,
+        connection_type=node.connection_type,
+        status=node.status,
+        username=node.username,
+        docker_host=node.docker_host,
+        tags=list(node.tags),
+        created_at=node.created_at,
+        updated_at=node.updated_at,
+    )
 
 
 @router.get("/")
@@ -66,11 +84,16 @@ async def get_nodes(
         except ValueError:
             raise HTTPException(status_code=422, detail="Invalid cursor")
         audit.info("api.nodes.list_cursor", limit=limit, tags=tag_list, search=search)
-        items, next_cursor, has_more = await service.get_nodes_cursor(
+        items, next_cursor_key, has_more = await service.get_nodes_cursor(
             cursor=decoded, limit=limit, tags=tag_list, search=search
         )
         return CursorPage(
-            items=items, next_cursor=next_cursor, has_more=has_more, limit=limit
+            items=[_node_response(node) for node in items],
+            next_cursor=(
+                encode_cursor(*next_cursor_key) if next_cursor_key is not None else None
+            ),
+            has_more=has_more,
+            limit=limit,
         )
 
     # Offset-based pagination (default)
@@ -78,7 +101,12 @@ async def get_nodes(
     nodes, total = await service.get_all_nodes(
         page=page, size=size, tags=tag_list, search=search
     )
-    return PaginatedResponse(items=nodes, total=total, page=page, size=size)
+    return PaginatedResponse(
+        items=[_node_response(node) for node in nodes],
+        total=total,
+        page=page,
+        size=size,
+    )
 
 
 @router.get("/tags")
@@ -101,7 +129,7 @@ async def get_node(
 ) -> NodeResponse:
     """Get a node by ID."""
     audit.info("api.nodes.get", node_id=str(node_id))
-    return await service.get_node(node_id)
+    return _node_response(await service.get_node(node_id))
 
 
 @router.post("/", response_model=NodeResponse, status_code=201)
@@ -113,7 +141,7 @@ async def create_node(
 ) -> NodeResponse:
     """Create a new node."""
     audit.info("api.nodes.create", name=data.name, connection_type=data.connection_type)
-    return await service.create_node(data)
+    return _node_response(await service.create_node(data))
 
 
 @router.put("/{node_id}", response_model=NodeResponse)
@@ -126,7 +154,7 @@ async def update_node(
 ) -> NodeResponse:
     """Update an existing node."""
     audit.info("api.nodes.update", node_id=str(node_id))
-    return await service.update_node(node_id, data)
+    return _node_response(await service.update_node(node_id, data))
 
 
 @router.delete("/{node_id}", status_code=204)
@@ -271,7 +299,7 @@ async def add_tag(
 ) -> NodeResponse:
     """Add a tag to a node."""
     audit.info("api.nodes.tags.add", node_id=str(node_id), tag=data.tag)
-    return await service.add_tag(node_id, data)
+    return _node_response(await service.add_tag(node_id, data))
 
 
 @router.delete("/{node_id}/tags", response_model=NodeResponse)
@@ -284,4 +312,4 @@ async def remove_tag(
 ) -> NodeResponse:
     """Remove a tag from a node."""
     audit.info("api.nodes.tags.remove", node_id=str(node_id), tag=data.tag)
-    return await service.remove_tag(node_id, data)
+    return _node_response(await service.remove_tag(node_id, data))

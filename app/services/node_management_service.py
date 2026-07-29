@@ -12,12 +12,12 @@ if TYPE_CHECKING:
 import structlog
 from sqlalchemy.exc import IntegrityError
 
+from app.application.dto.node_view import NodeViewDTO
 from app.core.exceptions import NodeNameConflictError, NodeNotFoundError
 from app.core.security import encrypt
 from app.repositories.node_repo import NodeRepository
 from app.schemas.node import (
     NodeCreate,
-    NodeResponse,
     NodeUpdate,
     TagAdd,
     TagRemove,
@@ -48,12 +48,12 @@ class NodeManagementService:
         if self._audit:
             await self._audit.log(action=action, node_id=node_id, details=details)
 
-    async def get_node(self, node_id: UUID) -> NodeResponse:
+    async def get_node(self, node_id: UUID) -> NodeViewDTO:
         """Get a node by ID."""
         node = await self._repository.get_by_id(node_id)
         if node is None:
             raise NodeNotFoundError(f"Node {node_id} not found")
-        return NodeResponse.model_validate(node)
+        return self._to_view(node)
 
     async def get_all_nodes(
         self,
@@ -61,7 +61,7 @@ class NodeManagementService:
         size: int = 20,
         tags: list[str] | None = None,
         search: str | None = None,
-    ) -> tuple[list[NodeResponse], int]:
+    ) -> tuple[list[NodeViewDTO], int]:
         """Get all nodes with total count, optionally filtered by tags and/or search."""
         skip = (page - 1) * size
         if tags or search:
@@ -72,7 +72,7 @@ class NodeManagementService:
         else:
             nodes = await self._repository.get_all(skip=skip, limit=size)
             total = await self._repository.count()
-        return [NodeResponse.model_validate(node) for node in nodes], total
+        return [self._to_view(node) for node in nodes], total
 
     async def get_nodes_cursor(
         self,
@@ -80,7 +80,7 @@ class NodeManagementService:
         limit: int = 20,
         tags: list[str] | None = None,
         search: str | None = None,
-    ) -> tuple[list[NodeResponse], str | None, bool]:
+    ) -> tuple[list[NodeViewDTO], tuple[datetime, UUID] | None, bool]:
         """Get nodes using cursor-based pagination.
 
         Returns (items, next_cursor, has_more).
@@ -90,15 +90,12 @@ class NodeManagementService:
         )
         has_more = len(nodes) > limit
         items = nodes[:limit]
-        next_cursor = None
-        if has_more and items:
-            last = items[-1]
-            from app.schemas.common import encode_cursor
+        next_cursor = (
+            (items[-1].created_at, items[-1].id) if has_more and items else None
+        )
+        return [self._to_view(node) for node in items], next_cursor, has_more
 
-            next_cursor = encode_cursor(last.created_at, last.id)
-        return [NodeResponse.model_validate(n) for n in items], next_cursor, has_more
-
-    async def create_node(self, data: NodeCreate) -> NodeResponse:
+    async def create_node(self, data: NodeCreate) -> NodeViewDTO:
         """Create a new node. Encrypts sensitive fields before storage."""
         raw = data.model_dump()
         self._encrypt_fields(raw)
@@ -110,9 +107,9 @@ class NodeManagementService:
             ) from exc
         audit.info("node.create.ok", node_id=str(node.id), name=data.name)
         await self._log("create", node_id=node.id, details={"name": data.name})
-        return NodeResponse.model_validate(node)
+        return self._to_view(node)
 
-    async def update_node(self, node_id: UUID, data: NodeUpdate) -> NodeResponse:
+    async def update_node(self, node_id: UUID, data: NodeUpdate) -> NodeViewDTO:
         """Update an existing node. Encrypts sensitive fields before storage."""
         update_data = data.model_dump(exclude_unset=True)
         self._encrypt_fields(update_data)
@@ -121,7 +118,7 @@ class NodeManagementService:
             raise NodeNotFoundError(f"Node {node_id} not found")
         audit.info("node.update.ok", node_id=str(node_id))
         await self._log("update", node_id=node_id, details=update_data)
-        return NodeResponse.model_validate(node)
+        return self._to_view(node)
 
     async def delete_node(self, node_id: UUID) -> bool:
         """Delete a node."""
@@ -135,17 +132,17 @@ class NodeManagementService:
 
     async def get_nodes_by_tags(
         self, tags: list[str], skip: int = 0, limit: int = 100
-    ) -> tuple[list[NodeResponse], int]:
+    ) -> tuple[list[NodeViewDTO], int]:
         """Get nodes filtered by tags (nodes must have ALL specified tags)."""
         nodes = await self._repository.get_by_tags(tags, skip=skip, limit=limit)
         total = await self._repository.count_by_tags(tags)
-        return [NodeResponse.model_validate(node) for node in nodes], total
+        return [self._to_view(node) for node in nodes], total
 
     async def get_all_tags(self) -> list[str]:
         """Get all unique tags across all nodes."""
         return await self._repository.get_all_tags()
 
-    async def add_tag(self, node_id: UUID, data: TagAdd) -> NodeResponse:
+    async def add_tag(self, node_id: UUID, data: TagAdd) -> NodeViewDTO:
         """Add a tag to a node."""
         node = await self._repository.get_by_id(node_id)
         if node is None:
@@ -157,11 +154,13 @@ class NodeManagementService:
             updated = await self._repository.update(node_id, {"tags": tags})
             audit.info("node.tag.add", node_id=str(node_id), tag=data.tag)
             await self._log("add_tag", node_id=node_id, details={"tag": data.tag})
-            return NodeResponse.model_validate(updated)
+            if updated is None:
+                raise NodeNotFoundError(f"Node {node_id} not found")
+            return self._to_view(updated)
 
-        return NodeResponse.model_validate(node)
+        return self._to_view(node)
 
-    async def remove_tag(self, node_id: UUID, data: TagRemove) -> NodeResponse:
+    async def remove_tag(self, node_id: UUID, data: TagRemove) -> NodeViewDTO:
         """Remove a tag from a node."""
         node = await self._repository.get_by_id(node_id)
         if node is None:
@@ -173,9 +172,28 @@ class NodeManagementService:
             updated = await self._repository.update(node_id, {"tags": tags})
             audit.info("node.tag.remove", node_id=str(node_id), tag=data.tag)
             await self._log("remove_tag", node_id=node_id, details={"tag": data.tag})
-            return NodeResponse.model_validate(updated)
+            if updated is None:
+                raise NodeNotFoundError(f"Node {node_id} not found")
+            return self._to_view(updated)
 
-        return NodeResponse.model_validate(node)
+        return self._to_view(node)
+
+    @staticmethod
+    def _to_view(node) -> NodeViewDTO:  # noqa: ANN001
+        """Map a persistence record to public-safe application data."""
+        return NodeViewDTO(
+            id=node.id,
+            name=node.name,
+            host=node.host,
+            port=node.port,
+            connection_type=node.connection_type,
+            status=node.status,
+            username=node.username,
+            docker_host=node.docker_host,
+            tags=tuple(node.tags or ()),
+            created_at=node.created_at,
+            updated_at=node.updated_at,
+        )
 
     @staticmethod
     def _encrypt_fields(data: dict[str, object]) -> None:

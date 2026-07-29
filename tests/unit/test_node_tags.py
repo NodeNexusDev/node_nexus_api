@@ -90,7 +90,7 @@ class TestAddTag:
         repo.get_by_id.return_value = node
         repo.update.return_value = updated_node
         result = await service.add_tag(node.id, TagAdd(tag="prod"))
-        assert result.tags == ["prod"]
+        assert result.tags == ("prod",)
         repo.update.assert_called_once_with(node.id, {"tags": ["prod"]})
 
     async def test_does_not_duplicate_tag(
@@ -99,7 +99,7 @@ class TestAddTag:
         node = _make_orm_node(tags=["prod"])
         repo.get_by_id.return_value = node
         result = await service.add_tag(node.id, TagAdd(tag="prod"))
-        assert result.tags == ["prod"]
+        assert result.tags == ("prod",)
         repo.update.assert_not_called()
 
     async def test_node_not_found(
@@ -119,7 +119,7 @@ class TestRemoveTag:
         repo.get_by_id.return_value = node
         repo.update.return_value = updated_node
         result = await service.remove_tag(node.id, TagRemove(tag="prod"))
-        assert result.tags == ["web"]
+        assert result.tags == ("web",)
         repo.update.assert_called_once_with(node.id, {"tags": ["web"]})
 
     async def test_noop_when_tag_absent(
@@ -128,7 +128,7 @@ class TestRemoveTag:
         node = _make_orm_node(tags=["web"])
         repo.get_by_id.return_value = node
         result = await service.remove_tag(node.id, TagRemove(tag="prod"))
-        assert result.tags == ["web"]
+        assert result.tags == ("web",)
         repo.update.assert_not_called()
 
     async def test_node_not_found(
@@ -152,7 +152,7 @@ class TestTagsInCreate:
             tags=["prod", "web"],
         )
         result = await service.create_node(data)
-        assert result.tags == ["prod", "web"]
+        assert result.tags == ("prod", "web")
         call_data = repo.create.call_args[0][0]
         assert call_data["tags"] == ["prod", "web"]
 
@@ -163,4 +163,4 @@ class TestTagsInCreate:
         repo.create.return_value = node
         data = NodeCreate(name="test", host="1.2.3.4", connection_type="ssh")
         result = await service.create_node(data)
-        assert result.tags == []
+        assert result.tags == ()
