@@ -192,7 +192,20 @@ async def check_node(
 ) -> NodeResponse:
     """Check SSH connectivity to a node."""
     audit.info("api.nodes.check", node_id=str(node_id))
-    return await service.check_connectivity(node_id)
+    result = await service.check_connectivity(node_id)
+    return NodeResponse(
+        id=result.id,
+        name=result.name,
+        host=result.host,
+        port=result.port,
+        connection_type=result.connection_type,
+        status=result.status,
+        username=result.username,
+        docker_host=result.docker_host,
+        tags=list(result.tags),
+        created_at=result.created_at,
+        updated_at=result.updated_at,
+    )
 
 
 @router.post(

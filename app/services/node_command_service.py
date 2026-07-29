@@ -13,11 +13,11 @@ if TYPE_CHECKING:
     from app.services.audit_service import AuditService
 
 from app.application.dto.command_execution import CommandRequestDTO, CommandResultDTO
+from app.application.dto.node_view import NodeViewDTO
 from app.core.connectors.ssh import command_fingerprint
 from app.core.exceptions import ConnectionFailedError, NodeNotFoundError
 from app.core.ssh_utils import decrypt_value, get_connector_factory
 from app.repositories.node_repo import NodeRepository
-from app.schemas.node import NodeResponse
 
 audit = structlog.get_logger("audit")
 
@@ -46,7 +46,7 @@ class NodeCommandService:
         if self._audit:
             await self._audit.log(action=action, node_id=node_id, details=details)
 
-    async def check_connectivity(self, node_id: UUID) -> NodeResponse:
+    async def check_connectivity(self, node_id: UUID) -> NodeViewDTO:
         """Check SSH connectivity and update the persisted node status."""
         node = (
             await self._node_reader.get_connection(node_id)
@@ -87,7 +87,21 @@ class NodeCommandService:
 
         await self._log("check", node_id, {"status": new_status})
         updated = await self._repository.update(node_id, {"status": new_status})
-        return NodeResponse.model_validate(updated)
+        if updated is None:  # defensive: the node existed when the use case started
+            raise NodeNotFoundError(f"Node {node_id} not found")
+        return NodeViewDTO(
+            id=updated.id,
+            name=updated.name,
+            host=updated.host,
+            port=updated.port,
+            connection_type=updated.connection_type,
+            status=updated.status,
+            username=updated.username,
+            docker_host=updated.docker_host,
+            tags=tuple(updated.tags or ()),
+            created_at=updated.created_at,
+            updated_at=updated.updated_at,
+        )
 
     async def execute_command(
         self, node_id: UUID, data: CommandRequestDTO

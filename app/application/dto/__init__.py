@@ -14,6 +14,7 @@ from app.application.dto.node_metrics import (
     NodeMetricsDTO,
     UsageMetricsDTO,
 )
+from app.application.dto.node_view import NodeViewDTO
 
 __all__ = [
     "AuditEventDTO",
@@ -25,5 +26,6 @@ __all__ = [
     "CpuMetricsDTO",
     "NodeConnectionDTO",
     "NodeMetricsDTO",
+    "NodeViewDTO",
     "UsageMetricsDTO",
 ]

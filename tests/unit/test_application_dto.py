@@ -1,6 +1,7 @@
 """Tests for internal application DTOs and persistence mappings."""
 
 import uuid
+from datetime import UTC, datetime
 
 import pytest
 
@@ -17,6 +18,7 @@ from app.application.dto.node_metrics import (
     NodeMetricsDTO,
     UsageMetricsDTO,
 )
+from app.application.dto.node_view import NodeViewDTO
 from app.application.ports.node_reader import NodeConnectionReader
 from app.models.node import NodeModel
 from app.repositories.node_repo import NodeRepository
@@ -88,6 +90,26 @@ def test_node_metrics_dto_is_immutable() -> None:
     assert metrics.cpu.cores == 4
     with pytest.raises(AttributeError):
         metrics.uptime_since = "changed"  # type: ignore[misc]
+
+
+def test_node_view_dto_excludes_credentials() -> None:
+    node = NodeViewDTO(
+        id=uuid.uuid4(),
+        name="node",
+        host="127.0.0.1",
+        port=22,
+        connection_type="ssh",
+        status="active",
+        username="root",
+        docker_host=None,
+        tags=("prod",),
+        created_at=datetime.now(UTC),
+        updated_at=datetime.now(UTC),
+    )
+
+    assert node.tags == ("prod",)
+    assert not hasattr(node, "password")
+    assert not hasattr(node, "ssh_key")
 
 
 def test_node_repository_maps_connection_dto() -> None:
