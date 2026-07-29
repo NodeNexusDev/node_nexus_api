@@ -22,6 +22,7 @@ if TYPE_CHECKING:
 
 import structlog
 
+from app.application.policies.output import bound_output
 from app.core.exceptions import (
     CommandNotFoundError,
     NodeNotFoundError,
@@ -46,16 +47,6 @@ from app.schemas.script_execution import ScriptExecutionResponse
 
 audit = structlog.get_logger("audit")
 _SCRIPT_NODE_CONCURRENCY = 5
-_MAX_PERSISTED_OUTPUT_BYTES = 65_536
-
-
-def _bounded_output(value: str) -> tuple[str, int, bool]:
-    """Bound persisted output by bytes while preserving valid Unicode."""
-    raw = value.encode()
-    if len(raw) <= _MAX_PERSISTED_OUTPUT_BYTES:
-        return value, len(raw), False
-    truncated = raw[:_MAX_PERSISTED_OUTPUT_BYTES].decode(errors="ignore")
-    return truncated, len(raw), True
 
 
 class ScriptService:
@@ -267,23 +258,19 @@ class ScriptService:
                         stderr = str(resolution_error)
                         exit_code = 1
 
-                    safe_stdout, stdout_bytes, stdout_truncated = _bounded_output(
-                        stdout
-                    )
-                    safe_stderr, stderr_bytes, stderr_truncated = _bounded_output(
-                        stderr
-                    )
+                    safe_stdout = bound_output(stdout)
+                    safe_stderr = bound_output(stderr)
                     step_result = {
                         "step_index": idx,
                         "label": step.label,
                         "command_fingerprint": hashlib.sha256(
                             command_str.encode()
                         ).hexdigest(),
-                        "stdout": safe_stdout,
-                        "stderr": safe_stderr,
-                        "stdout_bytes": stdout_bytes,
-                        "stderr_bytes": stderr_bytes,
-                        "truncated": stdout_truncated or stderr_truncated,
+                        "stdout": safe_stdout.value,
+                        "stderr": safe_stderr.value,
+                        "stdout_bytes": safe_stdout.original_bytes,
+                        "stderr_bytes": safe_stderr.original_bytes,
+                        "truncated": safe_stdout.truncated or safe_stderr.truncated,
                         "exit_code": exit_code,
                     }
                     step_results.append(step_result)
