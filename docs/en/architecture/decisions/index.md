@@ -2,7 +2,7 @@
 title: Architecture decision records
 status: stable
 translation_key: architecture.decisions.index
-source_revision: "2026-07-29"
+source_revision: "2026-07-30"
 ---
 
 # Architecture decision records
@@ -21,3 +21,6 @@ the old record becomes superseded.
 | 007 | Separate locale trees | Accepted |
 | 008 | OpenAPI HTTP contract | Accepted |
 | 009 | Translation parity policy | Accepted |
+| 010 | Focused application ports | Accepted |
+| 011 | Audit outbox boundary | Accepted |
+| 012 | Atomic configuration import | Accepted |

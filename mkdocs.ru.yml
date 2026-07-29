@@ -74,6 +74,9 @@ nav:
           - ADR-007 Языковые деревья: architecture/decisions/ADR-007-separate-locale-trees.md
           - ADR-008 OpenAPI: architecture/decisions/ADR-008-openapi-contract.md
           - ADR-009 Политика перевода: architecture/decisions/ADR-009-translation-policy.md
+          - ADR-010 Focused ports: architecture/decisions/ADR-010-focused-application-ports.md
+          - ADR-011 Audit outbox: architecture/decisions/ADR-011-audit-outbox-boundary.md
+          - ADR-012 Config import: architecture/decisions/ADR-012-atomic-configuration-import.md
   - Справочник:
       - reference/index.md
       - HTTP API: reference/api.md
