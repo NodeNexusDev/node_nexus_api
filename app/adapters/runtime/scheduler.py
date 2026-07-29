@@ -2,6 +2,9 @@
 
 from datetime import datetime
 from uuid import UUID
+from zoneinfo import ZoneInfo
+
+from apscheduler.triggers.cron import CronTrigger
 
 from app.application.dto.schedule import RuntimeJobViewDTO, RuntimeScheduleDTO
 from app.core.scheduler import ScriptScheduler
@@ -12,6 +15,9 @@ class ApschedulerJobScheduler:
 
     def __init__(self, scheduler: ScriptScheduler) -> None:
         self._scheduler = scheduler
+
+    def validate(self, cron: str, timezone: str) -> None:
+        CronTrigger.from_crontab(cron, timezone=ZoneInfo(timezone))
 
     def add_or_replace(self, schedule: RuntimeScheduleDTO) -> RuntimeJobViewDTO:
         self._scheduler.schedule_script(

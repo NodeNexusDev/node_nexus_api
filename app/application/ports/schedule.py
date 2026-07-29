@@ -66,6 +66,10 @@ class ScheduleWriter(Protocol):
 class JobSchedulerPort(Protocol):
     """Apply and inspect ephemeral runtime jobs."""
 
+    def validate(self, cron: str, timezone: str) -> None:
+        """Validate adapter-specific trigger syntax without mutating runtime."""
+        ...
+
     def add_or_replace(self, schedule: RuntimeScheduleDTO) -> RuntimeJobViewDTO:
         """Register a runtime job for the desired schedule."""
         ...
