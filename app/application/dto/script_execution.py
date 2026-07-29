@@ -1,0 +1,83 @@
+"""Immutable DTOs for script execution use cases."""
+
+from dataclasses import dataclass
+from datetime import datetime
+from typing import Any
+from uuid import UUID
+
+from app.application.dto.node_connection import NodeConnectionDTO
+from app.application.dto.script_management import ScriptStepDTO
+
+
+@dataclass(frozen=True, slots=True)
+class ScriptExecutionRequestDTO:
+    """Application input for executing a script on multiple nodes."""
+
+    node_ids: tuple[UUID, ...]
+    params: tuple[tuple[str, Any], ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class ScriptExecutionTargetDTO:
+    """Fully loaded target passed to one remote worker."""
+
+    script_id: UUID
+    node: NodeConnectionDTO
+    steps: tuple[ScriptStepDTO, ...]
+    params: tuple[tuple[str, Any], ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class ScriptStepResultDTO:
+    """Result of one resolved script step."""
+
+    step_index: int
+    label: str
+    command_fingerprint: str
+    stdout: str
+    stderr: str
+    stdout_bytes: int
+    stderr_bytes: int
+    truncated: bool
+    exit_code: int
+
+
+@dataclass(frozen=True, slots=True)
+class ScriptNodeResultDTO:
+    """Result of executing a script on one node."""
+
+    execution_id: UUID
+    node_id: UUID
+    node_name: str
+    status: str
+    steps: tuple[ScriptStepResultDTO, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class ScriptExecutionBatchResultDTO:
+    """Results for all requested execution targets."""
+
+    script_id: UUID
+    results: tuple[ScriptNodeResultDTO, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class ScriptExecutionDTO:
+    """Application view of one persisted execution."""
+
+    id: UUID
+    script_id: UUID
+    node_id: UUID | None
+    params: tuple[tuple[str, Any], ...]
+    status: str
+    steps: tuple[ScriptStepResultDTO, ...]
+    started_at: datetime
+    finished_at: datetime | None
+
+
+@dataclass(frozen=True, slots=True)
+class ScriptExecutionPageDTO:
+    """One page of execution history."""
+
+    items: tuple[ScriptExecutionDTO, ...]
+    total: int

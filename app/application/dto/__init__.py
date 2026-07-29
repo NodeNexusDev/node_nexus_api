@@ -33,6 +33,23 @@ from app.application.dto.node_metrics import (
     UsageMetricsDTO,
 )
 from app.application.dto.node_view import NodeViewDTO
+from app.application.dto.script_execution import (
+    ScriptExecutionBatchResultDTO,
+    ScriptExecutionDTO,
+    ScriptExecutionPageDTO,
+    ScriptExecutionRequestDTO,
+    ScriptExecutionTargetDTO,
+    ScriptNodeResultDTO,
+    ScriptStepResultDTO,
+)
+from app.application.dto.script_management import (
+    ScriptCreateDTO,
+    ScriptListQueryDTO,
+    ScriptPageDTO,
+    ScriptStepDTO,
+    ScriptUpdateDTO,
+    ScriptViewDTO,
+)
 
 __all__ = [
     "AuditEventDTO",
@@ -59,5 +76,18 @@ __all__ = [
     "NodeTagDTO",
     "NodeUpdateDTO",
     "NodeViewDTO",
+    "ScriptCreateDTO",
+    "ScriptExecutionBatchResultDTO",
+    "ScriptExecutionDTO",
+    "ScriptExecutionPageDTO",
+    "ScriptExecutionRequestDTO",
+    "ScriptExecutionTargetDTO",
+    "ScriptListQueryDTO",
+    "ScriptNodeResultDTO",
+    "ScriptPageDTO",
+    "ScriptStepDTO",
+    "ScriptStepResultDTO",
+    "ScriptUpdateDTO",
+    "ScriptViewDTO",
     "UsageMetricsDTO",
 ]
