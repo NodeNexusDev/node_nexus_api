@@ -24,7 +24,8 @@ from app.core.exceptions import (
     TemplateRenderError,
 )
 from app.schemas.command import CommandResult
-from app.services.command_service import CommandService
+from app.services.command_execution_service import CommandExecutionService
+from app.services.command_management_service import CommandManagementService
 from tests.unit.conftest import MockAuthServiceProvider, _mock_settings
 
 
@@ -43,7 +44,7 @@ def _make_command(**overrides: Any) -> CommandViewDTO:
     return CommandViewDTO(**defaults)
 
 
-def _create_test_app(service: CommandService | AsyncMock) -> FastAPI:
+def _create_test_app(service: AsyncMock) -> FastAPI:
     app = FastAPI()
     app.add_exception_handler(DomainError, domain_error_handler)
     app.include_router(health_router)
@@ -51,7 +52,11 @@ def _create_test_app(service: CommandService | AsyncMock) -> FastAPI:
 
     class MockServiceProvider(Provider):
         @provide(scope=Scope.REQUEST)
-        def get_service(self) -> CommandService:
+        def get_management_service(self) -> CommandManagementService:
+            return service
+
+        @provide(scope=Scope.REQUEST)
+        def get_execution_service(self) -> CommandExecutionService:
             return service
 
     container = make_async_container(MockServiceProvider(), MockAuthServiceProvider())
@@ -61,7 +66,7 @@ def _create_test_app(service: CommandService | AsyncMock) -> FastAPI:
 
 @pytest.fixture
 def mock_service() -> AsyncMock:
-    return AsyncMock(spec=CommandService)
+    return AsyncMock()
 
 
 @pytest.fixture

@@ -46,7 +46,8 @@ from app.repositories.script_schedule_repo import ScriptScheduleRepository
 from app.services.api_key_service import APIKeyService
 from app.services.audit_outbox_worker import AuditOutboxWorker
 from app.services.audit_service import AuditService, RequiredAuditWriter
-from app.services.command_service import CommandService
+from app.services.command_execution_service import CommandExecutionService
+from app.services.command_management_service import CommandManagementService
 from app.services.config_service import ConfigService
 from app.services.docker_service import DockerService
 from app.services.health_service import HealthService
@@ -349,25 +350,35 @@ class ServiceProvider(Provider):
         )
 
     @provide(scope=Scope.REQUEST)
-    def get_command_service(
+    def get_command_management_service(
         self,
         reader: CommandReader,
         writer: CommandWriter,
+        audit_service: AuditEventSink,
+    ) -> CommandManagementService:
+        """Get command management service."""
+        return CommandManagementService(
+            reader=reader,
+            writer=writer,
+            audit_service=audit_service,
+        )
+
+    @provide(scope=Scope.REQUEST)
+    def get_command_execution_service(
+        self,
         audit_service: AuditEventSink,
         connector_factory: RemoteConnectorFactory,
         command_reader: CommandTemplateReader,
         node_reader: NodeConnectionReader,
         credential_cipher: CredentialCipher,
-    ) -> CommandService:
-        """Get command service."""
-        return CommandService(
-            reader=reader,
-            writer=writer,
-            audit_service=audit_service,
+    ) -> CommandExecutionService:
+        """Get command execution service."""
+        return CommandExecutionService(
             connector_factory=connector_factory,
             command_reader=command_reader,
             node_reader=node_reader,
             credential_cipher=credential_cipher,
+            audit_service=audit_service,
         )
 
     @provide(scope=Scope.REQUEST)

@@ -1,4 +1,4 @@
-"""Unit tests for CommandService."""
+"""Unit tests for focused command services."""
 
 import uuid
 from datetime import UTC, datetime
@@ -21,7 +21,8 @@ from app.core.exceptions import (
     ConnectionFailedError,
     NodeNotFoundError,
 )
-from app.services.command_service import CommandService
+from app.services.command_execution_service import CommandExecutionService
+from app.services.command_management_service import CommandManagementService
 
 
 def make_command_view(**overrides: object) -> CommandViewDTO:
@@ -58,12 +59,20 @@ def connector_factory() -> Mock:
 @pytest.fixture
 def service(
     command_gateway: AsyncMock,
-    node_reader: AsyncMock,
-    connector_factory: Mock,
-) -> CommandService:
-    return CommandService(
+) -> CommandManagementService:
+    return CommandManagementService(
         reader=command_gateway,
         writer=command_gateway,
+    )
+
+
+@pytest.fixture
+def execution_service(
+    command_gateway: AsyncMock,
+    node_reader: AsyncMock,
+    connector_factory: Mock,
+) -> CommandExecutionService:
+    return CommandExecutionService(
         command_reader=command_gateway,
         node_reader=node_reader,
         credential_cipher=AesGcmCredentialCipher(),
@@ -73,21 +82,21 @@ def service(
 
 class TestManagement:
     async def test_get_found(
-        self, service: CommandService, command_gateway: AsyncMock
+        self, service: CommandManagementService, command_gateway: AsyncMock
     ) -> None:
         command = make_command_view()
         command_gateway.get_command.return_value = command
         assert await service.get_command(command.id) == command
 
     async def test_get_not_found(
-        self, service: CommandService, command_gateway: AsyncMock
+        self, service: CommandManagementService, command_gateway: AsyncMock
     ) -> None:
         command_gateway.get_command.return_value = None
         with pytest.raises(CommandNotFoundError):
             await service.get_command(uuid.uuid4())
 
     async def test_list_builds_query(
-        self, service: CommandService, command_gateway: AsyncMock
+        self, service: CommandManagementService, command_gateway: AsyncMock
     ) -> None:
         command = make_command_view()
         command_gateway.list_commands.return_value = CommandPageDTO(
@@ -100,7 +109,7 @@ class TestManagement:
         assert (query.offset, query.limit, query.tags) == (10, 10, ("ops",))
 
     async def test_create_delegates_dto(
-        self, service: CommandService, command_gateway: AsyncMock
+        self, service: CommandManagementService, command_gateway: AsyncMock
     ) -> None:
         data = CommandCreateDTO(name="check_disk", command="df -h")
         command_gateway.create_command.return_value = make_command_view()
@@ -109,7 +118,7 @@ class TestManagement:
         command_gateway.create_command.assert_awaited_once_with(data)
 
     async def test_update_delegates_dto(
-        self, service: CommandService, command_gateway: AsyncMock
+        self, service: CommandManagementService, command_gateway: AsyncMock
     ) -> None:
         command = make_command_view()
         data = CommandUpdateDTO(changes=(("name", "new-name"),))
@@ -118,7 +127,7 @@ class TestManagement:
         command_gateway.update_command.assert_awaited_once_with(command.id, data)
 
     async def test_update_not_found(
-        self, service: CommandService, command_gateway: AsyncMock
+        self, service: CommandManagementService, command_gateway: AsyncMock
     ) -> None:
         command_gateway.update_command.return_value = None
         with pytest.raises(CommandNotFoundError):
@@ -127,7 +136,7 @@ class TestManagement:
             )
 
     async def test_delete(
-        self, service: CommandService, command_gateway: AsyncMock
+        self, service: CommandManagementService, command_gateway: AsyncMock
     ) -> None:
         command = make_command_view()
         command_gateway.get_command.return_value = command
@@ -138,7 +147,7 @@ class TestManagement:
 class TestExecuteCommand:
     async def test_success(
         self,
-        service: CommandService,
+        execution_service: CommandExecutionService,
         command_gateway: AsyncMock,
         node_reader: AsyncMock,
         connector_factory: Mock,
@@ -162,7 +171,7 @@ class TestExecuteCommand:
         connector.execute_command.return_value = ("ok", "", 0)
         connector_factory.create_ssh.return_value = connector
 
-        result = await service.execute_command(
+        result = await execution_service.execute_command(
             command_id,
             CommandExecuteRequestDTO(node_id=node_id, params=(("service", "nginx"),)),
         )
@@ -171,17 +180,17 @@ class TestExecuteCommand:
         connector.execute_command.assert_awaited_once_with("systemctl restart nginx")
 
     async def test_command_not_found(
-        self, service: CommandService, command_gateway: AsyncMock
+        self, execution_service: CommandExecutionService, command_gateway: AsyncMock
     ) -> None:
         command_gateway.get_template.return_value = None
         with pytest.raises(CommandNotFoundError):
-            await service.execute_command(
+            await execution_service.execute_command(
                 uuid.uuid4(), CommandExecuteRequestDTO(node_id=uuid.uuid4())
             )
 
     async def test_node_not_found(
         self,
-        service: CommandService,
+        execution_service: CommandExecutionService,
         command_gateway: AsyncMock,
         node_reader: AsyncMock,
     ) -> None:
@@ -191,13 +200,13 @@ class TestExecuteCommand:
         )
         node_reader.get_connection.return_value = None
         with pytest.raises(NodeNotFoundError):
-            await service.execute_command(
+            await execution_service.execute_command(
                 command_id, CommandExecuteRequestDTO(node_id=uuid.uuid4())
             )
 
     async def test_connector_error(
         self,
-        service: CommandService,
+        execution_service: CommandExecutionService,
         command_gateway: AsyncMock,
         node_reader: AsyncMock,
         connector_factory: Mock,
@@ -219,7 +228,7 @@ class TestExecuteCommand:
         connector.__aenter__.side_effect = RuntimeError("SSH error")
         connector_factory.create_ssh.return_value = connector
         with pytest.raises(ConnectionFailedError):
-            await service.execute_command(
+            await execution_service.execute_command(
                 command_id, CommandExecuteRequestDTO(node_id=node_id)
             )
 
@@ -232,14 +241,12 @@ class TestLogWithAudit:
         connector_factory: Mock,
     ) -> None:
         audit = AsyncMock()
-        service = CommandService(
-            reader=command_gateway,
-            writer=command_gateway,
+        service = CommandExecutionService(
             command_reader=command_gateway,
             node_reader=node_reader,
             credential_cipher=AesGcmCredentialCipher(),
             connector_factory=connector_factory,
             audit_service=audit,
         )
-        await service._log("test_action", node_id=uuid.uuid4(), details={"k": "v"})
+        await service._log("test_action", uuid.uuid4(), {"k": "v"})
         audit.log.assert_awaited_once()

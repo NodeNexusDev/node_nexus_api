@@ -24,7 +24,8 @@ from app.schemas.command import (
     CommandUpdate,
 )
 from app.schemas.node import PaginatedResponse
-from app.services.command_service import CommandService
+from app.services.command_execution_service import CommandExecutionService
+from app.services.command_management_service import CommandManagementService
 
 audit = structlog.get_logger("audit")
 
@@ -66,7 +67,7 @@ def _command_response(command: CommandViewDTO) -> CommandResponse:
 @router.get("/", response_model=PaginatedResponse[CommandResponse])
 @inject
 async def get_commands(
-    service: FromDishka[CommandService],
+    service: FromDishka[CommandManagementService],
     page: int = Query(1, ge=1),
     size: int = Query(20, ge=1, le=100),
     tag: str | None = Query(None, description="Filter by tag (AND)"),
@@ -90,7 +91,7 @@ async def get_commands(
 @inject
 async def get_command(
     command_id: uuid.UUID,
-    service: FromDishka[CommandService],
+    service: FromDishka[CommandManagementService],
     _key: str = Security(get_current_api_key),
 ) -> CommandResponse:
     """Get a command by ID."""
@@ -102,7 +103,7 @@ async def get_command(
 @inject
 async def create_command(
     data: CommandCreate,
-    service: FromDishka[CommandService],
+    service: FromDishka[CommandManagementService],
     _key: str = Security(require_write_scope),
 ) -> CommandResponse:
     """Create a new command template."""
@@ -124,7 +125,7 @@ async def create_command(
 async def update_command(
     command_id: uuid.UUID,
     data: CommandUpdate,
-    service: FromDishka[CommandService],
+    service: FromDishka[CommandManagementService],
     _key: str = Security(require_write_scope),
 ) -> CommandResponse:
     """Update an existing command template."""
@@ -147,7 +148,7 @@ async def update_command(
 @inject
 async def delete_command(
     command_id: uuid.UUID,
-    service: FromDishka[CommandService],
+    service: FromDishka[CommandManagementService],
     _key: str = Security(require_write_scope),
 ) -> None:
     """Delete a command template."""
@@ -160,7 +161,7 @@ async def delete_command(
 async def execute_command(
     command_id: uuid.UUID,
     data: CommandExecuteRequest,
-    service: FromDishka[CommandService],
+    service: FromDishka[CommandExecutionService],
     _key: str = Security(require_write_scope),
 ) -> CommandResult:
     """Execute a command template on a node."""

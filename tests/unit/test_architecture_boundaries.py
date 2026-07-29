@@ -3,6 +3,8 @@
 import ast
 from pathlib import Path
 
+import pytest
+
 APP_ROOT = Path(__file__).parents[2] / "app"
 
 
@@ -184,9 +186,15 @@ def test_node_bulk_command_workers_do_not_depend_on_persistence() -> None:
     assert not violations
 
 
-def test_command_service_does_not_depend_on_transport_schemas() -> None:
-    """Commands application logic must depend only on inward-facing modules."""
-    imports = _imports_in_file(APP_ROOT / "services" / "command_service.py")
+@pytest.mark.parametrize(
+    "filename",
+    ("command_management_service.py", "command_execution_service.py"),
+)
+def test_command_services_depend_only_on_inward_facing_modules(
+    filename: str,
+) -> None:
+    """Focused command services must depend only on inward-facing modules."""
+    imports = _imports_in_file(APP_ROOT / "services" / filename)
     forbidden = (
         "app.adapters",
         "app.core.connectors",

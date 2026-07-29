@@ -18,7 +18,6 @@ from sqlalchemy.ext.asyncio import (
 )
 
 from app.adapters.persistence.command_management import SqlAlchemyCommandGateway
-from app.adapters.security import AesGcmCredentialCipher
 from app.api.error_mapping import domain_error_handler
 from app.api.v1.commands import router as commands_router
 from app.api.v1.health import router as health_router
@@ -27,7 +26,7 @@ from app.models.base import Base
 from app.repositories.api_key_repo import APIKeyRepository
 from app.repositories.command_repo import CommandRepository
 from app.services.api_key_service import APIKeyService
-from app.services.command_service import CommandService
+from app.services.command_management_service import CommandManagementService
 
 MASTER_KEY = "test-master-key"
 
@@ -77,14 +76,10 @@ class IntegrationDbProvider(Provider):
     def get_service(
         self,
         gateway: SqlAlchemyCommandGateway,
-    ) -> CommandService:
-        return CommandService(
+    ) -> CommandManagementService:
+        return CommandManagementService(
             reader=gateway,
             writer=gateway,
-            command_reader=gateway,
-            node_reader=MagicMock(),
-            credential_cipher=AesGcmCredentialCipher(),
-            connector_factory=MagicMock(),
         )
 
     @provide(scope=Scope.REQUEST)

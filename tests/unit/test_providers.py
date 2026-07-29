@@ -22,7 +22,8 @@ from app.repositories.script_repo import ScriptRepository
 from app.repositories.script_schedule_repo import ScriptScheduleRepository
 from app.services.api_key_service import APIKeyService
 from app.services.audit_service import AuditService
-from app.services.command_service import CommandService
+from app.services.command_execution_service import CommandExecutionService
+from app.services.command_management_service import CommandManagementService
 from app.services.config_service import ConfigService
 from app.services.docker_service import DockerService
 from app.services.health_service import HealthService
@@ -172,16 +173,20 @@ def test_service_provider_resolves() -> None:
     )
     assert isinstance(node_svc, NodeManagementService)
 
-    cmd_svc = svc_provider.get_command_service(
+    command_management_svc = svc_provider.get_command_management_service(
         MagicMock(),
         MagicMock(),
+        audit_svc,
+    )
+    command_execution_svc = svc_provider.get_command_execution_service(
         audit_svc,
         factory,
         command_reader,
         node_reader,
         credential_cipher,
     )
-    assert isinstance(cmd_svc, CommandService)
+    assert isinstance(command_management_svc, CommandManagementService)
+    assert isinstance(command_execution_svc, CommandExecutionService)
 
     script_svc = svc_provider.get_script_service(
         script_repo,
