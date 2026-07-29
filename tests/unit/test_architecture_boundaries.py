@@ -269,6 +269,12 @@ def test_docker_command_runner_uses_only_application_ports() -> None:
     ]
 
 
+def test_production_composition_does_not_import_docker_facade() -> None:
+    """Composition root must expose focused Docker use cases only."""
+    imports = _imports_in_file(APP_ROOT / "di" / "providers.py")
+    assert "app.services.docker_service" not in imports
+
+
 def test_models_are_persistence_only() -> None:
     """ORM models may only depend on other ORM model modules."""
     violations = [

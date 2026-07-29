@@ -64,7 +64,6 @@ from app.services.docker.command_runner import DockerCommandRunner
 from app.services.docker.container_service import DockerContainerService
 from app.services.docker.image_service import DockerImageService
 from app.services.docker.resource_service import DockerResourceService
-from app.services.docker_service import DockerService
 from app.services.health_service import HealthService
 from app.services.node_bulk_command_service import NodeBulkCommandService
 from app.services.node_command_service import NodeCommandService
@@ -497,22 +496,6 @@ class ServiceProvider(Provider):
     def get_api_key_service(self, repository: APIKeyRepository) -> APIKeyService:
         """Get API key service."""
         return APIKeyService(repository=repository)
-
-    @provide(scope=Scope.REQUEST)
-    def get_docker_service(
-        self,
-        repository: NodeRepository,
-        audit_service: AuditService,
-        node_reader: NodeConnectionReader,
-        runtime: DockerRuntime,
-    ) -> DockerService:
-        """Get Docker service."""
-        return DockerService(
-            repository=repository,
-            audit_service=audit_service,
-            node_reader=node_reader,
-            runtime=runtime,
-        )
 
     @provide(scope=Scope.APP)
     def get_docker_command_runner(
