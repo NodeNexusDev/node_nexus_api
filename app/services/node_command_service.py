@@ -8,13 +8,13 @@ from uuid import UUID
 import structlog
 
 if TYPE_CHECKING:
+    from app.application.ports.audit_sink import AuditEventSink
     from app.application.ports.credential_cipher import CredentialCipher
     from app.application.ports.node_reader import (
         NodeConnectionReader,
         NodeStatusWriter,
     )
     from app.application.ports.remote_command import RemoteConnectorFactory
-    from app.services.audit_service import AuditService
 
 from app.application.command_policy import command_fingerprint
 from app.application.dto.command_execution import CommandRequestDTO, CommandResultDTO
@@ -33,7 +33,7 @@ class NodeCommandService:
         status_writer: NodeStatusWriter,
         credential_cipher: CredentialCipher,
         connector_factory: RemoteConnectorFactory,
-        audit_service: AuditService | None = None,
+        audit_service: AuditEventSink | None = None,
     ) -> None:
         self._node_reader = node_reader
         self._status_writer = status_writer

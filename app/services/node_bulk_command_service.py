@@ -9,11 +9,12 @@ import structlog
 
 if TYPE_CHECKING:
     from app.application.dto.node_connection import NodeConnectionDTO
+    from app.application.ports.audit_sink import AuditEventSink
     from app.application.ports.credential_cipher import CredentialCipher
     from app.application.ports.node_reader import NodeConnectionReader
     from app.application.ports.remote_command import RemoteConnectorFactory
-    from app.services.audit_service import AuditService
 
+from app.application.command_policy import command_fingerprint
 from app.application.dto.command_execution import (
     BulkCommandRequestDTO,
     BulkCommandResultDTO,
@@ -32,7 +33,7 @@ class NodeBulkCommandService:
         node_reader: NodeConnectionReader,
         credential_cipher: CredentialCipher,
         connector_factory: RemoteConnectorFactory,
-        audit_service: AuditService | None = None,
+        audit_service: AuditEventSink | None = None,
     ) -> None:
         self._node_reader = node_reader
         self._credential_cipher = credential_cipher
@@ -44,6 +45,15 @@ class NodeBulkCommandService:
         target_nodes = await self._resolve_targets(data)
         if not target_nodes:
             raise NodeNotFoundError("No nodes matched the given criteria")
+
+        if self._audit:
+            fingerprint = command_fingerprint(data.command)
+            for node in target_nodes:
+                await self._audit.log_required(
+                    action="bulk_execute.requested",
+                    node_id=node.id,
+                    details={"command_fingerprint": fingerprint},
+                )
 
         results = await asyncio.gather(
             *(self._execute_on_single_node(node, data.command) for node in target_nodes)

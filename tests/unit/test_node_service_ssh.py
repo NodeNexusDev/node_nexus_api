@@ -262,6 +262,7 @@ class TestBulkCommandBoundaries:
             username="root",
         )
         reader = AsyncMock()
+        audit = AsyncMock()
 
         async def resolve_nodes(_node_ids):  # noqa: ANN001
             order.append("resolve")
@@ -271,12 +272,21 @@ class TestBulkCommandBoundaries:
             order.append("remote")
             return mock_factory.create_ssh.return_value
 
+        async def write_intent(**_kwargs):  # noqa: ANN003
+            order.append("intent")
+
+        async def write_result(**_kwargs):  # noqa: ANN003
+            order.append("result")
+
         reader.get_connections_by_ids.side_effect = resolve_nodes
+        audit.log_required.side_effect = write_intent
+        audit.log.side_effect = write_result
         mock_factory.create_ssh.return_value.__aenter__.side_effect = enter_connector
         service = NodeBulkCommandService(
             node_reader=reader,
             credential_cipher=AesGcmCredentialCipher(),
             connector_factory=mock_factory,
+            audit_service=audit,
         )
 
         result = await service.execute(
@@ -286,5 +296,8 @@ class TestBulkCommandBoundaries:
             )
         )
 
-        assert order == ["resolve", "remote"]
+        assert order == ["resolve", "intent", "remote", "result"]
         assert result.results[0].node_id == node.id
+        details = audit.log_required.call_args.kwargs["details"]
+        assert "command_fingerprint" in details
+        assert "uptime" not in str(details)

@@ -8,12 +8,12 @@ from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 if TYPE_CHECKING:
+    from app.application.ports.audit_sink import AuditEventSink
     from app.application.ports.credential_cipher import CredentialCipher
     from app.application.ports.node_management import (
         NodeManagementReader,
         NodeManagementWriter,
     )
-    from app.services.audit_service import AuditService
 
 import structlog
 
@@ -41,7 +41,7 @@ class NodeManagementService:
         reader: NodeManagementReader,
         writer: NodeManagementWriter,
         credential_cipher: CredentialCipher,
-        audit_service: AuditService | None = None,
+        audit_service: AuditEventSink | None = None,
     ) -> None:
         self._reader = reader
         self._writer = writer

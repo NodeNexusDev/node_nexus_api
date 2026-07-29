@@ -20,6 +20,7 @@ from app.adapters.persistence.script_gateway import (
     ScopedScriptExecutionWriter,
 )
 from app.adapters.security import AesGcmCredentialCipher
+from app.application.ports.audit_sink import AuditEventSink
 from app.application.ports.credential_cipher import CredentialCipher
 from app.application.ports.node_management import (
     NodeManagementReader,
@@ -236,7 +237,7 @@ class ServiceProvider(Provider):
     @provide(scope=Scope.REQUEST)
     def get_node_bulk_command_service(
         self,
-        audit_service: AuditService,
+        audit_service: AuditEventSink,
         connector_factory: RemoteConnectorFactory,
         node_reader: NodeConnectionReader,
         credential_cipher: CredentialCipher,
@@ -252,7 +253,7 @@ class ServiceProvider(Provider):
     @provide(scope=Scope.REQUEST)
     def get_node_command_service(
         self,
-        audit_service: AuditService,
+        audit_service: AuditEventSink,
         connector_factory: RemoteConnectorFactory,
         node_reader: NodeConnectionReader,
         status_writer: NodeStatusWriter,
@@ -288,6 +289,11 @@ class ServiceProvider(Provider):
             required_writer=required_writer,
         )
 
+    @provide(scope=Scope.REQUEST)
+    def get_audit_event_sink(self, audit_service: AuditService) -> AuditEventSink:
+        """Bind Node use cases to the application audit port."""
+        return audit_service
+
     @provide(scope=Scope.APP)
     def get_required_audit_writer(
         self, sessionmaker: async_sessionmaker[AsyncSession]
@@ -301,7 +307,7 @@ class ServiceProvider(Provider):
         reader: NodeManagementReader,
         writer: NodeManagementWriter,
         credential_cipher: CredentialCipher,
-        audit_service: AuditService,
+        audit_service: AuditEventSink,
     ) -> NodeManagementService:
         """Get the node management service."""
         return NodeManagementService(

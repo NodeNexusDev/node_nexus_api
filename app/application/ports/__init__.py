@@ -1,5 +1,6 @@
 """Ports implemented by persistence and infrastructure adapters."""
 
+from app.application.ports.audit_sink import AuditEventSink
 from app.application.ports.audit_writer import AuditWriter
 from app.application.ports.credential_cipher import CredentialCipher
 from app.application.ports.node_management import (
@@ -13,6 +14,7 @@ from app.application.ports.remote_command import (
 )
 
 __all__ = [
+    "AuditEventSink",
     "AuditWriter",
     "CredentialCipher",
     "NodeConnectionReader",

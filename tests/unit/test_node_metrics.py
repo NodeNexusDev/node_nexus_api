@@ -244,6 +244,54 @@ class MockAsyncContextManager:
 
 class TestNodeMetricsService:
     @pytest.mark.asyncio
+    async def test_reads_node_before_opening_remote_session(self) -> None:
+        order: list[str] = []
+        reader = AsyncMock()
+        factory = MagicMock()
+        node = MagicMock(
+            id=uuid.uuid4(),
+            host="10.0.0.1",
+            port=22,
+            username="root",
+            password=None,
+            ssh_key=None,
+        )
+
+        async def read_node(_node_id):  # noqa: ANN001
+            order.append("read")
+            return node
+
+        connector = AsyncMock()
+
+        async def enter_connector():
+            order.append("remote")
+            return connector
+
+        async def execute(command: str) -> tuple[str, str, int]:
+            if "top" in command:
+                return ("1.0", "", 0)
+            if "nproc" in command:
+                return ("1", "", 0)
+            if "free" in command or "df" in command:
+                return ("100 50 50", "", 0)
+            return ("2026-07-29 10:00:00", "", 0)
+
+        reader.get_connection.side_effect = read_node
+        connector.__aenter__.side_effect = enter_connector
+        connector.__aexit__.return_value = None
+        connector.execute_command.side_effect = execute
+        factory.create_ssh.return_value = connector
+        service = NodeMetricsService(
+            node_reader=reader,
+            credential_cipher=AesGcmCredentialCipher(),
+            connector_factory=factory,
+        )
+
+        await service.collect(node.id)
+
+        assert order == ["read", "remote"]
+
+    @pytest.mark.asyncio
     async def test_get_node_metrics_success(self) -> None:
         """get_node_metrics returns metrics from SSH."""
         mock_repo = AsyncMock()
