@@ -1,13 +1,11 @@
 """Tests for app.main startup, migrations, and lifespan."""
 
 from unittest.mock import AsyncMock, MagicMock, patch
-from uuid import uuid4
 
 import pytest
 
 from app.main import (
     _cleanup_audit_logs,
-    _execute_scheduled_script,
     _restore_schedules,
     _run_migrations,
     _run_migrations_sync,
@@ -64,61 +62,12 @@ class TestCleanupAuditLogs:
 
 
 class TestRuntimeBackgroundJobs:
-    @patch("app.main.container")
-    async def test_execution_updates_success_metadata(
-        self, mock_container: MagicMock
-    ) -> None:
-        script_service = AsyncMock()
-        schedule_service = AsyncMock()
-        request_container = AsyncMock()
-        request_container.get = AsyncMock(
-            side_effect=[script_service, schedule_service]
-        )
-        mock_container.return_value.__aenter__ = AsyncMock(
-            return_value=request_container
-        )
-        mock_container.return_value.__aexit__ = AsyncMock(return_value=False)
-
-        await _execute_scheduled_script(uuid4(), [uuid4()], {})
-        schedule_service.mark_started.assert_awaited_once()
-        schedule_service.mark_succeeded.assert_awaited_once()
-        schedule_service.mark_failed.assert_not_awaited()
-
-    @patch("app.main.container")
-    async def test_execution_updates_failure_metadata(
-        self, mock_container: MagicMock
-    ) -> None:
-        script_service = AsyncMock()
-        script_service.execute_script.side_effect = TimeoutError("remote")
-        schedule_service = AsyncMock()
-        request_container = AsyncMock()
-        request_container.get = AsyncMock(
-            side_effect=[script_service, schedule_service]
-        )
-        mock_container.return_value.__aenter__ = AsyncMock(
-            return_value=request_container
-        )
-        mock_container.return_value.__aexit__ = AsyncMock(return_value=False)
-
-        with pytest.raises(TimeoutError):
-            await _execute_scheduled_script(uuid4(), [uuid4()], {})
-        schedule_service.mark_failed.assert_awaited_once()
-
-    @patch("app.main.container")
-    async def test_restore_publishes_scheduler_state(
-        self, mock_container: MagicMock
-    ) -> None:
-        schedule_service = AsyncMock()
-        schedule_service.restore.return_value = (3, 1)
-        request_container = AsyncMock()
-        request_container.get.return_value = schedule_service
-        context = AsyncMock()
-        context.__aenter__.return_value = request_container
-        mock_container.return_value = context
+    async def test_restore_publishes_scheduler_state(self) -> None:
+        reconciler = AsyncMock()
+        reconciler.reconcile.return_value = MagicMock(restored=3, failed=1)
         scheduler = MagicMock()
-        mock_container.get = AsyncMock(return_value=scheduler)
 
-        assert await _restore_schedules() == (3, 1)
+        assert await _restore_schedules(reconciler, scheduler) == (3, 1)
         scheduler.mark_restored.assert_called_once_with(failed=1)
 
     @patch("app.main.container")

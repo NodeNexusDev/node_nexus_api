@@ -18,6 +18,9 @@ from app.application.services.schedule_management import (
 from app.application.services.schedule_reconciliation import (
     ScheduleReconciliationService,
 )
+from app.application.services.scheduled_script_executor import (
+    ScheduledScriptExecutor,
+)
 from app.core.exceptions import (
     NodeNotFoundError,
     ScheduleNotFoundError,
@@ -179,3 +182,29 @@ async def test_reconciliation_removes_orphans_and_records_each_outcome() -> None
     assert (result.restored, result.failed) == (1, 1)
     scheduler.remove.assert_called_once_with(orphan)
     assert writer.mark_registration.await_count == 2
+
+
+async def test_scheduled_executor_records_success_metadata() -> None:
+    execution = AsyncMock()
+    writer = AsyncMock()
+    executor = ScheduledScriptExecutor(execution, writer)
+    script_id = uuid4()
+
+    await executor.execute(script_id, [uuid4()], {"environment": "prod"})
+
+    writer.mark_started.assert_awaited_once()
+    writer.mark_succeeded.assert_awaited_once()
+    writer.mark_failed.assert_not_awaited()
+
+
+async def test_scheduled_executor_records_and_propagates_failure() -> None:
+    execution = AsyncMock()
+    execution.execute_script.side_effect = TimeoutError("remote")
+    writer = AsyncMock()
+    executor = ScheduledScriptExecutor(execution, writer)
+
+    with pytest.raises(TimeoutError):
+        await executor.execute(uuid4(), [uuid4()], {})
+
+    writer.mark_failed.assert_awaited_once()
+    writer.mark_succeeded.assert_not_awaited()

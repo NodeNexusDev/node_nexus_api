@@ -51,6 +51,12 @@ from app.application.ports.script_persistence import (
 from app.application.services.schedule_management import (
     ScheduleManagementService,
 )
+from app.application.services.schedule_reconciliation import (
+    ScheduleReconciliationService,
+)
+from app.application.services.scheduled_script_executor import (
+    ScheduledScriptExecutor,
+)
 from app.application.services.streaming_command_service import StreamingCommandService
 from app.core.config import Settings, get_settings
 from app.core.connectors.ssh import SSHConnectorFactory
@@ -62,7 +68,6 @@ from app.repositories.health_repo import HealthRepository
 from app.repositories.node_repo import NodeRepository
 from app.repositories.script_execution_repo import ScriptExecutionRepository
 from app.repositories.script_repo import ScriptRepository
-from app.repositories.script_schedule_repo import ScriptScheduleRepository
 from app.services.api_key_service import APIKeyService
 from app.services.audit_outbox_worker import AuditOutboxWorker
 from app.services.audit_service import AuditService, RequiredAuditWriter
@@ -79,7 +84,6 @@ from app.services.node_bulk_command_service import NodeBulkCommandService
 from app.services.node_command_service import NodeCommandService
 from app.services.node_management_service import NodeManagementService
 from app.services.node_metrics_service import NodeMetricsService
-from app.services.schedule_service import ScheduleService
 from app.services.script_execution_service import ScriptExecutionService
 from app.services.script_history_service import ScriptHistoryService
 from app.services.script_management_service import ScriptManagementService
@@ -287,13 +291,6 @@ class RepositoryProvider(Provider):
     ) -> ScriptExecutionRepository:
         """Get script execution repository."""
         return ScriptExecutionRepository(session)
-
-    @provide(scope=Scope.REQUEST)
-    def get_script_schedule_repository(
-        self, session: AsyncSession
-    ) -> ScriptScheduleRepository:
-        """Get persistent script schedule repository."""
-        return ScriptScheduleRepository(session)
 
     @provide(scope=Scope.REQUEST)
     def get_api_key_repository(self, session: AsyncSession) -> APIKeyRepository:
@@ -601,22 +598,6 @@ class ServiceProvider(Provider):
             script_repository=script_repository,
         )
 
-    @provide(scope=Scope.REQUEST)
-    def get_schedule_service(
-        self,
-        repository: ScriptScheduleRepository,
-        script_repository: ScriptRepository,
-        node_repository: NodeRepository,
-        scheduler: ScriptScheduler,
-    ) -> ScheduleService:
-        """Get the persistent schedule application service."""
-        return ScheduleService(
-            repository=repository,
-            script_repository=script_repository,
-            node_repository=node_repository,
-            scheduler=scheduler,
-        )
-
 
 class ConfigProvider(Provider):
     """Configuration provider."""
@@ -629,6 +610,38 @@ class ConfigProvider(Provider):
 
 class SchedulerProvider(Provider):
     """Scheduler providers."""
+
+    @provide(scope=Scope.APP)
+    def get_scheduled_script_executor(
+        self,
+        script_reader: ScriptDefinitionReader,
+        command_reader: CommandTemplateReader,
+        node_reader: NodeConnectionReader,
+        execution_writer: ScriptExecutionWriter,
+        credential_cipher: CredentialCipher,
+        connector_factory: RemoteConnectorFactory,
+        schedule_writer: ScheduleWriter,
+    ) -> ScheduledScriptExecutor:
+        """Compose the scheduler callback without a request service locator."""
+        execution = ScriptExecutionService(
+            script_reader=script_reader,
+            command_reader=command_reader,
+            node_reader=node_reader,
+            execution_writer=execution_writer,
+            credential_cipher=credential_cipher,
+            connector_factory=connector_factory,
+        )
+        return ScheduledScriptExecutor(execution, schedule_writer)
+
+    @provide(scope=Scope.APP)
+    def get_schedule_reconciliation_service(
+        self,
+        reader: ScheduleReader,
+        writer: ScheduleWriter,
+        scheduler: JobSchedulerPort,
+    ) -> ScheduleReconciliationService:
+        """Compose persistent-to-runtime schedule reconciliation."""
+        return ScheduleReconciliationService(reader, writer, scheduler)
 
     @provide(scope=Scope.APP)
     def get_job_scheduler(self, scheduler: ScriptScheduler) -> ApschedulerJobScheduler:

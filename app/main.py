@@ -3,6 +3,7 @@
 import asyncio
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from functools import partial
 from importlib.metadata import PackageNotFoundError
 from importlib.metadata import version as pkg_version
 
@@ -31,6 +32,12 @@ from app.api.v1.health import router as health_router
 from app.api.v1.nodes import router as nodes_router
 from app.api.v1.scripts import router as scripts_router
 from app.api.v1.websocket import router as ws_router
+from app.application.services.schedule_reconciliation import (
+    ScheduleReconciliationService,
+)
+from app.application.services.scheduled_script_executor import (
+    ScheduledScriptExecutor,
+)
 from app.core.config import get_settings
 from app.core.exceptions import DomainError
 from app.core.logging import configure_logging
@@ -99,49 +106,19 @@ async def _cleanup_audit_logs() -> None:
         logger.warning("audit.cleanup.startup.failed")
 
 
-async def _execute_scheduled_script(
-    script_id,
-    node_ids,
-    params,  # noqa: ANN001
-) -> None:
-    """Execute one scheduled script in a fresh request scope."""
-    from app.application.dto.script_execution import ScriptExecutionRequestDTO
-    from app.services.schedule_service import ScheduleService
-    from app.services.script_execution_service import ScriptExecutionService
-
-    async with container() as request_container:
-        script_service = await request_container.get(ScriptExecutionService)
-        schedule_service = await request_container.get(ScheduleService)
-        await schedule_service.mark_started(script_id)
-        try:
-            await script_service.execute_script(
-                script_id,
-                ScriptExecutionRequestDTO(
-                    node_ids=tuple(node_ids),
-                    params=tuple(params.items()),
-                ),
-            )
-        except Exception as exc:
-            await schedule_service.mark_failed(script_id, type(exc).__name__)
-            raise
-        await schedule_service.mark_succeeded(script_id)
-
-
-async def _restore_schedules() -> tuple[int, int]:
-    """Restore persistent schedules in a short database scope."""
-    async with container() as request_container:
-        from app.services.schedule_service import ScheduleService
-
-        schedule_service = await request_container.get(ScheduleService)
-        restored, failed = await schedule_service.restore()
-        scheduler = await container.get(ScriptScheduler)
-        scheduler.mark_restored(failed=failed)
-        logger.info(
-            "scheduler.restore.completed",
-            restored=restored,
-            failed=failed,
-        )
-        return restored, failed
+async def _restore_schedules(
+    reconciler: ScheduleReconciliationService,
+    scheduler: ScriptScheduler,
+) -> tuple[int, int]:
+    """Restore persistent schedules through the application use case."""
+    result = await reconciler.reconcile()
+    scheduler.mark_restored(failed=result.failed)
+    logger.info(
+        "scheduler.restore.completed",
+        restored=result.restored,
+        failed=result.failed,
+    )
+    return result.restored, result.failed
 
 
 @asynccontextmanager
@@ -156,13 +133,16 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     else:
         logger.info("migrations.skipped", reason="AUTO_MIGRATE is disabled")
     scheduler = await container.get(ScriptScheduler)
+    scheduled_executor = await container.get(ScheduledScriptExecutor)
+    reconciler = await container.get(ScheduleReconciliationService)
     from app.services.audit_outbox_worker import AuditOutboxWorker
 
     await container.get(AuditOutboxWorker)
-    scheduler.configure_executor(_execute_scheduled_script)
+    scheduler.configure_executor(scheduled_executor.execute)
     if settings.SCHEDULER_ENABLED:
-        scheduler.configure_reconciler(_restore_schedules)
-        await _restore_schedules()
+        restore = partial(_restore_schedules, reconciler, scheduler)
+        scheduler.configure_reconciler(restore)
+        await restore()
         scheduler.start_reconciliation()
     else:
         scheduler.mark_restored(failed=0)

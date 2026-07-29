@@ -19,7 +19,6 @@ from app.repositories.health_repo import HealthRepository
 from app.repositories.node_repo import NodeRepository
 from app.repositories.script_execution_repo import ScriptExecutionRepository
 from app.repositories.script_repo import ScriptRepository
-from app.repositories.script_schedule_repo import ScriptScheduleRepository
 from app.services.api_key_service import APIKeyService
 from app.services.audit_service import AuditService
 from app.services.command_execution_service import CommandExecutionService
@@ -27,7 +26,6 @@ from app.services.command_management_service import CommandManagementService
 from app.services.config_service import ConfigService
 from app.services.health_service import HealthService
 from app.services.node_management_service import NodeManagementService
-from app.services.schedule_service import ScheduleService
 from app.services.script_execution_service import ScriptExecutionService
 from app.services.script_history_service import ScriptHistoryService
 from app.services.script_management_service import ScriptManagementService
@@ -86,9 +84,6 @@ def test_repository_provider_resolves() -> None:
         provider.get_script_execution_repository(session), ScriptExecutionRepository
     )
     assert isinstance(provider.get_api_key_repository(session), APIKeyRepository)
-    assert isinstance(
-        provider.get_script_schedule_repository(session), ScriptScheduleRepository
-    )
     assert isinstance(provider.get_health_repository(session), HealthRepository)
     assert provider.get_scoped_script_reader(MagicMock()) is not None
     execution_writer = provider.get_scoped_execution_writer(MagicMock())
@@ -233,13 +228,6 @@ def test_service_provider_resolves() -> None:
         MagicMock(SCHEDULER_ENABLED=True),
     )
     assert isinstance(health, HealthService)
-    schedule = svc_provider.get_schedule_service(
-        repo_provider.get_script_schedule_repository(session),
-        script_repo,
-        node_repo,
-        scheduler,
-    )
-    assert isinstance(schedule, ScheduleService)
     assert svc_provider.get_streaming_command_service(node_reader, factory) is not None
 
 
