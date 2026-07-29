@@ -12,11 +12,13 @@ from dishka.integrations.fastapi import setup_dishka
 from fastapi import FastAPI
 from httpx2 import ASGITransport, AsyncClient
 
+from app.api.error_mapping import domain_error_handler
 from app.api.v1.commands import router as commands_router
 from app.api.v1.health import router as health_router
 from app.core.exceptions import (
     CommandNotFoundError,
     ConnectionFailedError,
+    DomainError,
     NodeNotFoundError,
     TemplateRenderError,
 )
@@ -42,6 +44,7 @@ def _make_command(**overrides: Any) -> CommandResponse:
 
 def _create_test_app(service: CommandService | AsyncMock) -> FastAPI:
     app = FastAPI()
+    app.add_exception_handler(DomainError, domain_error_handler)
     app.include_router(health_router)
     app.include_router(commands_router, prefix="/api/v1")
 

@@ -4,16 +4,9 @@ import uuid
 
 import structlog
 from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
-from fastapi import APIRouter, HTTPException, Query, Security
+from fastapi import APIRouter, Query, Security
 
 from app.api.deps import get_current_api_key, require_write_scope
-from app.core.exceptions import (
-    CommandNotFoundError,
-    ConnectionFailedError,
-    NodeNotFoundError,
-    ScriptNotFoundError,
-    TemplateRenderError,
-)
 from app.schemas.node import PaginatedResponse
 from app.schemas.scheduler import ScheduledJob, ScheduleRequest, ScheduleResponse
 from app.schemas.script import (
@@ -57,11 +50,7 @@ async def get_script(
 ) -> ScriptResponse:
     """Get a script by ID."""
     audit.info("api.scripts.get", script_id=str(script_id))
-    try:
-        return await service.get_script(script_id)
-    except ScriptNotFoundError:
-        audit.warning("api.scripts.not_found", script_id=str(script_id))
-        raise HTTPException(status_code=404, detail="Script not found")
+    return await service.get_script(script_id)
 
 
 @router.post("/", response_model=ScriptResponse, status_code=201)
@@ -86,11 +75,7 @@ async def update_script(
 ) -> ScriptResponse:
     """Update an existing script."""
     audit.info("api.scripts.update", script_id=str(script_id))
-    try:
-        return await service.update_script(script_id, data)
-    except ScriptNotFoundError:
-        audit.warning("api.scripts.not_found", script_id=str(script_id))
-        raise HTTPException(status_code=404, detail="Script not found")
+    return await service.update_script(script_id, data)
 
 
 @router.delete("/{script_id}", status_code=204)
@@ -102,11 +87,7 @@ async def delete_script(
 ) -> None:
     """Delete a script."""
     audit.info("api.scripts.delete", script_id=str(script_id))
-    try:
-        await service.delete_script(script_id)
-    except ScriptNotFoundError:
-        audit.warning("api.scripts.not_found", script_id=str(script_id))
-        raise HTTPException(status_code=404, detail="Script not found")
+    await service.delete_script(script_id)
 
 
 @router.post("/{script_id}/execute", response_model=ScriptExecutionBatchResult)
@@ -123,20 +104,7 @@ async def execute_script(
         script_id=str(script_id),
         node_count=len(data.node_ids),
     )
-    try:
-        return await service.execute_script(script_id, data)
-    except ScriptNotFoundError:
-        audit.warning("api.scripts.not_found", script_id=str(script_id))
-        raise HTTPException(status_code=404, detail="Script not found")
-    except (NodeNotFoundError, CommandNotFoundError) as exc:
-        audit.warning("api.scripts.dependency_not_found", error=str(exc))
-        raise HTTPException(status_code=404, detail=str(exc))
-    except TemplateRenderError as exc:
-        audit.error("api.scripts.render_error", error=str(exc))
-        raise HTTPException(status_code=422, detail=str(exc))
-    except ConnectionFailedError as exc:
-        audit.error("api.scripts.connection_failed", error=str(exc))
-        raise HTTPException(status_code=503, detail=str(exc))
+    return await service.execute_script(script_id, data)
 
 
 @router.get("/{script_id}/executions")
@@ -150,14 +118,8 @@ async def get_executions(
 ) -> PaginatedResponse[ScriptExecutionResponse]:
     """Get execution history for a script."""
     audit.info("api.scripts.executions", script_id=str(script_id))
-    try:
-        executions, total = await service.get_executions(
-            script_id, page=page, size=size
-        )
-        return PaginatedResponse(items=executions, total=total, page=page, size=size)
-    except ScriptNotFoundError:
-        audit.warning("api.scripts.not_found", script_id=str(script_id))
-        raise HTTPException(status_code=404, detail="Script not found")
+    executions, total = await service.get_executions(script_id, page=page, size=size)
+    return PaginatedResponse(items=executions, total=total, page=page, size=size)
 
 
 # --- Schedule endpoints ---

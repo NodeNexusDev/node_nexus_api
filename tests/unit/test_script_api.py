@@ -12,11 +12,13 @@ from dishka.integrations.fastapi import setup_dishka
 from fastapi import FastAPI
 from httpx2 import ASGITransport, AsyncClient
 
+from app.api.error_mapping import domain_error_handler
 from app.api.v1.health import router as health_router
 from app.api.v1.scripts import router as scripts_router
 from app.core.exceptions import (
     CommandNotFoundError,
     ConnectionFailedError,
+    DomainError,
     NodeNotFoundError,
     ScriptNotFoundError,
     TemplateRenderError,
@@ -75,6 +77,7 @@ def _make_batch_result(**overrides: Any) -> ScriptExecutionBatchResult:
 
 def _create_test_app(service: ScriptService | AsyncMock) -> FastAPI:
     app = FastAPI()
+    app.add_exception_handler(DomainError, domain_error_handler)
     app.include_router(health_router)
     app.include_router(scripts_router, prefix="/api/v1")
 

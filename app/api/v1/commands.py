@@ -4,15 +4,9 @@ import uuid
 
 import structlog
 from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
-from fastapi import APIRouter, HTTPException, Query, Security
+from fastapi import APIRouter, Query, Security
 
 from app.api.deps import get_current_api_key, require_write_scope
-from app.core.exceptions import (
-    CommandNotFoundError,
-    ConnectionFailedError,
-    NodeNotFoundError,
-    TemplateRenderError,
-)
 from app.schemas.command import (
     CommandCreate,
     CommandExecuteRequest,
@@ -55,11 +49,7 @@ async def get_command(
 ) -> CommandResponse:
     """Get a command by ID."""
     audit.info("api.commands.get", command_id=str(command_id))
-    try:
-        return await service.get_command(command_id)
-    except CommandNotFoundError:
-        audit.warning("api.commands.not_found", command_id=str(command_id))
-        raise HTTPException(status_code=404, detail="Command not found")
+    return await service.get_command(command_id)
 
 
 @router.post("/", response_model=CommandResponse, status_code=201)
@@ -84,11 +74,7 @@ async def update_command(
 ) -> CommandResponse:
     """Update an existing command template."""
     audit.info("api.commands.update", command_id=str(command_id))
-    try:
-        return await service.update_command(command_id, data)
-    except CommandNotFoundError:
-        audit.warning("api.commands.not_found", command_id=str(command_id))
-        raise HTTPException(status_code=404, detail="Command not found")
+    return await service.update_command(command_id, data)
 
 
 @router.delete("/{command_id}", status_code=204)
@@ -100,11 +86,7 @@ async def delete_command(
 ) -> None:
     """Delete a command template."""
     audit.info("api.commands.delete", command_id=str(command_id))
-    try:
-        await service.delete_command(command_id)
-    except CommandNotFoundError:
-        audit.warning("api.commands.not_found", command_id=str(command_id))
-        raise HTTPException(status_code=404, detail="Command not found")
+    await service.delete_command(command_id)
 
 
 @router.post("/{command_id}/execute", response_model=CommandResult)
@@ -121,17 +103,4 @@ async def execute_command(
         command_id=str(command_id),
         node_id=str(data.node_id),
     )
-    try:
-        return await service.execute_command(command_id, data)
-    except CommandNotFoundError:
-        audit.warning("api.commands.not_found", command_id=str(command_id))
-        raise HTTPException(status_code=404, detail="Command not found")
-    except NodeNotFoundError:
-        audit.warning("api.commands.node_not_found", node_id=str(data.node_id))
-        raise HTTPException(status_code=404, detail="Node not found")
-    except TemplateRenderError as exc:
-        audit.error("api.commands.render_error", error=str(exc))
-        raise HTTPException(status_code=422, detail=str(exc))
-    except ConnectionFailedError as exc:
-        audit.error("api.commands.connection_failed", error=str(exc))
-        raise HTTPException(status_code=503, detail=str(exc))
+    return await service.execute_command(command_id, data)

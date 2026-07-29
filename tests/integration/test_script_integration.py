@@ -17,8 +17,10 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
+from app.api.error_mapping import domain_error_handler
 from app.api.v1.health import router as health_router
 from app.api.v1.scripts import router as scripts_router
+from app.core.exceptions import DomainError
 from app.models.base import Base
 from app.repositories.api_key_repo import APIKeyRepository
 from app.repositories.command_repo import CommandRepository
@@ -114,6 +116,7 @@ async def integration_client(
     container = make_async_container(provider)
 
     app = FastAPI()
+    app.add_exception_handler(DomainError, domain_error_handler)
     app.include_router(health_router)
     app.include_router(scripts_router, prefix="/api/v1")
     setup_dishka(container, app)

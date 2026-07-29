@@ -12,9 +12,10 @@ from dishka.integrations.fastapi import setup_dishka
 from fastapi import FastAPI
 from httpx2 import ASGITransport, AsyncClient
 
+from app.api.error_mapping import domain_error_handler
 from app.api.v1.health import router as health_router
 from app.api.v1.nodes import router as nodes_router
-from app.core.exceptions import ConnectionFailedError, NodeNotFoundError
+from app.core.exceptions import ConnectionFailedError, DomainError, NodeNotFoundError
 from app.schemas.node import (
     BulkCommandResult,
     BulkNodeResult,
@@ -45,6 +46,7 @@ def _make_node(**overrides: Any) -> NodeResponse:
 
 def _create_test_app(service: NodeService | AsyncMock) -> FastAPI:
     app = FastAPI()
+    app.add_exception_handler(DomainError, domain_error_handler)
     app.include_router(health_router)
     app.include_router(nodes_router, prefix="/api/v1")
 

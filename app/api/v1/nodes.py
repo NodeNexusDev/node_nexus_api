@@ -7,7 +7,6 @@ from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
 from fastapi import APIRouter, HTTPException, Query, Security
 
 from app.api.deps import get_current_api_key, require_write_scope
-from app.core.exceptions import ConnectionFailedError, NodeNotFoundError
 from app.schemas.common import CursorPage, decode_cursor
 from app.schemas.node import (
     BulkCommandRequest,
@@ -91,11 +90,7 @@ async def get_node(
 ) -> NodeResponse:
     """Get a node by ID."""
     audit.info("api.nodes.get", node_id=str(node_id))
-    try:
-        return await service.get_node(node_id)
-    except NodeNotFoundError:
-        audit.warning("api.nodes.not_found", node_id=str(node_id))
-        raise HTTPException(status_code=404, detail="Node not found")
+    return await service.get_node(node_id)
 
 
 @router.post("/", response_model=NodeResponse, status_code=201)
@@ -120,11 +115,7 @@ async def update_node(
 ) -> NodeResponse:
     """Update an existing node."""
     audit.info("api.nodes.update", node_id=str(node_id))
-    try:
-        return await service.update_node(node_id, data)
-    except NodeNotFoundError:
-        audit.warning("api.nodes.not_found", node_id=str(node_id))
-        raise HTTPException(status_code=404, detail="Node not found")
+    return await service.update_node(node_id, data)
 
 
 @router.delete("/{node_id}", status_code=204)
@@ -136,11 +127,7 @@ async def delete_node(
 ) -> None:
     """Delete a node."""
     audit.info("api.nodes.delete", node_id=str(node_id))
-    try:
-        await service.delete_node(node_id)
-    except NodeNotFoundError:
-        audit.warning("api.nodes.not_found", node_id=str(node_id))
-        raise HTTPException(status_code=404, detail="Node not found")
+    await service.delete_node(node_id)
 
 
 @router.post("/bulk/execute", response_model=BulkCommandResult)
@@ -157,11 +144,7 @@ async def bulk_execute_command(
         node_ids=[str(n) for n in (data.node_ids or [])],
         tags=data.tags,
     )
-    try:
-        return await service.bulk_execute_command(data)
-    except NodeNotFoundError as exc:
-        audit.warning("api.nodes.bulk_execute.no_nodes", error=str(exc))
-        raise HTTPException(status_code=404, detail=str(exc))
+    return await service.bulk_execute_command(data)
 
 
 @router.post(
@@ -176,18 +159,7 @@ async def check_node(
 ) -> NodeResponse:
     """Check SSH connectivity to a node."""
     audit.info("api.nodes.check", node_id=str(node_id))
-    try:
-        return await service.check_connectivity(node_id)
-    except NodeNotFoundError:
-        audit.warning("api.nodes.not_found", node_id=str(node_id))
-        raise HTTPException(status_code=404, detail="Node not found")
-    except ConnectionFailedError as exc:
-        audit.error(
-            "api.nodes.connection_failed",
-            node_id=str(node_id),
-            error=str(exc),
-        )
-        raise HTTPException(status_code=503, detail=str(exc))
+    return await service.check_connectivity(node_id)
 
 
 @router.post(
@@ -203,18 +175,7 @@ async def execute_command(
 ) -> CommandResult:
     """Execute a command on a node via SSH."""
     audit.info("api.nodes.execute", node_id=str(node_id), command=data.command)
-    try:
-        return await service.execute_command(node_id, data)
-    except NodeNotFoundError:
-        audit.warning("api.nodes.not_found", node_id=str(node_id))
-        raise HTTPException(status_code=404, detail="Node not found")
-    except ConnectionFailedError as exc:
-        audit.error(
-            "api.nodes.connection_failed",
-            node_id=str(node_id),
-            error=str(exc),
-        )
-        raise HTTPException(status_code=503, detail=str(exc))
+    return await service.execute_command(node_id, data)
 
 
 @router.get("/{node_id}/metrics", response_model=NodeMetrics)
@@ -226,18 +187,7 @@ async def get_node_metrics(
 ) -> NodeMetrics:
     """Get system metrics from a node (CPU, memory, disk)."""
     audit.info("api.nodes.metrics", node_id=str(node_id))
-    try:
-        return await service.get_node_metrics(node_id)
-    except NodeNotFoundError:
-        audit.warning("api.nodes.not_found", node_id=str(node_id))
-        raise HTTPException(status_code=404, detail="Node not found")
-    except ConnectionFailedError as exc:
-        audit.error(
-            "api.nodes.metrics_failed",
-            node_id=str(node_id),
-            error=str(exc),
-        )
-        raise HTTPException(status_code=503, detail=str(exc))
+    return await service.get_node_metrics(node_id)
 
 
 @router.post("/{node_id}/tags", response_model=NodeResponse)
@@ -250,11 +200,7 @@ async def add_tag(
 ) -> NodeResponse:
     """Add a tag to a node."""
     audit.info("api.nodes.tags.add", node_id=str(node_id), tag=data.tag)
-    try:
-        return await service.add_tag(node_id, data)
-    except NodeNotFoundError:
-        audit.warning("api.nodes.not_found", node_id=str(node_id))
-        raise HTTPException(status_code=404, detail="Node not found")
+    return await service.add_tag(node_id, data)
 
 
 @router.delete("/{node_id}/tags", response_model=NodeResponse)
@@ -267,8 +213,4 @@ async def remove_tag(
 ) -> NodeResponse:
     """Remove a tag from a node."""
     audit.info("api.nodes.tags.remove", node_id=str(node_id), tag=data.tag)
-    try:
-        return await service.remove_tag(node_id, data)
-    except NodeNotFoundError:
-        audit.warning("api.nodes.not_found", node_id=str(node_id))
-        raise HTTPException(status_code=404, detail="Node not found")
+    return await service.remove_tag(node_id, data)
