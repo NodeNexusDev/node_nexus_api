@@ -1,6 +1,5 @@
 """FastAPI application entry point."""
 
-import asyncio
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from functools import partial
@@ -8,14 +7,13 @@ from importlib.metadata import PackageNotFoundError
 from importlib.metadata import version as pkg_version
 
 import structlog
-from alembic.config import Config as AlembicConfig
 from dishka.integrations.fastapi import setup_dishka
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.routing import APIRoute
 from prometheus_fastapi_instrumentator import Instrumentator
 
-from alembic import command as alembic_command
+from app.adapters.lifecycle.migration_runner import MigrationRunner
 from app.api.error_mapping import domain_error_handler
 from app.api.middleware import (
     RateLimitMiddleware,
@@ -62,26 +60,6 @@ def stable_operation_id(route: APIRoute) -> str:
     return f"{methods}_{path or 'root'}"
 
 
-def _run_migrations_sync() -> None:
-    """Run pending Alembic migrations (sync, runs in thread)."""
-    settings = get_settings()
-    alembic_cfg = AlembicConfig("alembic.ini")
-    alembic_cfg.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
-    try:
-        alembic_command.upgrade(alembic_cfg, "head")
-    except Exception as exc:
-        logger.exception("migrations.failed", error_type=type(exc).__name__)
-        raise RuntimeError(
-            "Database migrations failed. Ensure the database is reachable "
-            "and the schema is compatible."
-        ) from exc
-
-
-async def _run_migrations() -> None:
-    """Run pending Alembic migrations."""
-    await asyncio.to_thread(_run_migrations_sync)
-
-
 async def _cleanup_audit_logs() -> None:
     """Cleanup old audit logs on startup."""
     try:
@@ -117,7 +95,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     configure_logging(log_level=settings.LOG_LEVEL, debug=settings.DEBUG)
     logger.info("app.startup")
     if settings.AUTO_MIGRATE:
-        await _run_migrations()
+        migration_runner = await container.get(MigrationRunner)
+        await migration_runner.run()
         logger.info("migrations.applied")
     else:
         logger.info("migrations.skipped", reason="AUTO_MIGRATE is disabled")

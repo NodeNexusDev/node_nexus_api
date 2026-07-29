@@ -2,51 +2,11 @@
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
-
 from app.main import (
     _cleanup_audit_logs,
     _restore_schedules,
-    _run_migrations,
-    _run_migrations_sync,
     lifespan,
 )
-
-
-class TestRunMigrationsSync:
-    @patch("app.main.alembic_command")
-    @patch("app.main.AlembicConfig")
-    @patch("app.main.get_settings")
-    def test_success(
-        self,
-        mock_get_settings: MagicMock,
-        mock_config_cls: MagicMock,
-        mock_cmd: MagicMock,
-    ) -> None:
-        mock_get_settings.return_value = MagicMock(DATABASE_URL="sqlite:///test.db")
-        _run_migrations_sync()
-        mock_cmd.upgrade.assert_called_once()
-
-    @patch("app.main.alembic_command")
-    @patch("app.main.AlembicConfig")
-    @patch("app.main.get_settings")
-    def test_failure_raises_runtime_error(
-        self,
-        mock_get_settings: MagicMock,
-        mock_config_cls: MagicMock,
-        mock_cmd: MagicMock,
-    ) -> None:
-        mock_get_settings.return_value = MagicMock(DATABASE_URL="sqlite:///test.db")
-        mock_cmd.upgrade.side_effect = Exception("connection refused")
-        with pytest.raises(RuntimeError, match="Database migrations failed"):
-            _run_migrations_sync()
-
-
-class TestRunMigrations:
-    @patch("app.main._run_migrations_sync")
-    async def test_calls_sync_in_thread(self, mock_sync: MagicMock) -> None:
-        await _run_migrations()
-        mock_sync.assert_called_once()
 
 
 class TestCleanupAuditLogs:
@@ -89,14 +49,12 @@ class TestRuntimeBackgroundJobs:
 class TestLifespan:
     @patch("app.main._restore_schedules", new_callable=AsyncMock)
     @patch("app.main.container")
-    @patch("app.main._run_migrations", new_callable=AsyncMock)
     @patch("app.main.configure_logging")
     @patch("app.main.get_settings")
     async def test_startup_and_shutdown(
         self,
         mock_get_settings: MagicMock,
         mock_configure: MagicMock,
-        mock_migrations: AsyncMock,
         mock_container: MagicMock,
         mock_restore: AsyncMock,
     ) -> None:
@@ -105,6 +63,7 @@ class TestLifespan:
         )
         mock_container.close = AsyncMock()
         mock_scheduler = MagicMock()
+        mock_scheduler.run = AsyncMock()
         mock_container.get = AsyncMock(return_value=mock_scheduler)
 
         from fastapi import FastAPI
@@ -112,7 +71,7 @@ class TestLifespan:
         app = FastAPI()
         async with lifespan(app):
             mock_configure.assert_called_once_with(log_level="info", debug=False)
-            mock_migrations.assert_called_once()
+            mock_scheduler.run.assert_awaited_once()
 
         mock_container.close.assert_awaited_once()
         mock_scheduler.configure_executor.assert_called_once()
@@ -121,14 +80,12 @@ class TestLifespan:
     @patch("app.main._restore_schedules", new_callable=AsyncMock)
     @patch("app.main._cleanup_audit_logs", new_callable=AsyncMock)
     @patch("app.main.container")
-    @patch("app.main._run_migrations", new_callable=AsyncMock)
     @patch("app.main.configure_logging")
     @patch("app.main.get_settings")
     async def test_lifespan_calls_cleanup(
         self,
         mock_get_settings: MagicMock,
         mock_configure: MagicMock,
-        mock_migrations: AsyncMock,
         mock_container: MagicMock,
         mock_cleanup: AsyncMock,
         mock_restore: AsyncMock,
@@ -138,7 +95,9 @@ class TestLifespan:
             LOG_LEVEL="info", DEBUG=False, AUDIT_LOG_RETENTION_DAYS=90
         )
         mock_container.close = AsyncMock()
-        mock_container.get = AsyncMock(return_value=MagicMock())
+        dependency = MagicMock()
+        dependency.run = AsyncMock()
+        mock_container.get = AsyncMock(return_value=dependency)
 
         from fastapi import FastAPI
 

@@ -60,6 +60,14 @@ def test_db_provider_builds_sessionmaker_from_engine() -> None:
     assert sessionmaker.kw["bind"] is engine
 
 
+def test_db_provider_builds_migration_runner() -> None:
+    settings = MagicMock(DATABASE_URL="postgresql+asyncpg://db/test")
+
+    runner = DbProvider().get_migration_runner(settings)
+
+    assert runner._database_url == settings.DATABASE_URL
+
+
 @pytest.mark.asyncio
 async def test_scheduler_provider_manages_lifecycle() -> None:
     provider = SchedulerProvider()

@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
+from app.adapters.lifecycle.migration_runner import MigrationRunner
 from app.adapters.persistence.api_key import SqlAlchemyAPIKeyGateway
 from app.adapters.persistence.audit import (
     RequestAuditOutbox,
@@ -117,6 +118,11 @@ class DbProvider(Provider):
     def get_sessionmaker(self, engine: AsyncEngine) -> async_sessionmaker[AsyncSession]:
         """Get a session maker bound to the managed application engine."""
         return async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+
+    @provide(scope=Scope.APP)
+    def get_migration_runner(self, settings: Settings) -> MigrationRunner:
+        """Get the Alembic lifecycle adapter."""
+        return MigrationRunner(settings.DATABASE_URL)
 
     @provide(scope=Scope.REQUEST)
     async def get_session(
