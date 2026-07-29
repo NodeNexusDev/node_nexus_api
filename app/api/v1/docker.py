@@ -38,7 +38,10 @@ async def list_containers(
 ) -> list[DockerContainer]:
     """List containers on a Docker node."""
     audit.info("api.docker.containers.list", node_id=str(node_id), all=all)
-    return await service.list_containers(node_id, all=all)
+    return [
+        DockerContainer.model_validate(item, from_attributes=True)
+        for item in await service.list_containers(node_id, all=all)
+    ]
 
 
 @router.get("/containers/{container_id}")
@@ -54,7 +57,8 @@ async def get_container(
     audit.info(
         "api.docker.containers.get", node_id=str(node_id), container_id=validated_id
     )
-    return await service.get_container(node_id, validated_id)
+    result = await service.get_container(node_id, validated_id)
+    return DockerContainerInspect.model_validate(result, from_attributes=True)
 
 
 @router.post("/containers/{container_id}/start", status_code=204)
@@ -159,9 +163,10 @@ async def exec_command(
         container_id=validated_id,
         command=data.command,
     )
-    return await service.exec_command(
+    result = await service.exec_command(
         node_id, validated_id, data.command, timeout=data.timeout
     )
+    return DockerExecResult.model_validate(result, from_attributes=True)
 
 
 @router.get("/images")
@@ -206,7 +211,8 @@ async def get_stats(
     audit.info(
         "api.docker.containers.stats", node_id=str(node_id), container_id=validated_id
     )
-    return await service.get_stats(node_id, validated_id)
+    result = await service.get_stats(node_id, validated_id)
+    return DockerStats.model_validate(result, from_attributes=True)
 
 
 @router.get("/networks")

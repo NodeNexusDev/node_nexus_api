@@ -11,17 +11,17 @@ if TYPE_CHECKING:
 
 import structlog
 
+from app.application.dto.docker import (
+    DockerContainerConfigDTO,
+    DockerContainerDTO,
+    DockerContainerInspectDTO,
+    DockerContainerStateDTO,
+    DockerExecResultDTO,
+    DockerStatsDTO,
+)
 from app.core.connectors.ssh import command_fingerprint
 from app.core.docker_validation import validate_container_id
 from app.core.exceptions import ContainerNotFoundError
-from app.schemas.docker import (
-    DockerContainer,
-    DockerContainerConfig,
-    DockerContainerInspect,
-    DockerContainerState,
-    DockerExecResult,
-    DockerStats,
-)
 from app.services.docker.command_runner import DockerCommandRunner
 from app.services.docker.error_mapper import raise_for_docker_error
 from app.services.docker.parsers import parse_json_array, parse_json_lines
@@ -52,7 +52,7 @@ class DockerContainerService:
 
     async def list_containers(
         self, node_id: UUID, *, all: bool = False
-    ) -> list[DockerContainer]:
+    ) -> list[DockerContainerDTO]:
         node = await self._runner.get_target(node_id)
         flag = " -a" if all else ""
         cmd = self._runner.build_command(node, f"ps{flag} --format '{{{{json .}}}}'")
@@ -61,11 +61,24 @@ class DockerContainerService:
         items = parse_json_lines(stdout)
         audit.info("docker.containers.list", node_id=str(node_id), count=len(items))
         await self._log("docker.containers.list", node_id, {"count": len(items)})
-        return [DockerContainer.model_validate(item) for item in items]
+        return [
+            DockerContainerDTO(
+                id=item["ID"],
+                names=item["Names"],
+                image=item["Image"],
+                command=item["Command"],
+                created_at=item["CreatedAt"],
+                state=item["State"],
+                status=item["Status"],
+                ports=item.get("Ports"),
+                networks=item.get("Networks"),
+            )
+            for item in items
+        ]
 
     async def get_container(
         self, node_id: UUID, container_id: str
-    ) -> DockerContainerInspect:
+    ) -> DockerContainerInspectDTO:
         validated_id = validate_container_id(container_id)
         node = await self._runner.get_target(node_id)
         cmd = self._runner.build_command(node, f"inspect {validated_id}")
@@ -85,10 +98,10 @@ class DockerContainerService:
         await self._log(
             "docker.container.inspect", node_id, {"container_id": validated_id}
         )
-        return DockerContainerInspect(
+        return DockerContainerInspectDTO(
             id=data.get("Id", ""),
             name=data.get("Name", ""),
-            state=DockerContainerState(
+            state=DockerContainerStateDTO(
                 status=state.get("Status", ""),
                 running=state.get("Running", False),
                 exit_code=state.get("ExitCode", 0),
@@ -96,12 +109,12 @@ class DockerContainerService:
                 finished_at=state.get("FinishedAt"),
                 oom_killed=state.get("OOMKilled"),
             ),
-            config=DockerContainerConfig(
+            config=DockerContainerConfigDTO(
                 image=config.get("Image"),
-                cmd=config.get("Cmd"),
+                cmd=tuple(config["Cmd"]) if config.get("Cmd") else None,
                 hostname=config.get("Hostname"),
             ),
-            network_settings=data.get("NetworkSettings"),
+            network_settings=tuple((data.get("NetworkSettings") or {}).items()),
         )
 
     async def _lifecycle_action(
@@ -190,7 +203,7 @@ class DockerContainerService:
         command: str,
         *,
         timeout: int = 30,
-    ) -> DockerExecResult:
+    ) -> DockerExecResultDTO:
         validated_id = validate_container_id(container_id)
         node = await self._runner.get_target(node_id)
         cmd = self._runner.build_command(
@@ -225,9 +238,9 @@ class DockerContainerService:
                 "exit_code": exit_code,
             },
         )
-        return DockerExecResult(stdout=stdout, stderr=stderr, exit_code=exit_code)
+        return DockerExecResultDTO(stdout=stdout, stderr=stderr, exit_code=exit_code)
 
-    async def get_stats(self, node_id: UUID, container_id: str) -> DockerStats:
+    async def get_stats(self, node_id: UUID, container_id: str) -> DockerStatsDTO:
         validated_id = validate_container_id(container_id)
         node = await self._runner.get_target(node_id)
         cmd = self._runner.build_command(
@@ -248,4 +261,15 @@ class DockerContainerService:
         await self._log(
             "docker.container.stats", node_id, {"container_id": validated_id}
         )
-        return DockerStats.model_validate(items[0])
+        item = items[0]
+        return DockerStatsDTO(
+            container_id=item["Container"],
+            name=item["Name"],
+            cpu_percent=item["CPUPerc"],
+            mem_usage=item["MemUsage"],
+            mem_limit=item.get("MemLimit"),
+            mem_percent=item["MemPerc"],
+            net_io=item["NetIO"],
+            block_io=item["BlockIO"],
+            pids=item.get("PIDs"),
+        )

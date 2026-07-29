@@ -15,17 +15,17 @@ if TYPE_CHECKING:
 from app.adapters.runtime.docker import SshDockerRuntime
 from app.adapters.security import AesGcmCredentialCipher
 from app.application.dto.docker import (
+    DockerContainerDTO,
+    DockerContainerInspectDTO,
+    DockerExecResultDTO,
     DockerImageDTO,
     DockerNetworkDTO,
     DockerPullResultDTO,
+    DockerStatsDTO,
     DockerVolumeDTO,
 )
 from app.schemas.docker import (
     BulkDockerResponse,
-    DockerContainer,
-    DockerContainerInspect,
-    DockerExecResult,
-    DockerStats,
 )
 from app.services.docker.bulk_service import DockerBulkService
 from app.services.docker.command_runner import DockerCommandRunner
@@ -102,12 +102,12 @@ class DockerService:
 
     async def list_containers(
         self, node_id: UUID, *, all: bool = False
-    ) -> list[DockerContainer]:
+    ) -> list[DockerContainerDTO]:
         return await self._containers.list_containers(node_id, all=all)
 
     async def get_container(
         self, node_id: UUID, container_id: str
-    ) -> DockerContainerInspect:
+    ) -> DockerContainerInspectDTO:
         return await self._containers.get_container(node_id, container_id)
 
     async def start_container(self, node_id: UUID, container_id: str) -> None:
@@ -147,12 +147,12 @@ class DockerService:
         command: str,
         *,
         timeout: int = 30,
-    ) -> DockerExecResult:
+    ) -> DockerExecResultDTO:
         return await self._containers.exec_command(
             node_id, container_id, command, timeout=timeout
         )
 
-    async def get_stats(self, node_id: UUID, container_id: str) -> DockerStats:
+    async def get_stats(self, node_id: UUID, container_id: str) -> DockerStatsDTO:
         return await self._containers.get_stats(node_id, container_id)
 
     async def list_images(self, node_id: UUID) -> list[DockerImageDTO]:
