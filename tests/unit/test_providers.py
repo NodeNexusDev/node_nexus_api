@@ -151,7 +151,6 @@ def test_service_provider_resolves() -> None:
         node_reader,
     )
     node_metrics_svc = svc_provider.get_node_metrics_service(
-        node_repo,
         factory,
         node_reader,
     )

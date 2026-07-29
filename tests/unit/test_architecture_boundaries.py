@@ -78,6 +78,17 @@ def test_repositories_do_not_depend_on_transport_or_services() -> None:
     _assert_no_imports("repositories", ("app.api", "app.services"))
 
 
+def test_node_metrics_use_case_depends_on_persistence_port() -> None:
+    """Remote metrics collection must not depend on repository implementations."""
+    violations = [
+        module
+        for path, module in _imports_in("services")
+        if path.name == "node_metrics_service.py"
+        and (module == "app.repositories" or module.startswith("app.repositories."))
+    ]
+    assert not violations
+
+
 def test_models_are_persistence_only() -> None:
     """ORM models may only depend on other ORM model modules."""
     violations = [

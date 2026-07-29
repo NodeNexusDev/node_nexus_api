@@ -83,7 +83,7 @@ class IntegrationDbProvider(Provider):
 
     @provide(scope=Scope.REQUEST)
     def get_node_metrics_service(self, repo: NodeRepository) -> NodeMetricsService:
-        return NodeMetricsService(repository=repo)
+        return NodeMetricsService(node_reader=repo)
 
     @provide(scope=Scope.REQUEST)
     def get_service(self, repo: NodeRepository) -> NodeManagementService:

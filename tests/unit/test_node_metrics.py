@@ -257,7 +257,7 @@ class TestNodeMetricsService:
         mock_node.password = None
         mock_node.ssh_key = None
 
-        mock_repo.get_by_id.return_value = mock_node
+        mock_repo.get_connection.return_value = mock_node
 
         # Mock connector
         mock_connector = AsyncMock()
@@ -280,7 +280,7 @@ class TestNodeMetricsService:
         mock_factory.create_ssh.return_value = MockAsyncContextManager(mock_connector)
 
         service = NodeMetricsService(
-            repository=mock_repo,
+            node_reader=mock_repo,
             connector_factory=mock_factory,
         )
         metrics = await service.collect(
@@ -311,14 +311,14 @@ class TestNodeMetricsService:
         mock_node.password = None
         mock_node.ssh_key = None
 
-        mock_repo.get_by_id.return_value = mock_node
+        mock_repo.get_connection.return_value = mock_node
 
         mock_connector = AsyncMock()
         mock_connector.execute_command.side_effect = Exception("Connection failed")
         mock_factory.create_ssh.return_value = MockAsyncContextManager(mock_connector)
 
         service = NodeMetricsService(
-            repository=mock_repo,
+            node_reader=mock_repo,
             connector_factory=mock_factory,
         )
 

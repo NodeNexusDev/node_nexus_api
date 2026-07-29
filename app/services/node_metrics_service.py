@@ -18,7 +18,6 @@ from app.application.dto.node_metrics import (
 )
 from app.core.exceptions import ConnectionFailedError, NodeNotFoundError
 from app.core.ssh_utils import decrypt_value, get_connector_factory
-from app.repositories.node_repo import NodeRepository
 
 audit = structlog.get_logger("audit")
 
@@ -28,21 +27,15 @@ class NodeMetricsService:
 
     def __init__(
         self,
-        repository: NodeRepository,
+        node_reader: NodeConnectionReader,
         connector_factory: ConnectorFactory | None = None,
-        node_reader: NodeConnectionReader | None = None,
     ) -> None:
-        self._repository = repository
         self._connector_factory = connector_factory
         self._node_reader = node_reader
 
     async def collect(self, node_id: UUID) -> NodeMetricsDTO:
         """Collect current system metrics from a node."""
-        node = (
-            await self._node_reader.get_connection(node_id)
-            if self._node_reader
-            else await self._repository.get_by_id(node_id)
-        )
+        node = await self._node_reader.get_connection(node_id)
         if node is None:
             raise NodeNotFoundError(f"Node {node_id} not found")
 

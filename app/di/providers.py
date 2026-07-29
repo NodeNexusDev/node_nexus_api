@@ -164,13 +164,11 @@ class ServiceProvider(Provider):
     @provide(scope=Scope.REQUEST)
     def get_node_metrics_service(
         self,
-        repository: NodeRepository,
         connector_factory: SSHConnectorFactory,
         node_reader: ScopedNodeConnectionReader,
     ) -> NodeMetricsService:
         """Get the node metrics service."""
         return NodeMetricsService(
-            repository=repository,
             connector_factory=connector_factory,
             node_reader=node_reader,
         )
