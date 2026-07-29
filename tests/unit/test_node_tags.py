@@ -7,10 +7,10 @@ from unittest.mock import AsyncMock
 
 import pytest
 
+from app.application.dto.node_management import NodeCreateDTO, NodeTagDTO
 from app.core.exceptions import NodeNotFoundError
 from app.models.node import NodeModel
 from app.repositories.node_repo import NodeRepository
-from app.schemas.node import NodeCreate, TagAdd, TagRemove
 from app.services.node_management_service import NodeManagementService
 
 
@@ -89,7 +89,7 @@ class TestAddTag:
         updated_node = _make_orm_node(tags=["prod"])
         repo.get_by_id.return_value = node
         repo.update.return_value = updated_node
-        result = await service.add_tag(node.id, TagAdd(tag="prod"))
+        result = await service.add_tag(node.id, NodeTagDTO(tag="prod"))
         assert result.tags == ("prod",)
         repo.update.assert_called_once_with(node.id, {"tags": ["prod"]})
 
@@ -98,7 +98,7 @@ class TestAddTag:
     ) -> None:
         node = _make_orm_node(tags=["prod"])
         repo.get_by_id.return_value = node
-        result = await service.add_tag(node.id, TagAdd(tag="prod"))
+        result = await service.add_tag(node.id, NodeTagDTO(tag="prod"))
         assert result.tags == ("prod",)
         repo.update.assert_not_called()
 
@@ -107,7 +107,7 @@ class TestAddTag:
     ) -> None:
         repo.get_by_id.return_value = None
         with pytest.raises(NodeNotFoundError):
-            await service.add_tag(uuid.uuid4(), TagAdd(tag="prod"))
+            await service.add_tag(uuid.uuid4(), NodeTagDTO(tag="prod"))
 
 
 class TestRemoveTag:
@@ -118,7 +118,7 @@ class TestRemoveTag:
         updated_node = _make_orm_node(tags=["web"])
         repo.get_by_id.return_value = node
         repo.update.return_value = updated_node
-        result = await service.remove_tag(node.id, TagRemove(tag="prod"))
+        result = await service.remove_tag(node.id, NodeTagDTO(tag="prod"))
         assert result.tags == ("web",)
         repo.update.assert_called_once_with(node.id, {"tags": ["web"]})
 
@@ -127,7 +127,7 @@ class TestRemoveTag:
     ) -> None:
         node = _make_orm_node(tags=["web"])
         repo.get_by_id.return_value = node
-        result = await service.remove_tag(node.id, TagRemove(tag="prod"))
+        result = await service.remove_tag(node.id, NodeTagDTO(tag="prod"))
         assert result.tags == ("web",)
         repo.update.assert_not_called()
 
@@ -136,7 +136,7 @@ class TestRemoveTag:
     ) -> None:
         repo.get_by_id.return_value = None
         with pytest.raises(NodeNotFoundError):
-            await service.remove_tag(uuid.uuid4(), TagRemove(tag="prod"))
+            await service.remove_tag(uuid.uuid4(), NodeTagDTO(tag="prod"))
 
 
 class TestTagsInCreate:
@@ -145,11 +145,12 @@ class TestTagsInCreate:
     ) -> None:
         node = _make_orm_node(tags=["prod", "web"])
         repo.create.return_value = node
-        data = NodeCreate(
+        data = NodeCreateDTO(
             name="test",
             host="1.2.3.4",
+            port=22,
             connection_type="ssh",
-            tags=["prod", "web"],
+            tags=("prod", "web"),
         )
         result = await service.create_node(data)
         assert result.tags == ("prod", "web")
@@ -161,6 +162,8 @@ class TestTagsInCreate:
     ) -> None:
         node = _make_orm_node(tags=[])
         repo.create.return_value = node
-        data = NodeCreate(name="test", host="1.2.3.4", connection_type="ssh")
+        data = NodeCreateDTO(
+            name="test", host="1.2.3.4", port=22, connection_type="ssh"
+        )
         result = await service.create_node(data)
         assert result.tags == ()

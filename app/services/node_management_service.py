@@ -12,16 +12,15 @@ if TYPE_CHECKING:
 import structlog
 from sqlalchemy.exc import IntegrityError
 
+from app.application.dto.node_management import (
+    NodeCreateDTO,
+    NodeTagDTO,
+    NodeUpdateDTO,
+)
 from app.application.dto.node_view import NodeViewDTO
 from app.core.exceptions import NodeNameConflictError, NodeNotFoundError
 from app.core.security import encrypt
 from app.repositories.node_repo import NodeRepository
-from app.schemas.node import (
-    NodeCreate,
-    NodeUpdate,
-    TagAdd,
-    TagRemove,
-)
 
 audit = structlog.get_logger("audit")
 
@@ -95,9 +94,19 @@ class NodeManagementService:
         )
         return [self._to_view(node) for node in items], next_cursor, has_more
 
-    async def create_node(self, data: NodeCreate) -> NodeViewDTO:
+    async def create_node(self, data: NodeCreateDTO) -> NodeViewDTO:
         """Create a new node. Encrypts sensitive fields before storage."""
-        raw = data.model_dump()
+        raw: dict[str, object] = {
+            "name": data.name,
+            "host": data.host,
+            "port": data.port,
+            "connection_type": data.connection_type,
+            "username": data.username,
+            "password": data.password,
+            "ssh_key": data.ssh_key,
+            "docker_host": data.docker_host,
+            "tags": list(data.tags),
+        }
         self._encrypt_fields(raw)
         try:
             node = await self._repository.create(raw)
@@ -109,9 +118,12 @@ class NodeManagementService:
         await self._log("create", node_id=node.id, details={"name": data.name})
         return self._to_view(node)
 
-    async def update_node(self, node_id: UUID, data: NodeUpdate) -> NodeViewDTO:
+    async def update_node(self, node_id: UUID, data: NodeUpdateDTO) -> NodeViewDTO:
         """Update an existing node. Encrypts sensitive fields before storage."""
-        update_data = data.model_dump(exclude_unset=True)
+        update_data: dict[str, object] = dict(data.changes)
+        tags = update_data.get("tags")
+        if isinstance(tags, tuple):
+            update_data["tags"] = list(tags)
         self._encrypt_fields(update_data)
         node = await self._repository.update(node_id, update_data)
         if node is None:
@@ -142,7 +154,7 @@ class NodeManagementService:
         """Get all unique tags across all nodes."""
         return await self._repository.get_all_tags()
 
-    async def add_tag(self, node_id: UUID, data: TagAdd) -> NodeViewDTO:
+    async def add_tag(self, node_id: UUID, data: NodeTagDTO) -> NodeViewDTO:
         """Add a tag to a node."""
         node = await self._repository.get_by_id(node_id)
         if node is None:
@@ -160,7 +172,7 @@ class NodeManagementService:
 
         return self._to_view(node)
 
-    async def remove_tag(self, node_id: UUID, data: TagRemove) -> NodeViewDTO:
+    async def remove_tag(self, node_id: UUID, data: NodeTagDTO) -> NodeViewDTO:
         """Remove a tag from a node."""
         node = await self._repository.get_by_id(node_id)
         if node is None:

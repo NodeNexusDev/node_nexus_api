@@ -13,6 +13,7 @@ from app.application.dto.command_execution import (
     CommandResultDTO,
 )
 from app.application.dto.node_connection import NodeConnectionDTO
+from app.application.dto.node_management import NodeCreateDTO, NodeUpdateDTO
 from app.application.dto.node_metrics import (
     CpuMetricsDTO,
     NodeMetricsDTO,
@@ -40,6 +41,28 @@ def test_node_connection_dto_hides_secrets_from_repr() -> None:
 
     assert "plain-password" not in representation
     assert "private-key" not in representation
+
+
+def test_node_create_dto_is_immutable_and_hides_secrets() -> None:
+    dto = NodeCreateDTO(
+        name="node",
+        host="127.0.0.1",
+        port=22,
+        connection_type="ssh",
+        password="plain-password",
+        ssh_key="private-key",
+    )
+
+    assert "plain-password" not in repr(dto)
+    assert "private-key" not in repr(dto)
+    with pytest.raises(AttributeError):
+        dto.name = "changed"  # type: ignore[misc]
+
+
+def test_node_update_dto_preserves_explicit_null() -> None:
+    dto = NodeUpdateDTO(changes=(("username", None),))
+
+    assert dict(dto.changes) == {"username": None}
 
 
 def test_command_boundary_dtos_are_immutable() -> None:

@@ -9,6 +9,11 @@ from app.application.dto.command_execution import (
     CommandResultDTO,
 )
 from app.application.dto.node_connection import NodeConnectionDTO
+from app.application.dto.node_management import (
+    NodeCreateDTO,
+    NodeTagDTO,
+    NodeUpdateDTO,
+)
 from app.application.dto.node_metrics import (
     CpuMetricsDTO,
     NodeMetricsDTO,
@@ -25,7 +30,10 @@ __all__ = [
     "CommandResultDTO",
     "CpuMetricsDTO",
     "NodeConnectionDTO",
+    "NodeCreateDTO",
     "NodeMetricsDTO",
+    "NodeTagDTO",
+    "NodeUpdateDTO",
     "NodeViewDTO",
     "UsageMetricsDTO",
 ]

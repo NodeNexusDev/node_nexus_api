@@ -7,10 +7,10 @@ import pytest
 from sqlalchemy.exc import IntegrityError
 
 from app.application.dto.command_execution import BulkCommandRequestDTO
+from app.application.dto.node_management import NodeCreateDTO, NodeUpdateDTO
 from app.core.exceptions import NodeNameConflictError, NodeNotFoundError
 from app.core.security import decrypt, encrypt
 from app.repositories.node_repo import NodeRepository
-from app.schemas.node import NodeCreate, NodeUpdate
 from app.services.node_bulk_command_service import NodeBulkCommandService
 from app.services.node_command_service import NodeCommandService
 from app.services.node_management_service import NodeManagementService
@@ -74,7 +74,9 @@ class TestCreateNode:
     ) -> None:
         orm_node = make_orm_node()
         repo.create.return_value = orm_node
-        data = NodeCreate(name="test", host="1.2.3.4", connection_type="ssh")
+        data = NodeCreateDTO(
+            name="test", host="1.2.3.4", port=22, connection_type="ssh"
+        )
         result = await service.create_node(data)
         assert result.name == "server-1"
         repo.create.assert_called_once()
@@ -83,7 +85,9 @@ class TestCreateNode:
         self, service: NodeManagementService, repo: AsyncMock
     ) -> None:
         repo.create.side_effect = IntegrityError("insert", {}, Exception("unique"))
-        data = NodeCreate(name="duplicate", host="1.2.3.4", connection_type="ssh")
+        data = NodeCreateDTO(
+            name="duplicate", host="1.2.3.4", port=22, connection_type="ssh"
+        )
 
         with pytest.raises(NodeNameConflictError, match="duplicate"):
             await service.create_node(data)
@@ -93,9 +97,10 @@ class TestCreateNode:
     ) -> None:
         orm_node = make_orm_node()
         repo.create.return_value = orm_node
-        data = NodeCreate(
+        data = NodeCreateDTO(
             name="test",
             host="1.2.3.4",
+            port=22,
             connection_type="ssh",
             password="secret123",
         )
@@ -110,9 +115,10 @@ class TestCreateNode:
         orm_node = make_orm_node()
         repo.create.return_value = orm_node
         key = "-----BEGIN RSA PRIVATE KEY-----\nfake\n-----END RSA PRIVATE KEY-----"
-        data = NodeCreate(
+        data = NodeCreateDTO(
             name="test",
             host="1.2.3.4",
+            port=22,
             connection_type="ssh",
             ssh_key=key,
         )
@@ -125,7 +131,7 @@ class TestUpdateNode:
     async def test_found(self, service: NodeManagementService, repo: AsyncMock) -> None:
         orm_node = make_orm_node()
         repo.update.return_value = orm_node
-        data = NodeUpdate(name="updated")
+        data = NodeUpdateDTO(changes=(("name", "updated"),))
         result = await service.update_node(orm_node.id, data)
         assert result.name == "server-1"
 
@@ -134,14 +140,16 @@ class TestUpdateNode:
     ) -> None:
         repo.update.return_value = None
         with pytest.raises(NodeNotFoundError):
-            await service.update_node(uuid.uuid4(), NodeUpdate(name="x"))
+            await service.update_node(
+                uuid.uuid4(), NodeUpdateDTO(changes=(("name", "x"),))
+            )
 
     async def test_encrypts_fields(
         self, service: NodeManagementService, repo: AsyncMock
     ) -> None:
         orm_node = make_orm_node()
         repo.update.return_value = orm_node
-        data = NodeUpdate(password="newpass")
+        data = NodeUpdateDTO(changes=(("password", "newpass"),))
         await service.update_node(orm_node.id, data)
         call_data = repo.update.call_args[0][1]
         assert call_data["password"] != "newpass"

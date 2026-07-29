@@ -11,6 +11,11 @@ from app.application.dto.command_execution import (
     BulkCommandRequestDTO,
     CommandRequestDTO,
 )
+from app.application.dto.node_management import (
+    NodeCreateDTO,
+    NodeTagDTO,
+    NodeUpdateDTO,
+)
 from app.application.dto.node_view import NodeViewDTO
 from app.schemas.common import CursorPage, decode_cursor, encode_cursor
 from app.schemas.node import (
@@ -141,7 +146,21 @@ async def create_node(
 ) -> NodeResponse:
     """Create a new node."""
     audit.info("api.nodes.create", name=data.name, connection_type=data.connection_type)
-    return _node_response(await service.create_node(data))
+    return _node_response(
+        await service.create_node(
+            NodeCreateDTO(
+                name=data.name,
+                host=data.host,
+                port=data.port,
+                connection_type=data.connection_type,
+                username=data.username,
+                password=data.password,
+                ssh_key=data.ssh_key,
+                docker_host=data.docker_host,
+                tags=tuple(data.tags),
+            )
+        )
+    )
 
 
 @router.put("/{node_id}", response_model=NodeResponse)
@@ -154,7 +173,15 @@ async def update_node(
 ) -> NodeResponse:
     """Update an existing node."""
     audit.info("api.nodes.update", node_id=str(node_id))
-    return _node_response(await service.update_node(node_id, data))
+    changes = data.model_dump(exclude_unset=True)
+    if isinstance(changes.get("tags"), list):
+        changes["tags"] = tuple(changes["tags"])
+    return _node_response(
+        await service.update_node(
+            node_id,
+            NodeUpdateDTO(changes=tuple(changes.items())),
+        )
+    )
 
 
 @router.delete("/{node_id}", status_code=204)
@@ -299,7 +326,7 @@ async def add_tag(
 ) -> NodeResponse:
     """Add a tag to a node."""
     audit.info("api.nodes.tags.add", node_id=str(node_id), tag=data.tag)
-    return _node_response(await service.add_tag(node_id, data))
+    return _node_response(await service.add_tag(node_id, NodeTagDTO(tag=data.tag)))
 
 
 @router.delete("/{node_id}/tags", response_model=NodeResponse)
@@ -312,4 +339,4 @@ async def remove_tag(
 ) -> NodeResponse:
     """Remove a tag from a node."""
     audit.info("api.nodes.tags.remove", node_id=str(node_id), tag=data.tag)
-    return _node_response(await service.remove_tag(node_id, data))
+    return _node_response(await service.remove_tag(node_id, NodeTagDTO(tag=data.tag)))
