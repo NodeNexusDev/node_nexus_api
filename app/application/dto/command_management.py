@@ -2,8 +2,9 @@
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any
 from uuid import UUID
+
+from app.application.types import JsonValue
 
 
 @dataclass(frozen=True, slots=True)
@@ -13,7 +14,7 @@ class CommandParameterDTO:
     name: str
     type: str = "string"
     required: bool = True
-    default: Any = None
+    default: JsonValue = None
     description: str | None = None
 
 
@@ -57,7 +58,7 @@ class CommandExecuteRequestDTO:
     """Immutable command template execution request."""
 
     node_id: UUID
-    params: tuple[tuple[str, Any], ...] = ()
+    params: tuple[tuple[str, JsonValue], ...] = ()
 
 
 @dataclass(frozen=True, slots=True)

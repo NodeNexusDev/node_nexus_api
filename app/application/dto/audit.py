@@ -2,8 +2,9 @@
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any
 from uuid import UUID
+
+from app.application.types import JsonObject
 
 
 @dataclass(frozen=True, slots=True)
@@ -13,7 +14,7 @@ class AuditEventDTO:
     action: str
     node_id: UUID | None = None
     user: str | None = None
-    details: dict[str, Any] | None = None
+    details: JsonObject | None = None
 
 
 @dataclass(frozen=True, slots=True)

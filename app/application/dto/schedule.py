@@ -2,8 +2,9 @@
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any
 from uuid import UUID
+
+from app.application.types import JsonValue
 
 
 @dataclass(frozen=True, slots=True)
@@ -12,7 +13,7 @@ class ScheduleRequestDTO:
 
     cron: str
     node_ids: tuple[UUID, ...]
-    params: tuple[tuple[str, Any], ...] = ()
+    params: tuple[tuple[str, JsonValue], ...] = ()
     timezone: str = "UTC"
     misfire_grace_seconds: int = 60
 
@@ -26,7 +27,7 @@ class ScheduleViewDTO:
     cron: str
     timezone: str
     node_ids: tuple[UUID, ...]
-    params: tuple[tuple[str, Any], ...]
+    params: tuple[tuple[str, JsonValue], ...]
     enabled: bool
     misfire_grace_seconds: int
     operational_state: str
@@ -46,7 +47,7 @@ class RuntimeScheduleDTO:
     cron: str
     timezone: str
     node_ids: tuple[UUID, ...]
-    params: tuple[tuple[str, Any], ...]
+    params: tuple[tuple[str, JsonValue], ...]
     misfire_grace_seconds: int
 
 

@@ -1,12 +1,12 @@
 """Inbound use case invoked by the runtime scheduler adapter."""
 
 from datetime import UTC, datetime
-from typing import Any
 from uuid import UUID
 
 from app.application.dto.script_execution import ScriptExecutionRequestDTO
 from app.application.ports.schedule import ScheduleWriter
 from app.application.services.script_execution_service import ScriptExecutionService
+from app.application.types import JsonValue
 
 
 class ScheduledScriptExecutor:
@@ -24,7 +24,7 @@ class ScheduledScriptExecutor:
         self,
         script_id: UUID,
         node_ids: list[UUID],
-        params: dict[str, Any],
+        params: dict[str, JsonValue],
     ) -> None:
         await self._schedule_writer.mark_started(script_id, datetime.now(UTC))
         try:

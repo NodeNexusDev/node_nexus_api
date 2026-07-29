@@ -1,6 +1,6 @@
 """Persistence ports for long-running script execution."""
 
-from typing import Any, Protocol
+from typing import Protocol
 from uuid import UUID
 
 from app.application.dto.script_definition import ScriptDefinitionDTO
@@ -15,6 +15,7 @@ from app.application.dto.script_management import (
     ScriptUpdateDTO,
     ScriptViewDTO,
 )
+from app.application.types import PersistenceObject
 
 
 class ScriptReader(Protocol):
@@ -68,10 +69,12 @@ class ScriptDefinitionReader(Protocol):
 class ScriptExecutionWriter(Protocol):
     """Persist execution state using independent short transactions."""
 
-    async def create_execution(self, data: dict[str, Any]) -> UUID:
+    async def create_execution(self, data: PersistenceObject) -> UUID:
         """Create an execution and return its identifier."""
         ...
 
-    async def update_execution(self, execution_id: UUID, data: dict[str, Any]) -> None:
+    async def update_execution(
+        self, execution_id: UUID, data: PersistenceObject
+    ) -> None:
         """Update and commit execution state."""
         ...

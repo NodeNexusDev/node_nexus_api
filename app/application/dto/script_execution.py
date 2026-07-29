@@ -2,10 +2,10 @@
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any
 from uuid import UUID
 
 from app.application.dto.node_connection import NodeConnectionDTO
+from app.application.types import JsonValue
 
 
 @dataclass(frozen=True, slots=True)
@@ -23,7 +23,7 @@ class ScriptExecutionRequestDTO:
     """Application input for executing a script on multiple nodes."""
 
     node_ids: tuple[UUID, ...]
-    params: tuple[tuple[str, Any], ...] = ()
+    params: tuple[tuple[str, JsonValue], ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -77,7 +77,7 @@ class ScriptExecutionDTO:
     id: UUID
     script_id: UUID
     node_id: UUID | None
-    params: tuple[tuple[str, Any], ...]
+    params: tuple[tuple[str, JsonValue], ...]
     status: str
     steps: tuple[ScriptStepResultDTO, ...]
     started_at: datetime

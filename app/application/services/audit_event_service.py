@@ -1,11 +1,11 @@
 """Application service for optional and required audit events."""
 
-from typing import Any
 from uuid import UUID
 
 from app.application.dto.audit import AuditEventDTO
 from app.application.policies.audit import sanitize_audit_details
 from app.application.ports.audit_log import AuditOutboxPort
+from app.application.types import JsonObject
 from app.core.exceptions import AuditWriteError
 
 
@@ -25,7 +25,7 @@ class AuditEventService:
         action: str,
         node_id: UUID | None = None,
         user: str | None = None,
-        details: dict[str, Any] | None = None,
+        details: JsonObject | None = None,
     ) -> None:
         try:
             await self._optional_outbox.enqueue(
@@ -38,7 +38,7 @@ class AuditEventService:
         self,
         action: str,
         node_id: UUID | None = None,
-        details: dict[str, Any] | None = None,
+        details: JsonObject | None = None,
     ) -> None:
         try:
             await self._required_outbox.enqueue(
@@ -54,7 +54,7 @@ class AuditEventService:
         action: str,
         node_id: UUID | None,
         user: str | None,
-        details: dict[str, Any] | None,
+        details: JsonObject | None,
     ) -> AuditEventDTO:
         return AuditEventDTO(
             action=action,

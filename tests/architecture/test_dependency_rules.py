@@ -1,6 +1,7 @@
 """Executable dependency rules for the modular monolith."""
 
 import ast
+import re
 from pathlib import Path
 
 import pytest
@@ -57,6 +58,16 @@ def test_layer_does_not_import_forbidden_dependencies(
                 violations.append(f"{path.relative_to(APP_ROOT)} -> {imported}")
 
     assert not violations, "Forbidden dependencies:\n" + "\n".join(violations)
+
+
+def test_application_boundaries_do_not_use_any() -> None:
+    """Application contracts must describe values without unbounded Any."""
+    violations = [
+        str(path.relative_to(APP_ROOT))
+        for path in (APP_ROOT / "application").rglob("*.py")
+        if re.search(r"\bAny\b", path.read_text(encoding="utf-8"))
+    ]
+    assert not violations, "Unbounded application values:\n" + "\n".join(violations)
 
 
 def test_api_does_not_construct_services_or_repositories() -> None:

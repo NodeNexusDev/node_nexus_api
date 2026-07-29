@@ -1,6 +1,6 @@
 """Pure policies for safe durable audit payloads."""
 
-from typing import Any
+from app.application.types import JsonObject
 
 _SENSITIVE_DETAIL_KEYS = {
     "password",
@@ -15,7 +15,7 @@ _SENSITIVE_DETAIL_KEYS = {
 }
 
 
-def sanitize_audit_details(details: dict[str, Any]) -> dict[str, Any]:
+def sanitize_audit_details(details: JsonObject) -> JsonObject:
     """Remove credential and command payloads from durable audit details."""
     return {
         key: value

@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, cast
 from uuid import UUID
 
 import structlog
@@ -19,6 +19,7 @@ from app.application.dto.script_execution import (
     ScriptStepResultDTO,
 )
 from app.application.policies.output import bound_output
+from app.application.types import JsonObject, JsonValue, PersistenceObject
 from app.core.exceptions import (
     CommandNotFoundError,
     NodeNotFoundError,
@@ -128,8 +129,8 @@ class ScriptExecutionService:
 
     async def _resolve_step(
         self,
-        raw_step: dict[str, Any],
-        global_params: dict[str, Any],
+        raw_step: JsonObject,
+        global_params: dict[str, JsonValue],
     ) -> ResolvedScriptStepDTO:
         label = cast(str, raw_step["label"])
         on_failure = cast(str, raw_step.get("on_failure", "stop"))
@@ -148,7 +149,7 @@ class ScriptExecutionService:
                 template = await self._command_reader.get_template(command_id)
                 if template is None:
                     raise CommandNotFoundError(f"Command {command_id} not found")
-                step_params = cast(dict[str, Any], raw_step.get("params", {}))
+                step_params = cast(JsonObject, raw_step.get("params", {}))
                 merged = {**global_params, **step_params}
                 rendered = render_command(
                     template.command,
@@ -244,7 +245,7 @@ class ScriptExecutionService:
             )
 
     @staticmethod
-    def _step_result_dict(step: ScriptStepResultDTO) -> dict[str, Any]:
+    def _step_result_dict(step: ScriptStepResultDTO) -> PersistenceObject:
         return {
             "step_index": step.step_index,
             "label": step.label,

@@ -2,7 +2,6 @@
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any
 from uuid import UUID
 
 
@@ -65,7 +64,7 @@ class APIKeyPersistenceDTO:
 class APIKeyUpdateDTO:
     """Partial management update."""
 
-    changes: tuple[tuple[str, Any], ...]
+    changes: tuple[tuple[str, str | bool | datetime | None], ...]
 
 
 @dataclass(frozen=True, slots=True)

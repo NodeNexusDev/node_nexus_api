@@ -2,8 +2,10 @@
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Literal
+from typing import Literal
 from uuid import UUID
+
+from app.application.types import JsonValue
 
 ScriptStepType = Literal["inline", "command"]
 ScriptFailurePolicy = Literal["stop", "continue"]
@@ -17,7 +19,7 @@ class ScriptStepDTO:
     type: ScriptStepType
     command: str | None = None
     command_id: UUID | None = None
-    params: tuple[tuple[str, Any], ...] = ()
+    params: tuple[tuple[str, JsonValue], ...] = ()
     on_failure: ScriptFailurePolicy = "stop"
 
 

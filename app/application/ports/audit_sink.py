@@ -1,7 +1,9 @@
 """Application audit event port."""
 
-from typing import Any, Protocol
+from typing import Protocol
 from uuid import UUID
+
+from app.application.types import JsonObject
 
 
 class AuditEventSink(Protocol):
@@ -12,7 +14,7 @@ class AuditEventSink(Protocol):
         action: str,
         node_id: UUID | None = None,
         user: str | None = None,
-        details: dict[str, Any] | None = None,
+        details: JsonObject | None = None,
     ) -> None:
         """Persist one audit result."""
         ...
@@ -21,7 +23,7 @@ class AuditEventSink(Protocol):
         self,
         action: str,
         node_id: UUID | None = None,
-        details: dict[str, Any] | None = None,
+        details: JsonObject | None = None,
     ) -> None:
         """Commit one audit intent before an external side effect."""
         ...
