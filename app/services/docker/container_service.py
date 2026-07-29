@@ -7,10 +7,11 @@ from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 if TYPE_CHECKING:
-    from app.services.audit_service import AuditService
+    from app.application.ports.audit_sink import AuditEventSink
 
 import structlog
 
+from app.application.command_policy import command_fingerprint
 from app.application.dto.docker import (
     DockerContainerConfigDTO,
     DockerContainerDTO,
@@ -19,7 +20,6 @@ from app.application.dto.docker import (
     DockerExecResultDTO,
     DockerStatsDTO,
 )
-from app.core.connectors.ssh import command_fingerprint
 from app.core.docker_validation import validate_container_id
 from app.core.exceptions import ContainerNotFoundError
 from app.services.docker.command_runner import DockerCommandRunner
@@ -33,7 +33,9 @@ class DockerContainerService:
     """Container operations composed over the shared command runner."""
 
     def __init__(
-        self, runner: DockerCommandRunner, audit_service: AuditService | None = None
+        self,
+        runner: DockerCommandRunner,
+        audit_service: AuditEventSink | None = None,
     ) -> None:
         self._runner = runner
         self._audit = audit_service

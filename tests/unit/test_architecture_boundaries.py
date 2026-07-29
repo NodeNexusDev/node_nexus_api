@@ -276,6 +276,25 @@ def test_production_composition_does_not_import_docker_facade() -> None:
     assert not (APP_ROOT / "services" / "docker_service.py").exists()
 
 
+def test_docker_use_cases_do_not_depend_on_transport_or_infrastructure() -> None:
+    """Focused Docker services must depend inward through application ports."""
+    forbidden = (
+        "app.adapters",
+        "app.core.connectors",
+        "app.repositories",
+        "app.schemas",
+        "app.services.audit_service",
+    )
+    violations = [
+        f"{path.name} -> {module}"
+        for path, module in _imports_in("services/docker")
+        if any(
+            module == prefix or module.startswith(f"{prefix}.") for prefix in forbidden
+        )
+    ]
+    assert not violations
+
+
 def test_models_are_persistence_only() -> None:
     """ORM models may only depend on other ORM model modules."""
     violations = [

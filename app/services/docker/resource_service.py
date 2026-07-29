@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 from uuid import UUID
 
 if TYPE_CHECKING:
-    from app.services.audit_service import AuditService
+    from app.application.ports.audit_sink import AuditEventSink
 
 import structlog
 
@@ -22,7 +22,9 @@ class DockerResourceService:
     """Network and volume listing operations."""
 
     def __init__(
-        self, runner: DockerCommandRunner, audit_service: AuditService | None = None
+        self,
+        runner: DockerCommandRunner,
+        audit_service: AuditEventSink | None = None,
     ) -> None:
         self._runner = runner
         self._audit = audit_service

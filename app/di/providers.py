@@ -508,19 +508,19 @@ class ServiceProvider(Provider):
 
     @provide(scope=Scope.REQUEST)
     def get_docker_container_service(
-        self, runner: DockerCommandRunner, audit_service: AuditService
+        self, runner: DockerCommandRunner, audit_service: AuditEventSink
     ) -> DockerContainerService:
         return DockerContainerService(runner, audit_service)
 
     @provide(scope=Scope.REQUEST)
     def get_docker_image_service(
-        self, runner: DockerCommandRunner, audit_service: AuditService
+        self, runner: DockerCommandRunner, audit_service: AuditEventSink
     ) -> DockerImageService:
         return DockerImageService(runner, audit_service)
 
     @provide(scope=Scope.REQUEST)
     def get_docker_resource_service(
-        self, runner: DockerCommandRunner, audit_service: AuditService
+        self, runner: DockerCommandRunner, audit_service: AuditEventSink
     ) -> DockerResourceService:
         return DockerResourceService(runner, audit_service)
 
