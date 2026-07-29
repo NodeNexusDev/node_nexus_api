@@ -9,6 +9,7 @@ from app.core.exceptions import ConnectionFailedError, NodeNotFoundError
 from app.core.security import decrypt, encrypt
 from app.repositories.node_repo import NodeRepository
 from app.schemas.node import CommandRequest
+from app.services.node_command_service import NodeCommandService
 from app.services.node_service import NodeService
 from tests.unit.conftest import make_orm_node, make_response
 
@@ -31,7 +32,15 @@ def mock_factory() -> MagicMock:
 
 @pytest.fixture
 def service(repo: AsyncMock, mock_factory: MagicMock) -> NodeService:
-    return NodeService(repository=repo, connector_factory=mock_factory)
+    command_service = NodeCommandService(
+        repository=repo,
+        connector_factory=mock_factory,
+    )
+    return NodeService(
+        repository=repo,
+        connector_factory=mock_factory,
+        command_service=command_service,
+    )
 
 
 class TestEncryption:

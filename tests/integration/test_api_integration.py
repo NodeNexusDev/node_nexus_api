@@ -25,6 +25,7 @@ from app.models.base import Base
 from app.repositories.api_key_repo import APIKeyRepository
 from app.repositories.node_repo import NodeRepository
 from app.services.api_key_service import APIKeyService
+from app.services.node_command_service import NodeCommandService
 from app.services.node_service import NodeService
 
 MASTER_KEY = "test-master-key"
@@ -68,8 +69,16 @@ class IntegrationDbProvider(Provider):
         return APIKeyRepository(session)
 
     @provide(scope=Scope.REQUEST)
-    def get_service(self, repo: NodeRepository) -> NodeService:
-        return NodeService(repository=repo)
+    def get_node_command_service(self, repo: NodeRepository) -> NodeCommandService:
+        return NodeCommandService(repository=repo)
+
+    @provide(scope=Scope.REQUEST)
+    def get_service(
+        self,
+        repo: NodeRepository,
+        command_service: NodeCommandService,
+    ) -> NodeService:
+        return NodeService(repository=repo, command_service=command_service)
 
     @provide(scope=Scope.REQUEST)
     def get_api_key_service(self, repo: APIKeyRepository) -> APIKeyService:

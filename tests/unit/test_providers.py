@@ -138,7 +138,19 @@ def test_service_provider_resolves() -> None:
     audit_svc = svc_provider.get_audit_service(audit_repo, required_writer)
     assert isinstance(audit_svc, AuditService)
 
-    node_svc = svc_provider.get_node_service(node_repo, audit_svc, factory, node_reader)
+    node_command_svc = svc_provider.get_node_command_service(
+        node_repo,
+        audit_svc,
+        factory,
+        node_reader,
+    )
+    node_svc = svc_provider.get_node_service(
+        node_repo,
+        audit_svc,
+        factory,
+        node_reader,
+        node_command_svc,
+    )
     assert isinstance(node_svc, NodeService)
 
     cmd_svc = svc_provider.get_command_service(

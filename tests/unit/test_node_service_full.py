@@ -10,6 +10,7 @@ from app.core.exceptions import NodeNameConflictError, NodeNotFoundError
 from app.core.security import decrypt, encrypt
 from app.repositories.node_repo import NodeRepository
 from app.schemas.node import BulkCommandRequest, NodeCreate, NodeUpdate
+from app.services.node_command_service import NodeCommandService
 from app.services.node_service import NodeService
 from tests.unit.conftest import make_orm_node
 
@@ -21,7 +22,10 @@ def repo() -> AsyncMock:
 
 @pytest.fixture
 def service(repo: AsyncMock) -> NodeService:
-    return NodeService(repository=repo)
+    return NodeService(
+        repository=repo,
+        command_service=NodeCommandService(repository=repo),
+    )
 
 
 class TestGetNode:
