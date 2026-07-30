@@ -7,13 +7,30 @@ from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
 from fastapi import APIRouter, HTTPException, Query, Security
 
 from app.api.deps import get_current_api_key, require_write_scope
-from app.core.exceptions import ConnectionFailedError, NodeNotFoundError
-from app.schemas.common import CursorPage, decode_cursor
+from app.application.dto.command_execution import (
+    BulkCommandRequestDTO,
+    CommandRequestDTO,
+)
+from app.application.dto.node_management import (
+    NodeCreateDTO,
+    NodeTagDTO,
+    NodeUpdateDTO,
+)
+from app.application.dto.node_view import NodeViewDTO
+from app.application.services.node_bulk_command_service import NodeBulkCommandService
+from app.application.services.node_command_service import NodeCommandService
+from app.application.services.node_management_service import NodeManagementService
+from app.application.services.node_metrics_service import NodeMetricsService
+from app.schemas.common import CursorPage, decode_cursor, encode_cursor
 from app.schemas.node import (
     BulkCommandRequest,
     BulkCommandResult,
+    BulkNodeResult,
     CommandRequest,
     CommandResult,
+    CpuMetrics,
+    DiskMetrics,
+    MemoryMetrics,
     NodeCreate,
     NodeMetrics,
     NodeResponse,
@@ -22,17 +39,33 @@ from app.schemas.node import (
     TagAdd,
     TagRemove,
 )
-from app.services.node_service import NodeService
 
 audit = structlog.get_logger("audit")
 
 router = APIRouter(prefix="/nodes", tags=["nodes"], route_class=DishkaRoute)
 
 
+def _node_response(node: NodeViewDTO) -> NodeResponse:
+    """Map an application node view to the HTTP response schema."""
+    return NodeResponse(
+        id=node.id,
+        name=node.name,
+        host=node.host,
+        port=node.port,
+        connection_type=node.connection_type,
+        status=node.status,
+        username=node.username,
+        docker_host=node.docker_host,
+        tags=list(node.tags),
+        created_at=node.created_at,
+        updated_at=node.updated_at,
+    )
+
+
 @router.get("/")
 @inject
 async def get_nodes(
-    service: FromDishka[NodeService],
+    service: FromDishka[NodeManagementService],
     page: int = Query(1, ge=1),
     size: int = Query(20, ge=1, le=100),
     tags: str | None = Query(None, description="Comma-separated tags (AND)"),
@@ -56,11 +89,16 @@ async def get_nodes(
         except ValueError:
             raise HTTPException(status_code=422, detail="Invalid cursor")
         audit.info("api.nodes.list_cursor", limit=limit, tags=tag_list, search=search)
-        items, next_cursor, has_more = await service.get_nodes_cursor(
+        items, next_cursor_key, has_more = await service.get_nodes_cursor(
             cursor=decoded, limit=limit, tags=tag_list, search=search
         )
         return CursorPage(
-            items=items, next_cursor=next_cursor, has_more=has_more, limit=limit
+            items=[_node_response(node) for node in items],
+            next_cursor=(
+                encode_cursor(*next_cursor_key) if next_cursor_key is not None else None
+            ),
+            has_more=has_more,
+            limit=limit,
         )
 
     # Offset-based pagination (default)
@@ -68,13 +106,18 @@ async def get_nodes(
     nodes, total = await service.get_all_nodes(
         page=page, size=size, tags=tag_list, search=search
     )
-    return PaginatedResponse(items=nodes, total=total, page=page, size=size)
+    return PaginatedResponse(
+        items=[_node_response(node) for node in nodes],
+        total=total,
+        page=page,
+        size=size,
+    )
 
 
 @router.get("/tags")
 @inject
 async def get_all_tags(
-    service: FromDishka[NodeService],
+    service: FromDishka[NodeManagementService],
     _key: str = Security(get_current_api_key),
 ) -> list[str]:
     """Get all unique tags across all nodes."""
@@ -86,28 +129,38 @@ async def get_all_tags(
 @inject
 async def get_node(
     node_id: uuid.UUID,
-    service: FromDishka[NodeService],
+    service: FromDishka[NodeManagementService],
     _key: str = Security(get_current_api_key),
 ) -> NodeResponse:
     """Get a node by ID."""
     audit.info("api.nodes.get", node_id=str(node_id))
-    try:
-        return await service.get_node(node_id)
-    except NodeNotFoundError:
-        audit.warning("api.nodes.not_found", node_id=str(node_id))
-        raise HTTPException(status_code=404, detail="Node not found")
+    return _node_response(await service.get_node(node_id))
 
 
 @router.post("/", response_model=NodeResponse, status_code=201)
 @inject
 async def create_node(
     data: NodeCreate,
-    service: FromDishka[NodeService],
+    service: FromDishka[NodeManagementService],
     _key: str = Security(require_write_scope),
 ) -> NodeResponse:
     """Create a new node."""
     audit.info("api.nodes.create", name=data.name, connection_type=data.connection_type)
-    return await service.create_node(data)
+    return _node_response(
+        await service.create_node(
+            NodeCreateDTO(
+                name=data.name,
+                host=data.host,
+                port=data.port,
+                connection_type=data.connection_type,
+                username=data.username,
+                password=data.password,
+                ssh_key=data.ssh_key,
+                docker_host=data.docker_host,
+                tags=tuple(data.tags),
+            )
+        )
+    )
 
 
 @router.put("/{node_id}", response_model=NodeResponse)
@@ -115,39 +168,39 @@ async def create_node(
 async def update_node(
     node_id: uuid.UUID,
     data: NodeUpdate,
-    service: FromDishka[NodeService],
+    service: FromDishka[NodeManagementService],
     _key: str = Security(require_write_scope),
 ) -> NodeResponse:
     """Update an existing node."""
     audit.info("api.nodes.update", node_id=str(node_id))
-    try:
-        return await service.update_node(node_id, data)
-    except NodeNotFoundError:
-        audit.warning("api.nodes.not_found", node_id=str(node_id))
-        raise HTTPException(status_code=404, detail="Node not found")
+    changes = data.model_dump(exclude_unset=True)
+    if isinstance(changes.get("tags"), list):
+        changes["tags"] = tuple(changes["tags"])
+    return _node_response(
+        await service.update_node(
+            node_id,
+            NodeUpdateDTO(changes=tuple(changes.items())),
+        )
+    )
 
 
 @router.delete("/{node_id}", status_code=204)
 @inject
 async def delete_node(
     node_id: uuid.UUID,
-    service: FromDishka[NodeService],
+    service: FromDishka[NodeManagementService],
     _key: str = Security(require_write_scope),
 ) -> None:
     """Delete a node."""
     audit.info("api.nodes.delete", node_id=str(node_id))
-    try:
-        await service.delete_node(node_id)
-    except NodeNotFoundError:
-        audit.warning("api.nodes.not_found", node_id=str(node_id))
-        raise HTTPException(status_code=404, detail="Node not found")
+    await service.delete_node(node_id)
 
 
 @router.post("/bulk/execute", response_model=BulkCommandResult)
 @inject
 async def bulk_execute_command(
     data: BulkCommandRequest,
-    service: FromDishka[NodeService],
+    service: FromDishka[NodeBulkCommandService],
     _key: str = Security(require_write_scope),
 ) -> BulkCommandResult:
     """Execute a command on multiple nodes by IDs and/or tags."""
@@ -157,11 +210,29 @@ async def bulk_execute_command(
         node_ids=[str(n) for n in (data.node_ids or [])],
         tags=data.tags,
     )
-    try:
-        return await service.bulk_execute_command(data)
-    except NodeNotFoundError as exc:
-        audit.warning("api.nodes.bulk_execute.no_nodes", error=str(exc))
-        raise HTTPException(status_code=404, detail=str(exc))
+    result = await service.bulk_execute_command(
+        BulkCommandRequestDTO(
+            command=data.command,
+            node_ids=tuple(data.node_ids or ()),
+            tags=tuple(data.tags or ()),
+        )
+    )
+    return BulkCommandResult(
+        command=result.command,
+        results=[
+            BulkNodeResult(
+                node_id=item.node_id,
+                node_name=item.node_name,
+                stdout=item.stdout,
+                stderr=item.stderr,
+                exit_code=item.exit_code,
+            )
+            for item in result.results
+        ],
+        total=result.total,
+        succeeded=result.succeeded,
+        failed=result.failed,
+    )
 
 
 @router.post(
@@ -171,23 +242,25 @@ async def bulk_execute_command(
 @inject
 async def check_node(
     node_id: uuid.UUID,
-    service: FromDishka[NodeService],
+    service: FromDishka[NodeCommandService],
     _key: str = Security(require_write_scope),
 ) -> NodeResponse:
     """Check SSH connectivity to a node."""
     audit.info("api.nodes.check", node_id=str(node_id))
-    try:
-        return await service.check_connectivity(node_id)
-    except NodeNotFoundError:
-        audit.warning("api.nodes.not_found", node_id=str(node_id))
-        raise HTTPException(status_code=404, detail="Node not found")
-    except ConnectionFailedError as exc:
-        audit.error(
-            "api.nodes.connection_failed",
-            node_id=str(node_id),
-            error=str(exc),
-        )
-        raise HTTPException(status_code=503, detail=str(exc))
+    result = await service.check_connectivity(node_id)
+    return NodeResponse(
+        id=result.id,
+        name=result.name,
+        host=result.host,
+        port=result.port,
+        connection_type=result.connection_type,
+        status=result.status,
+        username=result.username,
+        docker_host=result.docker_host,
+        tags=list(result.tags),
+        created_at=result.created_at,
+        updated_at=result.updated_at,
+    )
 
 
 @router.post(
@@ -198,46 +271,49 @@ async def check_node(
 async def execute_command(
     node_id: uuid.UUID,
     data: CommandRequest,
-    service: FromDishka[NodeService],
+    service: FromDishka[NodeCommandService],
     _key: str = Security(require_write_scope),
 ) -> CommandResult:
     """Execute a command on a node via SSH."""
     audit.info("api.nodes.execute", node_id=str(node_id), command=data.command)
-    try:
-        return await service.execute_command(node_id, data)
-    except NodeNotFoundError:
-        audit.warning("api.nodes.not_found", node_id=str(node_id))
-        raise HTTPException(status_code=404, detail="Node not found")
-    except ConnectionFailedError as exc:
-        audit.error(
-            "api.nodes.connection_failed",
-            node_id=str(node_id),
-            error=str(exc),
-        )
-        raise HTTPException(status_code=503, detail=str(exc))
+    result = await service.execute_command(
+        node_id,
+        CommandRequestDTO(command=data.command, timeout=data.timeout),
+    )
+    return CommandResult(
+        stdout=result.stdout,
+        stderr=result.stderr,
+        exit_code=result.exit_code,
+    )
 
 
 @router.get("/{node_id}/metrics", response_model=NodeMetrics)
 @inject
 async def get_node_metrics(
     node_id: uuid.UUID,
-    service: FromDishka[NodeService],
+    service: FromDishka[NodeMetricsService],
     _key: str = Security(get_current_api_key),
 ) -> NodeMetrics:
     """Get system metrics from a node (CPU, memory, disk)."""
     audit.info("api.nodes.metrics", node_id=str(node_id))
-    try:
-        return await service.get_node_metrics(node_id)
-    except NodeNotFoundError:
-        audit.warning("api.nodes.not_found", node_id=str(node_id))
-        raise HTTPException(status_code=404, detail="Node not found")
-    except ConnectionFailedError as exc:
-        audit.error(
-            "api.nodes.metrics_failed",
-            node_id=str(node_id),
-            error=str(exc),
-        )
-        raise HTTPException(status_code=503, detail=str(exc))
+    result = await service.get_node_metrics(node_id)
+    return NodeMetrics(
+        cpu=CpuMetrics(
+            usage_percent=result.cpu.usage_percent,
+            cores=result.cpu.cores,
+        ),
+        memory=MemoryMetrics(
+            total_bytes=result.memory.total_bytes,
+            used_bytes=result.memory.used_bytes,
+            percent=result.memory.percent,
+        ),
+        disk=DiskMetrics(
+            total_bytes=result.disk.total_bytes,
+            used_bytes=result.disk.used_bytes,
+            percent=result.disk.percent,
+        ),
+        uptime_since=result.uptime_since,
+    )
 
 
 @router.post("/{node_id}/tags", response_model=NodeResponse)
@@ -245,16 +321,12 @@ async def get_node_metrics(
 async def add_tag(
     node_id: uuid.UUID,
     data: TagAdd,
-    service: FromDishka[NodeService],
+    service: FromDishka[NodeManagementService],
     _key: str = Security(require_write_scope),
 ) -> NodeResponse:
     """Add a tag to a node."""
     audit.info("api.nodes.tags.add", node_id=str(node_id), tag=data.tag)
-    try:
-        return await service.add_tag(node_id, data)
-    except NodeNotFoundError:
-        audit.warning("api.nodes.not_found", node_id=str(node_id))
-        raise HTTPException(status_code=404, detail="Node not found")
+    return _node_response(await service.add_tag(node_id, NodeTagDTO(tag=data.tag)))
 
 
 @router.delete("/{node_id}/tags", response_model=NodeResponse)
@@ -262,13 +334,9 @@ async def add_tag(
 async def remove_tag(
     node_id: uuid.UUID,
     data: TagRemove,
-    service: FromDishka[NodeService],
+    service: FromDishka[NodeManagementService],
     _key: str = Security(require_write_scope),
 ) -> NodeResponse:
     """Remove a tag from a node."""
     audit.info("api.nodes.tags.remove", node_id=str(node_id), tag=data.tag)
-    try:
-        return await service.remove_tag(node_id, data)
-    except NodeNotFoundError:
-        audit.warning("api.nodes.not_found", node_id=str(node_id))
-        raise HTTPException(status_code=404, detail="Node not found")
+    return _node_response(await service.remove_tag(node_id, NodeTagDTO(tag=data.tag)))

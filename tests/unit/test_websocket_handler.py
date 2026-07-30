@@ -11,7 +11,7 @@ import pytest
 from fastapi import WebSocketDisconnect
 
 from app.api.v1.websocket import _send_command_events, _validate_ws_token, exec_stream
-from app.core.connectors.base import StreamEvent
+from app.application.dto.remote_stream import RemoteStreamEventDTO
 from app.core.exceptions import ConnectionFailedError, NodeNotFoundError
 
 _exec = exec_stream.__dishka_orig_func__  # type: ignore[attr-defined]
@@ -27,12 +27,12 @@ class FakeStreamingSession:
     def __init__(self, error: Exception | None = None) -> None:
         self.error = error
 
-    async def execute_events(self, command: str) -> AsyncIterator[StreamEvent]:
+    async def execute_events(self, command: str) -> AsyncIterator[RemoteStreamEventDTO]:
         if self.error:
             raise self.error
-        yield StreamEvent(type="stdout", data="output line 1\n")
-        yield StreamEvent(type="stderr", data="warning\n")
-        yield StreamEvent(type="exit", exit_code=7)
+        yield RemoteStreamEventDTO(type="stdout", data="output line 1\n")
+        yield RemoteStreamEventDTO(type="stderr", data="warning\n")
+        yield RemoteStreamEventDTO(type="exit", exit_code=7)
 
     async def send_signal(self, signal: str) -> None:
         if signal != "SIGINT":
@@ -56,7 +56,9 @@ class FakeStreamingService:
 
 def _api_key_service() -> AsyncMock:
     service = AsyncMock()
-    service.validate_api_key.return_value = None
+    service.authenticate.return_value = SimpleNamespace(
+        scope="read-write", key_prefix="nnk_test"
+    )
     return service
 
 
@@ -71,13 +73,13 @@ class TestExecStreamFullCoverage:
     async def test_read_only_and_invalid_token_are_rejected(self) -> None:
         ws = _make_ws()
         service = _api_key_service()
-        service.validate_api_key.return_value = SimpleNamespace(
+        service.authenticate.return_value = SimpleNamespace(
             scope="read-only", key_prefix="nnk_test"
         )
         assert await _validate_ws_token(ws, "read-only", service) is False
-        service.validate_api_key.side_effect = ValueError("invalid")
+        service.authenticate.side_effect = ValueError("invalid")
         assert await _validate_ws_token(ws, "invalid", service) is False
-        service.validate_api_key.side_effect = RuntimeError("database")
+        service.authenticate.side_effect = RuntimeError("database")
         assert await _validate_ws_token(ws, "broken", service) is False
 
     async def test_missing_token(self) -> None:

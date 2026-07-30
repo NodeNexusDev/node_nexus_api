@@ -12,11 +12,16 @@ from dishka.integrations.fastapi import setup_dishka
 from fastapi import FastAPI
 from httpx2 import ASGITransport, AsyncClient
 
+from app.api.error_mapping import domain_error_handler
 from app.api.v1.health import router as health_router
 from app.api.v1.scripts import router as scripts_router
+from app.application.services.script_execution_service import ScriptExecutionService
+from app.application.services.script_history_service import ScriptHistoryService
+from app.application.services.script_management_service import ScriptManagementService
 from app.core.exceptions import (
     CommandNotFoundError,
     ConnectionFailedError,
+    DomainError,
     NodeNotFoundError,
     ScriptNotFoundError,
     TemplateRenderError,
@@ -26,7 +31,6 @@ from app.schemas.script import (
     ScriptResponse,
     ScriptStepResult,
 )
-from app.services.script_service import ScriptService
 from tests.unit.conftest import MockAuthServiceProvider, _mock_settings
 
 
@@ -73,14 +77,23 @@ def _make_batch_result(**overrides: Any) -> ScriptExecutionBatchResult:
     return ScriptExecutionBatchResult(**defaults)
 
 
-def _create_test_app(service: ScriptService | AsyncMock) -> FastAPI:
+def _create_test_app(service: AsyncMock) -> FastAPI:
     app = FastAPI()
+    app.add_exception_handler(DomainError, domain_error_handler)
     app.include_router(health_router)
     app.include_router(scripts_router, prefix="/api/v1")
 
     class MockServiceProvider(Provider):
         @provide(scope=Scope.REQUEST)
-        def get_service(self) -> ScriptService:
+        def get_management_service(self) -> ScriptManagementService:
+            return service
+
+        @provide(scope=Scope.REQUEST)
+        def get_history_service(self) -> ScriptHistoryService:
+            return service
+
+        @provide(scope=Scope.REQUEST)
+        def get_execution_service(self) -> ScriptExecutionService:
             return service
 
     container = make_async_container(MockServiceProvider(), MockAuthServiceProvider())
@@ -90,7 +103,7 @@ def _create_test_app(service: ScriptService | AsyncMock) -> FastAPI:
 
 @pytest.fixture
 def mock_service() -> AsyncMock:
-    return AsyncMock(spec=ScriptService)
+    return AsyncMock()
 
 
 @pytest.fixture

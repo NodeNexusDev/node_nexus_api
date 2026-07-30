@@ -2,7 +2,7 @@
 title: Documentation and translation
 status: stable
 translation_key: development.documentation
-source_revision: "2026-07-29"
+source_revision: "2026-07-30"
 ---
 
 # Documentation and translation

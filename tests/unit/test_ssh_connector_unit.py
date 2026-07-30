@@ -4,11 +4,11 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from app.core.connectors.ssh import (
+from app.adapters.runtime.ssh import (
     SSHConnector,
     SSHConnectorFactory,
-    command_fingerprint,
 )
+from app.application.command_policy import command_fingerprint
 from app.core.exceptions import ConnectionFailedError
 
 
@@ -55,7 +55,7 @@ class TestSSHConnector:
             strict_host_key_checking=False,
         )
         mock_conn = AsyncMock()
-        connect_path = "app.core.connectors.ssh.asyncssh.connect"
+        connect_path = "app.adapters.runtime.ssh.asyncssh.connect"
         with patch(connect_path, new_callable=AsyncMock) as mock_connect:
             mock_connect.return_value = mock_conn
             await connector.connect()
@@ -72,7 +72,7 @@ class TestSSHConnector:
             strict_host_key_checking=False,
         )
         mock_conn = AsyncMock()
-        connect_path = "app.core.connectors.ssh.asyncssh.connect"
+        connect_path = "app.adapters.runtime.ssh.asyncssh.connect"
         with patch(connect_path, new_callable=AsyncMock) as mock_connect:
             mock_connect.return_value = mock_conn
             await connector.connect()
@@ -117,7 +117,7 @@ class TestSSHConnector:
         )
         mock_conn = AsyncMock()
         mock_conn.close = MagicMock()
-        connect_path = "app.core.connectors.ssh.asyncssh.connect"
+        connect_path = "app.adapters.runtime.ssh.asyncssh.connect"
         with patch(connect_path, new_callable=AsyncMock) as mock_connect:
             mock_connect.return_value = mock_conn
             async with connector:
@@ -134,7 +134,7 @@ class TestSSHConnector:
         )
         mock_conn = AsyncMock()
         mock_conn.close = MagicMock()
-        connect_path = "app.core.connectors.ssh.asyncssh.connect"
+        connect_path = "app.adapters.runtime.ssh.asyncssh.connect"
         with patch(connect_path, new_callable=AsyncMock) as mock_connect:
             mock_connect.return_value = mock_conn
             with pytest.raises(ValueError):
@@ -149,7 +149,7 @@ class TestSSHConnector:
             strict_host_key_checking=False,
         )
         mock_conn = AsyncMock()
-        connect_path = "app.core.connectors.ssh.asyncssh.connect"
+        connect_path = "app.adapters.runtime.ssh.asyncssh.connect"
         with patch(connect_path, new_callable=AsyncMock) as mock_connect:
             mock_connect.return_value = mock_conn
             await connector.connect()
@@ -165,7 +165,7 @@ class TestSSHConnector:
             known_hosts=None,
             strict_host_key_checking=False,
         )
-        connect_path = "app.core.connectors.ssh.asyncssh.connect"
+        connect_path = "app.adapters.runtime.ssh.asyncssh.connect"
         with patch(connect_path, new_callable=AsyncMock) as mock_connect:
             mock_connect.side_effect = asyncssh.Error("Connection refused", "")
             with pytest.raises(ConnectionFailedError):

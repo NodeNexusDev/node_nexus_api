@@ -13,12 +13,12 @@ from fastapi import FastAPI
 from httpx2 import ASGITransport, AsyncClient
 
 from app.api.v1.audit import router as audit_router
-from app.schemas.audit_log import AuditLogResponse
-from app.services.audit_service import AuditService
+from app.application.dto.audit import AuditLogDTO, AuditLogPageDTO
+from app.application.services.audit_log_service import AuditLogService
 from tests.unit.conftest import MockAuthServiceProvider, _mock_settings
 
 
-def _make_log(**overrides: Any) -> AuditLogResponse:
+def _make_log(**overrides: Any) -> AuditLogDTO:
     defaults: dict[str, Any] = {
         "id": uuid.uuid4(),
         "node_id": uuid.uuid4(),
@@ -28,16 +28,16 @@ def _make_log(**overrides: Any) -> AuditLogResponse:
         "created_at": datetime.now(UTC),
     }
     defaults.update(overrides)
-    return AuditLogResponse(**defaults)
+    return AuditLogDTO(**defaults)
 
 
-def _create_test_app(service: AuditService | AsyncMock) -> FastAPI:
+def _create_test_app(service: AuditLogService | AsyncMock) -> FastAPI:
     app = FastAPI()
     app.include_router(audit_router, prefix="/api/v1")
 
     class MockServiceProvider(Provider):
         @provide(scope=Scope.REQUEST)
-        def get_service(self) -> AuditService:
+        def get_service(self) -> AuditLogService:
             return service
 
     container = make_async_container(MockServiceProvider(), MockAuthServiceProvider())
@@ -47,7 +47,7 @@ def _create_test_app(service: AuditService | AsyncMock) -> FastAPI:
 
 @pytest.fixture
 def mock_service() -> AsyncMock:
-    return AsyncMock(spec=AuditService)
+    return AsyncMock(spec=AuditLogService)
 
 
 @pytest.fixture
@@ -67,7 +67,7 @@ class TestGetAuditLogs:
     async def test_empty_list(
         self, client: AsyncClient, mock_service: AsyncMock
     ) -> None:
-        mock_service.get_logs.return_value = ([], 0)
+        mock_service.get_logs.return_value = AuditLogPageDTO(items=(), total=0)
         response = await client.get("/api/v1/audit/")
         assert response.status_code == 200
         data = response.json()
@@ -80,7 +80,7 @@ class TestGetAuditLogs:
         self, client: AsyncClient, mock_service: AsyncMock
     ) -> None:
         logs = [_make_log(action="create"), _make_log(action="update")]
-        mock_service.get_logs.return_value = (logs, 2)
+        mock_service.get_logs.return_value = AuditLogPageDTO(items=tuple(logs), total=2)
         response = await client.get("/api/v1/audit/")
         assert response.status_code == 200
         data = response.json()
@@ -92,7 +92,7 @@ class TestGetAuditLogs:
         self, client: AsyncClient, mock_service: AsyncMock
     ) -> None:
         node_id = uuid.uuid4()
-        mock_service.get_logs.return_value = ([], 0)
+        mock_service.get_logs.return_value = AuditLogPageDTO(items=(), total=0)
         await client.get(f"/api/v1/audit/?node_id={node_id}")
         mock_service.get_logs.assert_called_once_with(
             node_id=node_id, action=None, page=1, size=20
@@ -101,7 +101,7 @@ class TestGetAuditLogs:
     async def test_filter_by_action(
         self, client: AsyncClient, mock_service: AsyncMock
     ) -> None:
-        mock_service.get_logs.return_value = ([], 0)
+        mock_service.get_logs.return_value = AuditLogPageDTO(items=(), total=0)
         await client.get("/api/v1/audit/?action=delete")
         mock_service.get_logs.assert_called_once_with(
             node_id=None, action="delete", page=1, size=20
@@ -110,7 +110,7 @@ class TestGetAuditLogs:
     async def test_pagination_params(
         self, client: AsyncClient, mock_service: AsyncMock
     ) -> None:
-        mock_service.get_logs.return_value = ([], 0)
+        mock_service.get_logs.return_value = AuditLogPageDTO(items=(), total=0)
         await client.get("/api/v1/audit/?page=3&size=10")
         mock_service.get_logs.assert_called_once_with(
             node_id=None, action=None, page=3, size=10

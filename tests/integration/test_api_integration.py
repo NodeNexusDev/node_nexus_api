@@ -17,13 +17,21 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
+from app.adapters.persistence.api_key import SqlAlchemyAPIKeyGateway
+from app.adapters.persistence.dao.node import NodeRepository
+from app.adapters.persistence.node_management import SqlAlchemyNodeManagementGateway
+from app.adapters.persistence.node_reader import ScopedNodeConnectionReader
+from app.adapters.security import AesGcmCredentialCipher, Sha256APIKeyHasher
+from app.api.error_mapping import domain_error_handler
 from app.api.v1.health import router as health_router
 from app.api.v1.nodes import router as nodes_router
+from app.application.services.api_key_authentication import APIKeyAuthenticationService
+from app.application.services.node_bulk_command_service import NodeBulkCommandService
+from app.application.services.node_command_service import NodeCommandService
+from app.application.services.node_management_service import NodeManagementService
+from app.application.services.node_metrics_service import NodeMetricsService
+from app.core.exceptions import DomainError
 from app.models.base import Base
-from app.repositories.api_key_repo import APIKeyRepository
-from app.repositories.node_repo import NodeRepository
-from app.services.api_key_service import APIKeyService
-from app.services.node_service import NodeService
 
 MASTER_KEY = "test-master-key"
 
@@ -61,17 +69,48 @@ class IntegrationDbProvider(Provider):
     def get_repo(self, session: AsyncSession) -> NodeRepository:
         return NodeRepository(session)
 
-    @provide(scope=Scope.REQUEST)
-    def get_api_key_repo(self, session: AsyncSession) -> APIKeyRepository:
-        return APIKeyRepository(session)
+    @provide(scope=Scope.APP)
+    def get_api_key_gateway(self) -> SqlAlchemyAPIKeyGateway:
+        return SqlAlchemyAPIKeyGateway(self._sm)
 
     @provide(scope=Scope.REQUEST)
-    def get_service(self, repo: NodeRepository) -> NodeService:
-        return NodeService(repository=repo)
+    def get_node_command_service(self) -> NodeCommandService:
+        gateway = SqlAlchemyNodeManagementGateway(self._sm)
+        return NodeCommandService(
+            node_reader=ScopedNodeConnectionReader(self._sm),
+            status_writer=gateway,
+            credential_cipher=AesGcmCredentialCipher(),
+            connector_factory=MagicMock(),
+        )
 
     @provide(scope=Scope.REQUEST)
-    def get_api_key_service(self, repo: APIKeyRepository) -> APIKeyService:
-        return APIKeyService(repository=repo)
+    def get_node_bulk_command_service(self) -> NodeBulkCommandService:
+        return NodeBulkCommandService(
+            node_reader=ScopedNodeConnectionReader(self._sm),
+            credential_cipher=AesGcmCredentialCipher(),
+            connector_factory=MagicMock(),
+        )
+
+    @provide(scope=Scope.REQUEST)
+    def get_node_metrics_service(self) -> NodeMetricsService:
+        return NodeMetricsService(
+            node_reader=ScopedNodeConnectionReader(self._sm),
+            credential_cipher=AesGcmCredentialCipher(),
+            connector_factory=MagicMock(),
+        )
+
+    @provide(scope=Scope.REQUEST)
+    def get_service(self) -> NodeManagementService:
+        gateway = SqlAlchemyNodeManagementGateway(self._sm)
+        return NodeManagementService(
+            reader=gateway, writer=gateway, credential_cipher=AesGcmCredentialCipher()
+        )
+
+    @provide(scope=Scope.REQUEST)
+    def get_api_key_service(
+        self, gateway: SqlAlchemyAPIKeyGateway
+    ) -> APIKeyAuthenticationService:
+        return APIKeyAuthenticationService(gateway, gateway, Sha256APIKeyHasher())
 
 
 def _mock_settings(master_key: str = "") -> MagicMock:
@@ -88,6 +127,7 @@ async def integration_client(
     container = make_async_container(provider)
 
     app = FastAPI()
+    app.add_exception_handler(DomainError, domain_error_handler)
     app.include_router(health_router)
     app.include_router(nodes_router, prefix="/api/v1")
     setup_dishka(container, app)

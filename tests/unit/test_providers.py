@@ -4,6 +4,25 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from app.adapters.persistence.dao.command import CommandRepository
+from app.adapters.persistence.dao.health import HealthRepository
+from app.adapters.persistence.dao.node import NodeRepository
+from app.adapters.persistence.dao.script import ScriptRepository
+from app.adapters.persistence.dao.script_execution import ScriptExecutionRepository
+from app.application.services.api_key_authentication import (
+    APIKeyAuthenticationService,
+)
+from app.application.services.api_key_management import APIKeyManagementService
+from app.application.services.audit_event_service import AuditEventService
+from app.application.services.audit_log_service import AuditLogService
+from app.application.services.command_execution_service import CommandExecutionService
+from app.application.services.command_management_service import CommandManagementService
+from app.application.services.config_service import ConfigService
+from app.application.services.health_service import HealthService
+from app.application.services.node_management_service import NodeManagementService
+from app.application.services.script_execution_service import ScriptExecutionService
+from app.application.services.script_history_service import ScriptHistoryService
+from app.application.services.script_management_service import ScriptManagementService
 from app.di.providers import (
     ConfigProvider,
     ConnectorProvider,
@@ -12,23 +31,6 @@ from app.di.providers import (
     SchedulerProvider,
     ServiceProvider,
 )
-from app.repositories.api_key_repo import APIKeyRepository
-from app.repositories.audit_repo import AuditLogRepository
-from app.repositories.command_repo import CommandRepository
-from app.repositories.health_repo import HealthRepository
-from app.repositories.node_repo import NodeRepository
-from app.repositories.script_execution_repo import ScriptExecutionRepository
-from app.repositories.script_repo import ScriptRepository
-from app.repositories.script_schedule_repo import ScriptScheduleRepository
-from app.services.api_key_service import APIKeyService
-from app.services.audit_service import AuditService
-from app.services.command_service import CommandService
-from app.services.config_service import ConfigService
-from app.services.docker_service import DockerService
-from app.services.health_service import HealthService
-from app.services.node_service import NodeService
-from app.services.schedule_service import ScheduleService
-from app.services.script_service import ScriptService
 
 
 @pytest.mark.asyncio
@@ -58,6 +60,14 @@ def test_db_provider_builds_sessionmaker_from_engine() -> None:
     assert sessionmaker.kw["bind"] is engine
 
 
+def test_db_provider_builds_migration_runner() -> None:
+    settings = MagicMock(DATABASE_URL="postgresql+asyncpg://db/test")
+
+    runner = DbProvider().get_migration_runner(settings)
+
+    assert runner._database_url == settings.DATABASE_URL
+
+
 @pytest.mark.asyncio
 async def test_scheduler_provider_manages_lifecycle() -> None:
     provider = SchedulerProvider()
@@ -77,25 +87,39 @@ def test_repository_provider_resolves() -> None:
     session = MagicMock()
     provider = RepositoryProvider()
     assert isinstance(provider.get_node_repository(session), NodeRepository)
-    assert isinstance(provider.get_audit_repository(session), AuditLogRepository)
+    audit_gateway = provider.get_audit_log_gateway(MagicMock())
+    assert provider.get_audit_log_reader(audit_gateway) is audit_gateway
+    assert provider.get_audit_log_writer(audit_gateway) is audit_gateway
     assert isinstance(provider.get_command_repository(session), CommandRepository)
     assert isinstance(provider.get_script_repository(session), ScriptRepository)
     assert isinstance(
         provider.get_script_execution_repository(session), ScriptExecutionRepository
     )
-    assert isinstance(provider.get_api_key_repository(session), APIKeyRepository)
-    assert isinstance(
-        provider.get_script_schedule_repository(session), ScriptScheduleRepository
-    )
-    assert isinstance(provider.get_health_repository(session), HealthRepository)
+    api_key_gateway = provider.get_api_key_gateway(MagicMock())
+    assert provider.get_api_key_reader(api_key_gateway) is api_key_gateway
+    assert provider.get_api_key_writer(api_key_gateway) is api_key_gateway
+    health_repository = provider.get_health_repository(session)
+    assert isinstance(health_repository, HealthRepository)
+    assert provider.get_database_health_probe(health_repository) is health_repository
     assert provider.get_scoped_script_reader(MagicMock()) is not None
-    assert provider.get_scoped_execution_writer(MagicMock()) is not None
+    execution_writer = provider.get_scoped_execution_writer(MagicMock())
+    assert execution_writer is not None
+    assert provider.get_script_execution_writer(execution_writer) is execution_writer
     assert provider.get_scoped_command_reader(MagicMock()) is not None
     assert provider.get_scoped_node_reader(MagicMock()) is not None
+    script_gateway = provider.get_script_gateway(MagicMock())
+    assert provider.get_script_reader(script_gateway) is script_gateway
+    assert provider.get_script_writer(script_gateway) is script_gateway
+    assert provider.get_script_execution_reader(script_gateway) is script_gateway
+    assert provider.get_script_definition_reader(script_gateway) is script_gateway
+    gateway = provider.get_command_management_gateway(MagicMock())
+    assert provider.get_command_management_reader(gateway) is gateway
+    assert provider.get_command_management_writer(gateway) is gateway
+    assert provider.get_command_template_reader(gateway) is gateway
 
 
 def test_connector_provider_resolves() -> None:
-    from app.core.connectors.ssh import SSHConnectorFactory
+    from app.adapters.runtime.ssh import SSHConnectorFactory
 
     provider = ConnectorProvider()
     settings = MagicMock()
@@ -104,13 +128,17 @@ def test_connector_provider_resolves() -> None:
     factory = provider.get_ssh_connector_factory(settings)
     assert isinstance(factory, SSHConnectorFactory)
     assert factory._known_hosts_path == "/tmp/known_hosts"
+    runtime = provider.get_docker_runtime(
+        factory,
+        provider.get_credential_cipher(),
+    )
+    assert runtime is not None
 
 
 def test_service_provider_resolves() -> None:
     from app.adapters.persistence.command_reader import ScopedCommandTemplateReader
     from app.adapters.persistence.node_reader import ScopedNodeConnectionReader
     from app.adapters.persistence.script_gateway import (
-        ScopedScriptDefinitionReader,
         ScopedScriptExecutionWriter,
     )
 
@@ -119,61 +147,111 @@ def test_service_provider_resolves() -> None:
     conn_provider = ConnectorProvider()
     svc_provider = ServiceProvider()
 
-    node_repo = repo_provider.get_node_repository(session)
-    audit_repo = repo_provider.get_audit_repository(session)
-    cmd_repo = repo_provider.get_command_repository(session)
-    script_repo = repo_provider.get_script_repository(session)
-    exec_repo = repo_provider.get_script_execution_repository(session)
-    api_key_repo = repo_provider.get_api_key_repository(session)
     settings = MagicMock()
     settings.SSH_KNOWN_HOSTS_PATH = "/tmp/known_hosts"
     settings.SSH_STRICT_HOST_KEY_CHECKING = False
     factory = conn_provider.get_ssh_connector_factory(settings)
+    credential_cipher = conn_provider.get_credential_cipher()
     node_reader = ScopedNodeConnectionReader(MagicMock())
     command_reader = ScopedCommandTemplateReader(MagicMock())
-    script_reader = ScopedScriptDefinitionReader(MagicMock())
     execution_writer = ScopedScriptExecutionWriter(MagicMock())
 
-    required_writer = svc_provider.get_required_audit_writer(MagicMock())
-    audit_svc = svc_provider.get_audit_service(audit_repo, required_writer)
-    assert isinstance(audit_svc, AuditService)
+    optional_outbox = svc_provider.get_request_audit_outbox(session)
+    required_outbox = svc_provider.get_required_audit_outbox(MagicMock())
+    audit_svc = svc_provider.get_audit_event_service(optional_outbox, required_outbox)
+    assert isinstance(audit_svc, AuditEventService)
+    assert isinstance(
+        svc_provider.get_audit_log_service(MagicMock(), MagicMock()),
+        AuditLogService,
+    )
 
-    node_svc = svc_provider.get_node_service(node_repo, audit_svc, factory, node_reader)
-    assert isinstance(node_svc, NodeService)
+    node_command_svc = svc_provider.get_node_command_service(
+        audit_svc,
+        factory,
+        node_reader,
+        MagicMock(),
+        credential_cipher,
+    )
+    node_bulk_command_svc = svc_provider.get_node_bulk_command_service(
+        audit_svc,
+        factory,
+        node_reader,
+        credential_cipher,
+    )
+    node_metrics_svc = svc_provider.get_node_metrics_service(
+        factory,
+        node_reader,
+        credential_cipher,
+    )
+    assert node_command_svc is not None
+    assert node_bulk_command_svc is not None
+    assert node_metrics_svc is not None
+    node_svc = svc_provider.get_node_management_service(
+        MagicMock(),
+        MagicMock(),
+        credential_cipher,
+        audit_svc,
+    )
+    assert isinstance(node_svc, NodeManagementService)
 
-    cmd_svc = svc_provider.get_command_service(
-        cmd_repo,
-        node_repo,
+    command_management_svc = svc_provider.get_command_management_service(
+        MagicMock(),
+        MagicMock(),
+        audit_svc,
+    )
+    command_execution_svc = svc_provider.get_command_execution_service(
         audit_svc,
         factory,
         command_reader,
         node_reader,
+        credential_cipher,
     )
-    assert isinstance(cmd_svc, CommandService)
+    assert isinstance(command_management_svc, CommandManagementService)
+    assert isinstance(command_execution_svc, CommandExecutionService)
 
-    script_svc = svc_provider.get_script_service(
-        script_repo,
-        cmd_repo,
-        node_repo,
-        exec_repo,
+    script_management_svc = svc_provider.get_script_management_service(
+        MagicMock(),
+        MagicMock(),
         audit_svc,
-        factory,
-        script_reader,
+    )
+    script_history_svc = svc_provider.get_script_history_service(
+        MagicMock(),
+        MagicMock(),
+    )
+    assert isinstance(script_management_svc, ScriptManagementService)
+    assert isinstance(script_history_svc, ScriptHistoryService)
+    script_execution_svc = svc_provider.get_script_execution_service(
+        MagicMock(),
         command_reader,
         node_reader,
         execution_writer,
+        credential_cipher,
+        factory,
+        audit_svc,
     )
-    assert isinstance(script_svc, ScriptService)
+    assert isinstance(script_execution_svc, ScriptExecutionService)
 
-    api_key_svc = svc_provider.get_api_key_service(api_key_repo)
-    assert isinstance(api_key_svc, APIKeyService)
-
-    docker_svc = svc_provider.get_docker_service(
-        node_repo, audit_svc, factory, node_reader
+    api_key_reader = MagicMock()
+    api_key_writer = MagicMock()
+    api_key_hasher = conn_provider.get_api_key_hasher()
+    assert isinstance(
+        svc_provider.get_api_key_authentication_service(
+            api_key_reader,
+            api_key_writer,
+            api_key_hasher,
+        ),
+        APIKeyAuthenticationService,
     )
-    assert isinstance(docker_svc, DockerService)
+    assert isinstance(
+        svc_provider.get_api_key_management_service(
+            api_key_reader,
+            api_key_writer,
+            api_key_hasher,
+        ),
+        APIKeyManagementService,
+    )
 
-    config_svc = svc_provider.get_config_service(node_repo, cmd_repo, script_repo)
+    config_svc = svc_provider.get_config_service(MagicMock(), MagicMock())
     assert isinstance(config_svc, ConfigService)
 
     scheduler = MagicMock()
@@ -183,14 +261,14 @@ def test_service_provider_resolves() -> None:
         MagicMock(SCHEDULER_ENABLED=True),
     )
     assert isinstance(health, HealthService)
-    schedule = svc_provider.get_schedule_service(
-        repo_provider.get_script_schedule_repository(session),
-        script_repo,
-        node_repo,
-        scheduler,
+    assert (
+        svc_provider.get_streaming_command_service(
+            node_reader,
+            factory,
+            credential_cipher,
+        )
+        is not None
     )
-    assert isinstance(schedule, ScheduleService)
-    assert svc_provider.get_streaming_command_service(node_reader, factory) is not None
 
 
 async def test_db_session_provider_manages_transaction() -> None:

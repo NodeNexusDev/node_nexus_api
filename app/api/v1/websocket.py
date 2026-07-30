@@ -11,6 +11,9 @@ from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from pydantic import ValidationError
 
+from app.application.services.api_key_authentication import (
+    APIKeyAuthenticationService,
+)
 from app.application.services.streaming_command_service import (
     StreamingCommandService,
     StreamingCommandSession,
@@ -18,7 +21,6 @@ from app.application.services.streaming_command_service import (
 from app.core.config import get_settings
 from app.core.exceptions import ConnectionFailedError, NodeNotFoundError
 from app.schemas.websocket import WebSocketCommandMessage, WebSocketSignalMessage
-from app.services.api_key_service import APIKeyService
 
 logger = structlog.get_logger()
 audit = structlog.get_logger("audit")
@@ -30,7 +32,7 @@ _MAX_WS_MESSAGE_SIZE = 16_384
 async def _validate_ws_token(
     websocket: WebSocket,
     token: str | None,
-    api_key_service: APIKeyService,
+    api_key_service: APIKeyAuthenticationService,
 ) -> bool:
     """Validate WebSocket API key token against the API key service.
 
@@ -44,13 +46,13 @@ async def _validate_ws_token(
         audit.info("ws.auth.ok", key_type="master")
         return True
     try:
-        principal = await api_key_service.validate_api_key(token)
-        if principal is not None and principal.scope != "read-write":
+        principal = await api_key_service.authenticate(token)
+        if principal.scope != "read-write":
             await websocket.close(code=4003, reason="Insufficient scope")
             return False
         audit.info(
             "ws.auth.ok",
-            key_prefix=principal.key_prefix if principal is not None else token[:8],
+            key_prefix=principal.key_prefix,
         )
         return True
     except (ConnectionError, ValueError):
@@ -104,7 +106,7 @@ async def exec_stream(
     websocket: WebSocket,
     node_id: UUID,
     streaming_service: FromDishka[StreamingCommandService],
-    api_key_service: FromDishka[APIKeyService],
+    api_key_service: FromDishka[APIKeyAuthenticationService],
 ) -> None:
     """Stream command output via WebSocket.
 

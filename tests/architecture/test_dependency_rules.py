@@ -1,6 +1,7 @@
 """Executable dependency rules for the modular monolith."""
 
 import ast
+import re
 from pathlib import Path
 
 import pytest
@@ -11,9 +12,23 @@ FORBIDDEN_IMPORTS: dict[str, tuple[str, ...]] = {
     "models": ("app.api", "app.services", "app.repositories"),
     "core": ("app.api",),
     "repositories": ("app.api", "app.services"),
-    "services": ("app.api",),
     "api": ("app.repositories", "app.models", "app.di.container"),
-    "application": ("fastapi", "sqlalchemy"),
+    "application": (
+        "app.api",
+        "app.schemas",
+        "app.models",
+        "app.repositories",
+        "app.adapters",
+        "app.di",
+        "app.services",
+        "fastapi",
+        "sqlalchemy",
+        "dishka",
+        "app.core.connectors",
+        "app.core.scheduler",
+        "app.core.security",
+        "app.core.ssh_utils",
+    ),
 }
 
 
@@ -46,6 +61,16 @@ def test_layer_does_not_import_forbidden_dependencies(
                 violations.append(f"{path.relative_to(APP_ROOT)} -> {imported}")
 
     assert not violations, "Forbidden dependencies:\n" + "\n".join(violations)
+
+
+def test_application_boundaries_do_not_use_any() -> None:
+    """Application contracts must describe values without unbounded Any."""
+    violations = [
+        str(path.relative_to(APP_ROOT))
+        for path in (APP_ROOT / "application").rglob("*.py")
+        if re.search(r"\bAny\b", path.read_text(encoding="utf-8"))
+    ]
+    assert not violations, "Unbounded application values:\n" + "\n".join(violations)
 
 
 def test_api_does_not_construct_services_or_repositories() -> None:
@@ -81,17 +106,73 @@ def test_docker_router_delegates_domain_errors_to_global_handler() -> None:
     }
 
 
-def test_docker_facade_remains_a_small_compatibility_layer() -> None:
-    """Prevent domain logic and legacy implementations returning to the facade."""
+def test_docker_facade_is_removed_from_production() -> None:
+    """Prevent the compatibility facade from returning to application code."""
     path = APP_ROOT / "services" / "docker_service.py"
-    source = path.read_text(encoding="utf-8")
-    assert len(source.splitlines()) <= 200
-    assert "_legacy_" not in source
+    assert not path.exists()
+
+
+def test_legacy_service_namespace_is_removed() -> None:
+    """All application use cases belong to the application layer."""
+    assert not list((APP_ROOT / "services").rglob("*.py"))
 
 
 @pytest.mark.parametrize(
     "relative_path",
-    ["api/v1/websocket.py", "core/scheduler.py"],
+    (
+        "core/connectors",
+        "core/scheduler.py",
+        "core/security.py",
+        "core/ssh_utils.py",
+    ),
+)
+def test_legacy_core_infrastructure_is_removed(relative_path: str) -> None:
+    """Concrete infrastructure must not return to the shared core."""
+    candidate = APP_ROOT / relative_path
+    if candidate.is_dir():
+        assert not list(candidate.rglob("*.py"))
+    else:
+        assert not candidate.exists()
+
+
+@pytest.mark.parametrize(
+    ("dependency", "allowed_prefix"),
+    (
+        ("asyncssh", "adapters/runtime/ssh.py"),
+        ("apscheduler", "adapters/runtime/"),
+        ("cryptography", "adapters/security/"),
+    ),
+)
+def test_infrastructure_packages_are_adapter_only(
+    dependency: str,
+    allowed_prefix: str,
+) -> None:
+    """Infrastructure libraries may only be imported by outbound adapters."""
+    violations = [
+        str(path.relative_to(APP_ROOT))
+        for path in APP_ROOT.rglob("*.py")
+        if any(
+            imported == dependency or imported.startswith(f"{dependency}.")
+            for imported in _imports(path)
+        )
+        and not str(path.relative_to(APP_ROOT)).startswith(allowed_prefix)
+    ]
+    assert not violations
+
+
+def test_legacy_generic_repository_contract_is_removed() -> None:
+    """Persistence adapters must implement focused application ports."""
+    assert not (APP_ROOT / "repositories" / "base.py").exists()
+
+
+def test_legacy_repository_namespace_is_removed() -> None:
+    """All SQLAlchemy DAOs belong to the outbound persistence adapter."""
+    assert not list((APP_ROOT / "repositories").glob("*.py"))
+
+
+@pytest.mark.parametrize(
+    "relative_path",
+    ["api/v1/websocket.py", "adapters/runtime/apscheduler_runtime.py"],
 )
 def test_runtime_orchestration_does_not_import_global_container(
     relative_path: str,
@@ -104,3 +185,95 @@ def test_app_resources_define_lifecycle_finalizers() -> None:
     source = (APP_ROOT / "di" / "providers.py").read_text(encoding="utf-8")
     assert "await engine.dispose()" in source
     assert "await scheduler.stop()" in source
+
+
+def test_application_ports_have_explicit_dishka_bindings() -> None:
+    """Composition root must identify port registrations explicitly."""
+    path = APP_ROOT / "di" / "providers.py"
+    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    port_factories = {
+        "get_api_key_reader",
+        "get_api_key_writer",
+        "get_api_key_hasher",
+        "get_script_execution_writer",
+        "get_script_reader",
+        "get_script_writer",
+        "get_script_execution_reader",
+        "get_script_definition_reader",
+        "get_command_management_reader",
+        "get_command_management_writer",
+        "get_command_template_reader",
+        "get_node_connection_reader",
+        "get_node_management_reader",
+        "get_node_management_writer",
+        "get_node_status_writer",
+        "get_schedule_reader",
+        "get_schedule_writer",
+        "get_audit_log_reader",
+        "get_audit_log_writer",
+        "get_configuration_exporter",
+        "get_configuration_importer",
+        "get_database_health_probe",
+        "get_remote_connector_factory",
+        "get_remote_streaming_connector_factory",
+        "get_credential_cipher",
+        "get_docker_runtime",
+        "get_audit_event_sink",
+        "get_job_scheduler_port",
+    }
+    factories = {
+        node.name: node
+        for node in ast.walk(tree)
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+        and node.name in port_factories
+    }
+
+    missing = []
+    for name in sorted(port_factories):
+        factory = factories.get(name)
+        if factory is None:
+            missing.append(f"{name}: factory missing")
+            continue
+        has_explicit_binding = any(
+            isinstance(decorator, ast.Call)
+            and getattr(decorator.func, "id", "") == "provide"
+            and any(keyword.arg == "provides" for keyword in decorator.keywords)
+            for decorator in factory.decorator_list
+        )
+        if not has_explicit_binding:
+            missing.append(f"{name}: provides=Port missing")
+
+    assert not missing, "Implicit port bindings:\n" + "\n".join(missing)
+
+
+@pytest.mark.parametrize(
+    "relative_path",
+    (
+        "application/services/script_execution_service.py",
+        "application/services/node_bulk_command_service.py",
+        "application/services/docker/bulk_service.py",
+    ),
+)
+def test_concurrent_remote_workers_cannot_import_persistence_state(
+    relative_path: str,
+) -> None:
+    """Concurrent worker modules receive DTOs, never sessions, DAOs, or ORM."""
+    path = APP_ROOT / relative_path
+    source = path.read_text(encoding="utf-8")
+    imports = _imports(path)
+    forbidden = (
+        "sqlalchemy",
+        "app.models",
+        "app.repositories",
+        "app.adapters.persistence",
+    )
+
+    assert "asyncio.gather" in source
+    assert not [
+        imported
+        for imported in imports
+        if any(
+            imported == prefix or imported.startswith(f"{prefix}.")
+            for prefix in forbidden
+        )
+    ]

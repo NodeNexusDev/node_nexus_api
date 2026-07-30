@@ -12,16 +12,20 @@ from dishka.integrations.fastapi import setup_dishka
 from fastapi import FastAPI
 from httpx2 import ASGITransport, AsyncClient
 
+from app.api.error_mapping import domain_error_handler
 from app.api.v1.health import router as health_router
 from app.api.v1.nodes import router as nodes_router
-from app.core.exceptions import ConnectionFailedError, NodeNotFoundError
+from app.application.services.node_bulk_command_service import NodeBulkCommandService
+from app.application.services.node_command_service import NodeCommandService
+from app.application.services.node_management_service import NodeManagementService
+from app.application.services.node_metrics_service import NodeMetricsService
+from app.core.exceptions import ConnectionFailedError, DomainError, NodeNotFoundError
 from app.schemas.node import (
     BulkCommandResult,
     BulkNodeResult,
     CommandResult,
     NodeResponse,
 )
-from app.services.node_service import NodeService
 from tests.unit.conftest import MockAuthServiceProvider, _mock_settings
 
 
@@ -43,14 +47,27 @@ def _make_node(**overrides: Any) -> NodeResponse:
     return NodeResponse(**defaults)
 
 
-def _create_test_app(service: NodeService | AsyncMock) -> FastAPI:
+def _create_test_app(service: NodeManagementService | AsyncMock) -> FastAPI:
     app = FastAPI()
+    app.add_exception_handler(DomainError, domain_error_handler)
     app.include_router(health_router)
     app.include_router(nodes_router, prefix="/api/v1")
 
     class MockServiceProvider(Provider):
         @provide(scope=Scope.REQUEST)
-        def get_service(self) -> NodeService:
+        def get_service(self) -> NodeManagementService:
+            return service
+
+        @provide(scope=Scope.REQUEST)
+        def get_command_service(self) -> NodeCommandService:
+            return service
+
+        @provide(scope=Scope.REQUEST)
+        def get_bulk_command_service(self) -> NodeBulkCommandService:
+            return service
+
+        @provide(scope=Scope.REQUEST)
+        def get_metrics_service(self) -> NodeMetricsService:
             return service
 
     container = make_async_container(MockServiceProvider(), MockAuthServiceProvider())
@@ -60,7 +77,7 @@ def _create_test_app(service: NodeService | AsyncMock) -> FastAPI:
 
 @pytest.fixture
 def mock_service() -> AsyncMock:
-    return AsyncMock(spec=NodeService)
+    return AsyncMock()
 
 
 @pytest.fixture

@@ -1,10 +1,12 @@
 """Tests for WebSocket streaming endpoint."""
 
 from unittest.mock import AsyncMock, MagicMock
+from uuid import uuid4
 
 import pytest
 
 from app.api.v1.websocket import _validate_ws_token
+from app.application.services.api_key_authentication import AuthenticatedPrincipal
 
 
 class TestWebSocketAuth:
@@ -31,20 +33,22 @@ class TestWebSocketAuth:
         """_validate_ws_token returns True for a valid API key."""
         ws = AsyncMock()
         mock_api_key_svc = AsyncMock()
-        mock_api_key_svc.validate_api_key.return_value = None  # success
+        mock_api_key_svc.authenticate.return_value = AuthenticatedPrincipal(
+            key_id=uuid4(), key_prefix="nnk_vali", scope="read-write"
+        )
 
         result = await _validate_ws_token(
             ws, token="nnk_validkey1234", api_key_service=mock_api_key_svc
         )
         assert result is True
-        mock_api_key_svc.validate_api_key.assert_called_once_with("nnk_validkey1234")
+        mock_api_key_svc.authenticate.assert_called_once_with("nnk_validkey1234")
 
     @pytest.mark.asyncio
     async def test_invalid_token_returns_false(self):
         """_validate_ws_token returns False and closes socket for invalid key."""
         ws = AsyncMock()
         mock_api_key_svc = AsyncMock()
-        mock_api_key_svc.validate_api_key.side_effect = Exception("Invalid key")
+        mock_api_key_svc.authenticate.side_effect = Exception("Invalid key")
 
         result = await _validate_ws_token(
             ws, token="nnk_badkey12345", api_key_service=mock_api_key_svc
@@ -87,7 +91,7 @@ class TestWebSocketStreaming:
     @pytest.mark.asyncio
     async def test_connector_streaming_method_exists(self):
         """SSHConnector has execute_command_streaming method."""
-        from app.core.connectors.ssh import SSHConnector
+        from app.adapters.runtime.ssh import SSHConnector
 
         assert hasattr(SSHConnector, "execute_command_streaming")
 

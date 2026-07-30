@@ -7,6 +7,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from app.adapters.persistence.dao.node import NodeRepository
 from app.core.exceptions import (
     ConnectionFailedError,
     ContainerNotFoundError,
@@ -16,8 +17,7 @@ from app.core.exceptions import (
     ImageNotFoundError,
     NodeNotFoundError,
 )
-from app.repositories.node_repo import NodeRepository
-from app.services.docker_service import DockerService
+from tests.docker_test_facade import DockerService
 from tests.unit.conftest import make_orm_node
 
 

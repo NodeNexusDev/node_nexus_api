@@ -10,6 +10,7 @@ from app.adapters.persistence.script_gateway import (
     ScopedScriptDefinitionReader,
     ScopedScriptExecutionWriter,
 )
+from tests.helpers import TransactionSpy
 
 
 def context_factory(session: object, *, begin: bool = False) -> MagicMock:
@@ -42,6 +43,24 @@ async def test_command_reader_found_and_missing() -> None:
     assert found.command == "echo ok"
     assert found.parameters == ("name",)
     assert missing is None
+
+
+async def test_command_reader_closes_session_before_returning() -> None:
+    repository = MagicMock()
+    repository.get_by_id = AsyncMock(
+        return_value=SimpleNamespace(id=uuid4(), command="echo ok", parameters=[])
+    )
+    boundary = TransactionSpy()
+    with patch(
+        "app.adapters.persistence.command_reader.CommandRepository",
+        return_value=repository,
+    ):
+        result = await ScopedCommandTemplateReader(boundary).get_template(uuid4())
+
+    assert result is not None
+    assert boundary.session_entries == 1
+    assert boundary.session_exits == 1
+    assert boundary.session_active is False
 
 
 async def test_node_reader_delegates_all_queries() -> None:
@@ -86,11 +105,15 @@ async def test_execution_writer_commits_short_transactions() -> None:
     repository = MagicMock()
     repository.create = AsyncMock(return_value=SimpleNamespace(id=execution_id))
     repository.update = AsyncMock()
+    boundary = TransactionSpy()
     with patch(
         "app.adapters.persistence.script_gateway.ScriptExecutionRepository",
         return_value=repository,
     ):
-        writer = ScopedScriptExecutionWriter(context_factory(object(), begin=True))
+        writer = ScopedScriptExecutionWriter(boundary)
         assert await writer.create_execution({"script_id": uuid4()}) == execution_id
         await writer.update_execution(execution_id, {"status": "completed"})
     repository.update.assert_awaited_once()
+    assert boundary.transaction_entries == 2
+    assert boundary.transaction_exits == 2
+    assert boundary.transaction_active is False

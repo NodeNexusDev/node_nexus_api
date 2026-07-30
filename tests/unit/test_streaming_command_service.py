@@ -24,7 +24,9 @@ async def test_connect_resolves_dto_and_always_disconnects() -> None:
     connector = AsyncMock()
     factory = MagicMock()
     factory.create_ssh.return_value = connector
-    service = StreamingCommandService(reader, factory)
+    cipher = MagicMock()
+    cipher.decrypt.side_effect = lambda value: value
+    service = StreamingCommandService(reader, factory, cipher)
 
     with pytest.raises(RuntimeError, match="cancelled"):
         async with service.connect(node_id):
@@ -38,7 +40,7 @@ async def test_connect_rejects_unknown_node_before_connector_creation() -> None:
     reader = AsyncMock()
     reader.get_connection.return_value = None
     factory = MagicMock()
-    service = StreamingCommandService(reader, factory)
+    service = StreamingCommandService(reader, factory, MagicMock())
 
     with pytest.raises(NodeNotFoundError):
         async with service.connect(uuid4()):

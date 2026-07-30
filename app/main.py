@@ -1,20 +1,17 @@
 """FastAPI application entry point."""
 
-import asyncio
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from importlib.metadata import PackageNotFoundError
 from importlib.metadata import version as pkg_version
 
-import structlog
-from alembic.config import Config as AlembicConfig
 from dishka.integrations.fastapi import setup_dishka
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.routing import APIRoute
 from prometheus_fastapi_instrumentator import Instrumentator
 
-from alembic import command as alembic_command
+from app.adapters.lifecycle.application_startup import ApplicationStartup
 from app.api.error_mapping import domain_error_handler
 from app.api.middleware import (
     RateLimitMiddleware,
@@ -33,13 +30,8 @@ from app.api.v1.scripts import router as scripts_router
 from app.api.v1.websocket import router as ws_router
 from app.core.config import get_settings
 from app.core.exceptions import DomainError
-from app.core.logging import configure_logging
-from app.core.scheduler import ScriptScheduler
 from app.core.telemetry import init_telemetry
 from app.di.container import container
-
-logger = structlog.get_logger()  # operational: lifecycle, performance
-audit = structlog.get_logger("audit")  # security: exceptions, errors
 
 
 def stable_operation_id(route: APIRoute) -> str:
@@ -55,121 +47,15 @@ def stable_operation_id(route: APIRoute) -> str:
     return f"{methods}_{path or 'root'}"
 
 
-def _run_migrations_sync() -> None:
-    """Run pending Alembic migrations (sync, runs in thread)."""
-    settings = get_settings()
-    alembic_cfg = AlembicConfig("alembic.ini")
-    alembic_cfg.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
-    try:
-        alembic_command.upgrade(alembic_cfg, "head")
-    except Exception as exc:
-        logger.exception("migrations.failed", error_type=type(exc).__name__)
-        raise RuntimeError(
-            "Database migrations failed. Ensure the database is reachable "
-            "and the schema is compatible."
-        ) from exc
-
-
-async def _run_migrations() -> None:
-    """Run pending Alembic migrations."""
-    await asyncio.to_thread(_run_migrations_sync)
-
-
-async def _cleanup_audit_logs() -> None:
-    """Cleanup old audit logs on startup."""
-    settings = get_settings()
-    if settings.AUDIT_LOG_RETENTION_DAYS <= 0:
-        return
-
-    try:
-        async with container() as request_container:
-            from app.services.audit_service import AuditService
-
-            audit_service = await request_container.get(AuditService)
-            deleted = await audit_service.cleanup_old_logs(
-                settings.AUDIT_LOG_RETENTION_DAYS
-            )
-            if deleted > 0:
-                logger.info(
-                    "audit.cleanup.startup",
-                    deleted=deleted,
-                    retention_days=settings.AUDIT_LOG_RETENTION_DAYS,
-                )
-    except Exception:
-        logger.warning("audit.cleanup.startup.failed")
-
-
-async def _execute_scheduled_script(
-    script_id,
-    node_ids,
-    params,  # noqa: ANN001
-) -> None:
-    """Execute one scheduled script in a fresh request scope."""
-    from app.schemas.script import ScriptExecuteRequest
-    from app.services.schedule_service import ScheduleService
-    from app.services.script_service import ScriptService
-
-    async with container() as request_container:
-        script_service = await request_container.get(ScriptService)
-        schedule_service = await request_container.get(ScheduleService)
-        await schedule_service.mark_started(script_id)
-        try:
-            await script_service.execute_script(
-                script_id,
-                ScriptExecuteRequest(node_ids=node_ids, params=params),
-            )
-        except Exception as exc:
-            await schedule_service.mark_failed(script_id, type(exc).__name__)
-            raise
-        await schedule_service.mark_succeeded(script_id)
-
-
-async def _restore_schedules() -> tuple[int, int]:
-    """Restore persistent schedules in a short database scope."""
-    async with container() as request_container:
-        from app.services.schedule_service import ScheduleService
-
-        schedule_service = await request_container.get(ScheduleService)
-        restored, failed = await schedule_service.restore()
-        scheduler = await container.get(ScriptScheduler)
-        scheduler.mark_restored(failed=failed)
-        logger.info(
-            "scheduler.restore.completed",
-            restored=restored,
-            failed=failed,
-        )
-        return restored, failed
-
-
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Application lifespan manager."""
-    settings = get_settings()
-    configure_logging(log_level=settings.LOG_LEVEL, debug=settings.DEBUG)
-    logger.info("app.startup")
-    if settings.AUTO_MIGRATE:
-        await _run_migrations()
-        logger.info("migrations.applied")
-    else:
-        logger.info("migrations.skipped", reason="AUTO_MIGRATE is disabled")
-    scheduler = await container.get(ScriptScheduler)
-    from app.services.audit_outbox_worker import AuditOutboxWorker
-
-    await container.get(AuditOutboxWorker)
-    scheduler.configure_executor(_execute_scheduled_script)
-    if settings.SCHEDULER_ENABLED:
-        scheduler.configure_reconciler(_restore_schedules)
-        await _restore_schedules()
-        scheduler.start_reconciliation()
-    else:
-        scheduler.mark_restored(failed=0)
-    await _cleanup_audit_logs()
-
+    startup = await container.get(ApplicationStartup)
+    await startup.run()
     try:
         yield
     finally:
         await container.close()
-        logger.info("app.shutdown")
 
 
 def create_app() -> FastAPI:

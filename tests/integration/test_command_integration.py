@@ -3,7 +3,7 @@
 import uuid
 from collections.abc import AsyncGenerator, AsyncIterable
 from typing import Any
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest_asyncio
 from dishka import Provider, Scope, make_async_container, provide
@@ -17,14 +17,18 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
+from app.adapters.persistence.api_key import SqlAlchemyAPIKeyGateway
+from app.adapters.persistence.command_management import SqlAlchemyCommandGateway
+from app.adapters.persistence.dao.command import CommandRepository
+from app.adapters.security import Sha256APIKeyHasher
+from app.api.error_mapping import domain_error_handler
 from app.api.v1.commands import router as commands_router
 from app.api.v1.health import router as health_router
+from app.application.services.api_key_authentication import APIKeyAuthenticationService
+from app.application.services.command_execution_service import CommandExecutionService
+from app.application.services.command_management_service import CommandManagementService
+from app.core.exceptions import DomainError
 from app.models.base import Base
-from app.repositories.api_key_repo import APIKeyRepository
-from app.repositories.command_repo import CommandRepository
-from app.repositories.node_repo import NodeRepository
-from app.services.api_key_service import APIKeyService
-from app.services.command_service import CommandService
 
 MASTER_KEY = "test-master-key"
 
@@ -62,28 +66,43 @@ class IntegrationDbProvider(Provider):
     def get_command_repo(self, session: AsyncSession) -> CommandRepository:
         return CommandRepository(session)
 
-    @provide(scope=Scope.REQUEST)
-    def get_node_repo(self, session: AsyncSession) -> NodeRepository:
-        return NodeRepository(session)
+    @provide(scope=Scope.APP)
+    def get_command_gateway(self) -> SqlAlchemyCommandGateway:
+        return SqlAlchemyCommandGateway(self._sm)
 
-    @provide(scope=Scope.REQUEST)
-    def get_api_key_repo(self, session: AsyncSession) -> APIKeyRepository:
-        return APIKeyRepository(session)
+    @provide(scope=Scope.APP)
+    def get_api_key_gateway(self) -> SqlAlchemyAPIKeyGateway:
+        return SqlAlchemyAPIKeyGateway(self._sm)
 
     @provide(scope=Scope.REQUEST)
     def get_service(
         self,
-        command_repo: CommandRepository,
-        node_repo: NodeRepository,
-    ) -> CommandService:
-        return CommandService(
-            repository=command_repo,
-            node_repository=node_repo,
+        gateway: SqlAlchemyCommandGateway,
+    ) -> CommandManagementService:
+        return CommandManagementService(
+            reader=gateway,
+            writer=gateway,
         )
 
     @provide(scope=Scope.REQUEST)
-    def get_api_key_service(self, repo: APIKeyRepository) -> APIKeyService:
-        return APIKeyService(repository=repo)
+    def get_execution_service(
+        self,
+        gateway: SqlAlchemyCommandGateway,
+    ) -> CommandExecutionService:
+        node_reader = AsyncMock()
+        node_reader.get_connection.return_value = None
+        return CommandExecutionService(
+            command_reader=gateway,
+            node_reader=node_reader,
+            credential_cipher=MagicMock(),
+            connector_factory=MagicMock(),
+        )
+
+    @provide(scope=Scope.REQUEST)
+    def get_api_key_service(
+        self, gateway: SqlAlchemyAPIKeyGateway
+    ) -> APIKeyAuthenticationService:
+        return APIKeyAuthenticationService(gateway, gateway, Sha256APIKeyHasher())
 
 
 def _mock_settings(master_key: str = "") -> MagicMock:
@@ -100,6 +119,7 @@ async def integration_client(
     container = make_async_container(provider)
 
     app = FastAPI()
+    app.add_exception_handler(DomainError, domain_error_handler)
     app.include_router(health_router)
     app.include_router(commands_router, prefix="/api/v1")
     setup_dishka(container, app)

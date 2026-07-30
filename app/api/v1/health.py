@@ -6,7 +6,7 @@ from importlib.metadata import version as pkg_version
 from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
 from fastapi import APIRouter, Response
 
-from app.services.health_service import HealthService
+from app.application.services.health_service import HealthService
 
 router = APIRouter(route_class=DishkaRoute)
 

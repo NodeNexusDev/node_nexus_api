@@ -2,7 +2,7 @@
 title: Backup and restore
 status: stable
 translation_key: operations.backup-and-restore
-source_revision: "2026-07-29"
+source_revision: "2026-07-30"
 ---
 
 # Backup and restore

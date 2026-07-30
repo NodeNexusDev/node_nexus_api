@@ -7,9 +7,10 @@ from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
 from fastapi import APIRouter, HTTPException, Query, Security
 
 from app.api.deps import get_current_api_key, require_write_scope
+from app.application.dto.audit import AuditLogDTO
+from app.application.services.audit_log_service import AuditLogService
 from app.schemas.audit_log import AuditLogResponse
 from app.schemas.node import PaginatedResponse
-from app.services.audit_service import AuditService
 
 audit = structlog.get_logger("audit")
 
@@ -19,7 +20,7 @@ router = APIRouter(prefix="/audit", tags=["audit"], route_class=DishkaRoute)
 @router.get("/", response_model=PaginatedResponse[AuditLogResponse])
 @inject
 async def get_audit_logs(
-    service: FromDishka[AuditService],
+    service: FromDishka[AuditLogService],
     node_id: uuid.UUID | None = Query(None),
     action: str | None = Query(None),
     page: int = Query(1, ge=1),
@@ -34,16 +35,21 @@ async def get_audit_logs(
         page=page,
         size=size,
     )
-    logs, total = await service.get_logs(
+    result = await service.get_logs(
         node_id=node_id, action=action, page=page, size=size
     )
-    return PaginatedResponse(items=logs, total=total, page=page, size=size)
+    return PaginatedResponse(
+        items=[_to_response(item) for item in result.items],
+        total=result.total,
+        page=page,
+        size=size,
+    )
 
 
 @router.delete("/")
 @inject
 async def delete_audit_logs(
-    service: FromDishka[AuditService],
+    service: FromDishka[AuditLogService],
     confirm: str | None = Query(None),
     _key: str = Security(require_write_scope),
 ) -> dict[str, int]:
@@ -64,3 +70,15 @@ async def delete_audit_logs(
     audit.info("api.audit.delete_all")
     deleted = await service.delete_all_logs()
     return {"deleted_count": deleted}
+
+
+def _to_response(log: AuditLogDTO) -> AuditLogResponse:
+    """Map an application DTO to the HTTP response schema."""
+    return AuditLogResponse(
+        id=log.id,
+        node_id=log.node_id,
+        action=log.action,
+        user=log.user,
+        details=log.details,
+        created_at=log.created_at,
+    )

@@ -12,11 +12,11 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
+from app.adapters.persistence.dao.script import ScriptRepository
 from app.models.base import Base
 from app.models.node import NodeModel  # noqa: F401
 from app.models.script import ScriptModel  # noqa: F401
 from app.models.script_execution import ScriptExecutionModel  # noqa: F401
-from app.repositories.script_repo import ScriptRepository
 
 
 @pytest_asyncio.fixture

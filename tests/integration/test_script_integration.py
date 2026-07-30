@@ -17,16 +17,23 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
+from app.adapters.persistence.api_key import SqlAlchemyAPIKeyGateway
+from app.adapters.persistence.command_reader import ScopedCommandTemplateReader
+from app.adapters.persistence.node_reader import ScopedNodeConnectionReader
+from app.adapters.persistence.script_gateway import (
+    ScopedScriptExecutionWriter,
+    SqlAlchemyScriptGateway,
+)
+from app.adapters.security import AesGcmCredentialCipher, Sha256APIKeyHasher
+from app.api.error_mapping import domain_error_handler
 from app.api.v1.health import router as health_router
 from app.api.v1.scripts import router as scripts_router
+from app.application.services.api_key_authentication import APIKeyAuthenticationService
+from app.application.services.script_execution_service import ScriptExecutionService
+from app.application.services.script_history_service import ScriptHistoryService
+from app.application.services.script_management_service import ScriptManagementService
+from app.core.exceptions import DomainError
 from app.models.base import Base
-from app.repositories.api_key_repo import APIKeyRepository
-from app.repositories.command_repo import CommandRepository
-from app.repositories.node_repo import NodeRepository
-from app.repositories.script_execution_repo import ScriptExecutionRepository
-from app.repositories.script_repo import ScriptRepository
-from app.services.api_key_service import APIKeyService
-from app.services.script_service import ScriptService
 
 MASTER_KEY = "test-master-key"
 
@@ -60,44 +67,47 @@ class IntegrationDbProvider(Provider):
             async with session.begin():
                 yield session
 
-    @provide(scope=Scope.REQUEST)
-    def get_script_repo(self, session: AsyncSession) -> ScriptRepository:
-        return ScriptRepository(session)
+    @provide(scope=Scope.APP)
+    def get_script_gateway(self) -> SqlAlchemyScriptGateway:
+        return SqlAlchemyScriptGateway(self._sm)
+
+    @provide(scope=Scope.APP)
+    def get_api_key_gateway(self) -> SqlAlchemyAPIKeyGateway:
+        return SqlAlchemyAPIKeyGateway(self._sm)
 
     @provide(scope=Scope.REQUEST)
-    def get_command_repo(self, session: AsyncSession) -> CommandRepository:
-        return CommandRepository(session)
+    def get_management_service(
+        self, gateway: SqlAlchemyScriptGateway
+    ) -> ScriptManagementService:
+        return ScriptManagementService(reader=gateway, writer=gateway)
 
     @provide(scope=Scope.REQUEST)
-    def get_node_repo(self, session: AsyncSession) -> NodeRepository:
-        return NodeRepository(session)
-
-    @provide(scope=Scope.REQUEST)
-    def get_exec_repo(self, session: AsyncSession) -> ScriptExecutionRepository:
-        return ScriptExecutionRepository(session)
-
-    @provide(scope=Scope.REQUEST)
-    def get_api_key_repo(self, session: AsyncSession) -> APIKeyRepository:
-        return APIKeyRepository(session)
-
-    @provide(scope=Scope.REQUEST)
-    def get_service(
-        self,
-        script_repo: ScriptRepository,
-        command_repo: CommandRepository,
-        node_repo: NodeRepository,
-        exec_repo: ScriptExecutionRepository,
-    ) -> ScriptService:
-        return ScriptService(
-            repository=script_repo,
-            command_repository=command_repo,
-            node_repository=node_repo,
-            execution_repository=exec_repo,
+    def get_history_service(
+        self, gateway: SqlAlchemyScriptGateway
+    ) -> ScriptHistoryService:
+        return ScriptHistoryService(
+            script_reader=gateway,
+            execution_reader=gateway,
         )
 
     @provide(scope=Scope.REQUEST)
-    def get_api_key_service(self, repo: APIKeyRepository) -> APIKeyService:
-        return APIKeyService(repository=repo)
+    def get_execution_service(
+        self, gateway: SqlAlchemyScriptGateway
+    ) -> ScriptExecutionService:
+        return ScriptExecutionService(
+            script_reader=gateway,
+            command_reader=ScopedCommandTemplateReader(self._sm),
+            node_reader=ScopedNodeConnectionReader(self._sm),
+            execution_writer=ScopedScriptExecutionWriter(self._sm),
+            credential_cipher=AesGcmCredentialCipher(),
+            connector_factory=MagicMock(),
+        )
+
+    @provide(scope=Scope.REQUEST)
+    def get_api_key_service(
+        self, gateway: SqlAlchemyAPIKeyGateway
+    ) -> APIKeyAuthenticationService:
+        return APIKeyAuthenticationService(gateway, gateway, Sha256APIKeyHasher())
 
 
 def _mock_settings(master_key: str = "") -> MagicMock:
@@ -114,6 +124,7 @@ async def integration_client(
     container = make_async_container(provider)
 
     app = FastAPI()
+    app.add_exception_handler(DomainError, domain_error_handler)
     app.include_router(health_router)
     app.include_router(scripts_router, prefix="/api/v1")
     setup_dishka(container, app)

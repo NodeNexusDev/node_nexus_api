@@ -12,42 +12,51 @@ from dishka.integrations.fastapi import setup_dishka
 from fastapi import FastAPI
 from httpx2 import ASGITransport, AsyncClient
 
+from app.api.error_mapping import domain_error_handler
 from app.api.v1.commands import router as commands_router
 from app.api.v1.health import router as health_router
+from app.application.dto.command_management import CommandViewDTO
+from app.application.services.command_execution_service import CommandExecutionService
+from app.application.services.command_management_service import CommandManagementService
 from app.core.exceptions import (
     CommandNotFoundError,
     ConnectionFailedError,
+    DomainError,
     NodeNotFoundError,
     TemplateRenderError,
 )
-from app.schemas.command import CommandResponse, CommandResult
-from app.services.command_service import CommandService
+from app.schemas.command import CommandResult
 from tests.unit.conftest import MockAuthServiceProvider, _mock_settings
 
 
-def _make_command(**overrides: Any) -> CommandResponse:
+def _make_command(**overrides: Any) -> CommandViewDTO:
     defaults: dict[str, Any] = {
         "id": uuid.uuid4(),
         "name": "check_disk",
         "description": "Check disk usage",
         "command": "df -h",
-        "parameters": None,
-        "tags": [],
+        "parameters": (),
+        "tags": (),
         "created_at": datetime.now(UTC),
         "updated_at": datetime.now(UTC),
     }
     defaults.update(overrides)
-    return CommandResponse(**defaults)
+    return CommandViewDTO(**defaults)
 
 
-def _create_test_app(service: CommandService | AsyncMock) -> FastAPI:
+def _create_test_app(service: AsyncMock) -> FastAPI:
     app = FastAPI()
+    app.add_exception_handler(DomainError, domain_error_handler)
     app.include_router(health_router)
     app.include_router(commands_router, prefix="/api/v1")
 
     class MockServiceProvider(Provider):
         @provide(scope=Scope.REQUEST)
-        def get_service(self) -> CommandService:
+        def get_management_service(self) -> CommandManagementService:
+            return service
+
+        @provide(scope=Scope.REQUEST)
+        def get_execution_service(self) -> CommandExecutionService:
             return service
 
     container = make_async_container(MockServiceProvider(), MockAuthServiceProvider())
@@ -57,7 +66,7 @@ def _create_test_app(service: CommandService | AsyncMock) -> FastAPI:
 
 @pytest.fixture
 def mock_service() -> AsyncMock:
-    return AsyncMock(spec=CommandService)
+    return AsyncMock()
 
 
 @pytest.fixture
@@ -172,6 +181,21 @@ class TestUpdateCommand:
         )
         assert response.status_code == 404
 
+    async def test_preserves_explicit_null(
+        self, client: AsyncClient, mock_service: AsyncMock
+    ) -> None:
+        cmd = _make_command(description=None)
+        mock_service.update_command.return_value = cmd
+
+        response = await client.put(
+            f"/api/v1/commands/{cmd.id}",
+            json={"description": None},
+        )
+
+        assert response.status_code == 200
+        update = mock_service.update_command.call_args.args[1]
+        assert dict(update.changes) == {"description": None}
+
 
 # --- DELETE /commands/{id} ---
 
@@ -214,6 +238,27 @@ class TestExecuteCommand:
             json={"node_id": str(uuid.uuid4()), "params": {}},
         )
         assert response.status_code == 404
+
+    async def test_maps_params_to_immutable_request(
+        self, client: AsyncClient, mock_service: AsyncMock
+    ) -> None:
+        mock_service.execute_command.return_value = CommandResult(
+            stdout="ok",
+            stderr="",
+            exit_code=0,
+        )
+        command_id = uuid.uuid4()
+        node_id = uuid.uuid4()
+
+        response = await client.post(
+            f"/api/v1/commands/{command_id}/execute",
+            json={"node_id": str(node_id), "params": {"service": "nginx"}},
+        )
+
+        assert response.status_code == 200
+        request = mock_service.execute_command.call_args.args[1]
+        assert request.node_id == node_id
+        assert request.params == (("service", "nginx"),)
 
     async def test_node_not_found(
         self, client: AsyncClient, mock_service: AsyncMock

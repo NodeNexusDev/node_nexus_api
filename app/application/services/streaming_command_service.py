@@ -4,23 +4,27 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from uuid import UUID
 
+from app.application.dto.remote_stream import RemoteStreamEventDTO
+from app.application.ports.credential_cipher import CredentialCipher
 from app.application.ports.node_reader import NodeConnectionReader
-from app.core.connectors.base import BaseConnector, ConnectorFactory, StreamEvent
+from app.application.ports.remote_stream import (
+    RemoteStreamingConnector,
+    RemoteStreamingConnectorFactory,
+)
 from app.core.exceptions import NodeNotFoundError
-from app.core.ssh_utils import decrypt_value
 
 
 class StreamingCommandSession:
     """Connected remote session used by a transport adapter."""
 
-    def __init__(self, connector: BaseConnector) -> None:
+    def __init__(self, connector: RemoteStreamingConnector) -> None:
         self._connector = connector
 
     def execute(self, command: str) -> AsyncIterator[str]:
         """Stream command output."""
         return self._connector.execute_command_streaming(command)
 
-    def execute_events(self, command: str) -> AsyncIterator[StreamEvent]:
+    def execute_events(self, command: str) -> AsyncIterator[RemoteStreamEventDTO]:
         """Stream typed stdout, stderr, and exit events."""
         return self._connector.execute_command_streaming_events(command)
 
@@ -35,10 +39,12 @@ class StreamingCommandService:
     def __init__(
         self,
         node_reader: NodeConnectionReader,
-        connector_factory: ConnectorFactory,
+        connector_factory: RemoteStreamingConnectorFactory,
+        credential_cipher: CredentialCipher,
     ) -> None:
         self._node_reader = node_reader
         self._connector_factory = connector_factory
+        self._credential_cipher = credential_cipher
 
     @asynccontextmanager
     async def connect(self, node_id: UUID) -> AsyncIterator[StreamingCommandSession]:
@@ -51,8 +57,8 @@ class StreamingCommandService:
             host=node.host,
             port=node.port,
             username=node.username,
-            password=decrypt_value(node.password),
-            ssh_key=decrypt_value(node.ssh_key),
+            password=self._credential_cipher.decrypt(node.password),
+            ssh_key=self._credential_cipher.decrypt(node.ssh_key),
         )
         await connector.connect()
         try:

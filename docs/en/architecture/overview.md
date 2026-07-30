@@ -2,20 +2,166 @@
 title: Architecture overview
 status: stable
 translation_key: architecture.overview
-source_revision: "2026-07-29"
+source_revision: "2026-07-30"
 ---
 
 # Architecture overview
 
-Node Nexus is a modular FastAPI application. HTTP and WebSocket adapters call
-application services; services coordinate repositories and external connectors;
-repositories own persistence access; Pydantic schemas and application DTOs are
-boundary values; SQLAlchemy models remain persistence details.
+Node Nexus uses Ports & Adapters. HTTP, WebSocket, and scheduler adapters call
+inbound application use cases. Use cases depend on immutable DTOs and focused
+ports. SQLAlchemy, SSH, Docker, security, and scheduler implementations are
+outbound adapters connected only by the Dishka composition root.
 
-Dishka creates application and request scopes. A request-scoped session is
-shared by repositories and services and committed at the use-case boundary.
-SSH and Docker are remote side effects and are never held inside long database
-transactions.
+Pydantic models are transport contracts and SQLAlchemy models are persistence
+details; neither crosses the application boundary. Dishka creates APP and
+REQUEST scopes. APP gateways own a sessionmaker, while request-transaction DAOs
+own a session. SSH and Docker side effects run after the read session closes.
 
-The current deployment model uses PostgreSQL and an in-process scheduler. API
-replicas are possible only when a single process owns scheduling.
+PostgreSQL is the system of record. The in-process scheduler uses advisory-lock
+ownership so non-owner replicas can serve HTTP without executing jobs.
+
+## Runtime flow
+
+```mermaid
+flowchart LR
+    HTTP[HTTP / WebSocket] --> API[Inbound adapters]
+    TIMER[APScheduler callback] --> JOB[ScheduledScriptExecutor]
+    API --> UC[Application use cases]
+    JOB --> UC
+
+    UC --> PORTS[DTOs, policies, focused ports]
+    PORTS --> READ[Short persistence read]
+    READ --> DTO[Immutable DTO]
+    DTO --> REMOTE[SSH / Docker remote I/O]
+    REMOTE --> WRITE[Short persistence write]
+
+    PORTS --> CFG[ConfigurationImporter]
+    CFG --> TX[One atomic SQLAlchemy transaction]
+
+    READ --> PG[(PostgreSQL)]
+    WRITE --> PG
+    TX --> PG
+    REMOTE --> HOST[Remote host]
+
+    DI[Dishka composition root] -. binds ports .-> READ
+    DI -. binds ports .-> WRITE
+    DI -. binds ports .-> REMOTE
+    DI -. binds ports .-> CFG
+```
+
+No live session or ORM model crosses from a persistence adapter into remote
+I/O. The config branch is deliberately different: its dedicated port owns one
+transaction because the complete payload is one atomic business operation.
+
+## Data model
+
+```mermaid
+erDiagram
+    NODE {
+        uuid id PK
+        string name UK
+        string host
+        int port
+        string connection_type
+        string status
+        string username
+        text password
+        text ssh_key
+        string docker_host
+        list tags
+        datetime created_at
+        datetime updated_at
+    }
+
+    COMMAND {
+        uuid id PK
+        string name UK
+        text description
+        text command
+        list parameters
+        list tags
+        datetime created_at
+        datetime updated_at
+    }
+
+    SCRIPT {
+        uuid id PK
+        string name UK
+        text description
+        json steps
+        list tags
+        datetime created_at
+        datetime updated_at
+    }
+
+    SCRIPT_SCHEDULE {
+        uuid id PK
+        uuid script_id FK,UK
+        string cron
+        string timezone
+        json node_ids
+        json params
+        bool enabled
+        int misfire_grace_seconds
+        string operational_state
+        string last_error_type
+        datetime last_run_at
+        datetime last_success_at
+        datetime last_failure_at
+        datetime next_run_at
+        datetime created_at
+        datetime updated_at
+    }
+
+    SCRIPT_EXECUTION {
+        uuid id PK
+        uuid script_id FK
+        uuid node_id FK
+        json params
+        string status
+        json steps
+        datetime started_at
+        datetime finished_at
+    }
+
+    AUDIT_LOG {
+        uuid id PK
+        uuid node_id FK
+        string action
+        string user
+        text details
+        datetime created_at
+    }
+
+    AUDIT_OUTBOX {
+        uuid id PK
+        json payload
+        string status
+        int attempts
+        string last_error_type
+        datetime next_attempt_at
+        datetime created_at
+        datetime delivered_at
+    }
+
+    API_KEY {
+        uuid id PK
+        string name
+        string key_hash UK
+        string key_prefix
+        bool is_active
+        string scope
+        datetime created_at
+        datetime last_used_at
+        datetime expires_at
+    }
+
+    SCRIPT ||--o{ SCRIPT_EXECUTION : "runs as"
+    SCRIPT ||--|| SCRIPT_SCHEDULE : "scheduled by"
+    NODE ||--o{ SCRIPT_EXECUTION : "targets"
+    NODE ||--o{ AUDIT_LOG : "tracks"
+```
+
+`COMMAND`, `AUDIT_OUTBOX`, and `API_KEY` are standalone entities with no foreign
+keys to other tables. Command templates are referenced by scripts through JSON
+steps, not database-level constraints.

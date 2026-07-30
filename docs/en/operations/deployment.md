@@ -2,7 +2,7 @@
 title: Deployment and rollback
 status: stable
 translation_key: operations.deployment
-source_revision: "2026-07-29"
+source_revision: "2026-07-30"
 ---
 
 # Deployment and rollback

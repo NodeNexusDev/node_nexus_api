@@ -9,7 +9,7 @@ import pytest
 from pytest_docker.plugin import Services
 from sqlalchemy.ext.asyncio import create_async_engine
 
-from app.core.scheduler import ScriptScheduler
+from app.adapters.runtime.apscheduler_runtime import ApschedulerRuntime
 from app.schemas.common import encode_cursor
 from tests.e2e.conftest import ServicePorts
 
@@ -2061,7 +2061,7 @@ async def test_second_scheduler_replica_cannot_acquire_ownership(
         f"postgresql+asyncpg://postgres:postgres@{docker_ip}:{database_port}"
         "/node_nexus_e2e"
     )
-    contender = ScriptScheduler()
+    contender = ApschedulerRuntime()
     try:
         assert await contender.acquire_ownership(engine) is False
         assert contender.owns_execution is False

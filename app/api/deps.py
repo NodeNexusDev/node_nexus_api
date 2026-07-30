@@ -7,8 +7,10 @@ from dishka.integrations.fastapi import FromDishka, inject
 from fastapi import HTTPException, Security
 from fastapi.security import APIKeyHeader
 
+from app.application.services.api_key_authentication import (
+    APIKeyAuthenticationService,
+)
 from app.core.config import get_settings
-from app.services.api_key_service import APIKeyService
 
 audit = structlog.get_logger("audit")
 
@@ -17,7 +19,7 @@ API_KEY_HEADER = APIKeyHeader(name="X-API-Key", auto_error=False)
 
 @inject
 async def get_current_api_key(
-    api_key_service: FromDishka[APIKeyService],
+    api_key_service: FromDishka[APIKeyAuthenticationService],
     api_key: str | None = Security(API_KEY_HEADER),
 ) -> str:
     """Validate API key from X-API-Key header.
@@ -35,13 +37,13 @@ async def get_current_api_key(
         audit.info("auth.master_key_used")
         return "master"
 
-    principal = await api_key_service.validate_api_key(api_key)
-    return principal.key_prefix if principal is not None else api_key[:8]
+    principal = await api_key_service.authenticate(api_key)
+    return principal.key_prefix
 
 
 @inject
 async def require_write_scope(
-    api_key_service: FromDishka[APIKeyService],
+    api_key_service: FromDishka[APIKeyAuthenticationService],
     api_key: str | None = Security(API_KEY_HEADER),
 ) -> str:
     """Require write scope for the API key.
@@ -65,15 +67,9 @@ async def require_write_scope(
         audit.info("auth.master_key_used")
         return "master"
 
-    principal = await api_key_service.validate_api_key(api_key)
-    scope = (
-        principal.scope
-        if principal is not None
-        else await api_key_service.get_api_key_scope(api_key)
-    )
-    key_prefix = principal.key_prefix if principal is not None else api_key[:8]
-    if scope == "read-only":
-        audit.warning("auth.read_only_denied", key_prefix=key_prefix)
+    principal = await api_key_service.authenticate(api_key)
+    if principal.scope == "read-only":
+        audit.warning("auth.read_only_denied", key_prefix=principal.key_prefix)
         raise HTTPException(status_code=403, detail="API key has read-only scope")
 
-    return key_prefix
+    return principal.key_prefix

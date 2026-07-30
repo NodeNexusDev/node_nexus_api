@@ -4,8 +4,8 @@ from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from app.adapters.persistence.dao.command import CommandRepository
 from app.application.dto.command_template import CommandTemplateDTO
-from app.repositories.command_repo import CommandRepository
 
 
 class ScopedCommandTemplateReader:

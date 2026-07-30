@@ -39,7 +39,7 @@ DOMAIN_ERROR_STATUS: dict[type[DomainError], int] = {
     NodeNameConflictError: 409,
     CommandNotFoundError: 404,
     ScriptNotFoundError: 404,
-    APIKeyNotFoundError: 401,
+    APIKeyNotFoundError: 404,
     APIKeyRevokedError: 401,
     APIKeyExpiredError: 401,
     AuthenticationError: 401,

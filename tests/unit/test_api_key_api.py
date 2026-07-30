@@ -11,13 +11,21 @@ from dishka.integrations.fastapi import setup_dishka
 from fastapi import FastAPI
 from httpx2 import ASGITransport, AsyncClient
 
+from app.api.error_mapping import domain_error_handler
 from app.api.v1.api_keys import router as api_keys_router
-from app.core.exceptions import APIKeyNotFoundError
-from app.schemas.api_key import APIKeyCreated, APIKeyList, APIKeyResponse
-from app.services.api_key_service import APIKeyService
+from app.application.dto.api_key import (
+    APIKeyCreateResultDTO,
+    APIKeyPageDTO,
+    APIKeyViewDTO,
+)
+from app.application.services.api_key_authentication import (
+    APIKeyAuthenticationService,
+)
+from app.application.services.api_key_management import APIKeyManagementService
+from app.core.exceptions import APIKeyNotFoundError, DomainError
 
 
-def _make_api_key_response(**overrides: Any) -> APIKeyResponse:
+def _make_api_key_response(**overrides: Any) -> APIKeyViewDTO:
     defaults: dict[str, Any] = {
         "id": uuid.uuid4(),
         "name": "test-key",
@@ -29,29 +37,34 @@ def _make_api_key_response(**overrides: Any) -> APIKeyResponse:
         "expires_at": None,
     }
     defaults.update(overrides)
-    return APIKeyResponse(**defaults)
+    return APIKeyViewDTO(**defaults)
 
 
-def _make_api_key_created(**overrides: Any) -> APIKeyCreated:
+def _make_api_key_created(**overrides: Any) -> APIKeyCreateResultDTO:
     defaults: dict[str, Any] = {
         "id": uuid.uuid4(),
         "name": "test-key",
-        "key": "nnk_abc123def456",
+        "plain_key": "nnk_abc123def456",
         "key_prefix": "nnk_abcd",
         "created_at": datetime.now(UTC),
     }
     defaults.update(overrides)
-    return APIKeyCreated(**defaults)
+    return APIKeyCreateResultDTO(**defaults)
 
 
-def _create_test_app(service: APIKeyService | AsyncMock) -> FastAPI:
+def _create_test_app(service: APIKeyManagementService | AsyncMock) -> FastAPI:
     app = FastAPI()
+    app.add_exception_handler(DomainError, domain_error_handler)
     app.include_router(api_keys_router)
 
     class MockServiceProvider(Provider):
         @provide(scope=Scope.REQUEST)
-        def get_service(self) -> APIKeyService:
+        def get_service(self) -> APIKeyManagementService:
             return service
+
+        @provide(scope=Scope.REQUEST)
+        def get_auth_service(self) -> APIKeyAuthenticationService:
+            return AsyncMock(spec=APIKeyAuthenticationService)
 
     container = make_async_container(MockServiceProvider())
     setup_dishka(container, app)
@@ -101,7 +114,7 @@ class MockSessionmaker:
 
 @pytest.fixture
 def mock_service() -> AsyncMock:
-    return AsyncMock(spec=APIKeyService)
+    return AsyncMock(spec=APIKeyManagementService)
 
 
 # --- POST /api-keys/ ---
@@ -115,9 +128,7 @@ class TestCreateApiKey:
         mock_get_settings.return_value = _mock_settings("test-master-key")
         app = _create_test_app(mock_service)
 
-        mock_service.create_api_key.side_effect = lambda name, scope="read-write": (
-            _make_api_key_created(name=name)
-        )
+        mock_service.create_api_key.return_value = _make_api_key_created(name="my-key")
 
         async with AsyncClient(
             transport=ASGITransport(app=app),
@@ -133,9 +144,9 @@ class TestCreateApiKey:
         data = response.json()
         assert data["name"] == "my-key"
         assert data["key"] == "nnk_abc123def456"
-        mock_service.create_api_key.assert_called_once_with(
-            "my-key", scope="read-write"
-        )
+        request = mock_service.create_api_key.call_args.args[0]
+        assert request.name == "my-key"
+        assert request.scope == "read-write"
 
     @patch("app.api.deps.get_settings")
     async def test_validation_error(
@@ -165,7 +176,7 @@ class TestListApiKeys:
     async def test_empty(self, mock_get_settings: Any, mock_service: AsyncMock) -> None:
         mock_get_settings.return_value = _mock_settings("test-master-key")
         app = _create_test_app(mock_service)
-        mock_service.list_api_keys.return_value = APIKeyList(items=[], total=0)
+        mock_service.list_api_keys.return_value = APIKeyPageDTO(items=(), total=0)
 
         async with AsyncClient(
             transport=ASGITransport(app=app),
@@ -188,7 +199,9 @@ class TestListApiKeys:
         mock_get_settings.return_value = _mock_settings("test-master-key")
         app = _create_test_app(mock_service)
         keys = [_make_api_key_response(name="k1"), _make_api_key_response(name="k2")]
-        mock_service.list_api_keys.return_value = APIKeyList(items=keys, total=2)
+        mock_service.list_api_keys.return_value = APIKeyPageDTO(
+            items=tuple(keys), total=2
+        )
 
         async with AsyncClient(
             transport=ASGITransport(app=app),
@@ -210,7 +223,7 @@ class TestListApiKeys:
     ) -> None:
         mock_get_settings.return_value = _mock_settings("test-master-key")
         app = _create_test_app(mock_service)
-        mock_service.list_api_keys.return_value = APIKeyList(items=[], total=0)
+        mock_service.list_api_keys.return_value = APIKeyPageDTO(items=(), total=0)
 
         async with AsyncClient(
             transport=ASGITransport(app=app),

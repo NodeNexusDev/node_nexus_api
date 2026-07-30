@@ -14,8 +14,8 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
+from app.adapters.persistence.dao.node import NodeRepository
 from app.models.base import Base
-from app.repositories.node_repo import NodeRepository
 
 
 @pytest_asyncio.fixture
@@ -196,7 +196,6 @@ async def test_postgresql_tag_query_builders() -> None:
     repository = NodeRepository(session)
 
     assert await repository.get_by_tags(["prod", "web"]) == []
-    assert await repository.count_by_tags(["prod"]) == 0
     assert await repository.get_all_tags() == ["prod", "web"]
     assert await repository.get_filtered(tags=["prod"]) == []
     assert await repository.count_filtered(tags=["prod"]) == 0

@@ -5,10 +5,11 @@ from datetime import UTC, datetime
 from typing import Any
 from unittest.mock import AsyncMock, Mock
 
-from app.core.connectors.ssh import SSHConnector
+from app.adapters.runtime.ssh import SSHConnector
+from app.adapters.security import AesGcmCredentialCipher
+from app.application.dto.command_execution import CommandRequestDTO
+from app.application.services.node_command_service import NodeCommandService
 from app.models.node import NodeModel
-from app.schemas.node import CommandRequest
-from app.services.node_service import NodeService
 from tests.integration_ssh.conftest import SSHServer
 
 
@@ -85,28 +86,38 @@ async def test_execute_multiple_commands(ssh_server: SSHServer) -> None:
 async def test_service_check_connectivity(ssh_server: SSHServer) -> None:
     orm_node = _make_orm_node(ssh_server)
     repo = AsyncMock()
-    repo.get_by_id.return_value = orm_node
-    repo.update.return_value = orm_node
+    repo.get_connection.return_value = orm_node
+    repo.update_node_status.return_value = orm_node
 
     factory = _make_connector_factory(ssh_server)
-    service = NodeService(repository=repo, connector_factory=factory)
+    service = NodeCommandService(
+        node_reader=repo,
+        status_writer=repo,
+        credential_cipher=AesGcmCredentialCipher(),
+        connector_factory=factory,
+    )
 
     result = await service.check_connectivity(orm_node.id)
 
     assert result.status == "active"
-    repo.update.assert_called_once_with(orm_node.id, {"status": "active"})
+    repo.update_node_status.assert_called_once_with(orm_node.id, "active")
 
 
 async def test_service_execute_command(ssh_server: SSHServer) -> None:
     orm_node = _make_orm_node(ssh_server)
     repo = AsyncMock()
-    repo.get_by_id.return_value = orm_node
+    repo.get_connection.return_value = orm_node
 
     factory = _make_connector_factory(ssh_server)
-    service = NodeService(repository=repo, connector_factory=factory)
+    service = NodeCommandService(
+        node_reader=repo,
+        status_writer=repo,
+        credential_cipher=AesGcmCredentialCipher(),
+        connector_factory=factory,
+    )
 
     result = await service.execute_command(
-        orm_node.id, CommandRequest(command="echo works")
+        orm_node.id, CommandRequestDTO(command="echo works")
     )
 
     assert result.stdout.strip() == "works"

@@ -5,8 +5,7 @@ from importlib.metadata import PackageNotFoundError, version
 
 from pydantic import BaseModel, Field
 
-CONFIG_FORMAT_VERSION = "1.0"
-LEGACY_CONFIG_VERSION = "0.5.0"
+from app.application.dto.config import CONFIG_FORMAT_VERSION, LEGACY_CONFIG_VERSION
 
 
 def application_version() -> str:

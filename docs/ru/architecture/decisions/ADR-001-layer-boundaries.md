@@ -2,7 +2,7 @@
 title: "ADR-001: Границы слоёв"
 status: accepted
 translation_key: architecture.decisions.001
-source_revision: "2026-07-29"
+source_revision: "2026-07-30"
 ---
 
 # ADR-001: Границы слоёв

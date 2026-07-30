@@ -6,6 +6,7 @@ from httpx2 import ASGITransport, AsyncClient
 from app.api.error_mapping import domain_error_handler
 from app.core.exceptions import (
     APIKeyNotFoundError,
+    AuthenticationError,
     CommandNotFoundError,
     ConnectionFailedError,
     ContainerNotFoundError,
@@ -36,6 +37,11 @@ async def raise_command_not_found() -> None:
 @app.get("/test-apikey")
 async def raise_apikey_not_found() -> None:
     raise APIKeyNotFoundError("key not found")
+
+
+@app.get("/test-authentication")
+async def raise_authentication_error() -> None:
+    raise AuthenticationError("invalid credential")
 
 
 @app.get("/test-tag")
@@ -102,11 +108,18 @@ class TestDomainErrorHandler:
             resp = await client.get("/test-command")
         assert resp.status_code == 404
 
-    async def test_apikey_not_found_returns_401(self) -> None:
+    async def test_apikey_not_found_returns_404(self) -> None:
         async with AsyncClient(
             transport=ASGITransport(app=app), base_url="http://test"
         ) as client:
             resp = await client.get("/test-apikey")
+        assert resp.status_code == 404
+
+    async def test_authentication_error_returns_401(self) -> None:
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            resp = await client.get("/test-authentication")
         assert resp.status_code == 401
 
     async def test_tag_not_found_returns_404(self) -> None:

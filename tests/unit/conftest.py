@@ -1,11 +1,15 @@
 """Shared test fixtures for unit tests."""
 
+import uuid
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 from dishka import Provider, Scope, provide
 
-from app.services.api_key_service import APIKeyService
+from app.application.services.api_key_authentication import (
+    APIKeyAuthenticationService,
+    AuthenticatedPrincipal,
+)
 
 
 def _mock_settings(master_key: str = "") -> MagicMock:
@@ -15,12 +19,16 @@ def _mock_settings(master_key: str = "") -> MagicMock:
 
 
 class MockAuthServiceProvider(Provider):
-    """Provider that returns a mock APIKeyService for auth tests."""
+    """Provider that returns a mock API-key authentication use case."""
 
     @provide(scope=Scope.REQUEST)
-    def get_api_key_service(self) -> APIKeyService:
-        mock = AsyncMock(spec=APIKeyService)
-        mock.validate_api_key.return_value = None
+    def get_api_key_service(self) -> APIKeyAuthenticationService:
+        mock = AsyncMock(spec=APIKeyAuthenticationService)
+        mock.authenticate.return_value = AuthenticatedPrincipal(
+            key_id=uuid.uuid4(),
+            key_prefix="nnk_test",
+            scope="read-write",
+        )
         return mock
 
 
@@ -48,6 +56,26 @@ def make_orm_node(**overrides: Any) -> Any:
     }
     defaults.update(overrides)
     return NodeModel(**defaults)
+
+
+def make_node_view(**overrides: Any) -> Any:
+    """Create a public-safe node DTO with defaults for testing."""
+    from app.application.dto.node_view import NodeViewDTO
+
+    node = make_orm_node(**overrides)
+    return NodeViewDTO(
+        id=node.id,
+        name=node.name,
+        host=node.host,
+        port=node.port,
+        connection_type=node.connection_type,
+        status=node.status,
+        username=node.username,
+        docker_host=node.docker_host,
+        tags=tuple(node.tags or ()),
+        created_at=node.created_at,
+        updated_at=node.updated_at,
+    )
 
 
 def make_orm_command(**overrides: Any) -> Any:

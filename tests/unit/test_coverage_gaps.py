@@ -8,15 +8,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from app.core.scheduler import ScriptScheduler
-from app.schemas.config import (
-    CommandExport,
-    ConfigImport,
-    ImportResult,
-    NodeExport,
-    ScriptExport,
-)
-from app.services.config_service import ConfigService
+from app.adapters.runtime.apscheduler_runtime import ApschedulerRuntime
+from app.schemas.config import ImportResult
 
 # ============================================================
 # Telemetry (59% → higher)
@@ -117,95 +110,6 @@ class TestTelemetryEnabled:
 
 
 # ============================================================
-# Config service imports (89% → higher)
-# ============================================================
-
-
-class TestConfigServiceImports:
-    """Test config service import with existing items."""
-
-    @pytest.mark.asyncio
-    async def test_import_existing_commands(self):
-        """Import skips commands that already exist."""
-        node_repo = AsyncMock()
-        cmd_repo = AsyncMock()
-        script_repo = AsyncMock()
-
-        existing_cmd = MagicMock()
-        existing_cmd.name = "existing-cmd"
-        cmd_repo.get_all.return_value = [existing_cmd]
-        node_repo.get_all.return_value = []
-        script_repo.get_all.return_value = []
-
-        svc = ConfigService(node_repo, cmd_repo, script_repo)
-
-        data = ConfigImport(commands=[CommandExport(name="existing-cmd", command="ls")])
-        result = await svc.import_config(data)
-
-        assert result.commands_created == 0
-        assert len(result.errors) == 1
-        assert "already exists" in result.errors[0]
-
-    @pytest.mark.asyncio
-    async def test_import_existing_scripts(self):
-        """Import skips scripts that already exist."""
-        node_repo = AsyncMock()
-        cmd_repo = AsyncMock()
-        script_repo = AsyncMock()
-
-        existing_script = MagicMock()
-        existing_script.name = "existing-script"
-        script_repo.get_all.return_value = [existing_script]
-        node_repo.get_all.return_value = []
-        cmd_repo.get_all.return_value = []
-
-        svc = ConfigService(node_repo, cmd_repo, script_repo)
-
-        data = ConfigImport(scripts=[ScriptExport(name="existing-script", steps=[])])
-        result = await svc.import_config(data)
-
-        assert result.scripts_created == 0
-        assert len(result.errors) == 1
-
-    @pytest.mark.asyncio
-    async def test_import_mixed_new_and_existing(self):
-        """Import handles mix of new and existing items."""
-        node_repo = AsyncMock()
-        cmd_repo = AsyncMock()
-        script_repo = AsyncMock()
-
-        existing_node = MagicMock()
-        existing_node.name = "old-node"
-        node_repo.get_all.return_value = [existing_node]
-        cmd_repo.get_all.return_value = []
-        script_repo.get_all.return_value = []
-
-        svc = ConfigService(node_repo, cmd_repo, script_repo)
-
-        data = ConfigImport(
-            nodes=[
-                NodeExport(
-                    name="old-node",
-                    host="1.1.1.1",
-                    port=22,
-                    connection_type="ssh",
-                ),
-                NodeExport(
-                    name="new-node",
-                    host="2.2.2.2",
-                    port=22,
-                    connection_type="ssh",
-                ),
-            ]
-        )
-        result = await svc.import_config(data)
-
-        assert result.nodes_created == 1
-        assert len(result.errors) == 1
-        node_repo.create.assert_called_once()
-
-
-# ============================================================
 # Scheduler advanced (89% → higher)
 # ============================================================
 
@@ -216,7 +120,7 @@ class TestSchedulerAdvanced:
     @pytest.mark.asyncio
     async def test_start_twice_no_error(self):
         """Starting scheduler twice doesn't raise."""
-        scheduler = ScriptScheduler()
+        scheduler = ApschedulerRuntime()
         await scheduler.start()
         await scheduler.start()
         await scheduler.stop()
@@ -224,18 +128,18 @@ class TestSchedulerAdvanced:
     @pytest.mark.asyncio
     async def test_stop_when_not_running(self):
         """Stopping scheduler when not running doesn't raise."""
-        scheduler = ScriptScheduler()
+        scheduler = ApschedulerRuntime()
         await scheduler.stop()
 
     def test_list_schedules_empty(self):
         """list_schedules returns empty when no jobs."""
-        scheduler = ScriptScheduler()
+        scheduler = ApschedulerRuntime()
         jobs = scheduler.list_schedules()
         assert jobs == []
 
     def test_get_schedule_returns_stored_info(self):
         """get_schedule returns info from APScheduler job."""
-        scheduler = ScriptScheduler()
+        scheduler = ApschedulerRuntime()
         script_id = MagicMock()
         scheduler.schedule_script(script_id, "0 9 * * *", [MagicMock()])
 
@@ -245,7 +149,7 @@ class TestSchedulerAdvanced:
 
     def test_schedule_with_callback(self):
         """schedule_script with callback adds to APScheduler."""
-        scheduler = ScriptScheduler()
+        scheduler = ApschedulerRuntime()
         script_id = MagicMock()
         callback = MagicMock()
 
@@ -259,13 +163,13 @@ class TestSchedulerAdvanced:
 
     def test_unschedule_nonexistent(self):
         """unschedule returns False for non-existent script."""
-        scheduler = ScriptScheduler()
+        scheduler = ApschedulerRuntime()
         removed = scheduler.unschedule_script(MagicMock())
         assert removed is False
 
     def test_get_schedule_nonexistent(self):
         """get_schedule returns None for non-existent script."""
-        scheduler = ScriptScheduler()
+        scheduler = ApschedulerRuntime()
         info = scheduler.get_schedule(MagicMock())
         assert info is None
 
@@ -281,7 +185,7 @@ class TestSSHStreaming:
     @pytest.mark.asyncio
     async def test_streaming_not_connected(self):
         """execute_command_streaming raises when not connected."""
-        from app.core.connectors.ssh import SSHConnector
+        from app.adapters.runtime.ssh import SSHConnector
 
         connector = SSHConnector(host="10.0.0.1")
         with pytest.raises(RuntimeError, match="Not connected"):
@@ -291,7 +195,7 @@ class TestSSHStreaming:
     @pytest.mark.asyncio
     async def test_streaming_yields_lines(self):
         """execute_command_streaming yields lines."""
-        from app.core.connectors.ssh import SSHConnector
+        from app.adapters.runtime.ssh import SSHConnector
 
         connector = SSHConnector(host="10.0.0.1")
         mock_conn = MagicMock()
@@ -324,7 +228,7 @@ class TestSSHStreaming:
         """execute_command_streaming handles asyncssh.Error."""
         import asyncssh
 
-        from app.core.connectors.ssh import SSHConnector
+        from app.adapters.runtime.ssh import SSHConnector
 
         connector = SSHConnector(host="10.0.0.1")
         mock_conn = MagicMock()

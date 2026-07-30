@@ -14,6 +14,14 @@ from httpx2 import ASGITransport, AsyncClient
 from app.api.error_mapping import domain_error_handler
 from app.api.v1.docker import router as docker_router
 from app.api.v1.health import router as health_router
+from app.application.dto.docker import (
+    DockerContainerConfigDTO,
+    DockerContainerInspectDTO,
+    DockerContainerStateDTO,
+)
+from app.application.services.docker.container_service import DockerContainerService
+from app.application.services.docker.image_service import DockerImageService
+from app.application.services.docker.resource_service import DockerResourceService
 from app.core.exceptions import (
     ConnectionFailedError,
     ContainerNotFoundError,
@@ -24,9 +32,6 @@ from app.core.exceptions import (
 )
 from app.schemas.docker import (
     DockerContainer,
-    DockerContainerConfig,
-    DockerContainerInspect,
-    DockerContainerState,
     DockerExecResult,
     DockerImage,
     DockerNetwork,
@@ -34,7 +39,7 @@ from app.schemas.docker import (
     DockerStats,
     DockerVolume,
 )
-from app.services.docker_service import DockerService
+from tests.docker_test_facade import DockerService
 from tests.unit.conftest import MockAuthServiceProvider, _mock_settings
 
 NODE_ID = uuid.uuid4()
@@ -58,16 +63,20 @@ def _make_container(**overrides: Any) -> DockerContainer:
     return DockerContainer(**defaults)
 
 
-def _make_container_inspect(**overrides: Any) -> DockerContainerInspect:
+def _make_container_inspect(**overrides: Any) -> DockerContainerInspectDTO:
     defaults: dict[str, Any] = {
-        "Id": CONTAINER_ID,
-        "Name": "/web",
-        "State": DockerContainerState(status="running", running=True, exit_code=0),
-        "Config": DockerContainerConfig(image="nginx:latest"),
-        "NetworkSettings": None,
+        "id": CONTAINER_ID,
+        "name": "/web",
+        "state": DockerContainerStateDTO(
+            status="running",
+            running=True,
+            exit_code=0,
+        ),
+        "config": DockerContainerConfigDTO(image="nginx:latest"),
+        "network_settings": (("Networks", {"bridge": {}}),),
     }
     defaults.update(overrides)
-    return DockerContainerInspect(**defaults)
+    return DockerContainerInspectDTO(**defaults)
 
 
 def _make_image(**overrides: Any) -> DockerImage:
@@ -148,7 +157,15 @@ def _create_test_app(service: DockerService | AsyncMock) -> FastAPI:
 
     class MockServiceProvider(Provider):
         @provide(scope=Scope.REQUEST)
-        def get_service(self) -> DockerService:
+        def get_container_service(self) -> DockerContainerService:
+            return service
+
+        @provide(scope=Scope.REQUEST)
+        def get_image_service(self) -> DockerImageService:
+            return service
+
+        @provide(scope=Scope.REQUEST)
+        def get_resource_service(self) -> DockerResourceService:
             return service
 
     container = make_async_container(MockServiceProvider(), MockAuthServiceProvider())
@@ -231,6 +248,7 @@ class TestGetContainer:
         )
         assert response.status_code == 200
         assert response.json()["Id"] == CONTAINER_ID
+        assert response.json()["NetworkSettings"] == {"Networks": {"bridge": {}}}
 
     async def test_node_not_found(
         self, client: AsyncClient, mock_service: AsyncMock

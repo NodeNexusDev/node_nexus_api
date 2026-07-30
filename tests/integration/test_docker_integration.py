@@ -7,9 +7,9 @@ from unittest.mock import AsyncMock, Mock
 
 import pytest
 
-from app.core.connectors.ssh import SSHConnector
+from app.adapters.runtime.ssh import SSHConnector
 from app.models.node import NodeModel
-from app.services.docker_service import DockerService
+from tests.docker_test_facade import DockerService
 from tests.integration.conftest import DockerSSHServer
 
 

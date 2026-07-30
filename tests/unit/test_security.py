@@ -4,7 +4,7 @@ import base64
 
 import pytest
 
-from app.core.security import ENCRYPTION_PREFIX, decrypt, encrypt
+from app.adapters.security.credential_cipher import ENCRYPTION_PREFIX, decrypt, encrypt
 
 
 class TestEncryptDecrypt:

@@ -2,6 +2,7 @@
 
 from collections.abc import AsyncGenerator
 from unittest.mock import AsyncMock, patch
+from uuid import UUID
 
 import pytest
 from dishka import Provider, Scope, make_async_container, provide
@@ -11,15 +12,19 @@ from httpx2 import ASGITransport, AsyncClient
 
 from app.api.error_mapping import domain_error_handler
 from app.api.v1.scripts import router as scripts_router
+from app.application.dto.schedule import ScheduleViewDTO
+from app.application.services.schedule_management import (
+    ScheduleManagementService,
+)
+from app.application.services.script_execution_service import ScriptExecutionService
+from app.application.services.script_history_service import ScriptHistoryService
+from app.application.services.script_management_service import ScriptManagementService
 from app.core.exceptions import DomainError, ScheduleNotFoundError, ScriptNotFoundError
-from app.schemas.scheduler import ScheduledJob
-from app.services.schedule_service import ScheduleService
-from app.services.script_service import ScriptService
 from tests.unit.conftest import MockAuthServiceProvider, _mock_settings
 
 
 def _create_test_app(
-    service: ScriptService, schedule_service: ScheduleService
+    service: AsyncMock, schedule_service: ScheduleManagementService
 ) -> FastAPI:
     app = FastAPI()
     app.add_exception_handler(DomainError, domain_error_handler)
@@ -27,11 +32,19 @@ def _create_test_app(
 
     class MockServiceProvider(Provider):
         @provide(scope=Scope.REQUEST)
-        def get_service(self) -> ScriptService:
+        def get_management_service(self) -> ScriptManagementService:
             return service
 
         @provide(scope=Scope.REQUEST)
-        def get_schedule_service(self) -> ScheduleService:
+        def get_history_service(self) -> ScriptHistoryService:
+            return service
+
+        @provide(scope=Scope.REQUEST)
+        def get_execution_service(self) -> ScriptExecutionService:
+            return service
+
+        @provide(scope=Scope.REQUEST)
+        def get_schedule_service(self) -> ScheduleManagementService:
             return schedule_service
 
     container = make_async_container(MockServiceProvider(), MockAuthServiceProvider())
@@ -41,19 +54,19 @@ def _create_test_app(
 
 @pytest.fixture
 def mock_service() -> AsyncMock:
-    return AsyncMock(spec=ScriptService)
+    return AsyncMock()
 
 
 @pytest.fixture
 def mock_schedule_service() -> AsyncMock:
-    service = AsyncMock(spec=ScheduleService)
-    service.create_or_update.return_value = ScheduledJob(
-        id="00000000-0000-0000-0000-000000000003",
-        script_id="00000000-0000-0000-0000-000000000001",
+    service = AsyncMock(spec=ScheduleManagementService)
+    service.create_or_update.return_value = ScheduleViewDTO(
+        id=UUID("00000000-0000-0000-0000-000000000003"),
+        script_id=UUID("00000000-0000-0000-0000-000000000001"),
         cron="0 9 * * *",
         timezone="UTC",
-        node_ids=["00000000-0000-0000-0000-000000000002"],
-        params={},
+        node_ids=(UUID("00000000-0000-0000-0000-000000000002"),),
+        params=(),
         enabled=True,
         misfire_grace_seconds=60,
         operational_state="registered",

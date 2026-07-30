@@ -1,10 +1,10 @@
 """Unit tests for health service."""
 
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from app.services.health_service import HealthService
+from app.application.services.health_service import HealthService
 
 
 class TestHealthServiceCheckDb:
@@ -31,3 +31,16 @@ class TestHealthServiceCheckDb:
 
         assert result is False
         mock_repo.ping.assert_called_once()
+
+
+def test_scheduler_readiness_uses_application_port() -> None:
+    scheduler = MagicMock()
+    scheduler.is_ready.return_value = True
+    service = HealthService(
+        repository=AsyncMock(),
+        scheduler=scheduler,
+        scheduler_enabled=True,
+    )
+
+    assert service.check_scheduler() is True
+    scheduler.is_ready.assert_called_once_with()
