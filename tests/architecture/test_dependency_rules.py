@@ -125,7 +125,7 @@ def test_legacy_repository_namespace_is_removed() -> None:
 
 @pytest.mark.parametrize(
     "relative_path",
-    ["api/v1/websocket.py", "core/scheduler.py"],
+    ["api/v1/websocket.py", "adapters/runtime/apscheduler_runtime.py"],
 )
 def test_runtime_orchestration_does_not_import_global_container(
     relative_path: str,

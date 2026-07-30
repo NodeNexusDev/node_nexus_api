@@ -4,6 +4,7 @@ import structlog
 
 from app.adapters.lifecycle.migration_runner import MigrationRunner
 from app.adapters.persistence.audit_outbox_worker import AuditOutboxWorker
+from app.adapters.runtime.apscheduler_runtime import ApschedulerRuntime
 from app.application.services.audit_cleanup_job import AuditCleanupJob
 from app.application.services.schedule_restorer import ScheduleRestorer
 from app.application.services.scheduled_script_executor import (
@@ -11,7 +12,6 @@ from app.application.services.scheduled_script_executor import (
 )
 from app.core.config import Settings
 from app.core.logging import configure_logging
-from app.core.scheduler import ScriptScheduler
 
 logger = structlog.get_logger()
 
@@ -23,7 +23,7 @@ class ApplicationStartup:
         self,
         settings: Settings,
         migration_runner: MigrationRunner,
-        scheduler: ScriptScheduler,
+        scheduler: ApschedulerRuntime,
         scheduled_executor: ScheduledScriptExecutor,
         schedule_restorer: ScheduleRestorer,
         audit_cleanup: AuditCleanupJob,

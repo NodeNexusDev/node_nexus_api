@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from app.core.scheduler import ScriptScheduler
+from app.adapters.runtime.apscheduler_runtime import ApschedulerRuntime
 from app.schemas.config import ImportResult
 
 # ============================================================
@@ -120,7 +120,7 @@ class TestSchedulerAdvanced:
     @pytest.mark.asyncio
     async def test_start_twice_no_error(self):
         """Starting scheduler twice doesn't raise."""
-        scheduler = ScriptScheduler()
+        scheduler = ApschedulerRuntime()
         await scheduler.start()
         await scheduler.start()
         await scheduler.stop()
@@ -128,18 +128,18 @@ class TestSchedulerAdvanced:
     @pytest.mark.asyncio
     async def test_stop_when_not_running(self):
         """Stopping scheduler when not running doesn't raise."""
-        scheduler = ScriptScheduler()
+        scheduler = ApschedulerRuntime()
         await scheduler.stop()
 
     def test_list_schedules_empty(self):
         """list_schedules returns empty when no jobs."""
-        scheduler = ScriptScheduler()
+        scheduler = ApschedulerRuntime()
         jobs = scheduler.list_schedules()
         assert jobs == []
 
     def test_get_schedule_returns_stored_info(self):
         """get_schedule returns info from APScheduler job."""
-        scheduler = ScriptScheduler()
+        scheduler = ApschedulerRuntime()
         script_id = MagicMock()
         scheduler.schedule_script(script_id, "0 9 * * *", [MagicMock()])
 
@@ -149,7 +149,7 @@ class TestSchedulerAdvanced:
 
     def test_schedule_with_callback(self):
         """schedule_script with callback adds to APScheduler."""
-        scheduler = ScriptScheduler()
+        scheduler = ApschedulerRuntime()
         script_id = MagicMock()
         callback = MagicMock()
 
@@ -163,13 +163,13 @@ class TestSchedulerAdvanced:
 
     def test_unschedule_nonexistent(self):
         """unschedule returns False for non-existent script."""
-        scheduler = ScriptScheduler()
+        scheduler = ApschedulerRuntime()
         removed = scheduler.unschedule_script(MagicMock())
         assert removed is False
 
     def test_get_schedule_nonexistent(self):
         """get_schedule returns None for non-existent script."""
-        scheduler = ScriptScheduler()
+        scheduler = ApschedulerRuntime()
         info = scheduler.get_schedule(MagicMock())
         assert info is None
 

@@ -1,4 +1,4 @@
-"""Scheduler configuration for cron-based script execution."""
+"""Concrete APScheduler lifecycle and ownership runtime."""
 
 from __future__ import annotations
 
@@ -42,8 +42,8 @@ _SCHEDULER_LOCK_ID = 5_642_395_847_322_111
 _OWNERSHIP_POLL_SECONDS = 5
 
 
-class ScriptScheduler:
-    """Application-scoped wrapper around the in-memory script scheduler."""
+class ApschedulerRuntime:
+    """Application-scoped APScheduler engine and ownership manager."""
 
     def __init__(self) -> None:
         self._scheduler = AsyncIOScheduler()

@@ -37,6 +37,7 @@ from app.adapters.persistence.script_gateway import (
     ScopedScriptExecutionWriter,
     SqlAlchemyScriptGateway,
 )
+from app.adapters.runtime.apscheduler_runtime import ApschedulerRuntime
 from app.adapters.runtime.docker import SshDockerRuntime
 from app.adapters.runtime.scheduler import ApschedulerJobScheduler
 from app.adapters.runtime.ssh import SSHConnectorFactory
@@ -108,7 +109,6 @@ from app.application.services.script_history_service import ScriptHistoryService
 from app.application.services.script_management_service import ScriptManagementService
 from app.application.services.streaming_command_service import StreamingCommandService
 from app.core.config import Settings, get_settings
-from app.core.scheduler import ScriptScheduler
 
 
 class DbProvider(Provider):
@@ -784,7 +784,9 @@ class SchedulerProvider(Provider):
         return ScheduleRestorer(reconciler, scheduler)
 
     @provide(scope=Scope.APP)
-    def get_job_scheduler(self, scheduler: ScriptScheduler) -> ApschedulerJobScheduler:
+    def get_job_scheduler(
+        self, scheduler: ApschedulerRuntime
+    ) -> ApschedulerJobScheduler:
         """Adapt the managed APScheduler runtime to the application port."""
         return ApschedulerJobScheduler(scheduler)
 
@@ -798,9 +800,9 @@ class SchedulerProvider(Provider):
     @provide(scope=Scope.APP)
     async def get_script_scheduler(
         self, engine: AsyncEngine, settings: Settings
-    ) -> AsyncIterable[ScriptScheduler]:
+    ) -> AsyncIterable[ApschedulerRuntime]:
         """Start and finalize the application-scoped script scheduler."""
-        scheduler = ScriptScheduler()
+        scheduler = ApschedulerRuntime()
         if settings.SCHEDULER_ENABLED:
             await scheduler.acquire_ownership(engine)
             scheduler.start_ownership_monitor(engine)
@@ -827,7 +829,7 @@ class SchedulerProvider(Provider):
         self,
         settings: Settings,
         migration_runner: MigrationRunner,
-        scheduler: ScriptScheduler,
+        scheduler: ApschedulerRuntime,
         scheduled_executor: ScheduledScriptExecutor,
         schedule_restorer: ScheduleRestorer,
         audit_cleanup: AuditCleanupJob,

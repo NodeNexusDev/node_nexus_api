@@ -6,14 +6,14 @@ from zoneinfo import ZoneInfo
 
 from apscheduler.triggers.cron import CronTrigger
 
+from app.adapters.runtime.apscheduler_runtime import ApschedulerRuntime
 from app.application.dto.schedule import RuntimeJobViewDTO, RuntimeScheduleDTO
-from app.core.scheduler import ScriptScheduler
 
 
 class ApschedulerJobScheduler:
     """Expose the concrete scheduler through the application runtime port."""
 
-    def __init__(self, scheduler: ScriptScheduler) -> None:
+    def __init__(self, scheduler: ApschedulerRuntime) -> None:
         self._scheduler = scheduler
 
     def is_ready(self) -> bool:
