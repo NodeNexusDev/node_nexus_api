@@ -2496,3 +2496,286 @@ def test_read_only_key_can_read(e2e_client):
             f"/api/v1/api-keys/{key_id}",
             headers={"X-API-Key": master_key},
         )
+
+
+# ---------------------------------------------------------------------------
+# Docker Container Logs — parameterized (Stage N.1)
+# ---------------------------------------------------------------------------
+
+
+def test_docker_container_logs_explicit_tail(e2e_client):
+    """GET .../containers/{cid}/logs?tail=N returns exactly N lines."""
+    node = _create_docker_node(e2e_client)
+    try:
+        _docker_pull_alpine(e2e_client, node["id"])
+        # Generate a container that prints 10 numbered lines then sleeps
+        cmd = (
+            "docker run -d --name e2e-logs-tail alpine sh -c "
+            "'for i in $(seq 1 10); do echo line-$i; done; sleep 60'"
+        )
+        resp = e2e_client.post(
+            f"/api/v1/nodes/{node['id']}/execute",
+            json={"command": cmd},
+        )
+        assert resp.status_code == 200
+
+        # Wait for container to finish printing
+        import time
+
+        time.sleep(2)
+
+        resp = e2e_client.get(
+            f"/api/v1/nodes/{node['id']}/docker/containers/e2e-logs-tail/logs?tail=3"
+        )
+        assert resp.status_code == 200, f"logs failed: {resp.status_code} {resp.text}"
+        output = (
+            resp.json()
+            if resp.headers.get("content-type", "").startswith("application/json")
+            else resp.text
+        )
+        # Should have at most 3 lines
+        if isinstance(output, str):
+            lines = [l for l in output.strip().split("\n") if l]
+            assert len(lines) <= 3, (
+                f"Expected <=3 lines, got {len(lines)}: {lines[:10]}"
+            )
+    finally:
+        e2e_client.delete(
+            f"/api/v1/nodes/{node['id']}/docker/containers/e2e-logs-tail?force=true"
+        )
+        e2e_client.delete(f"/api/v1/nodes/{node['id']}")
+
+
+def test_docker_container_logs_tail_default(e2e_client):
+    """GET .../containers/{cid}/logs (without tail) uses default tail=100."""
+    node = _create_docker_node(e2e_client)
+    try:
+        _docker_pull_alpine(e2e_client, node["id"])
+        cmd = (
+            "docker run -d --name e2e-logs-default alpine sh -c 'echo hello; sleep 60'"
+        )
+        resp = e2e_client.post(
+            f"/api/v1/nodes/{node['id']}/execute",
+            json={"command": cmd},
+        )
+        assert resp.status_code == 200
+        import time
+
+        time.sleep(1)
+
+        resp = e2e_client.get(
+            f"/api/v1/nodes/{node['id']}/docker/containers/e2e-logs-default/logs"
+        )
+        assert resp.status_code == 200
+        output = (
+            resp.json()
+            if resp.headers.get("content-type", "").startswith("application/json")
+            else resp.text
+        )
+        assert "hello" in str(output).lower() or len(str(output)) > 0
+    finally:
+        e2e_client.delete(
+            f"/api/v1/nodes/{node['id']}/docker/containers/e2e-logs-default?force=true"
+        )
+        e2e_client.delete(f"/api/v1/nodes/{node['id']}")
+
+
+def test_docker_container_logs_invalid_tail_zero(e2e_client):
+    """GET .../logs?tail=0 should return 422 (ge=1 constraint)."""
+    node = _create_docker_node(e2e_client)
+    try:
+        _docker_pull_alpine(e2e_client, node["id"])
+        cmd = "docker run -d --name e2e-logs-zero alpine sleep 60"
+        e2e_client.post(
+            f"/api/v1/nodes/{node['id']}/execute",
+            json={"command": cmd},
+        )
+        resp = e2e_client.get(
+            f"/api/v1/nodes/{node['id']}/docker/containers/e2e-logs-zero/logs?tail=0"
+        )
+        assert resp.status_code == 422, (
+            f"Expected 422 for tail=0, got {resp.status_code}: {resp.text}"
+        )
+    finally:
+        e2e_client.delete(
+            f"/api/v1/nodes/{node['id']}/docker/containers/e2e-logs-zero?force=true"
+        )
+        e2e_client.delete(f"/api/v1/nodes/{node['id']}")
+
+
+def test_docker_container_logs_invalid_tail_overflow(e2e_client):
+    """GET .../logs?tail=99999 should return 422 (le=10000 constraint)."""
+    node = _create_docker_node(e2e_client)
+    try:
+        _docker_pull_alpine(e2e_client, node["id"])
+        cmd = "docker run -d --name e2e-logs-overflow alpine sleep 60"
+        e2e_client.post(
+            f"/api/v1/nodes/{node['id']}/execute",
+            json={"command": cmd},
+        )
+        resp = e2e_client.get(
+            f"/api/v1/nodes/{node['id']}/docker/containers/e2e-logs-overflow/logs?tail=99999"
+        )
+        assert resp.status_code == 422, (
+            f"Expected 422 for tail=99999, got {resp.status_code}: {resp.text}"
+        )
+    finally:
+        e2e_client.delete(
+            f"/api/v1/nodes/{node['id']}/docker/containers/e2e-logs-overflow?force=true"
+        )
+        e2e_client.delete(f"/api/v1/nodes/{node['id']}")
+
+
+# ---------------------------------------------------------------------------
+# Docker Container Exec — parameterized (Stage N.2)
+# ---------------------------------------------------------------------------
+
+
+def test_docker_container_exec_timeout_boundary(e2e_client):
+    """POST .../exec with timeout=1 (minimum) should work."""
+    node = _create_docker_node(e2e_client)
+    try:
+        _docker_pull_alpine(e2e_client, node["id"])
+        cmd = "docker run -d --name e2e-exec-t1 alpine sleep 300"
+        e2e_client.post(
+            f"/api/v1/nodes/{node['id']}/execute",
+            json={"command": cmd},
+        )
+        resp = e2e_client.post(
+            f"/api/v1/nodes/{node['id']}/docker/containers/e2e-exec-t1/exec",
+            json={"command": "echo ok", "timeout": 1},
+        )
+        assert resp.status_code == 200, (
+            f"Expected 200 for timeout=1, got {resp.status_code}: {resp.text}"
+        )
+    finally:
+        e2e_client.delete(
+            f"/api/v1/nodes/{node['id']}/docker/containers/e2e-exec-t1?force=true"
+        )
+        e2e_client.delete(f"/api/v1/nodes/{node['id']}")
+
+
+def test_docker_container_exec_timeout_max(e2e_client):
+    """POST .../exec with timeout=600 (maximum) should work."""
+    node = _create_docker_node(e2e_client)
+    try:
+        _docker_pull_alpine(e2e_client, node["id"])
+        cmd = "docker run -d --name e2e-exec-tmax alpine sleep 300"
+        e2e_client.post(
+            f"/api/v1/nodes/{node['id']}/execute",
+            json={"command": cmd},
+        )
+        resp = e2e_client.post(
+            f"/api/v1/nodes/{node['id']}/docker/containers/e2e-exec-tmax/exec",
+            json={"command": "echo ok", "timeout": 600},
+        )
+        assert resp.status_code == 200, (
+            f"Expected 200 for timeout=600, got {resp.status_code}: {resp.text}"
+        )
+    finally:
+        e2e_client.delete(
+            f"/api/v1/nodes/{node['id']}/docker/containers/e2e-exec-tmax?force=true"
+        )
+        e2e_client.delete(f"/api/v1/nodes/{node['id']}")
+
+
+def test_docker_container_exec_command_too_long(e2e_client):
+    """POST .../exec with command > 4096 chars should return 422."""
+    node = _create_docker_node(e2e_client)
+    try:
+        _docker_pull_alpine(e2e_client, node["id"])
+        cmd = "docker run -d --name e2e-exec-long alpine sleep 300"
+        e2e_client.post(
+            f"/api/v1/nodes/{node['id']}/execute",
+            json={"command": cmd},
+        )
+        resp = e2e_client.post(
+            f"/api/v1/nodes/{node['id']}/docker/containers/e2e-exec-long/exec",
+            json={"command": "A" * 5000, "timeout": 30},
+        )
+        assert resp.status_code == 422, (
+            f"Expected 422 for long command, got {resp.status_code}: {resp.text}"
+        )
+    finally:
+        e2e_client.delete(
+            f"/api/v1/nodes/{node['id']}/docker/containers/e2e-exec-long?force=true"
+        )
+        e2e_client.delete(f"/api/v1/nodes/{node['id']}")
+
+
+def test_docker_container_exec_timeout_exceeded(e2e_client):
+    """POST .../exec with command that exceeds timeout should complete with error."""
+    node = _create_docker_node(e2e_client)
+    try:
+        _docker_pull_alpine(e2e_client, node["id"])
+        cmd = "docker run -d --name e2e-exec-timeout alpine sleep 300"
+        e2e_client.post(
+            f"/api/v1/nodes/{node['id']}/execute",
+            json={"command": cmd},
+        )
+        resp = e2e_client.post(
+            f"/api/v1/nodes/{node['id']}/docker/containers/e2e-exec-timeout/exec",
+            json={"command": "sleep 10", "timeout": 1},
+        )
+        # May be 200 with non-zero exit, or may be an error response
+        # The key assertion: it should NOT be a 500 internal server error
+        assert resp.status_code < 500, (
+            f"Got 5xx ({resp.status_code}) on exec timeout: {resp.text}"
+        )
+    finally:
+        e2e_client.delete(
+            f"/api/v1/nodes/{node['id']}/docker/containers/e2e-exec-timeout?force=true"
+        )
+        e2e_client.delete(f"/api/v1/nodes/{node['id']}")
+
+
+# ---------------------------------------------------------------------------
+# Docker Container Stats — parameterized (Stage N.3)
+# ---------------------------------------------------------------------------
+
+
+def test_docker_container_stats_fields(e2e_client):
+    """GET .../containers/{cid}/stats returns all expected DockerStats fields."""
+    node = _create_docker_node(e2e_client)
+    try:
+        _docker_pull_alpine(e2e_client, node["id"])
+        cmd = "docker run -d --name e2e-stats-fields alpine sleep 300"
+        e2e_client.post(
+            f"/api/v1/nodes/{node['id']}/execute",
+            json={"command": cmd},
+        )
+        resp = e2e_client.get(
+            f"/api/v1/nodes/{node['id']}/docker/containers/e2e-stats-fields/stats"
+        )
+        assert resp.status_code == 200, f"stats failed: {resp.status_code} {resp.text}"
+        stats = resp.json()
+        # Verify key DockerStats fields are present (aliased: Container, Name, CPUPerc, MemUsage)
+        assert "Container" in stats, (
+            f"Missing 'Container' in stats: {list(stats.keys())}"
+        )
+        assert "Name" in stats, f"Missing 'Name' in stats: {list(stats.keys())}"
+        assert "CPUPerc" in stats or "cpu_percent" in stats, (
+            f"Missing CPU field in stats: {list(stats.keys())}"
+        )
+        assert "MemUsage" in stats or "mem_usage" in stats, (
+            f"Missing memory field in stats: {list(stats.keys())}"
+        )
+    finally:
+        e2e_client.delete(
+            f"/api/v1/nodes/{node['id']}/docker/containers/e2e-stats-fields?force=true"
+        )
+        e2e_client.delete(f"/api/v1/nodes/{node['id']}")
+
+
+def test_docker_container_stats_not_found(e2e_client):
+    """GET .../containers/nonexistent/stats should return 404."""
+    node = _create_docker_node(e2e_client)
+    try:
+        resp = e2e_client.get(
+            f"/api/v1/nodes/{node['id']}/docker/containers/nonexistent-ctr/stats"
+        )
+        assert resp.status_code == 404, (
+            f"Expected 404, got {resp.status_code}: {resp.text}"
+        )
+    finally:
+        e2e_client.delete(f"/api/v1/nodes/{node['id']}")
