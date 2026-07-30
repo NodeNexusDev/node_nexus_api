@@ -1,10 +1,12 @@
 """AsyncSSH outbound adapter."""
 
 import asyncio
-from collections.abc import AsyncIterator
+import shlex
+from collections.abc import AsyncGenerator, AsyncIterator
 from pathlib import Path
 from types import TracebackType
 from typing import Any, Literal, Self
+from uuid import uuid4
 
 import asyncssh
 import structlog
@@ -17,6 +19,7 @@ logger = structlog.get_logger()  # operational: flow, performance
 audit = structlog.get_logger("audit")  # security: access, commands, failures
 _ALLOWED_SIGNALS = frozenset({"SIGINT", "SIGTERM", "SIGHUP"})
 _STREAM_QUEUE_SIZE = 128
+_PROCESS_TERMINATION_TIMEOUT = 5.0
 
 
 class SSHConnector:
@@ -43,6 +46,7 @@ class SSHConnector:
         self._strict_host_key_checking = strict_host_key_checking
         self._connection: asyncssh.SSHClientConnection | None = None
         self._active_process: Any | None = None
+        self._active_process_group_file: str | None = None
 
     async def connect(self) -> None:
         """Establish SSH connection.
@@ -191,13 +195,19 @@ class SSHConnector:
 
     async def execute_command_streaming_events(
         self, command: str
-    ) -> AsyncIterator[RemoteStreamEventDTO]:
+    ) -> AsyncGenerator[RemoteStreamEventDTO]:
         """Stream stdout/stderr separately and finish with the real exit status."""
         if not self._connection:
             raise RuntimeError("Not connected")
         queue: asyncio.Queue[RemoteStreamEventDTO] = asyncio.Queue(_STREAM_QUEUE_SIZE)
-        process = await self._connection.create_process(command)
+        group_file = f"/tmp/node-nexus-stream-{uuid4().hex}.pid"
+        grouped_command = f"printf '%s' \"$$\" > {group_file}; {command}"
+        remote_command = (
+            f'setsid sh -c {shlex.quote(grouped_command)}; status=$?; exit "$status"'
+        )
+        process = await self._connection.create_process(remote_command)
         self._active_process = process
+        self._active_process_group_file = group_file
 
         async def pump(stream: Any, event_type: Literal["stdout", "stderr"]) -> None:
             async for chunk in stream:
@@ -212,11 +222,11 @@ class SSHConnector:
                 )
             )
 
-        tasks = [
+        pump_tasks = [
             asyncio.create_task(pump(process.stdout, "stdout")),
             asyncio.create_task(pump(process.stderr, "stderr")),
-            asyncio.create_task(wait_for_exit()),
         ]
+        exit_task = asyncio.create_task(wait_for_exit())
         try:
             while True:
                 event = await queue.get()
@@ -224,13 +234,31 @@ class SSHConnector:
                 if event.type == "exit":
                     break
         finally:
-            for task in tasks:
+            for task in pump_tasks:
                 if not task.done():
                     task.cancel()
-            await asyncio.gather(*tasks, return_exceptions=True)
-            if getattr(process, "exit_status", None) is None:
-                process.terminate()
-            self._active_process = None
+            await asyncio.gather(*pump_tasks, return_exceptions=True)
+            try:
+                if getattr(process, "exit_status", None) is None:
+                    await self._signal_active_process_group("TERM")
+                try:
+                    await asyncio.wait_for(
+                        exit_task,
+                        timeout=_PROCESS_TERMINATION_TIMEOUT,
+                    )
+                except TimeoutError:
+                    await self._signal_active_process_group("KILL")
+                    await process.wait()
+            finally:
+                if not exit_task.done():
+                    exit_task.cancel()
+                    await asyncio.gather(exit_task, return_exceptions=True)
+                self._active_process = None
+                await self._connection.run(
+                    f"rm -f {group_file}",
+                    check=False,
+                )
+                self._active_process_group_file = None
 
     async def send_signal(self, signal: str) -> None:
         """Send an allowlisted signal to the active SSH process."""
@@ -238,7 +266,22 @@ class SSHConnector:
             raise ValueError("Signal is not allowed")
         if self._active_process is None:
             raise RuntimeError("No active process")
-        self._active_process.send_signal(signal)
+        # RFC 4254 uses signal names without the POSIX ``SIG`` prefix.
+        await self._signal_active_process_group(signal.removeprefix("SIG"))
+
+    async def abort_active_process(self) -> None:
+        """Forcibly stop the active remote process group."""
+        if self._active_process is not None:
+            await self._signal_active_process_group("KILL")
+
+    async def _signal_active_process_group(self, signal: str) -> None:
+        """Signal the full remote process group, including command children."""
+        if not self._connection or not self._active_process_group_file:
+            raise RuntimeError("No active process")
+        await self._connection.run(
+            f"kill -{signal} -$(cat {self._active_process_group_file})",
+            check=False,
+        )
 
 
 class SSHConnectorFactory:

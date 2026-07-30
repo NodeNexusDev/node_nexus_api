@@ -1,5 +1,6 @@
 """Unit tests for SSH connector edge cases."""
 
+import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -255,15 +256,23 @@ class TestSSHConnector:
         process.stdout = AsyncChunks("out")
         process.stderr = AsyncChunks()
         process.exit_status = None
-        process.terminate = MagicMock()
+        terminated = asyncio.Event()
+        process.wait.side_effect = terminated.wait
         connection = AsyncMock()
         connection.create_process.return_value = process
+
+        async def complete_on_signal(command: str, *, check: bool) -> None:
+            if command.startswith("kill -TERM"):
+                terminated.set()
+
+        connection.run.side_effect = complete_on_signal
         connector._connection = connection
 
         stream = connector.execute_command_streaming_events("run")
         await anext(stream)
         await stream.aclose()
-        process.terminate.assert_called_once()
+        process.wait.assert_awaited_once()
+        assert connection.run.await_count == 2
 
     async def test_typed_streaming_requires_connection(self) -> None:
         connector = SSHConnector(host="127.0.0.1")
@@ -278,8 +287,13 @@ class TestSSHConnector:
             await connector.send_signal("SIGTERM")
         process = MagicMock()
         connector._active_process = process
+        connector._active_process_group_file = "/tmp/process.pid"
+        connector._connection = AsyncMock()
         await connector.send_signal("SIGINT")
-        process.send_signal.assert_called_once_with("SIGINT")
+        connector._connection.run.assert_awaited_once_with(
+            "kill -INT -$(cat /tmp/process.pid)",
+            check=False,
+        )
 
 
 class TestSSHConnectorFactory:

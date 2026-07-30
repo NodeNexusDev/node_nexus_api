@@ -78,8 +78,9 @@ async def _send_command_events(
     node_id: UUID,
 ) -> None:
     """Forward typed remote process events without exposing internal errors."""
+    events = session.execute_events(command)
     try:
-        async for event in session.execute_events(command):
+        async for event in events:
             payload = {"version": "1", "type": event.type}
             if event.data is not None:
                 payload["data"] = event.data
@@ -101,6 +102,8 @@ async def _send_command_events(
         await websocket.send_json(
             {"version": "1", "type": "error", "message": "Internal error"}
         )
+    finally:
+        await events.aclose()
 
 
 @router.websocket("/nodes/{node_id}/exec-stream")
@@ -148,6 +151,10 @@ async def exec_stream(
                 while True:
                     try:
                         data = await websocket.receive_json()
+                    except WebSocketDisconnect:
+                        if active_task is not None and not active_task.done():
+                            await streaming_session.abort_active_process()
+                        raise
                     except (json.JSONDecodeError, ValueError):
                         await websocket.send_json(
                             {"version": "1", "type": "error", "message": "Invalid JSON"}
@@ -235,6 +242,14 @@ async def exec_stream(
             return
         finally:
             if "active_task" in locals() and active_task is not None:
+                if not active_task.done():
+                    try:
+                        await streaming_session.abort_active_process()
+                    except (OSError, RuntimeError):
+                        logger.debug(
+                            "ws.exec.disconnect_signal_failed",
+                            node_id=str(node_id),
+                        )
                 active_task.cancel()
                 await asyncio.gather(active_task, return_exceptions=True)
             audit.info("ws.exec.disconnected", node_id=str(node_id))

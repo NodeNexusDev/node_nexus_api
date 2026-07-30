@@ -1,6 +1,6 @@
 """Streaming command orchestration independent from the WebSocket adapter."""
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator, AsyncIterator
 from contextlib import asynccontextmanager
 from uuid import UUID
 
@@ -24,13 +24,17 @@ class StreamingCommandSession:
         """Stream command output."""
         return self._connector.execute_command_streaming(command)
 
-    def execute_events(self, command: str) -> AsyncIterator[RemoteStreamEventDTO]:
+    def execute_events(self, command: str) -> AsyncGenerator[RemoteStreamEventDTO]:
         """Stream typed stdout, stderr, and exit events."""
         return self._connector.execute_command_streaming_events(command)
 
     async def send_signal(self, signal: str) -> None:
         """Forward an allowed signal to the active remote process."""
         await self._connector.send_signal(signal)
+
+    async def abort_active_process(self) -> None:
+        """Forcibly stop the active remote process group."""
+        await self._connector.abort_active_process()
 
 
 class StreamingCommandService:
