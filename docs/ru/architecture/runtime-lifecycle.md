@@ -20,3 +20,39 @@ jobs.
 
 При shutdown Dishka закрывает container; APP finalizers останавливают scheduler
 и audit worker и освобождают database engine.
+
+## Запуск и жизненный цикл планировщика
+
+```mermaid
+stateDiagram-v2
+    [*] --> Starting
+    Starting --> Migrating : AUTO_MIGRATE=true
+    Starting --> Ready : AUTO_MIGRATE=false
+    Migrating --> Ready : миграции применены
+
+    Ready --> Reconciling : scheduler включён
+    Reconciling --> Owner : advisory lock получен
+    Reconciling --> Standby : lock у другой реплики
+
+    Owner --> Executing : наступило время job
+    Executing --> Owner : job завершён
+    Executing --> Owner : job упал (записан)
+
+    Owner --> Reconciling : периодическая сверка
+    Standby --> Reconciling : периодическая сверка
+
+    Owner --> Shutting_Down : SIGTERM
+    Standby --> Shutting_Down : SIGTERM
+    Shutting_Down --> [*] : finalizers отработали
+
+    note right of Standby
+        Обслуживает HTTP и schedule API.
+        Не выполняет jobs.
+    end note
+
+    note right of Owner
+        Обслуживает HTTP и schedule API.
+        Выполняет scheduled jobs.
+        Владеет PostgreSQL advisory lock.
+    end note
+```

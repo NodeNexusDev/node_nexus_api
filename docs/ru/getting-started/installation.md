@@ -2,7 +2,7 @@
 title: Установка
 status: stable
 translation_key: getting-started.installation
-source_revision: "2026-07-29"
+source_revision: "2026-07-30"
 ---
 
 # Установка
@@ -16,7 +16,7 @@ cp .env.example .env
 docker compose up -d --build
 ```
 
-До публикации сервиса задайте секреты из раздела
+Перед тем как открыть доступ к сервису, задайте секреты из раздела
 [конфигурации](configuration.md). Убедитесь, что запрос
 `GET http://localhost:8000/health` завершается успешно.
 

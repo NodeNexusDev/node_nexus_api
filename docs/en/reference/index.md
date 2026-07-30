@@ -7,6 +7,7 @@ source_revision: "2026-07-29"
 
 # Reference
 
-Use the [HTTP API overview](api.md), [configuration table](configuration.md),
-[error catalog](error-catalog.md), and [compatibility policy](compatibility.md)
+Use the [HTTP API overview](api.md), [cheat sheet](cheat-sheet.md),
+[configuration table](configuration.md), [error catalog](error-catalog.md),
+[glossary](glossary.md), and [compatibility policy](compatibility.md)
 for exact lookup material. OpenAPI remains the complete endpoint contract.

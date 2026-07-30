@@ -39,6 +39,7 @@ nav:
       - WebSocket: guides/websocket.md
       - Импорт и экспорт: guides/configuration-import-export.md
       - Решение проблем: guides/troubleshooting.md
+      - Частые вопросы: guides/faq.md
   - Эксплуатация:
       - operations/index.md
       - Развёртывание: operations/deployment.md
@@ -84,3 +85,5 @@ nav:
       - Конфигурация: reference/configuration.md
       - Каталог ошибок: reference/error-catalog.md
       - Совместимость: reference/compatibility.md
+      - Шпаргалка: reference/cheat-sheet.md
+      - Глоссарий: reference/glossary.md

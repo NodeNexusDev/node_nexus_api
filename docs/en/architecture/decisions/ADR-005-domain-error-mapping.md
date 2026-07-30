@@ -2,7 +2,7 @@
 title: "ADR-005: Domain error mapping"
 status: accepted
 translation_key: architecture.decisions.005
-source_revision: "2026-07-29"
+source_revision: "2026-07-30"
 ---
 
 # ADR-005: Domain error mapping
@@ -10,7 +10,8 @@ source_revision: "2026-07-29"
 ## Decision
 
 Domain code raises transport-agnostic errors. One API mapping translates them
-to stable HTTP statuses and the `{"detail": "..."}` envelope.
+to stable HTTP statuses and a JSON envelope with `code`, `message`,
+`request_id`, and `detail` fields.
 
 ## Consequences
 

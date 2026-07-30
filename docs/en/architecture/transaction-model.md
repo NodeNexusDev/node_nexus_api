@@ -19,3 +19,44 @@ distributed rollback.
 Multi-aggregate operations use dedicated boundaries only when atomicity is a
 business requirement. Configuration import owns one transaction for the whole
 payload; there is no universal application Unit of Work.
+
+## Request lifecycle
+
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant API as FastAPI router
+    participant AUTH as Auth middleware
+    participant UC as Application use case
+    participant R as Persistence reader
+    participant DB as PostgreSQL
+    participant SSH as Remote host
+    participant W as Persistence writer
+
+    C->>API: POST /nodes/{id}/execute
+    API->>AUTH: validate X-API-Key
+    AUTH-->>API: API key + scope
+    API->>UC: execute(command_dto)
+
+    UC->>R: get_connection(node_id)
+    R->>DB: SELECT (short session)
+    DB-->>R: node model
+    R-->>UC: NodeConnectionDTO
+    Note over R,DB: session closed
+
+    UC->>SSH: execute_command(conn_dto, command)
+    SSH-->>UC: stdout, stderr, exit_code
+    Note over UC,SSH: no DB session held
+
+    UC->>W: save_result(execution_dto)
+    W->>DB: INSERT (short transaction)
+    DB-->>W: ok
+    W-->>UC: done
+    Note over W,DB: transaction committed
+
+    UC-->>API: CommandResultDTO
+    API-->>C: 200 JSON
+```
+
+The gap between the read and the remote call is intentional: no database
+connection or transaction is held during SSH or Docker I/O.

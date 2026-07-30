@@ -2,7 +2,7 @@
 title: HTTP API
 status: stable
 translation_key: reference.api
-source_revision: "2026-07-29"
+source_revision: "2026-07-30"
 ---
 
 # HTTP API
@@ -20,7 +20,9 @@ Runtime contract:
 Списки используют offset pagination `page`/`size` или keyset pagination
 `cursor`/`limit`. Rate limits локальны для process и задаются environment
 variables. Global request timeout возвращает `504`. Validation errors используют
-FastAPI envelope, domain errors — `{"detail": "message"}`.
+FastAPI envelope, domain errors —
+стабильный JSON-конверт с полями `code`, `message`, `request_id` и `detail`
+(см. [Каталог ошибок](error-catalog.md)).
 
 ```bash
 curl -H 'X-API-Key: your-key' \

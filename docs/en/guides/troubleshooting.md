@@ -2,7 +2,7 @@
 title: Troubleshooting
 status: stable
 translation_key: guides.troubleshooting
-source_revision: "2026-07-29"
+source_revision: "2026-07-30"
 ---
 
 # Troubleshooting
@@ -37,8 +37,9 @@ revision with `uv run alembic current`.
 
 ## Schedules and remote Docker
 
-Schedules live in process memory, disappear after restart, and are not
-coordinated across replicas. Use one scheduler owner or an external durable
-scheduler. For Docker failures, verify node connectivity and run `docker
-version`, `docker info`, and `docker ps` on the remote host. Bulk operations can
-partially succeed, so inspect every result.
+Schedules are persisted in PostgreSQL and restored during startup. APScheduler
+jobs are an ephemeral runtime projection; after restart the reconciliation
+service rebuilds them from the database. Only the replica that owns the advisory
+lock executes jobs. For Docker failures, verify node connectivity and run
+`docker version`, `docker info`, and `docker ps` on the remote host. Bulk
+operations can partially succeed, so inspect every result.

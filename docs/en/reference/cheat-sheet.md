@@ -1,0 +1,79 @@
+---
+title: Cheat sheet
+status: stable
+translation_key: reference.cheat-sheet
+source_revision: "2026-07-30"
+---
+
+# Cheat sheet
+
+Copy-paste recipes for common operations. Replace `${...}` placeholders
+with your values.
+
+## Setup
+
+```bash
+export NODE_NEXUS_URL=http://localhost:8000
+export NODE_NEXUS_API_KEY='your-key'
+```
+
+## Nodes
+
+| Task | Command |
+|------|---------|
+| List nodes | `curl -H "X-API-Key: ${NODE_NEXUS_API_KEY}" "${NODE_NEXUS_URL}/api/v1/nodes/?page=1&size=20"` |
+| List with tags | `curl -H "X-API-Key: ${NODE_NEXUS_API_KEY}" "${NODE_NEXUS_URL}/api/v1/nodes/?tags=production&tags=frontend"` |
+| Create node | `curl -X POST -H "X-API-Key: ${NODE_NEXUS_API_KEY}" -H 'Content-Type: application/json' -d '{"name":"srv","host":"192.0.2.10","port":22,"connection_type":"ssh","username":"ops","password":"...","tags":["prod"]}' "${NODE_NEXUS_URL}/api/v1/nodes/"` |
+| Get one node | `curl -H "X-API-Key: ${NODE_NEXUS_API_KEY}" "${NODE_NEXUS_URL}/api/v1/nodes/${NODE_ID}"` |
+| Update node | `curl -X PATCH -H "X-API-Key: ${NODE_NEXUS_API_KEY}" -H 'Content-Type: application/json' -d '{"tags":["prod","db"]}' "${NODE_NEXUS_URL}/api/v1/nodes/${NODE_ID}"` |
+| Delete node | `curl -X DELETE -H "X-API-Key: ${NODE_NEXUS_API_KEY}" "${NODE_NEXUS_URL}/api/v1/nodes/${NODE_ID}"` |
+| Check connectivity | `curl -X POST -H "X-API-Key: ${NODE_NEXUS_API_KEY}" "${NODE_NEXUS_URL}/api/v1/nodes/${NODE_ID}/check/"` |
+| Get metrics | `curl -H "X-API-Key: ${NODE_NEXUS_API_KEY}" "${NODE_NEXUS_URL}/api/v1/nodes/${NODE_ID}/metrics/"` |
+
+## Commands
+
+| Task | Command |
+|------|---------|
+| Execute inline command | `curl -X POST -H "X-API-Key: ${NODE_NEXUS_API_KEY}" -H 'Content-Type: application/json' -d '{"command":"uptime"}' "${NODE_NEXUS_URL}/api/v1/nodes/${NODE_ID}/execute/"` |
+| Execute on multiple nodes | `curl -X POST -H "X-API-Key: ${NODE_NEXUS_API_KEY}" -H 'Content-Type: application/json' -d '{"command":"df -h","node_ids":["id1","id2"]}' "${NODE_NEXUS_URL}/api/v1/nodes/bulk/execute/"` |
+| Create command template | `curl -X POST -H "X-API-Key: ${NODE_NEXUS_API_KEY}" -H 'Content-Type: application/json' -d '{"name":"disk","command":"df -h {{ mount }}","parameters":[{"name":"mount","type":"string","required":true}]}' "${NODE_NEXUS_URL}/api/v1/commands/"` |
+| List templates | `curl -H "X-API-Key: ${NODE_NEXUS_API_KEY}" "${NODE_NEXUS_URL}/api/v1/commands/?page=1&size=20"` |
+| Execute template | `curl -X POST -H "X-API-Key: ${NODE_NEXUS_API_KEY}" -H 'Content-Type: application/json' -d "{\"node_id\":\"${NODE_ID}\",\"params\":{\"mount\":\"/\"}}" "${NODE_NEXUS_URL}/api/v1/commands/${COMMAND_ID}/execute"` |
+
+## Docker
+
+| Task | Command |
+|------|---------|
+| List containers | `curl -H "X-API-Key: ${NODE_NEXUS_API_KEY}" "${NODE_NEXUS_URL}/api/v1/nodes/${NODE_ID}/docker/containers/"` |
+| List images | `curl -H "X-API-Key: ${NODE_NEXUS_API_KEY}" "${NODE_NEXUS_URL}/api/v1/nodes/${NODE_ID}/docker/images/"` |
+| Exec in container | `curl -X POST -H "X-API-Key: ${NODE_NEXUS_API_KEY}" -H 'Content-Type: application/json' -d '{"command":"id","timeout":30}' "${NODE_NEXUS_URL}/api/v1/nodes/${NODE_ID}/docker/containers/${CONTAINER_ID}/exec/"` |
+| Start container | `curl -X POST -H "X-API-Key: ${NODE_NEXUS_API_KEY}" "${NODE_NEXUS_URL}/api/v1/nodes/${NODE_ID}/docker/containers/${CONTAINER_ID}/start/"` |
+| Stop container | `curl -X POST -H "X-API-Key: ${NODE_NEXUS_API_KEY}" "${NODE_NEXUS_URL}/api/v1/nodes/${NODE_ID}/docker/containers/${CONTAINER_ID}/stop/"` |
+
+## API keys
+
+| Task | Command |
+|------|---------|
+| Create key | `curl -X POST -H "X-API-Key: ${NODE_NEXUS_API_KEY}" -H 'Content-Type: application/json' -d '{"name":"reader","scope":"read-only"}' "${NODE_NEXUS_URL}/api/v1/api-keys/"` |
+| List keys | `curl -H "X-API-Key: ${NODE_NEXUS_API_KEY}" "${NODE_NEXUS_URL}/api/v1/api-keys/?page=1&size=20"` |
+| Update key | `curl -X PATCH -H "X-API-Key: ${NODE_NEXUS_API_KEY}" -H 'Content-Type: application/json' -d '{"is_active":false}' "${NODE_NEXUS_URL}/api/v1/api-keys/${KEY_ID}"` |
+| Delete key | `curl -X DELETE -H "X-API-Key: ${NODE_NEXUS_API_KEY}" "${NODE_NEXUS_URL}/api/v1/api-keys/${KEY_ID}"` |
+
+## Audit
+
+| Task | Command |
+|------|---------|
+| Query events | `curl -H "X-API-Key: ${NODE_NEXUS_API_KEY}" "${NODE_NEXUS_URL}/api/v1/audit/?page=1&size=50"` |
+| Filter by node | `curl -H "X-API-Key: ${NODE_NEXUS_API_KEY}" "${NODE_NEXUS_URL}/api/v1/audit/?node_id=${NODE_ID}"` |
+| Delete log | `curl -X DELETE -H "X-API-Key: ${MASTER_API_KEY}" "${NODE_NEXUS_URL}/api/v1/audit/?confirm=yes"` |
+
+## Health
+
+| Task | Command |
+|------|---------|
+| Liveness | `curl "${NODE_NEXUS_URL}/health"` |
+| Readiness | `curl "${NODE_NEXUS_URL}/ready"` |
+| Metrics | `curl "${NODE_NEXUS_URL}/metrics"` |
+
+See the [HTTP API reference](api.md) for the complete endpoint catalog and
+[interactive docs](openapi.html) for request/response schemas.

@@ -52,3 +52,116 @@ flowchart LR
 No live session or ORM model crosses from a persistence adapter into remote
 I/O. The config branch is deliberately different: its dedicated port owns one
 transaction because the complete payload is one atomic business operation.
+
+## Data model
+
+```mermaid
+erDiagram
+    NODE {
+        uuid id PK
+        string name UK
+        string host
+        int port
+        string connection_type
+        string status
+        string username
+        text password
+        text ssh_key
+        string docker_host
+        list tags
+        datetime created_at
+        datetime updated_at
+    }
+
+    COMMAND {
+        uuid id PK
+        string name UK
+        text description
+        text command
+        list parameters
+        list tags
+        datetime created_at
+        datetime updated_at
+    }
+
+    SCRIPT {
+        uuid id PK
+        string name UK
+        text description
+        json steps
+        list tags
+        datetime created_at
+        datetime updated_at
+    }
+
+    SCRIPT_SCHEDULE {
+        uuid id PK
+        uuid script_id FK,UK
+        string cron
+        string timezone
+        json node_ids
+        json params
+        bool enabled
+        int misfire_grace_seconds
+        string operational_state
+        string last_error_type
+        datetime last_run_at
+        datetime last_success_at
+        datetime last_failure_at
+        datetime next_run_at
+        datetime created_at
+        datetime updated_at
+    }
+
+    SCRIPT_EXECUTION {
+        uuid id PK
+        uuid script_id FK
+        uuid node_id FK
+        json params
+        string status
+        json steps
+        datetime started_at
+        datetime finished_at
+    }
+
+    AUDIT_LOG {
+        uuid id PK
+        uuid node_id FK
+        string action
+        string user
+        text details
+        datetime created_at
+    }
+
+    AUDIT_OUTBOX {
+        uuid id PK
+        json payload
+        string status
+        int attempts
+        string last_error_type
+        datetime next_attempt_at
+        datetime created_at
+        datetime delivered_at
+    }
+
+    API_KEY {
+        uuid id PK
+        string name
+        string key_hash UK
+        string key_prefix
+        bool is_active
+        string scope
+        datetime created_at
+        datetime last_used_at
+        datetime expires_at
+    }
+
+    SCRIPT ||--o{ SCRIPT_EXECUTION : "runs as"
+    SCRIPT ||--|| SCRIPT_SCHEDULE : "scheduled by"
+    NODE ||--o{ SCRIPT_EXECUTION : "targets"
+    NODE ||--o{ AUDIT_LOG : "tracks"
+```
+
+`COMMAND`, `AUDIT_OUTBOX`, and `API_KEY` are standalone entities with no foreign
+keys to other tables. Command templates are referenced by scripts through JSON
+steps, not database-level constraints.
