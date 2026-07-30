@@ -167,6 +167,7 @@ def test_application_ports_have_explicit_dishka_bindings() -> None:
         "get_configuration_importer",
         "get_database_health_probe",
         "get_remote_connector_factory",
+        "get_remote_streaming_connector_factory",
         "get_credential_cipher",
         "get_docker_runtime",
         "get_audit_event_sink",

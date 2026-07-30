@@ -2,18 +2,10 @@
 
 from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator
-from dataclasses import dataclass
 from types import TracebackType
 from typing import Protocol, Self
 
-
-@dataclass(frozen=True, slots=True)
-class StreamEvent:
-    """One version-independent remote process stream event."""
-
-    type: str
-    data: str | None = None
-    exit_code: int | None = None
+from app.application.dto.remote_stream import RemoteStreamEventDTO as StreamEvent
 
 
 class BaseConnector(ABC):

@@ -21,6 +21,10 @@ from app.application.ports.remote_command import (
     RemoteCommandSession,
     RemoteConnectorFactory,
 )
+from app.application.ports.remote_stream import (
+    RemoteStreamingConnector,
+    RemoteStreamingConnectorFactory,
+)
 from app.application.ports.schedule import (
     JobSchedulerPort,
     ScheduleReader,
@@ -54,6 +58,8 @@ __all__ = [
     "NodeStatusWriter",
     "RemoteCommandSession",
     "RemoteConnectorFactory",
+    "RemoteStreamingConnector",
+    "RemoteStreamingConnectorFactory",
     "ScheduleReader",
     "ScheduleWriter",
     "ScriptDefinitionReader",

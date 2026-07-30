@@ -11,7 +11,7 @@ import pytest
 from fastapi import WebSocketDisconnect
 
 from app.api.v1.websocket import _send_command_events, _validate_ws_token, exec_stream
-from app.core.connectors.base import StreamEvent
+from app.application.dto.remote_stream import RemoteStreamEventDTO
 from app.core.exceptions import ConnectionFailedError, NodeNotFoundError
 
 _exec = exec_stream.__dishka_orig_func__  # type: ignore[attr-defined]
@@ -27,12 +27,12 @@ class FakeStreamingSession:
     def __init__(self, error: Exception | None = None) -> None:
         self.error = error
 
-    async def execute_events(self, command: str) -> AsyncIterator[StreamEvent]:
+    async def execute_events(self, command: str) -> AsyncIterator[RemoteStreamEventDTO]:
         if self.error:
             raise self.error
-        yield StreamEvent(type="stdout", data="output line 1\n")
-        yield StreamEvent(type="stderr", data="warning\n")
-        yield StreamEvent(type="exit", exit_code=7)
+        yield RemoteStreamEventDTO(type="stdout", data="output line 1\n")
+        yield RemoteStreamEventDTO(type="stderr", data="warning\n")
+        yield RemoteStreamEventDTO(type="exit", exit_code=7)
 
     async def send_signal(self, signal: str) -> None:
         if signal != "SIGINT":

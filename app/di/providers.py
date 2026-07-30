@@ -58,6 +58,7 @@ from app.application.ports.node_management import (
 )
 from app.application.ports.node_reader import NodeConnectionReader, NodeStatusWriter
 from app.application.ports.remote_command import RemoteConnectorFactory
+from app.application.ports.remote_stream import RemoteStreamingConnectorFactory
 from app.application.ports.schedule import (
     JobSchedulerPort,
     ScheduleReader,
@@ -400,6 +401,13 @@ class ConnectorProvider(Provider):
         """Bind remote command sessions to the SSH adapter."""
         return factory
 
+    @provide(scope=Scope.APP, provides=RemoteStreamingConnectorFactory)
+    def get_remote_streaming_connector_factory(
+        self, factory: SSHConnectorFactory
+    ) -> RemoteStreamingConnectorFactory:
+        """Bind SSH streaming to its application port."""
+        return factory
+
     @provide(scope=Scope.APP, provides=CredentialCipher)
     def get_credential_cipher(self) -> CredentialCipher:
         """Bind credential protection to the configured AES-GCM adapter."""
@@ -469,11 +477,16 @@ class ServiceProvider(Provider):
     @provide(scope=Scope.REQUEST)
     def get_streaming_command_service(
         self,
-        node_reader: ScopedNodeConnectionReader,
-        connector_factory: SSHConnectorFactory,
+        node_reader: NodeConnectionReader,
+        connector_factory: RemoteStreamingConnectorFactory,
+        credential_cipher: CredentialCipher,
     ) -> StreamingCommandService:
         """Get WebSocket streaming orchestration service."""
-        return StreamingCommandService(node_reader, connector_factory)
+        return StreamingCommandService(
+            node_reader,
+            connector_factory,
+            credential_cipher,
+        )
 
     @provide(scope=Scope.REQUEST)
     def get_audit_event_service(

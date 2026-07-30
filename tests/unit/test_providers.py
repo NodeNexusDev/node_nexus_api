@@ -252,7 +252,14 @@ def test_service_provider_resolves() -> None:
         MagicMock(SCHEDULER_ENABLED=True),
     )
     assert isinstance(health, HealthService)
-    assert svc_provider.get_streaming_command_service(node_reader, factory) is not None
+    assert (
+        svc_provider.get_streaming_command_service(
+            node_reader,
+            factory,
+            credential_cipher,
+        )
+        is not None
+    )
 
 
 async def test_db_session_provider_manages_transaction() -> None:

@@ -3,7 +3,7 @@
 import asyncio
 from collections.abc import AsyncIterator
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import asyncssh
 import structlog
@@ -184,7 +184,7 @@ class SSHConnector(BaseConnector):
         process = await self._connection.create_process(command)
         self._active_process = process
 
-        async def pump(stream: Any, event_type: str) -> None:
+        async def pump(stream: Any, event_type: Literal["stdout", "stderr"]) -> None:
             async for chunk in stream:
                 await queue.put(StreamEvent(type=event_type, data=str(chunk)))
 
