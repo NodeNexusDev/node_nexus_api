@@ -24,6 +24,10 @@ FORBIDDEN_IMPORTS: dict[str, tuple[str, ...]] = {
         "fastapi",
         "sqlalchemy",
         "dishka",
+        "app.core.connectors",
+        "app.core.scheduler",
+        "app.core.security",
+        "app.core.ssh_utils",
     ),
 }
 
@@ -111,6 +115,49 @@ def test_docker_facade_is_removed_from_production() -> None:
 def test_legacy_service_namespace_is_removed() -> None:
     """All application use cases belong to the application layer."""
     assert not list((APP_ROOT / "services").rglob("*.py"))
+
+
+@pytest.mark.parametrize(
+    "relative_path",
+    (
+        "core/connectors",
+        "core/scheduler.py",
+        "core/security.py",
+        "core/ssh_utils.py",
+    ),
+)
+def test_legacy_core_infrastructure_is_removed(relative_path: str) -> None:
+    """Concrete infrastructure must not return to the shared core."""
+    candidate = APP_ROOT / relative_path
+    if candidate.is_dir():
+        assert not list(candidate.rglob("*.py"))
+    else:
+        assert not candidate.exists()
+
+
+@pytest.mark.parametrize(
+    ("dependency", "allowed_prefix"),
+    (
+        ("asyncssh", "adapters/runtime/ssh.py"),
+        ("apscheduler", "adapters/runtime/"),
+        ("cryptography", "adapters/security/"),
+    ),
+)
+def test_infrastructure_packages_are_adapter_only(
+    dependency: str,
+    allowed_prefix: str,
+) -> None:
+    """Infrastructure libraries may only be imported by outbound adapters."""
+    violations = [
+        str(path.relative_to(APP_ROOT))
+        for path in APP_ROOT.rglob("*.py")
+        if any(
+            imported == dependency or imported.startswith(f"{dependency}.")
+            for imported in _imports(path)
+        )
+        and not str(path.relative_to(APP_ROOT)).startswith(allowed_prefix)
+    ]
+    assert not violations
 
 
 def test_legacy_generic_repository_contract_is_removed() -> None:

@@ -79,7 +79,7 @@ def test_api_does_not_access_persistence_or_concrete_connectors() -> None:
         "api",
         (
             "app.adapters",
-            "app.core.connectors.ssh",
+            "app.adapters.runtime.ssh",
             "app.di",
             "app.models",
             "app.repositories",
