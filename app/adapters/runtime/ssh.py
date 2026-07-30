@@ -1,15 +1,16 @@
-"""SSH connector implementation."""
+"""AsyncSSH outbound adapter."""
 
 import asyncio
 from collections.abc import AsyncIterator
 from pathlib import Path
-from typing import Any, Literal
+from types import TracebackType
+from typing import Any, Literal, Self
 
 import asyncssh
 import structlog
 
 from app.application.command_policy import command_fingerprint
-from app.core.connectors.base import BaseConnector, StreamEvent
+from app.application.dto.remote_stream import RemoteStreamEventDTO
 from app.core.exceptions import ConnectionFailedError
 
 logger = structlog.get_logger()  # operational: flow, performance
@@ -18,7 +19,7 @@ _ALLOWED_SIGNALS = frozenset({"SIGINT", "SIGTERM", "SIGHUP"})
 _STREAM_QUEUE_SIZE = 128
 
 
-class SSHConnector(BaseConnector):
+class SSHConnector:
     """SSH connector for remote command execution."""
 
     def __init__(
@@ -91,6 +92,20 @@ class SSHConnector(BaseConnector):
             await self._connection.wait_closed()
             self._connection = None
             logger.debug("ssh.disconnect", host=self._host)
+
+    async def __aenter__(self) -> Self:
+        """Connect and enter the remote session."""
+        await self.connect()
+        return self
+
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> None:
+        """Disconnect when leaving the remote session."""
+        await self.disconnect()
 
     async def execute_command(self, command: str) -> tuple[str, str, int]:
         """Execute a command on the remote system.
@@ -176,22 +191,25 @@ class SSHConnector(BaseConnector):
 
     async def execute_command_streaming_events(
         self, command: str
-    ) -> AsyncIterator[StreamEvent]:
+    ) -> AsyncIterator[RemoteStreamEventDTO]:
         """Stream stdout/stderr separately and finish with the real exit status."""
         if not self._connection:
             raise RuntimeError("Not connected")
-        queue: asyncio.Queue[StreamEvent] = asyncio.Queue(_STREAM_QUEUE_SIZE)
+        queue: asyncio.Queue[RemoteStreamEventDTO] = asyncio.Queue(_STREAM_QUEUE_SIZE)
         process = await self._connection.create_process(command)
         self._active_process = process
 
         async def pump(stream: Any, event_type: Literal["stdout", "stderr"]) -> None:
             async for chunk in stream:
-                await queue.put(StreamEvent(type=event_type, data=str(chunk)))
+                await queue.put(RemoteStreamEventDTO(type=event_type, data=str(chunk)))
 
         async def wait_for_exit() -> None:
             await process.wait()
             await queue.put(
-                StreamEvent(type="exit", exit_code=process.exit_status or 0)
+                RemoteStreamEventDTO(
+                    type="exit",
+                    exit_code=process.exit_status or 0,
+                )
             )
 
         tasks = [

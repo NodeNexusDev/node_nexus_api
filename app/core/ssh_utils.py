@@ -3,7 +3,6 @@
 import base64
 import binascii
 
-from app.core.connectors.base import ConnectorFactory
 from app.core.exceptions import CredentialDecryptionError
 from app.core.security import ENCRYPTION_PREFIX, decrypt
 
@@ -32,10 +31,3 @@ def decrypt_value(value: str | None) -> str | None:
         raise CredentialDecryptionError("Credential decryption failed") from exc
     except Exception as exc:
         raise CredentialDecryptionError("Credential decryption failed") from exc
-
-
-def get_connector_factory(factory: ConnectorFactory | None) -> ConnectorFactory:
-    """Get connector factory or raise if not configured."""
-    if factory is None:
-        raise RuntimeError("ConnectorFactory not configured")
-    return factory

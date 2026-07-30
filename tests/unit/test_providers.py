@@ -119,7 +119,7 @@ def test_repository_provider_resolves() -> None:
 
 
 def test_connector_provider_resolves() -> None:
-    from app.core.connectors.ssh import SSHConnectorFactory
+    from app.adapters.runtime.ssh import SSHConnectorFactory
 
     provider = ConnectorProvider()
     settings = MagicMock()

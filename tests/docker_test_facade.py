@@ -10,7 +10,7 @@ if TYPE_CHECKING:
     from app.application.ports.audit_sink import AuditEventSink
     from app.application.ports.docker_runtime import DockerRuntime
     from app.application.ports.node_reader import NodeConnectionReader
-    from app.core.connectors.base import ConnectorFactory
+    from app.application.ports.remote_command import RemoteConnectorFactory
 
 from app.adapters.runtime.docker import SshDockerRuntime
 from app.adapters.security import AesGcmCredentialCipher
@@ -41,7 +41,7 @@ class DockerService:
         self,
         repository: NodeRepository,
         audit_service: AuditEventSink | None = None,
-        connector_factory: ConnectorFactory | None = None,
+        connector_factory: RemoteConnectorFactory | None = None,
         node_reader: NodeConnectionReader | None = None,
         runtime: DockerRuntime | None = None,
     ) -> None:

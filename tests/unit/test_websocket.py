@@ -91,7 +91,7 @@ class TestWebSocketStreaming:
     @pytest.mark.asyncio
     async def test_connector_streaming_method_exists(self):
         """SSHConnector has execute_command_streaming method."""
-        from app.core.connectors.ssh import SSHConnector
+        from app.adapters.runtime.ssh import SSHConnector
 
         assert hasattr(SSHConnector, "execute_command_streaming")
 

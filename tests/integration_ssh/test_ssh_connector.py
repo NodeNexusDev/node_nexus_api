@@ -5,10 +5,10 @@ from datetime import UTC, datetime
 from typing import Any
 from unittest.mock import AsyncMock, Mock
 
+from app.adapters.runtime.ssh import SSHConnector
 from app.adapters.security import AesGcmCredentialCipher
 from app.application.dto.command_execution import CommandRequestDTO
 from app.application.services.node_command_service import NodeCommandService
-from app.core.connectors.ssh import SSHConnector
 from app.models.node import NodeModel
 from tests.integration_ssh.conftest import SSHServer
 

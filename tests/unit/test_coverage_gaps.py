@@ -185,7 +185,7 @@ class TestSSHStreaming:
     @pytest.mark.asyncio
     async def test_streaming_not_connected(self):
         """execute_command_streaming raises when not connected."""
-        from app.core.connectors.ssh import SSHConnector
+        from app.adapters.runtime.ssh import SSHConnector
 
         connector = SSHConnector(host="10.0.0.1")
         with pytest.raises(RuntimeError, match="Not connected"):
@@ -195,7 +195,7 @@ class TestSSHStreaming:
     @pytest.mark.asyncio
     async def test_streaming_yields_lines(self):
         """execute_command_streaming yields lines."""
-        from app.core.connectors.ssh import SSHConnector
+        from app.adapters.runtime.ssh import SSHConnector
 
         connector = SSHConnector(host="10.0.0.1")
         mock_conn = MagicMock()
@@ -228,7 +228,7 @@ class TestSSHStreaming:
         """execute_command_streaming handles asyncssh.Error."""
         import asyncssh
 
-        from app.core.connectors.ssh import SSHConnector
+        from app.adapters.runtime.ssh import SSHConnector
 
         connector = SSHConnector(host="10.0.0.1")
         mock_conn = MagicMock()

@@ -39,6 +39,7 @@ from app.adapters.persistence.script_gateway import (
 )
 from app.adapters.runtime.docker import SshDockerRuntime
 from app.adapters.runtime.scheduler import ApschedulerJobScheduler
+from app.adapters.runtime.ssh import SSHConnectorFactory
 from app.adapters.security import AesGcmCredentialCipher
 from app.application.ports.api_key import APIKeyReader, APIKeyWriter
 from app.application.ports.audit_log import AuditLogReader, AuditLogWriter
@@ -106,7 +107,6 @@ from app.application.services.script_history_service import ScriptHistoryService
 from app.application.services.script_management_service import ScriptManagementService
 from app.application.services.streaming_command_service import StreamingCommandService
 from app.core.config import Settings, get_settings
-from app.core.connectors.ssh import SSHConnectorFactory
 from app.core.scheduler import ScriptScheduler
 
 
