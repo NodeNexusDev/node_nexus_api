@@ -1,6 +1,7 @@
 """Docker management HTTP adapter."""
 
 import uuid
+from dataclasses import asdict
 
 import structlog
 from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
@@ -60,7 +61,9 @@ async def get_container(
         "api.docker.containers.get", node_id=str(node_id), container_id=validated_id
     )
     result = await service.get_container(node_id, validated_id)
-    return DockerContainerInspect.model_validate(result, from_attributes=True)
+    payload = asdict(result)
+    payload["network_settings"] = dict(result.network_settings)
+    return DockerContainerInspect.model_validate(payload)
 
 
 @router.post("/containers/{container_id}/start", status_code=204)
