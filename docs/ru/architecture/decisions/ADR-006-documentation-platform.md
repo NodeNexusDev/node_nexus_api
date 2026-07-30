@@ -2,7 +2,7 @@
 title: "ADR-006: Платформа документации"
 status: accepted
 translation_key: architecture.decisions.006
-source_revision: "2026-07-29"
+source_revision: "2026-07-30"
 ---
 
 # ADR-006: Платформа документации

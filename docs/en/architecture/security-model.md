@@ -2,7 +2,7 @@
 title: Security model
 status: stable
 translation_key: architecture.security-model
-source_revision: "2026-07-29"
+source_revision: "2026-07-30"
 ---
 
 # Security model
