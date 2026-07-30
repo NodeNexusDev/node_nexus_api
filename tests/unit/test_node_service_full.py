@@ -12,11 +12,11 @@ from app.application.dto.node_management import (
     NodePageDTO,
     NodeUpdateDTO,
 )
+from app.application.services.node_bulk_command_service import NodeBulkCommandService
+from app.application.services.node_command_service import NodeCommandService
+from app.application.services.node_management_service import NodeManagementService
 from app.core.exceptions import NodeNameConflictError, NodeNotFoundError
 from app.core.security import decrypt, encrypt
-from app.services.node_bulk_command_service import NodeBulkCommandService
-from app.services.node_command_service import NodeCommandService
-from app.services.node_management_service import NodeManagementService
 from tests.unit.conftest import make_node_view, make_orm_node
 
 
@@ -442,7 +442,9 @@ class TestLogWithAudit:
     async def test_calls_audit(self, repo: AsyncMock) -> None:
         from unittest.mock import AsyncMock
 
-        from app.services.node_management_service import NodeManagementService
+        from app.application.services.node_management_service import (
+            NodeManagementService,
+        )
 
         audit_mock = AsyncMock()
         svc = NodeManagementService(

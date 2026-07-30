@@ -17,9 +17,9 @@ from app.application.dto.script_management import (
     ScriptUpdateDTO,
     ScriptViewDTO,
 )
+from app.application.services.script_history_service import ScriptHistoryService
+from app.application.services.script_management_service import ScriptManagementService
 from app.core.exceptions import ScriptNotFoundError
-from app.services.script_history_service import ScriptHistoryService
-from app.services.script_management_service import ScriptManagementService
 
 
 def _script_view() -> ScriptViewDTO:

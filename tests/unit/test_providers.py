@@ -15,8 +15,14 @@ from app.application.services.api_key_authentication import (
 from app.application.services.api_key_management import APIKeyManagementService
 from app.application.services.audit_event_service import AuditEventService
 from app.application.services.audit_log_service import AuditLogService
+from app.application.services.command_execution_service import CommandExecutionService
+from app.application.services.command_management_service import CommandManagementService
 from app.application.services.config_service import ConfigService
+from app.application.services.health_service import HealthService
+from app.application.services.node_management_service import NodeManagementService
 from app.application.services.script_execution_service import ScriptExecutionService
+from app.application.services.script_history_service import ScriptHistoryService
+from app.application.services.script_management_service import ScriptManagementService
 from app.di.providers import (
     ConfigProvider,
     ConnectorProvider,
@@ -25,12 +31,6 @@ from app.di.providers import (
     SchedulerProvider,
     ServiceProvider,
 )
-from app.services.command_execution_service import CommandExecutionService
-from app.services.command_management_service import CommandManagementService
-from app.services.health_service import HealthService
-from app.services.node_management_service import NodeManagementService
-from app.services.script_history_service import ScriptHistoryService
-from app.services.script_management_service import ScriptManagementService
 
 
 @pytest.mark.asyncio

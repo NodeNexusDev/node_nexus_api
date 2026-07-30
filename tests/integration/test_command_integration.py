@@ -24,10 +24,10 @@ from app.api.error_mapping import domain_error_handler
 from app.api.v1.commands import router as commands_router
 from app.api.v1.health import router as health_router
 from app.application.services.api_key_authentication import APIKeyAuthenticationService
+from app.application.services.command_execution_service import CommandExecutionService
+from app.application.services.command_management_service import CommandManagementService
 from app.core.exceptions import DomainError
 from app.models.base import Base
-from app.services.command_execution_service import CommandExecutionService
-from app.services.command_management_service import CommandManagementService
 
 MASTER_KEY = "test-master-key"
 

@@ -25,8 +25,8 @@ from app.api.v1.health import router as health_router
 from app.api.v1.nodes import router as nodes_router
 from app.application.services.api_key_authentication import APIKeyAuthenticationService
 from app.application.services.api_key_management import APIKeyManagementService
+from app.application.services.node_management_service import NodeManagementService
 from app.models.base import Base
-from app.services.node_management_service import NodeManagementService
 
 MASTER_KEY = "test-master-key-123"
 

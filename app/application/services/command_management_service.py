@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 import structlog
@@ -13,6 +13,7 @@ from app.application.dto.command_management import (
     CommandUpdateDTO,
     CommandViewDTO,
 )
+from app.application.types import JsonObject
 from app.core.exceptions import CommandNotFoundError
 
 if TYPE_CHECKING:
@@ -35,7 +36,7 @@ class CommandManagementService:
         self._writer = writer
         self._audit = audit_service
 
-    async def _log(self, action: str, details: dict[str, Any]) -> None:
+    async def _log(self, action: str, details: JsonObject) -> None:
         if self._audit:
             await self._audit.log(action=action, details=details)
 

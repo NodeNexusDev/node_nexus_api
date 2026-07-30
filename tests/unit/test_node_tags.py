@@ -11,8 +11,8 @@ from app.application.dto.node_management import (
     NodePageDTO,
     NodeTagDTO,
 )
+from app.application.services.node_management_service import NodeManagementService
 from app.core.exceptions import NodeNotFoundError
-from app.services.node_management_service import NodeManagementService
 from tests.unit.conftest import make_node_view
 
 

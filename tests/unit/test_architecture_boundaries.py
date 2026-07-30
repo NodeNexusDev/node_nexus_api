@@ -103,7 +103,7 @@ def test_node_metrics_use_case_depends_on_persistence_port() -> None:
     violations = [
         module
         for module in _imports_in_file(
-            APP_ROOT / "services" / "node_metrics_service.py"
+            APP_ROOT / "application" / "services" / "node_metrics_service.py"
         )
         if any(
             module == prefix or module.startswith(f"{prefix}.") for prefix in forbidden
@@ -127,7 +127,7 @@ def test_node_management_use_case_depends_on_application_ports() -> None:
     violations = [
         module
         for module in _imports_in_file(
-            APP_ROOT / "services" / "node_management_service.py"
+            APP_ROOT / "application" / "services" / "node_management_service.py"
         )
         if any(
             module == prefix or module.startswith(f"{prefix}.") for prefix in forbidden
@@ -152,7 +152,7 @@ def test_node_command_use_case_does_not_depend_on_persistence() -> None:
     violations = [
         module
         for module in _imports_in_file(
-            APP_ROOT / "services" / "node_command_service.py"
+            APP_ROOT / "application" / "services" / "node_command_service.py"
         )
         if any(
             module == prefix or module.startswith(f"{prefix}.") for prefix in forbidden
@@ -177,7 +177,7 @@ def test_node_bulk_command_workers_do_not_depend_on_persistence() -> None:
     violations = [
         module
         for module in _imports_in_file(
-            APP_ROOT / "services" / "node_bulk_command_service.py"
+            APP_ROOT / "application" / "services" / "node_bulk_command_service.py"
         )
         if any(
             module == prefix or module.startswith(f"{prefix}.") for prefix in forbidden
@@ -194,7 +194,7 @@ def test_command_services_depend_only_on_inward_facing_modules(
     filename: str,
 ) -> None:
     """Focused command services must depend only on inward-facing modules."""
-    imports = _imports_in_file(APP_ROOT / "services" / filename)
+    imports = _imports_in_file(APP_ROOT / "application" / "services" / filename)
     forbidden = (
         "app.adapters",
         "app.core.connectors",
@@ -226,7 +226,7 @@ def test_focused_script_services_depend_only_on_inward_facing_modules(
     filename: str,
 ) -> None:
     """Focused script services must not know transport or persistence details."""
-    imports = _imports_in_file(APP_ROOT / "services" / filename)
+    imports = _imports_in_file(APP_ROOT / "application" / "services" / filename)
     forbidden = (
         "app.adapters",
         "app.models",

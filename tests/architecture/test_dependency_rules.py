@@ -197,7 +197,7 @@ def test_application_ports_have_explicit_dishka_bindings() -> None:
     "relative_path",
     (
         "application/services/script_execution_service.py",
-        "services/node_bulk_command_service.py",
+        "application/services/node_bulk_command_service.py",
         "services/docker/bulk_service.py",
     ),
 )

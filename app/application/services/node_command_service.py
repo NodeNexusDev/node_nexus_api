@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 import structlog
@@ -19,6 +19,7 @@ if TYPE_CHECKING:
 from app.application.command_policy import command_fingerprint
 from app.application.dto.command_execution import CommandRequestDTO, CommandResultDTO
 from app.application.dto.node_view import NodeViewDTO
+from app.application.types import JsonObject
 from app.core.exceptions import ConnectionFailedError, NodeNotFoundError
 
 audit = structlog.get_logger("audit")
@@ -45,7 +46,7 @@ class NodeCommandService:
         self,
         action: str,
         node_id: UUID,
-        details: dict[str, Any],
+        details: JsonObject,
     ) -> None:
         if self._audit:
             await self._audit.log(action=action, node_id=node_id, details=details)

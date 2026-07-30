@@ -12,7 +12,7 @@ from httpx2 import ASGITransport, AsyncClient
 from app.api.middleware import TimeoutMiddleware
 from app.api.v1.health import router as health_router
 from app.api.v1.nodes import router as nodes_router
-from app.services.node_management_service import NodeManagementService
+from app.application.services.node_management_service import NodeManagementService
 from tests.unit.conftest import MockAuthServiceProvider, _mock_settings
 
 
@@ -65,7 +65,7 @@ async def test_health_endpoint_no_timeout(client: AsyncClient) -> None:
 
 async def test_ready_endpoint_no_timeout(client: AsyncClient) -> None:
     """GET /ready should not be affected by timeout middleware."""
-    from app.services.health_service import HealthService
+    from app.application.services.health_service import HealthService
 
     mock_health = AsyncMock(spec=HealthService)
     mock_health.check_db.return_value = True
@@ -101,7 +101,7 @@ async def test_timeout_middleware_excludes_ready(
     client: AsyncClient, mock_service: AsyncMock
 ) -> None:
     """Timeout middleware should exclude /ready path."""
-    from app.services.health_service import HealthService
+    from app.application.services.health_service import HealthService
 
     mock_health = AsyncMock(spec=HealthService)
     mock_health.check_db.return_value = True

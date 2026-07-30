@@ -14,6 +14,8 @@ from httpx2 import ASGITransport, AsyncClient
 from app.adapters.security import AesGcmCredentialCipher
 from app.api.error_mapping import domain_error_handler
 from app.api.v1.nodes import router as nodes_router
+from app.application.services.node_management_service import NodeManagementService
+from app.application.services.node_metrics_service import NodeMetricsService
 from app.core.exceptions import ConnectionFailedError, DomainError, NodeNotFoundError
 from app.schemas.node import (
     CpuMetrics,
@@ -22,8 +24,6 @@ from app.schemas.node import (
     NodeMetrics,
     NodeResponse,
 )
-from app.services.node_management_service import NodeManagementService
-from app.services.node_metrics_service import NodeMetricsService
 from tests.unit.conftest import MockAuthServiceProvider, _mock_settings
 
 

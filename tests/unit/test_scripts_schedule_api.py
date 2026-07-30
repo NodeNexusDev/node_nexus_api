@@ -17,9 +17,9 @@ from app.application.services.schedule_management import (
     ScheduleManagementService,
 )
 from app.application.services.script_execution_service import ScriptExecutionService
+from app.application.services.script_history_service import ScriptHistoryService
+from app.application.services.script_management_service import ScriptManagementService
 from app.core.exceptions import DomainError, ScheduleNotFoundError, ScriptNotFoundError
-from app.services.script_history_service import ScriptHistoryService
-from app.services.script_management_service import ScriptManagementService
 from tests.unit.conftest import MockAuthServiceProvider, _mock_settings
 
 

@@ -16,6 +16,8 @@ from app.api.error_mapping import domain_error_handler
 from app.api.v1.commands import router as commands_router
 from app.api.v1.health import router as health_router
 from app.application.dto.command_management import CommandViewDTO
+from app.application.services.command_execution_service import CommandExecutionService
+from app.application.services.command_management_service import CommandManagementService
 from app.core.exceptions import (
     CommandNotFoundError,
     ConnectionFailedError,
@@ -24,8 +26,6 @@ from app.core.exceptions import (
     TemplateRenderError,
 )
 from app.schemas.command import CommandResult
-from app.services.command_execution_service import CommandExecutionService
-from app.services.command_management_service import CommandManagementService
 from tests.unit.conftest import MockAuthServiceProvider, _mock_settings
 
 

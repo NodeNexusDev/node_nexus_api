@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 from datetime import datetime
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 if TYPE_CHECKING:
@@ -26,6 +26,7 @@ from app.application.dto.node_management import (
     NodeUpdateValue,
 )
 from app.application.dto.node_view import NodeViewDTO
+from app.application.types import JsonObject
 from app.core.exceptions import NodeNotFoundError
 
 audit = structlog.get_logger("audit")
@@ -52,7 +53,7 @@ class NodeManagementService:
         self,
         action: str,
         node_id: UUID | None = None,
-        details: dict[str, Any] | None = None,
+        details: JsonObject | None = None,
     ) -> None:
         if self._audit:
             await self._audit.log(action=action, node_id=node_id, details=details)
@@ -130,7 +131,11 @@ class NodeManagementService:
         if node is None:
             raise NodeNotFoundError(f"Node {node_id} not found")
         audit.info("node.update.ok", node_id=str(node_id))
-        await self._log("update", node_id=node_id, details=dict(secured.changes))
+        audit_details: JsonObject = {
+            key: list(value) if isinstance(value, tuple) else value
+            for key, value in secured.changes
+        }
+        await self._log("update", node_id=node_id, details=audit_details)
         return node
 
     async def delete_node(self, node_id: UUID) -> bool:

@@ -30,10 +30,10 @@ from app.api.v1.health import router as health_router
 from app.api.v1.scripts import router as scripts_router
 from app.application.services.api_key_authentication import APIKeyAuthenticationService
 from app.application.services.script_execution_service import ScriptExecutionService
+from app.application.services.script_history_service import ScriptHistoryService
+from app.application.services.script_management_service import ScriptManagementService
 from app.core.exceptions import DomainError
 from app.models.base import Base
-from app.services.script_history_service import ScriptHistoryService
-from app.services.script_management_service import ScriptManagementService
 
 MASTER_KEY = "test-master-key"
 

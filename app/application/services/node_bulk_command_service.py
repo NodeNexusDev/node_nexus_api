@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 import structlog
 
@@ -20,6 +20,7 @@ from app.application.dto.command_execution import (
     BulkCommandResultDTO,
     CommandExecutionDTO,
 )
+from app.application.types import JsonObject
 from app.core.exceptions import ConnectionFailedError, NodeNotFoundError
 
 audit = structlog.get_logger("audit")
@@ -63,7 +64,7 @@ class NodeBulkCommandService:
         # concurrent workers.
         for result in results:
             succeeded = result.exit_code == 0
-            details: dict[str, Any] = {
+            details: JsonObject = {
                 "command": data.command,
                 "exit_code": result.exit_code,
             }

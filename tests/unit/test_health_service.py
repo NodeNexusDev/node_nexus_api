@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from app.services.health_service import HealthService
+from app.application.services.health_service import HealthService
 
 
 class TestHealthServiceCheckDb:
