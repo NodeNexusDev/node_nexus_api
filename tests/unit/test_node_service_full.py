@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from app.adapters.security import AesGcmCredentialCipher
+from app.adapters.security.credential_cipher import decrypt, encrypt
 from app.application.dto.command_execution import BulkCommandRequestDTO
 from app.application.dto.node_management import (
     NodeCreateDTO,
@@ -16,7 +17,6 @@ from app.application.services.node_bulk_command_service import NodeBulkCommandSe
 from app.application.services.node_command_service import NodeCommandService
 from app.application.services.node_management_service import NodeManagementService
 from app.core.exceptions import NodeNameConflictError, NodeNotFoundError
-from app.core.security import decrypt, encrypt
 from tests.unit.conftest import make_node_view, make_orm_node
 
 
@@ -183,29 +183,29 @@ class TestDeleteNode:
 
 class TestDecryptValue:
     def test_none_returns_none(self) -> None:
-        from app.core.ssh_utils import decrypt_value
+        from app.adapters.security.credential_cipher import decrypt_value
 
         assert decrypt_value(None) is None
 
     def test_empty_string_returns_empty(self) -> None:
-        from app.core.ssh_utils import decrypt_value
+        from app.adapters.security.credential_cipher import decrypt_value
 
         assert decrypt_value("") == ""
 
     def test_encrypted_value_decrypts(self) -> None:
-        from app.core.ssh_utils import decrypt_value
+        from app.adapters.security.credential_cipher import decrypt_value
 
         token = encrypt("secret")
         assert decrypt_value(token) == "secret"
 
     def test_non_encrypted_value_returns_as_is(self) -> None:
-        from app.core.ssh_utils import decrypt_value
+        from app.adapters.security.credential_cipher import decrypt_value
 
         assert decrypt_value("plain-text") == "plain-text"
 
     def test_tampered_ciphertext_fails_closed(self) -> None:
+        from app.adapters.security.credential_cipher import decrypt_value
         from app.core.exceptions import CredentialDecryptionError
-        from app.core.ssh_utils import decrypt_value
 
         token = encrypt("secret")
         tampered = f"{token[:-1]}{'A' if token[-1] != 'A' else 'B'}"

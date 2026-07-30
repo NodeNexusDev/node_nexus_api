@@ -18,7 +18,7 @@ from sqlalchemy.ext.asyncio import (
 from app.adapters.persistence.api_key import SqlAlchemyAPIKeyGateway
 from app.adapters.persistence.dao.node import NodeRepository
 from app.adapters.persistence.node_management import SqlAlchemyNodeManagementGateway
-from app.adapters.security import AesGcmCredentialCipher
+from app.adapters.security import AesGcmCredentialCipher, Sha256APIKeyHasher
 from app.api.error_mapping import domain_error_handler
 from app.api.v1.api_keys import router as api_keys_router
 from app.api.v1.health import router as health_router
@@ -70,13 +70,13 @@ class IntegrationAuthProvider(Provider):
     def get_api_key_service(
         self, gateway: SqlAlchemyAPIKeyGateway
     ) -> APIKeyAuthenticationService:
-        return APIKeyAuthenticationService(gateway, gateway)
+        return APIKeyAuthenticationService(gateway, gateway, Sha256APIKeyHasher())
 
     @provide(scope=Scope.REQUEST)
     def get_api_key_management_service(
         self, gateway: SqlAlchemyAPIKeyGateway
     ) -> APIKeyManagementService:
-        return APIKeyManagementService(gateway, gateway)
+        return APIKeyManagementService(gateway, gateway, Sha256APIKeyHasher())
 
     @provide(scope=Scope.REQUEST)
     def get_node_service(self) -> NodeManagementService:

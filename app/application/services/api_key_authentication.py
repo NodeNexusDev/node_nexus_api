@@ -5,12 +5,12 @@ from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
 from app.application.ports.api_key import APIKeyReader, APIKeyWriter
+from app.application.ports.api_key_hasher import APIKeyHasher
 from app.core.exceptions import (
     APIKeyExpiredError,
     APIKeyRevokedError,
     AuthenticationError,
 )
-from app.core.security import hash_api_key
 
 _LAST_USED_UPDATE_INTERVAL = timedelta(minutes=5)
 
@@ -28,12 +28,18 @@ class AuthenticatedPrincipal:
 class APIKeyAuthenticationService:
     """Authenticate presented credentials through safe persistence ports."""
 
-    def __init__(self, reader: APIKeyReader, writer: APIKeyWriter) -> None:
+    def __init__(
+        self,
+        reader: APIKeyReader,
+        writer: APIKeyWriter,
+        hasher: APIKeyHasher,
+    ) -> None:
         self._reader = reader
         self._writer = writer
+        self._hasher = hasher
 
     async def authenticate(self, plain_key: str) -> AuthenticatedPrincipal:
-        record = await self._reader.get_auth_by_hash(hash_api_key(plain_key))
+        record = await self._reader.get_auth_by_hash(self._hasher.hash(plain_key))
         if record is None:
             raise AuthenticationError("Invalid API key")
         if not record.is_active:

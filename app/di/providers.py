@@ -40,8 +40,9 @@ from app.adapters.persistence.script_gateway import (
 from app.adapters.runtime.docker import SshDockerRuntime
 from app.adapters.runtime.scheduler import ApschedulerJobScheduler
 from app.adapters.runtime.ssh import SSHConnectorFactory
-from app.adapters.security import AesGcmCredentialCipher
+from app.adapters.security import AesGcmCredentialCipher, Sha256APIKeyHasher
 from app.application.ports.api_key import APIKeyReader, APIKeyWriter
+from app.application.ports.api_key_hasher import APIKeyHasher
 from app.application.ports.audit_log import AuditLogReader, AuditLogWriter
 from app.application.ports.audit_sink import AuditEventSink
 from app.application.ports.command_management import CommandReader, CommandWriter
@@ -413,6 +414,11 @@ class ConnectorProvider(Provider):
         """Bind credential protection to the configured AES-GCM adapter."""
         return AesGcmCredentialCipher()
 
+    @provide(scope=Scope.APP, provides=APIKeyHasher)
+    def get_api_key_hasher(self) -> APIKeyHasher:
+        """Bind API-key lookup hashing to the SHA-256 adapter."""
+        return Sha256APIKeyHasher()
+
     @provide(scope=Scope.APP, provides=DockerRuntime)
     def get_docker_runtime(
         self,
@@ -654,18 +660,20 @@ class ServiceProvider(Provider):
         self,
         reader: APIKeyReader,
         writer: APIKeyWriter,
+        hasher: APIKeyHasher,
     ) -> APIKeyAuthenticationService:
         """Get API-key authentication query use case."""
-        return APIKeyAuthenticationService(reader, writer)
+        return APIKeyAuthenticationService(reader, writer, hasher)
 
     @provide(scope=Scope.APP)
     def get_api_key_management_service(
         self,
         reader: APIKeyReader,
         writer: APIKeyWriter,
+        hasher: APIKeyHasher,
     ) -> APIKeyManagementService:
         """Get API-key management use cases."""
-        return APIKeyManagementService(reader, writer)
+        return APIKeyManagementService(reader, writer, hasher)
 
     @provide(scope=Scope.APP)
     def get_docker_command_runner(

@@ -12,30 +12,36 @@ from app.application.dto.api_key import (
     APIKeyViewDTO,
 )
 from app.application.ports.api_key import APIKeyReader, APIKeyWriter
+from app.application.ports.api_key_hasher import APIKeyHasher
 from app.core.exceptions import APIKeyNotFoundError
-from app.core.security import hash_api_key
 
 _KEY_PREFIX_LENGTH = 8
 _KEY_RANDOM_LENGTH = 48
 _KEY_FORMAT = "nnk_"
 
 
-def generate_api_key() -> tuple[str, str, str]:
+def generate_api_key(hasher: APIKeyHasher) -> tuple[str, str, str]:
     """Generate one plain credential, hash, and display-safe prefix."""
     random_part = secrets.token_urlsafe(_KEY_RANDOM_LENGTH)[:_KEY_RANDOM_LENGTH]
     plain_key = f"{_KEY_FORMAT}{random_part}"
-    return plain_key, hash_api_key(plain_key), plain_key[:_KEY_PREFIX_LENGTH]
+    return plain_key, hasher.hash(plain_key), plain_key[:_KEY_PREFIX_LENGTH]
 
 
 class APIKeyManagementService:
     """Create, query, update, and revoke managed API keys."""
 
-    def __init__(self, reader: APIKeyReader, writer: APIKeyWriter) -> None:
+    def __init__(
+        self,
+        reader: APIKeyReader,
+        writer: APIKeyWriter,
+        hasher: APIKeyHasher,
+    ) -> None:
         self._reader = reader
         self._writer = writer
+        self._hasher = hasher
 
     async def create_api_key(self, data: APIKeyCreateDTO) -> APIKeyCreateResultDTO:
-        plain_key, key_hash, key_prefix = generate_api_key()
+        plain_key, key_hash, key_prefix = generate_api_key(self._hasher)
         created = await self._writer.create_api_key(
             APIKeyPersistenceDTO(
                 name=data.name,

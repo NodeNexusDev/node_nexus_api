@@ -233,12 +233,21 @@ def test_service_provider_resolves() -> None:
 
     api_key_reader = MagicMock()
     api_key_writer = MagicMock()
+    api_key_hasher = conn_provider.get_api_key_hasher()
     assert isinstance(
-        svc_provider.get_api_key_authentication_service(api_key_reader, api_key_writer),
+        svc_provider.get_api_key_authentication_service(
+            api_key_reader,
+            api_key_writer,
+            api_key_hasher,
+        ),
         APIKeyAuthenticationService,
     )
     assert isinstance(
-        svc_provider.get_api_key_management_service(api_key_reader, api_key_writer),
+        svc_provider.get_api_key_management_service(
+            api_key_reader,
+            api_key_writer,
+            api_key_hasher,
+        ),
         APIKeyManagementService,
     )
 

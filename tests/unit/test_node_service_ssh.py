@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from app.adapters.security import AesGcmCredentialCipher
+from app.adapters.security.credential_cipher import decrypt, encrypt
 from app.application.dto.command_execution import (
     BulkCommandRequestDTO,
     CommandRequestDTO,
@@ -14,7 +15,6 @@ from app.application.dto.node_connection import NodeConnectionDTO
 from app.application.services.node_bulk_command_service import NodeBulkCommandService
 from app.application.services.node_command_service import NodeCommandService
 from app.core.exceptions import ConnectionFailedError, NodeNotFoundError
-from app.core.security import decrypt, encrypt
 from tests.unit.conftest import make_node_view, make_orm_node, make_response
 
 

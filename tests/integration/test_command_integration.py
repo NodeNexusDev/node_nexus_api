@@ -20,6 +20,7 @@ from sqlalchemy.ext.asyncio import (
 from app.adapters.persistence.api_key import SqlAlchemyAPIKeyGateway
 from app.adapters.persistence.command_management import SqlAlchemyCommandGateway
 from app.adapters.persistence.dao.command import CommandRepository
+from app.adapters.security import Sha256APIKeyHasher
 from app.api.error_mapping import domain_error_handler
 from app.api.v1.commands import router as commands_router
 from app.api.v1.health import router as health_router
@@ -101,7 +102,7 @@ class IntegrationDbProvider(Provider):
     def get_api_key_service(
         self, gateway: SqlAlchemyAPIKeyGateway
     ) -> APIKeyAuthenticationService:
-        return APIKeyAuthenticationService(gateway, gateway)
+        return APIKeyAuthenticationService(gateway, gateway, Sha256APIKeyHasher())
 
 
 def _mock_settings(master_key: str = "") -> MagicMock:

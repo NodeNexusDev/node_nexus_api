@@ -1,6 +1,7 @@
 """Ports implemented by persistence and infrastructure adapters."""
 
 from app.application.ports.api_key import APIKeyReader, APIKeyWriter
+from app.application.ports.api_key_hasher import APIKeyHasher
 from app.application.ports.audit_log import (
     AuditLogReader,
     AuditLogWriter,
@@ -41,6 +42,7 @@ from app.application.ports.script_persistence import (
 __all__ = [
     "APIKeyReader",
     "APIKeyWriter",
+    "APIKeyHasher",
     "AuditEventSink",
     "AuditLogReader",
     "AuditLogWriter",

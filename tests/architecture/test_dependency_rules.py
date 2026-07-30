@@ -147,6 +147,7 @@ def test_application_ports_have_explicit_dishka_bindings() -> None:
     port_factories = {
         "get_api_key_reader",
         "get_api_key_writer",
+        "get_api_key_hasher",
         "get_script_execution_writer",
         "get_script_reader",
         "get_script_writer",
