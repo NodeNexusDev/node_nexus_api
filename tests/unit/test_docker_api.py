@@ -19,6 +19,9 @@ from app.application.dto.docker import (
     DockerContainerInspectDTO,
     DockerContainerStateDTO,
 )
+from app.application.services.docker.container_service import DockerContainerService
+from app.application.services.docker.image_service import DockerImageService
+from app.application.services.docker.resource_service import DockerResourceService
 from app.core.exceptions import (
     ConnectionFailedError,
     ContainerNotFoundError,
@@ -36,9 +39,6 @@ from app.schemas.docker import (
     DockerStats,
     DockerVolume,
 )
-from app.services.docker.container_service import DockerContainerService
-from app.services.docker.image_service import DockerImageService
-from app.services.docker.resource_service import DockerResourceService
 from tests.docker_test_facade import DockerService
 from tests.unit.conftest import MockAuthServiceProvider, _mock_settings
 

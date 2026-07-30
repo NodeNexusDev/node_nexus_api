@@ -251,7 +251,9 @@ def test_legacy_script_service_is_removed() -> None:
 
 def test_docker_command_runner_uses_only_application_ports() -> None:
     """Docker runner must not know repositories, crypto, or SSH implementations."""
-    imports = _imports_in_file(APP_ROOT / "services" / "docker" / "command_runner.py")
+    imports = _imports_in_file(
+        APP_ROOT / "application" / "services" / "docker" / "command_runner.py"
+    )
     forbidden = (
         "app.adapters",
         "app.core.connectors",
@@ -271,7 +273,7 @@ def test_docker_command_runner_uses_only_application_ports() -> None:
 def test_production_composition_does_not_import_docker_facade() -> None:
     """Composition root must expose focused Docker use cases only."""
     imports = _imports_in_file(APP_ROOT / "di" / "providers.py")
-    assert "app.services.docker_service" not in imports
+    assert "app.application.services.docker_service" not in imports
     assert not (APP_ROOT / "services" / "docker_service.py").exists()
 
 
@@ -282,11 +284,10 @@ def test_docker_use_cases_do_not_depend_on_transport_or_infrastructure() -> None
         "app.core.connectors",
         "app.repositories",
         "app.schemas",
-        "app.services.audit_service",
     )
     violations = [
         f"{path.name} -> {module}"
-        for path, module in _imports_in("services/docker")
+        for path, module in _imports_in("application/services/docker")
         if any(
             module == prefix or module.startswith(f"{prefix}.") for prefix in forbidden
         )

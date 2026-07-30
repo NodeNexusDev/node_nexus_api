@@ -1,1 +1,0 @@
-"""Focused Docker domain components."""

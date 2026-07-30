@@ -10,8 +10,8 @@ from fastapi import FastAPI
 from httpx2 import ASGITransport, AsyncClient
 
 from app.api.v1.docker_bulk import router as docker_bulk_router
+from app.application.services.docker.bulk_service import DockerBulkService
 from app.schemas.docker import BulkDockerNodeResult, BulkDockerResponse
-from app.services.docker.bulk_service import DockerBulkService
 from tests.docker_test_facade import DockerService
 from tests.unit.conftest import MockAuthServiceProvider, _mock_settings
 

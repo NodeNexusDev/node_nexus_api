@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import shlex
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 if TYPE_CHECKING:
@@ -20,13 +20,47 @@ from app.application.dto.docker import (
     DockerExecResultDTO,
     DockerStatsDTO,
 )
+from app.application.services.docker.command_runner import DockerCommandRunner
+from app.application.services.docker.error_mapper import raise_for_docker_error
+from app.application.services.docker.parsers import (
+    json_optional_string,
+    json_string,
+    parse_json_array,
+    parse_json_lines,
+)
+from app.application.types import JsonObject
 from app.core.docker_validation import validate_container_id
 from app.core.exceptions import ContainerNotFoundError
-from app.services.docker.command_runner import DockerCommandRunner
-from app.services.docker.error_mapper import raise_for_docker_error
-from app.services.docker.parsers import parse_json_array, parse_json_lines
 
 audit = structlog.get_logger("audit")
+
+
+def _json_object(value: object) -> dict[str, object]:
+    if not isinstance(value, dict):
+        return {}
+    return {str(key): item for key, item in value.items()}
+
+
+def _string(value: object, default: str = "") -> str:
+    return value if isinstance(value, str) else default
+
+
+def _optional_string(value: object) -> str | None:
+    return value if isinstance(value, str) else None
+
+
+def _boolean(value: object, default: bool = False) -> bool:
+    return value if isinstance(value, bool) else default
+
+
+def _integer(value: object, default: int = 0) -> int:
+    return value if isinstance(value, int) and not isinstance(value, bool) else default
+
+
+def _string_tuple(value: object) -> tuple[str, ...] | None:
+    if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+        return None
+    return tuple(item for item in value if isinstance(item, str))
 
 
 class DockerContainerService:
@@ -40,12 +74,12 @@ class DockerContainerService:
         self._runner = runner
         self._audit = audit_service
 
-    async def _log(self, action: str, node_id: UUID, details: dict[str, Any]) -> None:
+    async def _log(self, action: str, node_id: UUID, details: JsonObject) -> None:
         if self._audit:
             await self._audit.log(action=action, node_id=node_id, details=details)
 
     async def _log_required(
-        self, action: str, node_id: UUID, details: dict[str, Any]
+        self, action: str, node_id: UUID, details: JsonObject
     ) -> None:
         if self._audit:
             await self._audit.log_required(
@@ -65,15 +99,15 @@ class DockerContainerService:
         await self._log("docker.containers.list", node_id, {"count": len(items)})
         return [
             DockerContainerDTO(
-                id=item["ID"],
-                names=item["Names"],
-                image=item["Image"],
-                command=item["Command"],
-                created_at=item["CreatedAt"],
-                state=item["State"],
-                status=item["Status"],
-                ports=item.get("Ports"),
-                networks=item.get("Networks"),
+                id=json_string(item, "ID"),
+                names=json_string(item, "Names"),
+                image=json_string(item, "Image"),
+                command=json_string(item, "Command"),
+                created_at=json_string(item, "CreatedAt"),
+                state=json_string(item, "State"),
+                status=json_string(item, "Status"),
+                ports=json_optional_string(item, "Ports"),
+                networks=json_optional_string(item, "Networks"),
             )
             for item in items
         ]
@@ -90,8 +124,9 @@ class DockerContainerService:
         if not items:
             raise ContainerNotFoundError(f"Container {validated_id} not found")
         data = items[0]
-        state = data.get("State", {})
-        config = data.get("Config", {})
+        state = _json_object(data.get("State"))
+        config = _json_object(data.get("Config"))
+        network_settings = _json_object(data.get("NetworkSettings"))
         audit.info(
             "docker.container.inspect",
             node_id=str(node_id),
@@ -101,22 +136,24 @@ class DockerContainerService:
             "docker.container.inspect", node_id, {"container_id": validated_id}
         )
         return DockerContainerInspectDTO(
-            id=data.get("Id", ""),
-            name=data.get("Name", ""),
+            id=_string(data.get("Id")),
+            name=_string(data.get("Name")),
             state=DockerContainerStateDTO(
-                status=state.get("Status", ""),
-                running=state.get("Running", False),
-                exit_code=state.get("ExitCode", 0),
-                started_at=state.get("StartedAt"),
-                finished_at=state.get("FinishedAt"),
-                oom_killed=state.get("OOMKilled"),
+                status=_string(state.get("Status")),
+                running=_boolean(state.get("Running")),
+                exit_code=_integer(state.get("ExitCode")),
+                started_at=_optional_string(state.get("StartedAt")),
+                finished_at=_optional_string(state.get("FinishedAt")),
+                oom_killed=(
+                    _boolean(state["OOMKilled"]) if "OOMKilled" in state else None
+                ),
             ),
             config=DockerContainerConfigDTO(
-                image=config.get("Image"),
-                cmd=tuple(config["Cmd"]) if config.get("Cmd") else None,
-                hostname=config.get("Hostname"),
+                image=_optional_string(config.get("Image")),
+                cmd=_string_tuple(config.get("Cmd")),
+                hostname=_optional_string(config.get("Hostname")),
             ),
-            network_settings=tuple((data.get("NetworkSettings") or {}).items()),
+            network_settings=tuple(network_settings.items()),
         )
 
     async def _lifecycle_action(
@@ -125,7 +162,7 @@ class DockerContainerService:
         container_id: str,
         action: str,
         args: str,
-        details: dict[str, Any],
+        details: JsonObject,
     ) -> None:
         validated_id = validate_container_id(container_id)
         node = await self._runner.get_target(node_id)
@@ -265,13 +302,13 @@ class DockerContainerService:
         )
         item = items[0]
         return DockerStatsDTO(
-            container_id=item["Container"],
-            name=item["Name"],
-            cpu_percent=item["CPUPerc"],
-            mem_usage=item["MemUsage"],
-            mem_limit=item.get("MemLimit"),
-            mem_percent=item["MemPerc"],
-            net_io=item["NetIO"],
-            block_io=item["BlockIO"],
-            pids=item.get("PIDs"),
+            container_id=json_string(item, "Container"),
+            name=json_string(item, "Name"),
+            cpu_percent=json_string(item, "CPUPerc"),
+            mem_usage=json_string(item, "MemUsage"),
+            mem_limit=json_optional_string(item, "MemLimit"),
+            mem_percent=json_string(item, "MemPerc"),
+            net_io=json_string(item, "NetIO"),
+            block_io=json_string(item, "BlockIO"),
+            pids=json_optional_string(item, "PIDs"),
         )

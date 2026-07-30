@@ -10,8 +10,8 @@ if TYPE_CHECKING:
     from app.application.ports.docker_runtime import DockerRuntime
     from app.application.ports.node_reader import NodeConnectionReader
 
+from app.application.services.docker.command_builder import build_docker_command
 from app.core.exceptions import DockerError, NodeNotFoundError
-from app.services.docker.command_builder import build_docker_command
 
 
 class DockerCommandRunner:

@@ -5,8 +5,8 @@ from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
 from fastapi import APIRouter, HTTPException, Security
 
 from app.api.deps import require_write_scope
+from app.application.services.docker.bulk_service import DockerBulkService
 from app.schemas.docker import BulkDockerRequest, BulkDockerResponse
-from app.services.docker.bulk_service import DockerBulkService
 
 audit = structlog.get_logger("audit")
 

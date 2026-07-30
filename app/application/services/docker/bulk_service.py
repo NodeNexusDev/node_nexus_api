@@ -10,9 +10,9 @@ from typing import TYPE_CHECKING
 import structlog
 
 from app.application.dto.docker import BulkDockerNodeResultDTO, BulkDockerResultDTO
+from app.application.services.docker.command_runner import DockerCommandRunner
 from app.core.docker_validation import validate_container_id
 from app.core.exceptions import DockerError, NodeNotFoundError
-from app.services.docker.command_runner import DockerCommandRunner
 
 audit = structlog.get_logger("audit")
 

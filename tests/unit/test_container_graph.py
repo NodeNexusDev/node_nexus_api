@@ -16,6 +16,10 @@ from app.application.services.audit_log_service import AuditLogService
 from app.application.services.command_execution_service import CommandExecutionService
 from app.application.services.command_management_service import CommandManagementService
 from app.application.services.config_service import ConfigService
+from app.application.services.docker.bulk_service import DockerBulkService
+from app.application.services.docker.container_service import DockerContainerService
+from app.application.services.docker.image_service import DockerImageService
+from app.application.services.docker.resource_service import DockerResourceService
 from app.application.services.health_service import HealthService
 from app.application.services.node_bulk_command_service import NodeBulkCommandService
 from app.application.services.node_command_service import NodeCommandService
@@ -28,10 +32,6 @@ from app.application.services.script_management_service import ScriptManagementS
 from app.application.services.streaming_command_service import StreamingCommandService
 from app.core.config import Settings
 from app.di.providers import AppProvider
-from app.services.docker.bulk_service import DockerBulkService
-from app.services.docker.container_service import DockerContainerService
-from app.services.docker.image_service import DockerImageService
-from app.services.docker.resource_service import DockerResourceService
 
 HTTP_DEPENDENCIES = (
     APIKeyAuthenticationService,

@@ -80,6 +80,11 @@ from app.application.services.audit_log_service import AuditLogService
 from app.application.services.command_execution_service import CommandExecutionService
 from app.application.services.command_management_service import CommandManagementService
 from app.application.services.config_service import ConfigService
+from app.application.services.docker.bulk_service import DockerBulkService
+from app.application.services.docker.command_runner import DockerCommandRunner
+from app.application.services.docker.container_service import DockerContainerService
+from app.application.services.docker.image_service import DockerImageService
+from app.application.services.docker.resource_service import DockerResourceService
 from app.application.services.health_service import HealthService
 from app.application.services.node_bulk_command_service import NodeBulkCommandService
 from app.application.services.node_command_service import NodeCommandService
@@ -102,11 +107,6 @@ from app.application.services.streaming_command_service import StreamingCommandS
 from app.core.config import Settings, get_settings
 from app.core.connectors.ssh import SSHConnectorFactory
 from app.core.scheduler import ScriptScheduler
-from app.services.docker.bulk_service import DockerBulkService
-from app.services.docker.command_runner import DockerCommandRunner
-from app.services.docker.container_service import DockerContainerService
-from app.services.docker.image_service import DockerImageService
-from app.services.docker.resource_service import DockerResourceService
 
 
 class DbProvider(Provider):

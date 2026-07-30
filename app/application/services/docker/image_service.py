@@ -11,11 +11,11 @@ if TYPE_CHECKING:
 import structlog
 
 from app.application.dto.docker import DockerImageDTO, DockerPullResultDTO
+from app.application.services.docker.command_runner import DockerCommandRunner
+from app.application.services.docker.error_mapper import raise_for_docker_error
+from app.application.services.docker.parsers import json_string, parse_json_lines
 from app.core.docker_validation import validate_image_name
 from app.core.exceptions import ConnectionFailedError
-from app.services.docker.command_runner import DockerCommandRunner
-from app.services.docker.error_mapper import raise_for_docker_error
-from app.services.docker.parsers import parse_json_lines
 
 audit = structlog.get_logger("audit")
 
@@ -46,11 +46,11 @@ class DockerImageService:
             )
         return [
             DockerImageDTO(
-                repository=item["Repository"],
-                tag=item["Tag"],
-                id=item["ID"],
-                size=item["Size"],
-                created_at=item["CreatedAt"],
+                repository=json_string(item, "Repository"),
+                tag=json_string(item, "Tag"),
+                id=json_string(item, "ID"),
+                size=json_string(item, "Size"),
+                created_at=json_string(item, "CreatedAt"),
             )
             for item in items
         ]

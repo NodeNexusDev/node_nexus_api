@@ -12,7 +12,6 @@ FORBIDDEN_IMPORTS: dict[str, tuple[str, ...]] = {
     "models": ("app.api", "app.services", "app.repositories"),
     "core": ("app.api",),
     "repositories": ("app.api", "app.services"),
-    "services": ("app.api",),
     "api": ("app.repositories", "app.models", "app.di.container"),
     "application": (
         "app.api",
@@ -109,6 +108,11 @@ def test_docker_facade_is_removed_from_production() -> None:
     assert not path.exists()
 
 
+def test_legacy_service_namespace_is_removed() -> None:
+    """All application use cases belong to the application layer."""
+    assert not list((APP_ROOT / "services").rglob("*.py"))
+
+
 def test_legacy_generic_repository_contract_is_removed() -> None:
     """Persistence adapters must implement focused application ports."""
     assert not (APP_ROOT / "repositories" / "base.py").exists()
@@ -198,7 +202,7 @@ def test_application_ports_have_explicit_dishka_bindings() -> None:
     (
         "application/services/script_execution_service.py",
         "application/services/node_bulk_command_service.py",
-        "services/docker/bulk_service.py",
+        "application/services/docker/bulk_service.py",
     ),
 )
 def test_concurrent_remote_workers_cannot_import_persistence_state(

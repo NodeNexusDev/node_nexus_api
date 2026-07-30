@@ -25,13 +25,13 @@ from app.application.dto.docker import (
     DockerStatsDTO,
     DockerVolumeDTO,
 )
-from app.services.docker.bulk_service import DockerBulkService
-from app.services.docker.command_runner import DockerCommandRunner
-from app.services.docker.container_service import DockerContainerService
-from app.services.docker.error_mapper import raise_for_docker_error
-from app.services.docker.image_service import DockerImageService
-from app.services.docker.parsers import parse_json_array, parse_json_lines
-from app.services.docker.resource_service import DockerResourceService
+from app.application.services.docker.bulk_service import DockerBulkService
+from app.application.services.docker.command_runner import DockerCommandRunner
+from app.application.services.docker.container_service import DockerContainerService
+from app.application.services.docker.error_mapper import raise_for_docker_error
+from app.application.services.docker.image_service import DockerImageService
+from app.application.services.docker.parsers import parse_json_array, parse_json_lines
+from app.application.services.docker.resource_service import DockerResourceService
 
 
 class DockerService:

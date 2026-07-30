@@ -11,9 +11,9 @@ if TYPE_CHECKING:
 import structlog
 
 from app.application.dto.docker import DockerNetworkDTO, DockerVolumeDTO
-from app.services.docker.command_runner import DockerCommandRunner
-from app.services.docker.error_mapper import raise_for_docker_error
-from app.services.docker.parsers import parse_json_lines
+from app.application.services.docker.command_runner import DockerCommandRunner
+from app.application.services.docker.error_mapper import raise_for_docker_error
+from app.application.services.docker.parsers import json_string, parse_json_lines
 
 audit = structlog.get_logger("audit")
 
@@ -34,7 +34,7 @@ class DockerResourceService:
         node_id: UUID,
         docker_args: str,
         event: str,
-    ) -> list[dict]:
+    ) -> list[dict[str, object]]:
         node = await self._runner.get_target(node_id)
         cmd = self._runner.build_command(node, docker_args)
         stdout, stderr, exit_code = await self._runner.execute(node, cmd)
@@ -55,10 +55,10 @@ class DockerResourceService:
         )
         return [
             DockerNetworkDTO(
-                id=item["ID"],
-                name=item["Name"],
-                driver=item["Driver"],
-                scope=item["Scope"],
+                id=json_string(item, "ID"),
+                name=json_string(item, "Name"),
+                driver=json_string(item, "Driver"),
+                scope=json_string(item, "Scope"),
             )
             for item in items
         ]
@@ -70,5 +70,9 @@ class DockerResourceService:
             "docker.volumes.list",
         )
         return [
-            DockerVolumeDTO(driver=item["Driver"], name=item["Name"]) for item in items
+            DockerVolumeDTO(
+                driver=json_string(item, "Driver"),
+                name=json_string(item, "Name"),
+            )
+            for item in items
         ]

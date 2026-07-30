@@ -8,6 +8,9 @@ from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
 from fastapi import APIRouter, Query, Security
 
 from app.api.deps import get_current_api_key, require_write_scope
+from app.application.services.docker.container_service import DockerContainerService
+from app.application.services.docker.image_service import DockerImageService
+from app.application.services.docker.resource_service import DockerResourceService
 from app.core.docker_validation import validate_container_id
 from app.schemas.docker import (
     DockerContainer,
@@ -21,9 +24,6 @@ from app.schemas.docker import (
     DockerStats,
     DockerVolume,
 )
-from app.services.docker.container_service import DockerContainerService
-from app.services.docker.image_service import DockerImageService
-from app.services.docker.resource_service import DockerResourceService
 
 audit = structlog.get_logger("audit")
 router = APIRouter(
