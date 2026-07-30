@@ -7,7 +7,7 @@ from collections.abc import Mapping
 from uuid import UUID
 
 import structlog
-from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
+from dishka.integrations.fastapi import FromDishka, inject
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from pydantic import ValidationError
 
@@ -25,7 +25,10 @@ from app.schemas.websocket import WebSocketCommandMessage, WebSocketSignalMessag
 logger = structlog.get_logger()
 audit = structlog.get_logger("audit")
 
-router = APIRouter(tags=["websocket"], route_class=DishkaRoute)
+# DishkaRoute only instruments HTTP routes. WebSocket handlers use the
+# explicit @inject decorator below, as required by Dishka's FastAPI
+# integration.
+router = APIRouter(tags=["websocket"])
 _MAX_WS_MESSAGE_SIZE = 16_384
 
 
@@ -129,10 +132,12 @@ async def exec_stream(
     )
     if websocket.query_params.get("token"):
         logger.warning("ws.auth.query_token.deprecated")
+    # Accept before application-level authentication so rejected clients
+    # receive the documented WebSocket close codes instead of an HTTP 403
+    # handshake rejection from the ASGI server.
+    await websocket.accept()
     if not await _validate_ws_token(websocket, token, api_key_service):
         return
-
-    await websocket.accept()
 
     try:
         try:
@@ -218,6 +223,15 @@ async def exec_stream(
                 {"type": "error", "message": f"Node {node_id} not found"}
             )
             await websocket.close(code=4004, reason="Node not found")
+            return
+        except ConnectionFailedError:
+            await websocket.send_json(
+                {
+                    "version": "1",
+                    "type": "error",
+                    "message": "Remote connection failed",
+                }
+            )
             return
         finally:
             if "active_task" in locals() and active_task is not None:

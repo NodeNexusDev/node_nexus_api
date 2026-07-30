@@ -1025,6 +1025,7 @@ dependencies = [
     { name = "sqlalchemy" },
     { name = "structlog" },
     { name = "uvicorn" },
+    { name = "websockets" },
 ]
 
 [package.optional-dependencies]
@@ -1047,11 +1048,6 @@ docs = [
     { name = "mkdocs-material" },
     { name = "openapi-spec-validator" },
     { name = "pymdown-extensions" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "websockets" },
 ]
 
 [package.metadata]
@@ -1090,11 +1086,9 @@ requires-dist = [
     { name = "structlog", specifier = ">=26.1.0" },
     { name = "ty", marker = "extra == 'dev'", specifier = ">=0.0.63" },
     { name = "uvicorn", specifier = ">=0.51.0" },
+    { name = "websockets", specifier = ">=17.0" },
 ]
 provides-extras = ["dev", "docs"]
-
-[package.metadata.requires-dev]
-dev = [{ name = "websockets", specifier = ">=17.0" }]
 
 [[package]]
 name = "nodeenv"

@@ -480,7 +480,7 @@ class ServiceProvider(Provider):
             credential_cipher=credential_cipher,
         )
 
-    @provide(scope=Scope.REQUEST)
+    @provide(scope=Scope.APP)
     def get_streaming_command_service(
         self,
         node_reader: NodeConnectionReader,
