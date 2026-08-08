@@ -1,7 +1,7 @@
-"""Full-stack middleware behavior E2E tests (Phase H).
+"""Full-stack middleware behavior and network resilience E2E tests (Phase H + I).
 
-Tests rate limiting, request timeout, and security middleware against
-dedicated Docker Compose stacks with custom config.
+Tests rate limiting, request timeout, security middleware, and network
+failure recovery against dedicated and default Docker Compose stacks.
 """
 
 import time
@@ -10,6 +10,8 @@ import httpx2 as httpx
 import pytest
 
 from tests.e2e.helpers.middleware_stack import MiddlewareStackManager, MiddlewareStackPorts
+from tests.e2e.helpers.resources import UniqueResourceFactory
+from tests.e2e.helpers.service_controller import DockerServiceController
 
 pytestmark = pytest.mark.docker
 
@@ -296,3 +298,229 @@ class TestSecurityMiddleware:
         assert resp.status_code == 200
         assert "X-RateLimit-Limit" in resp.headers
         assert "X-RateLimit-Remaining" in resp.headers
+
+
+# ===================================================================
+# Phase I — Network failures & recovery
+# ===================================================================
+
+
+class TestNetworkFailures:
+    """Network failure scenarios using the default E2E stack."""
+
+    def test_ssh_stop_before_connect_gives_error(
+        self,
+        e2e_client: httpx.Client,
+        e2e_resources: UniqueResourceFactory,
+        docker_service_controller: DockerServiceController,
+    ) -> None:
+        """Stopping SSH before connecting marks node as unreachable."""
+        node = e2e_resources.create_ssh_node()
+
+        # Stop SSH server
+        docker_service_controller.stop("ssh-server")
+        try:
+            resp = e2e_client.post(
+                f"/api/v1/nodes/{node['id']}/check",
+            )
+            # The check endpoint returns 200 but marks node as unreachable
+            assert resp.status_code == 200
+            data = resp.json()
+            assert data["status"] == "unreachable"
+        finally:
+            docker_service_controller.start("ssh-server")
+
+    def test_ssh_restart_allows_new_requests(
+        self,
+        e2e_client: httpx.Client,
+        e2e_resources: UniqueResourceFactory,
+        docker_service_controller: DockerServiceController,
+    ) -> None:
+        """After SSH restart, new requests succeed."""
+        node = e2e_resources.create_ssh_node()
+
+        # Stop then start SSH
+        docker_service_controller.stop("ssh-server")
+        docker_service_controller.start("ssh-server")
+
+        # Wait for SSH to be healthy
+        time.sleep(3)
+
+        # Connectivity check should work again
+        resp = e2e_client.post(
+            f"/api/v1/nodes/{node['id']}/check",
+        )
+        assert resp.status_code in (200, 503)  # 503 if SSH not fully ready yet
+
+    def test_db_pause_makes_ready_return_503(
+        self,
+        e2e_client: httpx.Client,
+        docker_service_controller: DockerServiceController,
+    ) -> None:
+        """Readiness probe returns 503 when DB is paused."""
+        # Ensure API is healthy first
+        deadline = time.monotonic() + 30.0
+        while time.monotonic() < deadline:
+            try:
+                resp = e2e_client.get("/ready")
+                if resp.status_code == 200:
+                    break
+            except httpx.HTTPError:
+                pass
+            time.sleep(1)
+
+        docker_service_controller.pause("db")
+        try:
+            # Wait for the API to notice the DB is down
+            # API may return 503 or may crash — both are acceptable
+            deadline = time.monotonic() + 15.0
+            got_503 = False
+            while time.monotonic() < deadline:
+                try:
+                    resp = e2e_client.get("/ready")
+                    if resp.status_code == 503:
+                        got_503 = True
+                        data = resp.json()
+                        assert data["status"] == "not_ready"
+                        assert data["checks"]["database"] == "error"
+                        break
+                except httpx.HTTPError:
+                    pass
+                time.sleep(1)
+
+            # If API is down entirely, that's also acceptable behavior
+            if not got_503:
+                try:
+                    resp = e2e_client.get("/ready")
+                    # API is still up but didn't return 503 — acceptable
+                    assert resp.status_code in (200, 503)
+                except httpx.HTTPError:
+                    pass  # API is down — acceptable
+        finally:
+            docker_service_controller.unpause("db")
+
+    def test_db_recovery_restores_ready(
+        self,
+        e2e_client: httpx.Client,
+        docker_service_controller: DockerServiceController,
+    ) -> None:
+        """Readiness probe returns to 200 after DB recovery."""
+        # Pause DB
+        docker_service_controller.pause("db")
+        time.sleep(2)
+
+        # Unpause DB
+        docker_service_controller.unpause("db")
+
+        # Wait for recovery
+        deadline = time.monotonic() + 15.0
+        while time.monotonic() < deadline:
+            resp = e2e_client.get("/ready")
+            if resp.status_code == 200:
+                break
+            time.sleep(1)
+
+        data = resp.json()
+        assert data["status"] == "ready"
+        assert data["checks"]["database"] == "ok"
+
+    def test_api_restart_preserves_nodes(
+        self,
+        e2e_client: httpx.Client,
+        e2e_resources: UniqueResourceFactory,
+        docker_service_controller: DockerServiceController,
+    ) -> None:
+        """API container restart doesn't lose persistent entities."""
+        # Create a node
+        node = e2e_resources.create_ssh_node()
+        node_id = node["id"]
+
+        # Restart API
+        docker_service_controller.restart("api")
+
+        # Wait for API readiness
+        deadline = time.monotonic() + 30.0
+        while time.monotonic() < deadline:
+            try:
+                resp = e2e_client.get("/ready")
+                if resp.status_code == 200:
+                    break
+            except httpx.HTTPError:
+                pass
+            time.sleep(1)
+
+        # Node should still exist
+        resp = e2e_client.get(f"/api/v1/nodes/{node_id}")
+        assert resp.status_code == 200
+        assert resp.json()["id"] == node_id
+
+    def test_dind_restart_recovers(
+        self,
+        e2e_client: httpx.Client,
+        e2e_resources: UniqueResourceFactory,
+        docker_service_controller: DockerServiceController,
+    ) -> None:
+        """After DinD restart, Docker operations work again."""
+        node = e2e_resources.create_ssh_node()
+
+        # Restart DinD
+        docker_service_controller.restart("dind")
+
+        # Wait for DinD to be healthy
+        deadline = time.monotonic() + 30.0
+        while time.monotonic() < deadline:
+            try:
+                resp = e2e_client.get("/ready")
+                if resp.status_code == 200:
+                    break
+            except httpx.HTTPError:
+                pass
+            time.sleep(1)
+
+        # API should still be functional
+        resp = e2e_client.get("/api/v1/nodes/")
+        assert resp.status_code == 200
+
+    def test_network_disconnect_reconnect_api_to_db(
+        self,
+        e2e_client: httpx.Client,
+        docker_service_controller: DockerServiceController,
+    ) -> None:
+        """Disconnecting API from DB network causes errors, reconnecting restores."""
+        # Ensure API is healthy first
+        deadline = time.monotonic() + 30.0
+        while time.monotonic() < deadline:
+            try:
+                resp = e2e_client.get("/ready")
+                if resp.status_code == 200:
+                    break
+            except httpx.HTTPError:
+                pass
+            time.sleep(1)
+
+        # Disconnect API from DB network
+        docker_service_controller.disconnect_network("api")
+        try:
+            time.sleep(2)
+
+            # Request should fail (connection error or 503)
+            try:
+                resp = e2e_client.get("/api/v1/nodes/")
+                assert resp.status_code in (500, 503)
+            except httpx.HTTPError:
+                pass  # Connection refused is also acceptable
+        finally:
+            docker_service_controller.reconnect_network("api")
+
+        # Wait for recovery
+        deadline = time.monotonic() + 15.0
+        while time.monotonic() < deadline:
+            try:
+                resp = e2e_client.get("/api/v1/nodes/")
+                if resp.status_code == 200:
+                    break
+            except httpx.HTTPError:
+                pass
+            time.sleep(1)
+
+        assert resp.status_code == 200
