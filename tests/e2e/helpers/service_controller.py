@@ -51,6 +51,14 @@ class DockerServiceController:
         """Restart one Compose service."""
         self._compose("restart", service)
 
+    def start(self, service: str) -> None:
+        """Create and start one optional Compose service."""
+        self._compose("up", "-d", "--wait", service)
+
+    def stop(self, service: str) -> None:
+        """Stop one Compose service without removing its container."""
+        self._compose("stop", service)
+
     def pause(self, service: str) -> None:
         """Pause one Compose service."""
         self._compose("pause", service)

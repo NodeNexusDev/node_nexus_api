@@ -81,3 +81,23 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+
+  api-replica:
+    profiles: ["failover"]
+    build: ..
+    env_file: ../.env.e2e
+    depends_on:
+      db:
+        condition: service_healthy
+      ssh-server:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request, os; req = urllib.request.Request('http://localhost:8000/health', headers={'X-API-Key': os.environ['MASTER_API_KEY']}); urllib.request.urlopen(req, timeout=5)\""]
+      interval: 3s
+      timeout: 10s
+      retries: 15
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

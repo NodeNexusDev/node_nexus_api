@@ -2386,8 +2386,10 @@ async def test_second_scheduler_replica_cannot_acquire_ownership(
         await engine.dispose()
 
 
-def test_script_schedule_invalid_cron(e2e_client: httpx.Client) -> None:
-    """POST /scripts/{id}/schedule with invalid cron returns 422."""
+def test_script_schedule_rejects_invalid_trigger_options(
+    e2e_client: httpx.Client,
+) -> None:
+    """Invalid cron, timezone, and misfire grace are rejected without side effects."""
     resp = e2e_client.post(
         "/api/v1/scripts/",
         json={"name": "badcron-e2e", "steps": _INLINE_STEP},
@@ -2408,11 +2410,28 @@ def test_script_schedule_invalid_cron(e2e_client: httpx.Client) -> None:
     node = resp.json()
 
     try:
-        resp = e2e_client.post(
-            f"/api/v1/scripts/{script['id']}/schedule",
-            json={"cron": "invalid", "node_ids": [node["id"]]},
+        invalid_payloads = (
+            {"cron": "invalid", "node_ids": [node["id"]]},
+            {
+                "cron": "* * * * *",
+                "node_ids": [node["id"]],
+                "timezone": "Mars/Olympus_Mons",
+            },
+            {
+                "cron": "* * * * *",
+                "node_ids": [node["id"]],
+                "misfire_grace_seconds": 0,
+            },
         )
-        assert resp.status_code == 422
+        for payload in invalid_payloads:
+            resp = e2e_client.post(
+                f"/api/v1/scripts/{script['id']}/schedule",
+                json=payload,
+            )
+            assert resp.status_code == 422, resp.text
+
+        current = e2e_client.get(f"/api/v1/scripts/{script['id']}/schedule")
+        assert current.status_code == 404
     finally:
         e2e_client.delete(f"/api/v1/scripts/{script['id']}")
         e2e_client.delete(f"/api/v1/nodes/{node['id']}")
@@ -2458,7 +2477,13 @@ def test_scheduler_executes_script_on_cron(e2e_client: httpx.Client) -> None:
     script = resp.json()
 
     try:
-        # Schedule with per-minute cron
+        # Register, then replace the same runtime job with a per-minute cron.
+        resp = e2e_client.post(
+            f"/api/v1/scripts/{script['id']}/schedule",
+            json={"cron": "*/2 * * * *", "node_ids": [node["id"]]},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["cron"] == "*/2 * * * *"
         resp = e2e_client.post(
             f"/api/v1/scripts/{script['id']}/schedule",
             json={"cron": "* * * * *", "node_ids": [node["id"]]},
@@ -2476,27 +2501,31 @@ def test_scheduler_executes_script_on_cron(e2e_client: httpx.Client) -> None:
                 data = resp.json()
                 if data.get("total", 0) > 0:
                     execution_found = True
-                    # Verify execution data
                     exec_item = data["items"][0]
-                    assert "started_at" in exec_item or "status" in exec_item, (
-                        f"Execution missing fields: {exec_item}"
-                    )
+                    assert exec_item["status"] == "completed"
+                    assert exec_item["started_at"] is not None
+                    assert exec_item["finished_at"] is not None
+                    assert len(exec_item["steps"]) == 1
+                    assert "scheduled-ok" in exec_item["steps"][0]["stdout"]
+                    assert exec_item["steps"][0]["exit_code"] == 0
                     break
             time.sleep(2)
 
         assert execution_found, (
             "Schedule did not execute within 65 seconds. Check scheduler is running."
         )
+        time.sleep(2)
+        history = e2e_client.get(f"/api/v1/scripts/{script['id']}/executions")
+        assert history.status_code == 200
+        assert history.json()["total"] == 1
 
         # Verify schedule metadata updated
         resp = e2e_client.get(f"/api/v1/scripts/{script['id']}/schedule")
         assert resp.status_code == 200
         schedule_after = resp.json()
-        # last_run_at should be set after execution
-        assert schedule_after.get("last_run_at") is not None or True, (
-            "Schedule metadata may not have updated — this is acceptable "
-            "if eventual consistency is in play"
-        )
+        assert schedule_after["last_run_at"] is not None
+        assert schedule_after["last_success_at"] is not None
+        assert schedule_after["next_run_at"] is not None
 
     finally:
         # Unschedule and cleanup
