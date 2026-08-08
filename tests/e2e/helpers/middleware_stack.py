@@ -72,9 +72,7 @@ class MiddlewareStackManager:
                 pass
             time.sleep(1)
         else:
-            raise RuntimeError(
-                f"Stack {self._project_name} API did not become ready"
-            )
+            raise RuntimeError(f"Stack {self._project_name} API did not become ready")
 
         return MiddlewareStackPorts(
             api_host="127.0.0.1",

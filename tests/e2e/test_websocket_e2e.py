@@ -19,6 +19,7 @@ import websockets
 from websockets.asyncio.client import ClientConnection
 
 from tests.e2e.conftest import ServicePorts
+from tests.e2e.helpers.nodes import create_ssh_node as _create_ssh_node
 from tests.e2e.helpers.resources import UniqueResourceFactory
 from tests.e2e.helpers.websocket import WebSocketClientFactory
 
@@ -45,21 +46,6 @@ def _ws_url_no_token(service_ports: ServicePorts, node_id: str) -> str:
         f"ws://{service_ports.api_host}:{service_ports.api_port}"
         f"{_WS_PATH.format(node_id=node_id)}"
     )
-
-
-def _create_ssh_node(e2e_client: httpx.Client) -> dict:
-    """Create an SSH node connected to the test SSH server."""
-    data = {
-        "name": f"ws-test-{uuid4().hex[:8]}",
-        "host": "ssh-server",
-        "port": 2222,
-        "connection_type": "ssh",
-        "username": "testuser",
-        "password": "testpass",
-    }
-    resp = e2e_client.post("/api/v1/nodes/", json=data)
-    assert resp.status_code == 201
-    return resp.json()
 
 
 async def _send_command(ws: ClientConnection, command: str) -> None:

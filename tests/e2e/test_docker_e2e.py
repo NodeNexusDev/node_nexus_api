@@ -26,11 +26,6 @@ async def client(service_ports: ServicePorts) -> httpx.AsyncClient:
 class TestDockerAPIValidation:
     """Test Docker API validation without requiring Docker daemon."""
 
-    async def test_health_check(self, client: httpx.AsyncClient) -> None:
-        """Test health endpoint."""
-        response = await client.get("/health")
-        assert response.status_code == 200
-
     async def test_create_docker_node(self, client: httpx.AsyncClient) -> None:
         """Test creating a Docker node."""
         node_data = {

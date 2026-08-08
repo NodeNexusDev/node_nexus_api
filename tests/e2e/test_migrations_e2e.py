@@ -19,9 +19,7 @@ pytestmark = pytest.mark.docker
 class TestMigrationFreshDB:
     """Migration behavior on a fresh database (AUTO_MIGRATE=true)."""
 
-    def test_api_starts_and_becomes_ready(
-        self, e2e_client: httpx.Client
-    ) -> None:
+    def test_api_starts_and_becomes_ready(self, e2e_client: httpx.Client) -> None:
         """API with AUTO_MIGRATE=true starts and passes readiness probe."""
         resp = e2e_client.get("/ready")
         assert resp.status_code == 200
@@ -41,8 +39,14 @@ class TestMigrationFreshDB:
         )
         tables = {row["table_name"] for row in rows}
         expected = {
-            "nodes", "commands", "scripts", "script_executions",
-            "api_keys", "audit_logs", "audit_outbox", "script_schedules",
+            "nodes",
+            "commands",
+            "scripts",
+            "script_executions",
+            "api_keys",
+            "audit_logs",
+            "audit_outbox",
+            "script_schedules",
         }
         assert expected.issubset(tables), f"Missing tables: {expected - tables}"
 

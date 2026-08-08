@@ -9,7 +9,10 @@ import time
 import httpx2 as httpx
 import pytest
 
-from tests.e2e.helpers.middleware_stack import MiddlewareStackManager, MiddlewareStackPorts
+from tests.e2e.helpers.middleware_stack import (
+    MiddlewareStackManager,
+    MiddlewareStackPorts,
+)
 from tests.e2e.helpers.resources import UniqueResourceFactory
 from tests.e2e.helpers.service_controller import DockerServiceController
 
@@ -22,13 +25,14 @@ _MASTER_API_KEY = "e2e-master-key-12345"
 # Fixtures: rate-limit stack (RATE_LIMIT_REQUESTS=5, WINDOW=10s)
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture(scope="module")
 def rate_limit_stack() -> MiddlewareStackPorts:
     """Start a Docker stack with a very low rate limit (5 req / 10s window)."""
     mgr = MiddlewareStackManager(
-        compose_file=__import__("pathlib").Path(
-            "tests/docker-compose.e2e-ratelimit.yml"
-        ).resolve(),
+        compose_file=__import__("pathlib")
+        .Path("tests/docker-compose.e2e-ratelimit.yml")
+        .resolve(),
         project_name="e2e-ratelimit",
         api_port=8002,
         db_port=5434,
@@ -51,13 +55,14 @@ def rate_limit_client(rate_limit_stack: MiddlewareStackPorts) -> httpx.Client:
 # Fixtures: timeout stack (REQUEST_TIMEOUT=2s)
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture(scope="module")
 def timeout_stack() -> MiddlewareStackPorts:
     """Start a Docker stack with a short request timeout (2 seconds)."""
     mgr = MiddlewareStackManager(
-        compose_file=__import__("pathlib").Path(
-            "tests/docker-compose.e2e-timeout.yml"
-        ).resolve(),
+        compose_file=__import__("pathlib")
+        .Path("tests/docker-compose.e2e-timeout.yml")
+        .resolve(),
         project_name="e2e-timeout",
         api_port=8003,
         db_port=5435,
@@ -84,9 +89,7 @@ def timeout_client(timeout_stack: MiddlewareStackPorts) -> httpx.Client:
 class TestRateLimit:
     """Rate-limit middleware behavior (RATE_LIMIT_REQUESTS=5, WINDOW=10s)."""
 
-    def test_remaining_header_decrements(
-        self, rate_limit_client: httpx.Client
-    ) -> None:
+    def test_remaining_header_decrements(self, rate_limit_client: httpx.Client) -> None:
         """Each request decrements X-RateLimit-Remaining."""
         resp = rate_limit_client.get("/api/v1/nodes/")
         assert resp.status_code == 200
@@ -98,9 +101,7 @@ class TestRateLimit:
         remaining2 = int(resp2.headers["X-RateLimit-Remaining"])
         assert remaining2 < remaining
 
-    def test_429_after_limit_exceeded(
-        self, rate_limit_client: httpx.Client
-    ) -> None:
+    def test_429_after_limit_exceeded(self, rate_limit_client: httpx.Client) -> None:
         """After exceeding the limit, 429 is returned."""
         # Drain the limit (5 requests)
         for _ in range(5):
@@ -112,9 +113,7 @@ class TestRateLimit:
         body = resp.json()
         assert "Rate limit exceeded" in body["detail"]
 
-    def test_retry_after_header_present(
-        self, rate_limit_client: httpx.Client
-    ) -> None:
+    def test_retry_after_header_present(self, rate_limit_client: httpx.Client) -> None:
         """429 response includes Retry-After header."""
         # Drain the limit
         for _ in range(5):
@@ -171,16 +170,12 @@ class TestRateLimit:
 class TestRequestTimeout:
     """Request timeout middleware behavior (REQUEST_TIMEOUT=2s)."""
 
-    def test_health_not_affected_by_timeout(
-        self, timeout_client: httpx.Client
-    ) -> None:
+    def test_health_not_affected_by_timeout(self, timeout_client: httpx.Client) -> None:
         """/health is not affected by global timeout."""
         resp = timeout_client.get("/health")
         assert resp.status_code == 200
 
-    def test_ready_not_affected_by_timeout(
-        self, timeout_client: httpx.Client
-    ) -> None:
+    def test_ready_not_affected_by_timeout(self, timeout_client: httpx.Client) -> None:
         """/ready is not affected by global timeout."""
         resp = timeout_client.get("/ready")
         assert resp.status_code == 200
@@ -192,9 +187,7 @@ class TestRequestTimeout:
         resp = timeout_client.get("/api/v1/nodes/")
         assert resp.status_code == 200
 
-    def test_node_survives_after_timeout(
-        self, timeout_client: httpx.Client
-    ) -> None:
+    def test_node_survives_after_timeout(self, timeout_client: httpx.Client) -> None:
         """After a timeout, subsequent requests to the same resource work."""
         # Create a node (fast)
         resp = timeout_client.post(
@@ -225,9 +218,7 @@ class TestRequestTimeout:
 class TestSecurityMiddleware:
     """Security headers, request ID, and CORS behavior."""
 
-    def test_security_headers_on_success(
-        self, e2e_client: httpx.Client
-    ) -> None:
+    def test_security_headers_on_success(self, e2e_client: httpx.Client) -> None:
         """Security headers are present on successful responses."""
         resp = e2e_client.get("/api/v1/nodes/")
         assert resp.status_code == 200
@@ -236,18 +227,14 @@ class TestSecurityMiddleware:
         assert resp.headers["X-XSS-Protection"] == "1; mode=block"
         assert "max-age=31536000" in resp.headers["Strict-Transport-Security"]
 
-    def test_security_headers_on_error(
-        self, e2e_client: httpx.Client
-    ) -> None:
+    def test_security_headers_on_error(self, e2e_client: httpx.Client) -> None:
         """Security headers are present on error responses."""
         resp = e2e_client.get("/api/v1/nodes/00000000-0000-0000-0000-000000000000")
         assert resp.status_code == 404
         assert resp.headers["X-Content-Type-Options"] == "nosniff"
         assert resp.headers["X-Frame-Options"] == "DENY"
 
-    def test_500_does_not_expose_traceback(
-        self, e2e_client: httpx.Client
-    ) -> None:
+    def test_500_does_not_expose_traceback(self, e2e_client: httpx.Client) -> None:
         """Internal errors do not expose traceback or secrets."""
         # A malformed request that triggers a 500 should not leak internals
         resp = e2e_client.post(
@@ -260,9 +247,7 @@ class TestSecurityMiddleware:
             assert "password" not in body
             assert "secret" not in body
 
-    def test_cors_allowed_origin(
-        self, api_base_url: str
-    ) -> None:
+    def test_cors_allowed_origin(self, api_base_url: str) -> None:
         """Requests from allowed origins pass CORS preflight."""
         resp = httpx.options(
             f"{api_base_url}/api/v1/nodes/",
@@ -273,11 +258,11 @@ class TestSecurityMiddleware:
             timeout=5.0,
         )
         assert resp.status_code == 200
-        assert resp.headers.get("access-control-allow-origin") == "http://localhost:3000"
+        assert (
+            resp.headers.get("access-control-allow-origin") == "http://localhost:3000"
+        )
 
-    def test_cors_disallowed_origin(
-        self, api_base_url: str
-    ) -> None:
+    def test_cors_disallowed_origin(self, api_base_url: str) -> None:
         """Requests from disallowed origins are blocked by CORS."""
         resp = httpx.options(
             f"{api_base_url}/api/v1/nodes/",
@@ -288,11 +273,11 @@ class TestSecurityMiddleware:
             timeout=5.0,
         )
         # Disallowed origin should NOT get access-control-allow-origin
-        assert resp.headers.get("access-control-allow-origin") != "http://evil.example.com"
+        assert (
+            resp.headers.get("access-control-allow-origin") != "http://evil.example.com"
+        )
 
-    def test_rate_limit_headers_present(
-        self, e2e_client: httpx.Client
-    ) -> None:
+    def test_rate_limit_headers_present(self, e2e_client: httpx.Client) -> None:
         """Rate limit headers are present on responses."""
         resp = e2e_client.get("/api/v1/nodes/")
         assert resp.status_code == 200
@@ -461,7 +446,7 @@ class TestNetworkFailures:
         docker_service_controller: DockerServiceController,
     ) -> None:
         """After DinD restart, Docker operations work again."""
-        node = e2e_resources.create_ssh_node()
+        e2e_resources.create_ssh_node()
 
         # Restart DinD
         docker_service_controller.restart("dind")
