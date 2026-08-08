@@ -3071,6 +3071,49 @@ def test_docker_container_logs_tail_default(e2e_client):
         e2e_client.delete(f"/api/v1/nodes/{node['id']}")
 
 
+def test_docker_container_logs_since_iso_timestamp(e2e_client):
+    """GET .../containers/{cid}/logs?since=<ISO> limits output to since timestamp."""
+    from datetime import UTC, datetime
+
+    node = _create_docker_node(e2e_client)
+    try:
+        _docker_pull_alpine(e2e_client, node["id"])
+        cmd = (
+            "docker run -d --name e2e-logs-since alpine sh -c "
+            "'echo before-sleep; sleep 2; echo after-sleep; sleep 60'"
+        )
+        resp = e2e_client.post(
+            f"/api/v1/nodes/{node['id']}/execute",
+            json={"command": cmd},
+        )
+        assert resp.status_code == 200
+
+        # Wait for container to start and print first line
+        import time
+        time.sleep(1)
+
+        # Capture current time (after first echo, before second)
+        since = datetime.now(UTC).isoformat()
+
+        # Wait for second echo
+        time.sleep(3)
+
+        # Get logs since the captured timestamp
+        resp = e2e_client.get(
+            f"/api/v1/nodes/{node['id']}/docker/containers/e2e-logs-since/logs"
+            f"?since={since}"
+        )
+        assert resp.status_code == 200
+        output = resp.text
+        # Should contain after-sleep but may not contain before-sleep
+        assert "after-sleep" in output
+    finally:
+        e2e_client.delete(
+            f"/api/v1/nodes/{node['id']}/docker/containers/e2e-logs-since?force=true"
+        )
+        e2e_client.delete(f"/api/v1/nodes/{node['id']}")
+
+
 def test_docker_container_logs_invalid_tail_zero(e2e_client):
     """GET .../logs?tail=0 should return 422 (ge=1 constraint)."""
     node = _create_docker_node(e2e_client)
