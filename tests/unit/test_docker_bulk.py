@@ -363,3 +363,139 @@ class TestDockerServiceBulk:
         assert result.total == 1
         assert result.succeeded == 1
         assert result.results[0].output == "hello"
+
+
+# ---------------------------------------------------------------------------
+# DockerBulkService unit tests — covering _prepare error paths and worker errors
+# ---------------------------------------------------------------------------
+
+
+def _make_node(node_id: str = "00000000-0000-0000-0000-000000000001") -> MagicMock:
+    """Return a mock NodeConnectionDTO."""
+    mock_node = MagicMock()
+    mock_node.id = uuid.UUID(node_id)
+    mock_node.name = "server1"
+    mock_node.connection_type = "docker"
+    mock_node.host = "10.0.0.1"
+    mock_node.port = 22
+    mock_node.username = "root"
+    mock_node.password = None
+    mock_node.ssh_key = None
+    mock_node.docker_host = None
+    return mock_node
+
+
+def _make_runner(node: MagicMock | None = None) -> AsyncMock:
+    """Return a mock DockerCommandRunner."""
+    runner = AsyncMock()
+    runner.get_target = AsyncMock(return_value=node or _make_node())
+    runner.build_command = MagicMock(return_value="docker ps")
+    runner.execute = AsyncMock(return_value=("", "", 0))
+    return runner
+
+
+class TestBulkServicePrepareErrors:
+    """Cover the _prepare error paths of DockerBulkService."""
+
+    @pytest.mark.asyncio
+    async def test_prepare_node_not_found(self) -> None:
+        """A missing node produces an error result, not an exception."""
+        from app.core.exceptions import NodeNotFoundError
+
+        runner = _make_runner()
+        runner.get_target = AsyncMock(side_effect=NodeNotFoundError("not found"))
+        service = DockerBulkService(runner)
+
+        result = await service.bulk_container_action(
+            node_ids=["00000000-0000-0000-0000-000000000001"],
+            container_id="abc123def456",
+            action="start",
+        )
+        assert result.failed == 1
+        assert "not found" in result.results[0].error
+
+    @pytest.mark.asyncio
+    async def test_prepare_invalid_uuid(self) -> None:
+        """A malformed UUID produces a ValueError error result."""
+
+        runner = _make_runner()
+        runner.get_target = AsyncMock(side_effect=ValueError("bad uuid"))
+        service = DockerBulkService(runner)
+
+        result = await service.bulk_container_action(
+            node_ids=["not-a-uuid"],
+            container_id="abc123def456",
+            action="start",
+        )
+        assert result.failed == 1
+        assert "badly formed" in result.results[0].error
+
+
+class TestBulkServiceContainerActionBranches:
+    """Cover stop/restart action and stderr error paths."""
+
+    @pytest.mark.asyncio
+    async def test_stop_action_success(self) -> None:
+        """Stop action builds the right command and succeeds."""
+        runner = _make_runner()
+        service = DockerBulkService(runner)
+
+        result = await service.bulk_container_action(
+            node_ids=["00000000-0000-0000-0000-000000000001"],
+            container_id="abc123def456",
+            action="stop",
+            timeout=15,
+        )
+        assert result.succeeded == 1
+        # Ensure stop with timeout was called
+        called_args = runner.build_command.call_args[0][1]
+        assert "stop" in called_args
+        assert "15" in called_args
+
+    @pytest.mark.asyncio
+    async def test_restart_action_success(self) -> None:
+        """Restart action builds the right command and succeeds."""
+        runner = _make_runner()
+        service = DockerBulkService(runner)
+
+        result = await service.bulk_container_action(
+            node_ids=["00000000-0000-0000-0000-000000000001"],
+            container_id="abc123def456",
+            action="restart",
+            timeout=20,
+        )
+        assert result.succeeded == 1
+
+    @pytest.mark.asyncio
+    async def test_nonzero_exit_with_stderr(self) -> None:
+        """Non-zero exit code with stderr produces an error result."""
+        runner = _make_runner()
+        runner.execute = AsyncMock(return_value=("", "container not found", 1))
+        service = DockerBulkService(runner)
+
+        result = await service.bulk_container_action(
+            node_ids=["00000000-0000-0000-0000-000000000001"],
+            container_id="abc123def456",
+            action="start",
+        )
+        assert result.failed == 1
+        assert "container not found" in result.results[0].error
+
+
+class TestBulkServiceExecErrors:
+    """Cover bulk_exec worker exception path."""
+
+    @pytest.mark.asyncio
+    async def test_exec_worker_exception(self) -> None:
+        """Worker exception during exec is caught and reported as error."""
+        runner = _make_runner()
+        runner.execute = AsyncMock(side_effect=RuntimeError("connection lost"))
+        service = DockerBulkService(runner)
+
+        result = await service.bulk_exec(
+            node_ids=["00000000-0000-0000-0000-000000000001"],
+            container_id="abc123def456",
+            command="echo hello",
+        )
+        assert result.failed == 1
+        assert "connection lost" in result.results[0].error
