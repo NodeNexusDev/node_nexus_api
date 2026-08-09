@@ -113,9 +113,7 @@ COVERED_WS_ENDPOINTS: set[str] = {
 def _build_openapi_inventory(e2e_client: httpx.Client) -> set[str]:
     """Fetch OpenAPI schema and extract all {method} {path} pairs."""
     resp = e2e_client.get("/openapi.json")
-    assert resp.status_code == 200, (
-        f"OpenAPI schema not available: {resp.status_code}"
-    )
+    assert resp.status_code == 200, f"OpenAPI schema not available: {resp.status_code}"
     schema = resp.json()
     paths: dict = schema.get("paths", {})
     inventory: set[str] = set()
