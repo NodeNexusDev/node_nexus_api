@@ -17,13 +17,16 @@ def wait_for_condition(
 
     Uses monotonic clock — immune to system time changes.
     """
-    deadline = time.monotonic() + timeout
+    started_at = time.monotonic()
+    deadline = started_at + timeout
     while True:
         if condition():
             return
         if time.monotonic() >= deadline:
+            elapsed = time.monotonic() - started_at
             raise AssertionError(
-                f"Timed out after {timeout:.1f}s waiting for: {description}"
+                f"Timed out after {elapsed:.1f}s waiting for: {description} "
+                f"(budget={timeout:.1f}s)"
             )
         time.sleep(pause)
 
@@ -88,7 +91,8 @@ def wait_for_audit_record(
 
     Returns the parsed JSON response.
     """
-    deadline = time.monotonic() + timeout
+    started_at = time.monotonic()
+    deadline = started_at + timeout
     while True:
         response = e2e_client.get(f"/api/v1/audit/{query}")
         assert response.status_code == 200
@@ -97,8 +101,10 @@ def wait_for_audit_record(
         if data["total"] >= minimum_total and (action is None or action in actions):
             return data
         if time.monotonic() >= deadline:
+            elapsed = time.monotonic() - started_at
             raise AssertionError(
                 f"Audit record not delivered: action={action}, query={query}, "
-                f"total={data.get('total', 0)}, actions_found={actions}"
+                f"total={data.get('total', 0)}, actions_found={actions}, "
+                f"elapsed={elapsed:.1f}s, budget={timeout:.1f}s"
             )
         time.sleep(0.1)

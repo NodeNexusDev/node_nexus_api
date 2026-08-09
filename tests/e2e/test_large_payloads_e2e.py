@@ -11,41 +11,10 @@ from uuid import uuid4
 import httpx2 as httpx
 import pytest
 
+from tests.e2e.helpers.nodes import create_docker_node as _create_docker_node
+from tests.e2e.helpers.nodes import create_ssh_node as _create_ssh_node
+
 pytestmark = [pytest.mark.docker, pytest.mark.e2e_slow]
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-
-def _create_ssh_node(e2e_client: httpx.Client) -> dict:
-    data = {
-        "name": f"lp-{uuid4().hex[:8]}",
-        "host": "ssh-server",
-        "port": 2222,
-        "connection_type": "ssh",
-        "username": "testuser",
-        "password": "testpass",
-    }
-    resp = e2e_client.post("/api/v1/nodes/", json=data)
-    assert resp.status_code == 201
-    return resp.json()
-
-
-def _create_docker_node(e2e_client: httpx.Client) -> dict:
-    """Create a Docker node pointing to the internal DinD service."""
-    data = {
-        "name": f"lp-docker-{uuid4().hex[:8]}",
-        "host": "ssh-server",
-        "port": 2222,
-        "connection_type": "docker",
-        "username": "testuser",
-        "password": "testpass",
-        "docker_host": "tcp://dind:2375",
-    }
-    resp = e2e_client.post("/api/v1/nodes/", json=data)
-    assert resp.status_code == 201
-    return resp.json()
 
 
 def _docker_pull_alpine(e2e_client: httpx.Client, node_id: str) -> None:

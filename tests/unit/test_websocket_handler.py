@@ -38,6 +38,9 @@ class FakeStreamingSession:
         if signal != "SIGINT":
             raise ValueError("rejected")
 
+    async def abort_active_process(self) -> None:
+        return None
+
 
 class FakeStreamingService:
     def __init__(self, error: Exception | None = None) -> None:

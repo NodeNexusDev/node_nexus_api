@@ -1,6 +1,6 @@
 """Remote process streaming ports."""
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator, AsyncIterator
 from typing import Protocol
 
 from app.application.dto.remote_stream import RemoteStreamEventDTO
@@ -23,12 +23,16 @@ class RemoteStreamingConnector(Protocol):
 
     def execute_command_streaming_events(
         self, command: str
-    ) -> AsyncIterator[RemoteStreamEventDTO]:
+    ) -> AsyncGenerator[RemoteStreamEventDTO]:
         """Stream typed stdout, stderr, and exit events."""
         ...
 
     async def send_signal(self, signal: str) -> None:
         """Forward an allowed signal to the active process."""
+        ...
+
+    async def abort_active_process(self) -> None:
+        """Forcibly stop the active process group during cleanup."""
         ...
 
 
