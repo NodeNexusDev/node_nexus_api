@@ -3,6 +3,8 @@ name: CI
 on:
   pull_request:
     branches: [main]
+  schedule:
+    - cron: "0 3 * * *"
 
 permissions:
   contents: read
@@ -175,10 +177,11 @@ jobs:
             -e MASTER_API_KEY=test-master-key \
             node-nexus-api:test python -c "from app.main import app; print('App loaded successfully')"
 
-  e2e:
+  e2e-smoke:
     if: github.head_ref == 'dev'
     runs-on: ubuntu-latest
     needs: docker
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v6
 
@@ -194,8 +197,119 @@ jobs:
       - name: Install dependencies
         run: uv sync --locked --all-extras
 
-      - name: Run production-like E2E stack
-        run: uv run pytest tests/e2e/ -m docker -q --tb=short
+      - name: Run E2E smoke suite
+        run: >-
+          uv run pytest tests/e2e/ -m "docker and e2e_smoke"
+          --junit-xml=build/test-results/e2e-smoke.xml
+          --tb=short -q
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-smoke-results
+          path: build/test-results/
+
+  e2e-full:
+    if: github.head_ref == 'dev'
+    runs-on: ubuntu-latest
+    needs: e2e-smoke
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+
+      - name: Set up Python
+        run: uv python install 3.13
+
+      - name: Install dependencies
+        run: uv sync --locked --all-extras
+
+      - name: Run full E2E suite (excluding nightly-only)
+        run: >-
+          uv run pytest tests/e2e/ -m "docker and not e2e_resilience and not e2e_migration and not e2e_slow"
+          --junit-xml=build/test-results/e2e-full.xml
+          --durations=10
+          --tb=short -q
+
+      - name: Collect Docker logs on failure
+        if: failure()
+        run: |
+          mkdir -p build/logs
+          for svc in db dind ssh-server api api-replica; do
+            docker compose -f tests/docker-compose.e2e.yml logs --no-color "$svc" > "build/logs/${svc}.log" 2>&1 || true
+          done
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-full-results
+          path: build/test-results/
+
+      - name: Upload logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-full-logs
+          path: build/logs/
+
+  e2e-nightly:
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        run: [1, 2, 3]
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+
+      - name: Set up Python
+        run: uv python install 3.13
+
+      - name: Install dependencies
+        run: uv sync --locked --all-extras
+
+      - name: Run nightly E2E suite (resilience + migration + slow)
+        run: >-
+          uv run pytest tests/e2e/ -m "docker and (e2e_resilience or e2e_migration or e2e_slow)"
+          --junit-xml=build/test-results/e2e-nightly-${{ matrix.run }}.xml
+          --durations=10
+          --tb=short -q
+
+      - name: Collect Docker logs on failure
+        if: failure()
+        run: |
+          mkdir -p build/logs
+          for svc in db dind ssh-server api api-replica; do
+            docker compose -f tests/docker-compose.e2e.yml logs --no-color "$svc" > "build/logs/${svc}.log" 2>&1 || true
+          done
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-nightly-results-run${{ matrix.run }}
+          path: build/test-results/
+
+      - name: Upload logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-nightly-logs-run${{ matrix.run }}
+          path: build/logs/
 
   security:
     if: github.head_ref == 'dev'

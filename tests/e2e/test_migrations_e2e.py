@@ -13,7 +13,7 @@ import pytest
 from tests.e2e.helpers.resources import UniqueResourceFactory
 from tests.e2e.helpers.service_controller import DockerServiceController
 
-pytestmark = pytest.mark.docker
+pytestmark = [pytest.mark.docker, pytest.mark.e2e_migration]
 
 
 class TestMigrationFreshDB:
