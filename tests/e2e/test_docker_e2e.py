@@ -465,3 +465,116 @@ class TestDockerContainerLifecycle:
             assert resp.status_code in (502, 503)
         finally:
             await client.delete(f"/api/v1/nodes/{node_id}")
+
+
+# ---------------------------------------------------------------------------
+# Bulk by tags (A.6) — requires Docker infrastructure
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.docker
+class TestDockerBulkByTags:
+    """Bulk Docker operations resolved by node tags."""
+
+    @staticmethod
+    def _make_docker_node_data(tags: list[str]) -> dict:
+        unique = uuid.uuid4().hex[:8]
+        return {
+            "name": f"docker-bulk-tag-{unique}",
+            "host": "ssh-server",
+            "port": 2222,
+            "connection_type": "docker",
+            "username": "testuser",
+            "password": "testpass",
+            "docker_host": "tcp://dind:2375",
+            "tags": tags,
+        }
+
+    async def _pull_alpine(self, client: httpx.AsyncClient, node_id: str) -> None:
+        resp = await client.post(
+            f"/api/v1/nodes/{node_id}/docker/images/pull",
+            json={"image": "alpine:latest", "timeout": 120},
+        )
+        assert resp.status_code == 200
+
+    async def test_docker_bulk_by_tags(self, client: httpx.AsyncClient) -> None:
+        """Create a tagged Docker node → bulk start by tag."""
+        node_data = self._make_docker_node_data(["zone-a", "env-e2e"])
+        node = (await client.post("/api/v1/nodes/", json=node_data)).json()
+        try:
+            self._pull_alpine(client, node["id"])
+            # Run a container via SSH exec so we can bulk-start it
+            resp = await client.post(
+                f"/api/v1/nodes/{node['id']}/execute",
+                json={"command": "docker run -d --name bulk-tag-ctr alpine sleep 300"},
+            )
+            assert resp.status_code == 200
+            # Stop it first
+            await client.post(
+                f"/api/v1/nodes/{node['id']}/docker/containers/bulk-tag-ctr/stop"
+            )
+
+            resp = await client.post(
+                "/api/v1/docker/bulk/start",
+                json={
+                    "node_tags": ["env-e2e"],
+                    "container_id": "bulk-tag-ctr",
+                },
+            )
+            assert resp.status_code == 200
+            data = resp.json()
+            assert data["action"] == "start"
+            assert data["total"] == 1
+            assert data["succeeded"] == 1
+        finally:
+            await client.delete(
+                f"/api/v1/nodes/{node['id']}/docker/containers/bulk-tag-ctr?force=true"
+            )
+            await client.delete(f"/api/v1/nodes/{node['id']}")
+
+    async def test_docker_bulk_mixed_ids_and_tags(
+        self, client: httpx.AsyncClient
+    ) -> None:
+        """Both node_ids and node_tags provided → deduplicate."""
+        node_data = self._make_docker_node_data(["zone-a", "env-e2e"])
+        node = (await client.post("/api/v1/nodes/", json=node_data)).json()
+        try:
+            self._pull_alpine(client, node["id"])
+            await client.post(
+                f"/api/v1/nodes/{node['id']}/execute",
+                json={
+                    "command": "docker run -d --name bulk-mixed-ctr alpine sleep 300"
+                },
+            )
+            await client.post(
+                f"/api/v1/nodes/{node['id']}/docker/containers/bulk-mixed-ctr/stop"
+            )
+
+            resp = await client.post(
+                "/api/v1/docker/bulk/start",
+                json={
+                    "node_ids": [node["id"]],
+                    "node_tags": ["env-e2e"],
+                    "container_id": "bulk-mixed-ctr",
+                },
+            )
+            assert resp.status_code == 200
+            data = resp.json()
+            # Deduplicated to exactly one node
+            assert data["total"] == 1
+            assert data["succeeded"] == 1
+        finally:
+            await client.delete(
+                f"/api/v1/nodes/{node['id']}/docker/containers/bulk-mixed-ctr?force=true"
+            )
+            await client.delete(f"/api/v1/nodes/{node['id']}")
+
+    async def test_docker_bulk_no_targets_validation_error(
+        self, client: httpx.AsyncClient
+    ) -> None:
+        """Empty node_ids and node_tags → 422."""
+        resp = await client.post(
+            "/api/v1/docker/bulk/start",
+            json={"container_id": "any-ctr"},
+        )
+        assert resp.status_code == 422

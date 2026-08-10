@@ -1,6 +1,6 @@
 """Docker schemas for API."""
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class DockerContainer(BaseModel):
@@ -71,6 +71,79 @@ class DockerExecResult(BaseModel):
     stdout: str
     stderr: str
     exit_code: int
+
+
+class ContainerVolumeMount(BaseModel):
+    """Bind-mount specification for ``docker create``."""
+
+    bind: str = Field(min_length=1, max_length=4096)
+    mode: str = Field(default="rw", pattern="^(rw|ro)$")
+
+
+class ContainerCreateRequest(BaseModel):
+    """Request body for ``POST /containers`` (``docker create``)."""
+
+    image: str = Field(min_length=1, max_length=255)
+    name: str | None = Field(default=None, min_length=1, max_length=255)
+    command: str | None = Field(default=None, max_length=4096)
+    ports: dict[str, str] = Field(default_factory=dict)
+    volumes: dict[str, ContainerVolumeMount] = Field(default_factory=dict)
+    env: list[str] = Field(default_factory=list)
+    labels: dict[str, str] = Field(default_factory=dict)
+    network: str | None = Field(default=None, max_length=255)
+    restart_policy: str | None = Field(default=None)
+    detach: bool = Field(default=True)
+
+
+class ContainerCreatedResponse(BaseModel):
+    """Response body for container creation (HTTP 201)."""
+
+    id: str
+    name: str
+    image: str
+    status: str = "created"
+
+
+class DockerImageInspectResponse(BaseModel):
+    """Parsed image inspect output."""
+
+    id: str
+    repo_tags: list[str] = Field(default_factory=list)
+    size: int = 0
+    created: str = ""
+    architecture: str = ""
+    os: str = ""
+
+
+class DockerImageTagRequest(BaseModel):
+    """Request body for ``POST /images/{image_id}/tag``."""
+
+    repo: str = Field(min_length=1, max_length=255)
+    tag: str = Field(min_length=1, max_length=128)
+
+
+class DockerImageTagResponse(BaseModel):
+    """Response body for image tagging."""
+
+    source: str
+    target: str
+
+
+class DockerImageBuildRequest(BaseModel):
+    """Request body for ``POST /images/build``."""
+
+    dockerfile: str = Field(min_length=1, max_length=1_048_576)
+    tag: str = Field(min_length=1, max_length=255)
+    build_args: dict[str, str] = Field(default_factory=dict)
+    no_cache: bool = False
+
+
+class DockerImageBuildResponse(BaseModel):
+    """Response body for image build."""
+
+    image_id: str
+    tag: str
+    output: str
 
 
 class DockerImage(BaseModel):
@@ -153,10 +226,17 @@ class DockerVolume(BaseModel):
 class BulkDockerRequest(BaseModel):
     """Request for bulk Docker operations on multiple nodes."""
 
-    node_ids: list[str] = Field(min_length=1)
+    node_ids: list[str] = Field(default_factory=list)
+    node_tags: list[str] = Field(default_factory=list)
     container_id: str = Field(min_length=1, max_length=255)
     timeout: int | None = Field(default=None, ge=1, le=300)
     command: str | None = Field(default=None, min_length=1, max_length=4096)
+
+    @model_validator(mode="after")
+    def _require_targets(self) -> "BulkDockerRequest":
+        if not self.node_ids and not self.node_tags:
+            raise ValueError("At least one of node_ids or node_tags must be provided")
+        return self
 
 
 class BulkDockerNodeResult(BaseModel):

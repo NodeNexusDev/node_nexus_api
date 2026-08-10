@@ -659,3 +659,154 @@ def test_docker_container_stats_not_found(e2e_client):
         )
     finally:
         e2e_client.delete(f"/api/v1/nodes/{node['id']}")
+
+
+# ---------------------------------------------------------------------------
+# Docker Container Create (A.1) + Image inspect/remove/tag/build (A.2-A.5)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.e2e_slow
+def test_docker_container_create(e2e_client):
+    """POST .../containers creates a container (Create -> inspect -> remove)."""
+    node = _create_docker_node(e2e_client)
+    try:
+        _docker_pull_alpine(e2e_client, node["id"])
+        resp = e2e_client.post(
+            f"/api/v1/nodes/{node['id']}/docker/containers",
+            json={
+                "image": "alpine:latest",
+                "name": "e2e-create-ctr",
+                "command": "sleep 60",
+                "labels": {"com.example.test": "true"},
+            },
+        )
+        assert resp.status_code == 201, f"create failed: {resp.status_code} {resp.text}"
+        data = resp.json()
+        assert data["id"]
+        assert data["name"] == "e2e-create-ctr"
+        assert data["image"] == "alpine:latest"
+        assert data["status"] == "created"
+
+        # Inspect via existing endpoint to confirm it exists
+        resp = e2e_client.get(
+            f"/api/v1/nodes/{node['id']}/docker/containers/e2e-create-ctr"
+        )
+        assert resp.status_code == 200
+        assert resp.json()["State"]["status"] == "created"
+
+        # Remove (force) via existing endpoint
+        resp = e2e_client.delete(
+            f"/api/v1/nodes/{node['id']}/docker/containers/e2e-create-ctr?force=true"
+        )
+        assert resp.status_code == 204
+    finally:
+        e2e_client.delete(f"/api/v1/nodes/{node['id']}")
+
+
+def test_docker_image_inspect(e2e_client):
+    """GET .../images/{image_id} returns image details."""
+    node = _create_docker_node(e2e_client)
+    try:
+        _docker_pull_alpine(e2e_client, node["id"])
+        resp = e2e_client.get(f"/api/v1/nodes/{node['id']}/docker/images/alpine:latest")
+        assert resp.status_code == 200, (
+            f"inspect failed: {resp.status_code} {resp.text}"
+        )
+        data = resp.json()
+        assert data["id"].startswith("sha256:")
+        assert "alpine:latest" in data["repo_tags"]
+        assert data["size"] > 0
+        assert data["architecture"] in {"amd64", "arm64", "arm", "x86_64"}
+        assert data["os"] == "linux"
+    finally:
+        e2e_client.delete(f"/api/v1/nodes/{node['id']}")
+
+
+def test_docker_image_remove(e2e_client):
+    """DELETE .../images/{image_id} removes an image."""
+    node = _create_docker_node(e2e_client)
+    try:
+        # Pull a separate image so we don't affect other tests
+        resp = e2e_client.post(
+            f"/api/v1/nodes/{node['id']}/docker/images/pull",
+            json={"image": "busybox:latest", "timeout": 120},
+        )
+        assert resp.status_code == 200
+
+        resp = e2e_client.delete(
+            f"/api/v1/nodes/{node['id']}/docker/images/busybox:latest"
+        )
+        assert resp.status_code == 204, f"remove failed: {resp.status_code} {resp.text}"
+
+        # Verify it's gone (inspect should 404)
+        resp = e2e_client.get(
+            f"/api/v1/nodes/{node['id']}/docker/images/busybox:latest"
+        )
+        assert resp.status_code == 404
+    finally:
+        e2e_client.delete(f"/api/v1/nodes/{node['id']}")
+
+
+def test_docker_image_tag(e2e_client):
+    """POST .../images/{image_id}/tag tags an image."""
+    node = _create_docker_node(e2e_client)
+    try:
+        _docker_pull_alpine(e2e_client, node["id"])
+        resp = e2e_client.post(
+            f"/api/v1/nodes/{node['id']}/docker/images/alpine:latest/tag",
+            json={"repo": "local/e2e-alpine", "tag": "v1.0"},
+        )
+        assert resp.status_code == 200, f"tag failed: {resp.status_code} {resp.text}"
+        data = resp.json()
+        assert data["source"] == "alpine:latest"
+        assert data["target"] == "local/e2e-alpine:v1.0"
+
+        # Inspect the tagged image to confirm it exists
+        resp = e2e_client.get(
+            f"/api/v1/nodes/{node['id']}/docker/images/local/e2e-alpine:v1.0"
+        )
+        assert resp.status_code == 200
+        assert "local/e2e-alpine:v1.0" in resp.json()["repo_tags"]
+
+        # Cleanup the tag
+        e2e_client.delete(
+            f"/api/v1/nodes/{node['id']}/docker/images/local/e2e-alpine:v1.0"
+        )
+    finally:
+        e2e_client.delete(f"/api/v1/nodes/{node['id']}")
+
+
+@pytest.mark.e2e_slow
+def test_docker_image_build(e2e_client):
+    """POST .../images/build builds an image from a Dockerfile via stdin."""
+    node = _create_docker_node(e2e_client)
+    try:
+        dockerfile = "FROM alpine:latest\nRUN echo hello > /built-marker\n"
+        resp = e2e_client.post(
+            f"/api/v1/nodes/{node['id']}/docker/images/build",
+            json={
+                "dockerfile": dockerfile,
+                "tag": "local/e2e-built:v1",
+                "no_cache": True,
+            },
+        )
+        assert resp.status_code == 200, f"build failed: {resp.status_code} {resp.text}"
+        data = resp.json()
+        assert data["tag"] == "local/e2e-built:v1"
+        assert data["image_id"]
+        assert "Successfully" in data["output"] or "sha256:" in data["output"]
+
+        # Verify the built image exists via inspect
+        resp = e2e_client.get(
+            f"/api/v1/nodes/{node['id']}/docker/images/local/e2e-built:v1"
+        )
+        assert resp.status_code == 200
+        assert "local/e2e-built:v1" in resp.json()["repo_tags"]
+
+        # Cleanup
+        e2e_client.delete(
+            f"/api/v1/nodes/{node['id']}/docker/images/local/e2e-built:v1"
+        )
+    finally:
+        e2e_client.delete(f"/api/v1/nodes/{node['id']}")
