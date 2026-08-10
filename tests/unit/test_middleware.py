@@ -185,6 +185,14 @@ class TestRequestLoggingMiddleware:
             assert resp.status_code == 200
             assert resp.json() == {"status": "ok"}
 
+    async def test_logs_exception(self, error_app) -> None:
+        async with AsyncClient(
+            transport=ASGITransport(app=error_app),
+            base_url="http://test",
+        ) as ac:
+            with pytest.raises(ValueError, match="test error"):
+                await ac.get("/error")
+
 
 async def _not_found_handler(request):
     from fastapi import HTTPException
@@ -349,6 +357,22 @@ class TestRateLimitMiddleware:
             resp = await ac.get("/test")  # 3rd request
             assert resp.status_code == 429
             assert "Rate limit" in resp.json()["detail"]
+
+    async def test_rate_limit_includes_request_id(self):
+        """429 response includes X-Request-ID when request id middleware is outer."""
+        app = Starlette(routes=[Route("/test", _fast_handler)])
+        app.add_middleware(RateLimitMiddleware, requests=1, window=60)
+        app.add_middleware(RequestIdMiddleware)
+
+        async with AsyncClient(
+            transport=ASGITransport(app=app),
+            base_url="http://test",
+        ) as ac:
+            await ac.get("/test")
+            resp = await ac.get("/test")
+            assert resp.status_code == 429
+            assert "x-request-id" in resp.headers
+            assert resp.headers["x-request-id"] == resp.json()["request_id"]
 
     async def test_rate_limit_headers_present(self):
         """Rate limit headers are present on responses."""
