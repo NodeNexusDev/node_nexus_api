@@ -93,7 +93,9 @@ class TestCreateContainer:
         assert "--label com.example.foo=bar" in build_args
         assert "--network bridge" in build_args
         assert "alpine:latest" in build_args
-        assert "'sleep 60'" in build_args
+        assert "sleep" in build_args
+        assert "60" in build_args
+        assert "'sleep 60'" not in build_args
 
     async def test_minimal_request(self) -> None:
         runner = _make_runner(stdout="deadbeef\n")

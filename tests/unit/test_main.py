@@ -113,3 +113,34 @@ class TestCreateApp:
             assert "x-request-id" in resp.headers
             assert resp.json()["request_id"] == resp.headers["x-request-id"]
             assert resp.json()["detail"] == "bad request"
+
+    @patch("app.main.get_settings")
+    async def test_validation_exception_handler_includes_request_id(
+        self, mock_get_settings: MagicMock
+    ) -> None:
+        """Custom RequestValidationError handler includes request_id in body."""
+        mock_get_settings.return_value = MagicMock(
+            CORS_ORIGINS=["*"],
+            REQUEST_TIMEOUT=300,
+            RATE_LIMIT_REQUESTS=100,
+            RATE_LIMIT_WINDOW=60,
+            SUPPORTED_API_VERSIONS=["1"],
+            PROMETHEUS_ENABLED=False,
+            PROMETHEUS_PATH="/metrics",
+        )
+        app = create_app()
+
+        @app.get("/need-param")
+        async def need_param(required: int):
+            return {"required": required}
+
+        async with AsyncClient(
+            transport=ASGITransport(app=app),
+            base_url="http://test",
+        ) as ac:
+            resp = await ac.get("/need-param?required=not-an-int")
+            assert resp.status_code == 422
+            assert "x-request-id" in resp.headers
+            body = resp.json()
+            assert body["request_id"] == resp.headers["x-request-id"]
+            assert isinstance(body["detail"], list)
