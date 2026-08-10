@@ -57,6 +57,9 @@ class Settings(BaseSettings):
     OTEL_ENDPOINT: str = "http://localhost:4317"
     OTEL_SERVICE_NAME: str = "node-nexus-api"
 
+    # API versioning
+    SUPPORTED_API_VERSIONS: list[str] = Field(default=["1"])
+
 
 @lru_cache
 def get_settings() -> Settings:
