@@ -74,8 +74,13 @@ COVERED_ENDPOINTS: set[str] = {
     # Docker Images
     "GET /api/v1/nodes/{node_id}/docker/images",
     "POST /api/v1/nodes/{node_id}/docker/images/pull",
+    "GET /api/v1/nodes/{node_id}/docker/images/{image_id}",
+    "DELETE /api/v1/nodes/{node_id}/docker/images/{image_id}",
+    "POST /api/v1/nodes/{node_id}/docker/images/{image_id}/tag",
+    "POST /api/v1/nodes/{node_id}/docker/images/build",
     # Docker Containers
     "GET /api/v1/nodes/{node_id}/docker/containers",
+    "POST /api/v1/nodes/{node_id}/docker/containers",
     "GET /api/v1/nodes/{node_id}/docker/containers/{container_id}",
     "POST /api/v1/nodes/{node_id}/docker/containers/{container_id}/start",
     "POST /api/v1/nodes/{node_id}/docker/containers/{container_id}/stop",
