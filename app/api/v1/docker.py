@@ -5,20 +5,32 @@ from dataclasses import asdict
 
 import structlog
 from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
-from fastapi import APIRouter, Query, Security
+from fastapi import APIRouter, Query, Security, status
 
 from app.api.deps import get_current_api_key, require_write_scope
+from app.application.dto.docker import (
+    ContainerCreateRequestDTO,
+    DockerImageBuildRequestDTO,
+    DockerImageTagRequestDTO,
+)
 from app.application.services.docker.container_service import DockerContainerService
 from app.application.services.docker.image_service import DockerImageService
 from app.application.services.docker.resource_service import DockerResourceService
 from app.core.docker_validation import validate_container_id
 from app.schemas.docker import (
+    ContainerCreatedResponse,
+    ContainerCreateRequest,
     DockerContainer,
     DockerContainerInspect,
     DockerExecRequest,
     DockerExecResult,
     DockerImage,
+    DockerImageBuildRequest,
+    DockerImageBuildResponse,
+    DockerImageInspectResponse,
     DockerImagePullRequest,
+    DockerImageTagRequest,
+    DockerImageTagResponse,
     DockerNetwork,
     DockerPullResult,
     DockerStats,
@@ -29,6 +41,37 @@ audit = structlog.get_logger("audit")
 router = APIRouter(
     prefix="/nodes/{node_id}/docker", tags=["docker"], route_class=DishkaRoute
 )
+
+
+@router.post("/containers", status_code=status.HTTP_201_CREATED)
+@inject
+async def create_container(
+    node_id: uuid.UUID,
+    data: ContainerCreateRequest,
+    service: FromDishka[DockerContainerService],
+    _key: str = Security(require_write_scope),
+) -> ContainerCreatedResponse:
+    """Create a container on a Docker node via ``docker create``."""
+    audit.info(
+        "api.docker.containers.create",
+        node_id=str(node_id),
+        image=data.image,
+        name=data.name,
+    )
+    request = ContainerCreateRequestDTO(
+        node_id=node_id,
+        image=data.image,
+        name=data.name,
+        command=data.command,
+        ports=tuple(data.ports.items()),
+        volumes=tuple((hp, m.bind, m.mode) for hp, m in data.volumes.items()),
+        env=tuple(data.env),
+        labels=tuple(data.labels.items()),
+        network=data.network,
+        restart_policy=data.restart_policy,
+    )
+    result = await service.create_container(request)
+    return ContainerCreatedResponse.model_validate(result, from_attributes=True)
 
 
 @router.get("/containers")
@@ -201,6 +244,83 @@ async def pull_image(
     audit.info("api.docker.images.pull", node_id=str(node_id), image=data.image)
     result = await service.pull_image(node_id, data.image, timeout=data.timeout)
     return DockerPullResult.model_validate(result, from_attributes=True)
+
+
+@router.post("/images/build")
+@inject
+async def build_image(
+    node_id: uuid.UUID,
+    data: DockerImageBuildRequest,
+    service: FromDishka[DockerImageService],
+    _key: str = Security(require_write_scope),
+) -> DockerImageBuildResponse:
+    """Build a Docker image from a Dockerfile piped through stdin."""
+    audit.info(
+        "api.docker.images.build",
+        node_id=str(node_id),
+        tag=data.tag,
+        no_cache=data.no_cache,
+    )
+    request = DockerImageBuildRequestDTO(
+        node_id=node_id,
+        dockerfile=data.dockerfile,
+        tag=data.tag,
+        build_args=tuple(data.build_args.items()),
+        no_cache=data.no_cache,
+    )
+    result = await service.build_image(request)
+    return DockerImageBuildResponse.model_validate(result, from_attributes=True)
+
+
+@router.get("/images/{image_id:path}")
+@inject
+async def inspect_image(
+    node_id: uuid.UUID,
+    image_id: str,
+    service: FromDishka[DockerImageService],
+    _key: str = Security(get_current_api_key),
+) -> DockerImageInspectResponse:
+    """Inspect a Docker image."""
+    audit.info("api.docker.images.inspect", node_id=str(node_id), image_id=image_id)
+    result = await service.inspect_image(node_id, image_id)
+    return DockerImageInspectResponse.model_validate(result, from_attributes=True)
+
+
+@router.delete("/images/{image_id:path}", status_code=204)
+@inject
+async def remove_image(
+    node_id: uuid.UUID,
+    image_id: str,
+    service: FromDishka[DockerImageService],
+    _key: str = Security(require_write_scope),
+) -> None:
+    """Remove a Docker image."""
+    audit.info("api.docker.images.remove", node_id=str(node_id), image_id=image_id)
+    await service.remove_image(node_id, image_id)
+
+
+@router.post("/images/{image_id:path}/tag")
+@inject
+async def tag_image(
+    node_id: uuid.UUID,
+    image_id: str,
+    data: DockerImageTagRequest,
+    service: FromDishka[DockerImageService],
+    _key: str = Security(require_write_scope),
+) -> DockerImageTagResponse:
+    """Tag a Docker image."""
+    audit.info(
+        "api.docker.images.tag",
+        node_id=str(node_id),
+        image_id=image_id,
+        repo=data.repo,
+        tag=data.tag,
+    )
+    request = DockerImageTagRequestDTO(
+        node_id=node_id, image_id=image_id, repo=data.repo, tag=data.tag
+    )
+    result = await service.tag_image(request)
+    return DockerImageTagResponse.model_validate(result, from_attributes=True)
 
 
 @router.get("/containers/{container_id}/stats")
