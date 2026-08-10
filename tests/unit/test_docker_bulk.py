@@ -200,6 +200,90 @@ class TestBulkExecInContainers:
         assert resp.status_code == 422
 
 
+class TestBulkByTags:
+    async def test_start_by_tags_only(
+        self, client: AsyncClient, mock_service: AsyncMock
+    ) -> None:
+        mock_service.bulk_container_action.return_value = BulkDockerResponse(
+            action="start",
+            results=[
+                BulkDockerNodeResult(
+                    node_id="node-1", node_name="server1", status="success"
+                )
+            ],
+            total=1,
+            succeeded=1,
+            failed=0,
+        )
+        resp = await client.post(
+            "/api/v1/docker/bulk/start",
+            json={"node_tags": ["zone-a"], "container_id": "nginx"},
+        )
+        assert resp.status_code == 200
+        mock_service.bulk_container_action.assert_called_once_with(
+            node_ids=[],
+            container_id="nginx",
+            action="start",
+            node_tags=["zone-a"],
+        )
+
+    async def test_mixed_ids_and_tags_passed(
+        self, client: AsyncClient, mock_service: AsyncMock
+    ) -> None:
+        mock_service.bulk_container_action.return_value = BulkDockerResponse(
+            action="stop", results=[], total=0, succeeded=0, failed=0
+        )
+        resp = await client.post(
+            "/api/v1/docker/bulk/stop",
+            json={
+                "node_ids": ["node-1"],
+                "node_tags": ["zone-a"],
+                "container_id": "nginx",
+                "timeout": 5,
+            },
+        )
+        assert resp.status_code == 200
+        mock_service.bulk_container_action.assert_called_once_with(
+            node_ids=["node-1"],
+            container_id="nginx",
+            action="stop",
+            timeout=5,
+            node_tags=["zone-a"],
+        )
+
+    async def test_no_targets_returns_422(
+        self, client: AsyncClient, mock_service: AsyncMock
+    ) -> None:
+        resp = await client.post(
+            "/api/v1/docker/bulk/restart",
+            json={"container_id": "nginx"},
+        )
+        assert resp.status_code == 422
+
+    async def test_exec_by_tags(
+        self, client: AsyncClient, mock_service: AsyncMock
+    ) -> None:
+        mock_service.bulk_exec.return_value = BulkDockerResponse(
+            action="exec", results=[], total=0, succeeded=0, failed=0
+        )
+        resp = await client.post(
+            "/api/v1/docker/bulk/exec",
+            json={
+                "node_tags": ["zone-a"],
+                "container_id": "nginx",
+                "command": "echo hi",
+            },
+        )
+        assert resp.status_code == 200
+        mock_service.bulk_exec.assert_called_once_with(
+            node_ids=[],
+            container_id="nginx",
+            command="echo hi",
+            timeout=30,
+            node_tags=["zone-a"],
+        )
+
+
 class TestBulkDockerSchemas:
     def test_bulk_request(self) -> None:
         from app.schemas.docker import BulkDockerRequest
@@ -212,6 +296,25 @@ class TestBulkDockerSchemas:
         assert req.container_id == "abc123def456"
         assert req.timeout is None
         assert req.command is None
+        assert req.node_tags == []
+
+    def test_bulk_request_tags_only(self) -> None:
+        from app.schemas.docker import BulkDockerRequest
+
+        req = BulkDockerRequest(
+            node_tags=["zone-a"],
+            container_id="abc123def456",
+        )
+        assert req.node_ids == []
+        assert req.node_tags == ["zone-a"]
+
+    def test_bulk_request_requires_targets(self) -> None:
+        from pydantic import ValidationError
+
+        from app.schemas.docker import BulkDockerRequest
+
+        with pytest.raises(ValidationError):
+            BulkDockerRequest(node_ids=[], node_tags=[], container_id="abc")
 
     def test_bulk_response(self) -> None:
         resp = BulkDockerResponse(

@@ -34,6 +34,10 @@ class DockerCommandRunner:
             raise DockerError(f"Node {node_id} is not a Docker node")
         return node
 
+    async def get_targets_by_tags(self, tags: list[str]) -> list[NodeConnectionDTO]:
+        """Resolve node connection targets matching all ``tags``."""
+        return await self._node_reader.get_connections_by_tags(tags)
+
     @staticmethod
     def build_command(node: NodeConnectionDTO, docker_args: str) -> str:
         """Build a Docker command for a target."""

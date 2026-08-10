@@ -125,12 +125,81 @@ class DockerVolumeDTO:
 
 
 @dataclass(frozen=True, slots=True)
+class ContainerCreateRequestDTO:
+    """Validated inputs for ``docker create``."""
+
+    node_id: UUID
+    image: str
+    name: str | None = None
+    command: str | None = None
+    ports: tuple[tuple[str, str], ...] = ()
+    volumes: tuple[tuple[str, str, str], ...] = ()
+    env: tuple[str, ...] = ()
+    labels: tuple[tuple[str, str], ...] = ()
+    network: str | None = None
+    restart_policy: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ContainerCreatedDTO:
+    """Result of ``docker create``."""
+
+    id: str
+    name: str
+    image: str
+    status: str = "created"
+
+
+@dataclass(frozen=True, slots=True)
+class DockerImageInspectDTO:
+    """Parsed ``docker inspect --type=image`` output."""
+
+    id: str
+    repo_tags: tuple[str, ...]
+    size: int
+    created: str
+    architecture: str
+    os: str
+
+
+@dataclass(frozen=True, slots=True)
+class DockerImageTagRequestDTO:
+    node_id: UUID
+    image_id: str
+    repo: str
+    tag: str
+
+
+@dataclass(frozen=True, slots=True)
+class DockerImageTagResultDTO:
+    source: str
+    target: str
+
+
+@dataclass(frozen=True, slots=True)
+class DockerImageBuildRequestDTO:
+    node_id: UUID
+    dockerfile: str
+    tag: str
+    build_args: tuple[tuple[str, str], ...] = ()
+    no_cache: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class DockerImageBuildResultDTO:
+    image_id: str
+    tag: str
+    output: str
+
+
+@dataclass(frozen=True, slots=True)
 class BulkDockerRequestDTO:
     node_ids: tuple[str, ...]
     container_id: str
     action: str
     timeout: int | None = None
     command: str | None = None
+    node_tags: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
