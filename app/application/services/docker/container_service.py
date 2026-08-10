@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import shlex
+from datetime import datetime
 from typing import TYPE_CHECKING
 from uuid import UUID
 
@@ -45,6 +46,28 @@ from app.core.docker_validation import (
 from app.core.exceptions import ContainerNotFoundError, DockerValidationError
 
 audit = structlog.get_logger("audit")
+
+
+def parse_since(since: str) -> str:
+    """Accept a Unix timestamp or ISO 8601 string and return a Docker-safe value.
+
+    Docker's ``--since`` flag accepts both formats, but we normalize ISO 8601
+    inputs to seconds-since-epoch to keep the behavior consistent across
+    Docker versions and to reject ambiguous strings early.
+    """
+    if since.isdigit():
+        return since  # Unix timestamp — pass through unchanged.
+    normalized = since.replace("Z", "+00:00")
+    try:
+        dt = datetime.fromisoformat(normalized)
+    except ValueError as exc:
+        raise DockerValidationError(
+            f"Invalid 'since' value: {since!r}. "
+            "Expected a Unix timestamp or an ISO 8601 string."
+        ) from exc
+    if dt.tzinfo is None:
+        dt = dt.astimezone()  # assume local time when no offset is provided
+    return str(int(dt.timestamp()))
 
 
 def _json_object(value: object) -> dict[str, object]:
@@ -318,8 +341,9 @@ class DockerContainerService:
         since: str | None = None,
     ) -> str:
         validated_id = validate_container_id(container_id)
+        normalized_since = parse_since(since) if since else None
         node = await self._runner.get_target(node_id)
-        since_flag = f" --since {since}" if since else ""
+        since_flag = f" --since {normalized_since}" if normalized_since else ""
         cmd = self._runner.build_command(
             node, f"logs --tail {tail}{since_flag} {validated_id}"
         )
