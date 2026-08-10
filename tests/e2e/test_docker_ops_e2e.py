@@ -1,6 +1,7 @@
 """E2E tests for Docker operations via SSH-backed Docker nodes."""
 
 import time
+from datetime import UTC
 
 import pytest
 
@@ -419,7 +420,12 @@ def test_docker_container_logs_tail_default(e2e_client):
 
 
 def test_docker_container_logs_since_iso_timestamp(e2e_client):
-    """GET .../containers/{cid}/logs?since=<ISO> limits output to since timestamp."""
+    """GET .../containers/{cid}/logs?since=<ISO 8601> limits output.
+
+    Docker accepts both Unix timestamps and ISO 8601 strings for ``--since``.
+    The API normalizes ISO 8601 to a Unix timestamp before invoking Docker.
+    """
+    from datetime import datetime
 
     node = _create_docker_node(e2e_client)
     try:
@@ -437,13 +443,14 @@ def test_docker_container_logs_since_iso_timestamp(e2e_client):
         # Wait for container to start and print first line
         time.sleep(1)
 
-        # Capture current time (after first echo, before second)
-        since = str(int(time.time()))
+        # Capture current time as ISO 8601 (after first echo, before second)
+        since_dt = datetime.now(UTC)
+        since = since_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
 
         # Wait for second echo
         time.sleep(3)
 
-        # Get logs since the captured timestamp
+        # Get logs since the captured ISO 8601 timestamp
         resp = e2e_client.get(
             f"/api/v1/nodes/{node['id']}/docker/containers/e2e-logs-since/logs"
             f"?since={since}"

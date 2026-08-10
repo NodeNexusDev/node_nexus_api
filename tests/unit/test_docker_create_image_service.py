@@ -1,6 +1,7 @@
 """Unit tests for new Docker image/container use cases (mocked command runner)."""
 
 import uuid
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -11,7 +12,10 @@ from app.application.dto.docker import (
     DockerImageTagRequestDTO,
 )
 from app.application.services.docker.bulk_service import DockerBulkService
-from app.application.services.docker.container_service import DockerContainerService
+from app.application.services.docker.container_service import (
+    DockerContainerService,
+    parse_since,
+)
 from app.application.services.docker.image_service import DockerImageService
 from app.core.exceptions import DockerValidationError, ImageNotFoundError
 
@@ -311,6 +315,63 @@ def _make_tag_node(node_id: str, name: str = "tag-node") -> MagicMock:
     node.connection_type = "docker"
     node.docker_host = None
     return node
+
+
+# ---------------------------------------------------------------------------
+# parse_since — ISO 8601 / Unix timestamp normalization (B.3)
+# ---------------------------------------------------------------------------
+
+
+class TestParseSince:
+    def test_unix_timestamp_passes_through(self) -> None:
+        assert parse_since("1700000000") == "1700000000"
+
+    def test_iso_8601_with_z_normalizes_to_unix(self) -> None:
+        dt = datetime(2026, 8, 10, 12, 0, 0, tzinfo=UTC)
+        expected = str(int(dt.timestamp()))
+        assert parse_since("2026-08-10T12:00:00Z") == expected
+
+    def test_iso_8601_with_offset_normalizes_to_unix(self) -> None:
+        dt_utc = datetime(2026, 8, 10, 12, 0, 0, tzinfo=UTC)
+        expected = str(int(dt_utc.timestamp()))
+        # +03:00 → 09:00 UTC
+        assert parse_since("2026-08-10T15:00:00+03:00") == expected
+
+    def test_iso_8601_without_timezone_uses_local(self) -> None:
+        dt = datetime(2026, 8, 10, 12, 0, 0)
+        expected = str(int(dt.astimezone().timestamp()))
+        assert parse_since("2026-08-10T12:00:00") == expected
+
+    def test_invalid_value_raises(self) -> None:
+        with pytest.raises(DockerValidationError, match="Invalid 'since'"):
+            parse_since("not-a-timestamp")
+
+    def test_empty_raises(self) -> None:
+        with pytest.raises(DockerValidationError):
+            parse_since("")
+
+
+class TestGetLogsSince:
+    async def test_iso_since_normalized_in_command(self) -> None:
+        runner = _make_runner(stdout="log line\n")
+        service = DockerContainerService(runner)
+        await service.get_logs(NODE, "abc123", since="2026-08-10T12:00:00Z")
+        args = runner.build_command.call_args[0][1]
+        assert "--since " in args
+        assert "2026-08-10T12:00:00Z" not in args  # normalized away
+
+    async def test_unix_since_passed_through(self) -> None:
+        runner = _make_runner(stdout="log line\n")
+        service = DockerContainerService(runner)
+        await service.get_logs(NODE, "abc123", since="1700000000")
+        args = runner.build_command.call_args[0][1]
+        assert "--since 1700000000" in args
+
+    async def test_invalid_since_raises(self) -> None:
+        runner = _make_runner()
+        service = DockerContainerService(runner)
+        with pytest.raises(DockerValidationError):
+            await service.get_logs(NODE, "abc123", since="not-a-ts")
 
 
 class TestBulkByTags:
