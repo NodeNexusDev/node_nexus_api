@@ -15,9 +15,13 @@ from app.api.error_mapping import domain_error_handler
 from app.api.v1.docker import router as docker_router
 from app.api.v1.health import router as health_router
 from app.application.dto.docker import (
+    ContainerCreatedDTO,
     DockerContainerConfigDTO,
     DockerContainerInspectDTO,
     DockerContainerStateDTO,
+    DockerImageBuildResultDTO,
+    DockerImageInspectDTO,
+    DockerImageTagResultDTO,
 )
 from app.application.services.docker.container_service import DockerContainerService
 from app.application.services.docker.image_service import DockerImageService
@@ -181,6 +185,25 @@ def mock_service() -> AsyncMock:
 @pytest.fixture
 async def client(mock_service: AsyncMock) -> AsyncGenerator[AsyncClient]:
     app = _create_test_app(mock_service)
+    with patch("app.api.deps.get_settings", return_value=_mock_settings("test-master")):
+        async with AsyncClient(
+            transport=ASGITransport(app=app),
+            base_url="http://test",
+            follow_redirects=True,
+            headers={"X-API-Key": "test-master"},
+        ) as ac:
+            yield ac
+
+
+@pytest.fixture
+def full_service() -> AsyncMock:
+    """An unrestricted mock exposing the new image/container service methods."""
+    return AsyncMock()
+
+
+@pytest.fixture
+async def full_client(full_service: AsyncMock) -> AsyncGenerator[AsyncClient]:
+    app = _create_test_app(full_service)
     with patch("app.api.deps.get_settings", return_value=_mock_settings("test-master")):
         async with AsyncClient(
             transport=ASGITransport(app=app),
@@ -814,3 +837,215 @@ class TestListVolumes:
         mock_service.list_volumes.side_effect = DockerError("daemon error")
         response = await client.get(f"/api/v1/nodes/{NODE_ID}/docker/volumes")
         assert response.status_code == 502
+
+
+# --- POST /nodes/{node_id}/docker/containers ---
+
+
+class TestCreateContainer:
+    async def test_success(
+        self, full_client: AsyncClient, full_service: AsyncMock
+    ) -> None:
+        full_service.create_container.return_value = ContainerCreatedDTO(
+            id="abc123def456", name="my-ctr", image="alpine:latest", status="created"
+        )
+        response = await full_client.post(
+            f"/api/v1/nodes/{NODE_ID}/docker/containers",
+            json={"image": "alpine:latest", "name": "my-ctr", "command": "sleep 60"},
+        )
+        assert response.status_code == 201
+        data = response.json()
+        assert data["id"] == "abc123def456"
+        assert data["name"] == "my-ctr"
+        assert data["image"] == "alpine:latest"
+        assert data["status"] == "created"
+
+    async def test_passes_ports_env_labels(
+        self, full_client: AsyncClient, full_service: AsyncMock
+    ) -> None:
+        full_service.create_container.return_value = ContainerCreatedDTO(
+            id="abc", name="x", image="alpine", status="created"
+        )
+        await full_client.post(
+            f"/api/v1/nodes/{NODE_ID}/docker/containers",
+            json={
+                "image": "alpine",
+                "name": "x",
+                "ports": {"80/tcp": "8080"},
+                "env": ["FOO=bar"],
+                "labels": {"app": "web"},
+                "network": "bridge",
+                "restart_policy": "always",
+            },
+        )
+        full_service.create_container.assert_called_once()
+        request_dto = full_service.create_container.call_args.args[0]
+        assert request_dto.ports == (("80/tcp", "8080"),)
+        assert request_dto.env == ("FOO=bar",)
+        assert request_dto.labels == (("app", "web"),)
+        assert request_dto.network == "bridge"
+        assert request_dto.restart_policy == "always"
+
+    async def test_missing_image_returns_422(
+        self, full_client: AsyncClient, full_service: AsyncMock
+    ) -> None:
+        response = await full_client.post(
+            f"/api/v1/nodes/{NODE_ID}/docker/containers",
+            json={"name": "x"},
+        )
+        assert response.status_code == 422
+
+    async def test_docker_error(
+        self, full_client: AsyncClient, full_service: AsyncMock
+    ) -> None:
+        full_service.create_container.side_effect = DockerError("daemon error")
+        response = await full_client.post(
+            f"/api/v1/nodes/{NODE_ID}/docker/containers",
+            json={"image": "alpine"},
+        )
+        assert response.status_code == 502
+
+
+# --- GET /nodes/{node_id}/docker/images/{image_id} ---
+
+
+class TestInspectImage:
+    async def test_success(
+        self, full_client: AsyncClient, full_service: AsyncMock
+    ) -> None:
+        full_service.inspect_image.return_value = DockerImageInspectDTO(
+            id="sha256:abc123",
+            repo_tags=("alpine:latest",),
+            size=7333821,
+            created="2026-01-01T00:00:00Z",
+            architecture="amd64",
+            os="linux",
+        )
+        response = await full_client.get(
+            f"/api/v1/nodes/{NODE_ID}/docker/images/sha256:abc123"
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["id"] == "sha256:abc123"
+        assert data["repo_tags"] == ["alpine:latest"]
+        assert data["size"] == 7333821
+        assert data["architecture"] == "amd64"
+
+    async def test_image_not_found(
+        self, full_client: AsyncClient, full_service: AsyncMock
+    ) -> None:
+        from app.core.exceptions import ImageNotFoundError
+
+        full_service.inspect_image.side_effect = ImageNotFoundError("not found")
+        response = await full_client.get(
+            f"/api/v1/nodes/{NODE_ID}/docker/images/missing:latest"
+        )
+        assert response.status_code == 404
+
+
+# --- DELETE /nodes/{node_id}/docker/images/{image_id} ---
+
+
+class TestRemoveImage:
+    async def test_success(
+        self, full_client: AsyncClient, full_service: AsyncMock
+    ) -> None:
+        full_service.remove_image.return_value = None
+        response = await full_client.delete(
+            f"/api/v1/nodes/{NODE_ID}/docker/images/alpine:latest"
+        )
+        assert response.status_code == 204
+        full_service.remove_image.assert_called_once_with(NODE_ID, "alpine:latest")
+
+    async def test_image_not_found(
+        self, full_client: AsyncClient, full_service: AsyncMock
+    ) -> None:
+        from app.core.exceptions import ImageNotFoundError
+
+        full_service.remove_image.side_effect = ImageNotFoundError("not found")
+        response = await full_client.delete(
+            f"/api/v1/nodes/{NODE_ID}/docker/images/missing:latest"
+        )
+        assert response.status_code == 404
+
+
+# --- POST /nodes/{node_id}/docker/images/{image_id}/tag ---
+
+
+class TestTagImage:
+    async def test_success(
+        self, full_client: AsyncClient, full_service: AsyncMock
+    ) -> None:
+        full_service.tag_image.return_value = DockerImageTagResultDTO(
+            source="alpine:latest", target="my-registry.com/app:v1.0"
+        )
+        response = await full_client.post(
+            f"/api/v1/nodes/{NODE_ID}/docker/images/alpine:latest/tag",
+            json={"repo": "my-registry.com/app", "tag": "v1.0"},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["source"] == "alpine:latest"
+        assert data["target"] == "my-registry.com/app:v1.0"
+
+    async def test_missing_repo_returns_422(
+        self, full_client: AsyncClient, full_service: AsyncMock
+    ) -> None:
+        response = await full_client.post(
+            f"/api/v1/nodes/{NODE_ID}/docker/images/alpine:latest/tag",
+            json={"tag": "v1.0"},
+        )
+        assert response.status_code == 422
+
+
+# --- POST /nodes/{node_id}/docker/images/build ---
+
+
+class TestBuildImage:
+    async def test_success(
+        self, full_client: AsyncClient, full_service: AsyncMock
+    ) -> None:
+        full_service.build_image.return_value = DockerImageBuildResultDTO(
+            image_id="sha256:abcdef",
+            tag="my-image:v1.0",
+            output="Successfully built sha256:abcdef",
+        )
+        response = await full_client.post(
+            f"/api/v1/nodes/{NODE_ID}/docker/images/build",
+            json={
+                "dockerfile": "FROM alpine:latest\nRUN echo hello",
+                "tag": "my-image:v1.0",
+            },
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["image_id"] == "sha256:abcdef"
+        assert data["tag"] == "my-image:v1.0"
+
+    async def test_passes_build_args_and_no_cache(
+        self, full_client: AsyncClient, full_service: AsyncMock
+    ) -> None:
+        full_service.build_image.return_value = DockerImageBuildResultDTO(
+            image_id="", tag="img:1", output=""
+        )
+        await full_client.post(
+            f"/api/v1/nodes/{NODE_ID}/docker/images/build",
+            json={
+                "dockerfile": "FROM alpine",
+                "tag": "img:1",
+                "build_args": {"VERSION": "1.0"},
+                "no_cache": True,
+            },
+        )
+        request_dto = full_service.build_image.call_args.args[0]
+        assert request_dto.build_args == (("VERSION", "1.0"),)
+        assert request_dto.no_cache is True
+
+    async def test_missing_dockerfile_returns_422(
+        self, full_client: AsyncClient, full_service: AsyncMock
+    ) -> None:
+        response = await full_client.post(
+            f"/api/v1/nodes/{NODE_ID}/docker/images/build",
+            json={"tag": "img:1"},
+        )
+        assert response.status_code == 422
