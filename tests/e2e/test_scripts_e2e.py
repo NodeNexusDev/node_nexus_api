@@ -1,5 +1,6 @@
 """E2E tests for script CRUD, execute, schedule, scheduler execution."""
 
+import asyncio
 import time
 from uuid import uuid4
 
@@ -12,6 +13,35 @@ from app.adapters.runtime.apscheduler_runtime import ApschedulerRuntime
 from tests.e2e.helpers.nodes import create_ssh_node as _create_ssh_node
 
 pytestmark = pytest.mark.docker
+
+
+_SCHEDULE_LOCK_ID = 5_642_395_847_322_111
+
+
+async def _wait_for_api_owns_lock(engine, *, timeout: float = 30.0) -> None:
+    """Block until the running API owns the scheduler advisory lock.
+
+    The flaky race: a prior failover test may have released the lock and the
+    API is still restarting. If a contender runs before the API reacquires the
+    lock, ``pg_try_advisory_lock`` returns True and the assertion fails. We
+    poll by attempting to grab the lock ourselves; if we succeed, the API does
+    NOT own it, so we release and wait, retrying until the API holds the lock.
+    """
+    deadline = asyncio.get_event_loop().time() + timeout
+    while asyncio.get_event_loop().time() < deadline:
+        probe = ApschedulerRuntime()
+        try:
+            acquired = await probe.acquire_ownership(engine)
+        finally:
+            await probe.stop()
+        if not acquired:
+            return
+        # API does not currently own the lock — wait and retry.
+        await asyncio.sleep(0.5)
+    raise AssertionError(
+        "API did not re-acquire the scheduler advisory lock within "
+        f"{timeout}s — readiness probe failed"
+    )
 
 
 def _create_command(e2e_client: httpx.Client, **overrides) -> dict:
@@ -465,12 +495,17 @@ async def test_second_scheduler_replica_cannot_acquire_ownership(
         f"postgresql+asyncpg://postgres:postgres@{docker_ip}:{database_port}"
         "/node_nexus_e2e"
     )
-    contender = ApschedulerRuntime()
     try:
-        assert await contender.acquire_ownership(engine) is False
-        assert contender.owns_execution is False
+        # Ensure the primary API holds the advisory lock before testing the
+        # contender, to avoid a flaky race after an earlier failover test.
+        await _wait_for_api_owns_lock(engine, timeout=30)
+        contender = ApschedulerRuntime()
+        try:
+            assert await contender.acquire_ownership(engine) is False
+            assert contender.owns_execution is False
+        finally:
+            await contender.stop()
     finally:
-        await contender.stop()
         await engine.dispose()
 
 
