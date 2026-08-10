@@ -235,11 +235,9 @@ class DockerImageService:
         return DockerImageTagResultDTO(source=validated_source, target=validated_target)
 
     @staticmethod
-    def _build_build_command_args(
-        request: DockerImageBuildRequestDTO, quoted_stdin: str
-    ) -> str:
-        """Assemble a shell-quoted ``docker build`` command reading from stdin."""
-        parts: list[str] = [f"printf %s {quoted_stdin} | docker build"]
+    def _build_build_command_args(request: DockerImageBuildRequestDTO) -> str:
+        """Assemble the ``docker build`` argument string."""
+        parts: list[str] = ["build"]
         parts.append(f"--tag {shlex.quote(request.tag)}")
         for key, value in request.build_args:
             parts.append(f"--build-arg {shlex.quote(f'{key}={value}')}")
@@ -265,8 +263,9 @@ class DockerImageService:
         )
         node = await self._runner.get_target(request.node_id)
         quoted_stdin = shlex.quote(normalized.dockerfile)
-        args = self._build_build_command_args(normalized, quoted_stdin)
-        cmd = self._runner.build_command(node, args)
+        docker_args = self._build_build_command_args(normalized)
+        base_cmd = self._runner.build_command(node, docker_args)
+        cmd = f"printf %s {quoted_stdin} | {base_cmd}"
         if self._audit:
             await self._audit.log_required(
                 action="docker.image.build.requested",

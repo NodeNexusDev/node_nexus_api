@@ -367,7 +367,7 @@ class TestNetworkFailures:
                         got_503 = True
                         data = resp.json()
                         assert data["status"] == "not_ready"
-                        assert data["checks"]["database"] == "error"
+                        assert data["checks"]["database"]["status"] == "error"
                         break
                 except httpx.HTTPError:
                     pass
@@ -407,7 +407,8 @@ class TestNetworkFailures:
 
         data = resp.json()
         assert data["status"] == "ready"
-        assert data["checks"]["database"] == "ok"
+        assert data["checks"]["database"]["status"] == "ok"
+        assert data["checks"]["database"]["detail"]
 
     def test_api_restart_preserves_nodes(
         self,
