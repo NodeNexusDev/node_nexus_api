@@ -16,6 +16,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from app.adapters.lifecycle.application_startup import ApplicationStartup
 from app.api.error_mapping import domain_error_handler
 from app.api.middleware import (
+    ApiVersionMiddleware,
     RateLimitMiddleware,
     RequestIdMiddleware,
     RequestLoggingMiddleware,
@@ -107,8 +108,12 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
-    app.add_middleware(RequestIdMiddleware)
     app.add_middleware(RequestLoggingMiddleware)
+    app.add_middleware(
+        ApiVersionMiddleware,
+        supported_versions=settings.SUPPORTED_API_VERSIONS,
+    )
+    app.add_middleware(RequestIdMiddleware)
     app.add_middleware(TimeoutMiddleware, timeout=settings.REQUEST_TIMEOUT)
     app.add_middleware(
         RateLimitMiddleware,
