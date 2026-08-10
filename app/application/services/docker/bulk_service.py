@@ -54,6 +54,28 @@ class DockerBulkService:
                 )
         return prepared, results
 
+    async def _resolve_node_ids(
+        self, node_ids: list[str], node_tags: list[str]
+    ) -> list[str]:
+        """Merge explicit node_ids with tag-resolved ids, deduplicated."""
+        if not node_tags:
+            return list(node_ids)
+        try:
+            tag_nodes = await self._runner.get_targets_by_tags(list(node_tags))
+        except Exception:
+            tag_nodes = []
+        tag_ids = [
+            str(node.id) for node in tag_nodes if node.connection_type == "docker"
+        ]
+        merged = [*node_ids, *tag_ids]
+        seen: set[str] = set()
+        deduped: list[str] = []
+        for node_id_str in merged:
+            if node_id_str not in seen:
+                seen.add(node_id_str)
+                deduped.append(node_id_str)
+        return deduped
+
     @staticmethod
     def _finalize(
         prepared: list[tuple[int, str, NodeConnectionDTO]],
@@ -70,9 +92,11 @@ class DockerBulkService:
         container_id: str,
         action: str,
         timeout: int | None = None,
+        node_tags: list[str] | None = None,
     ) -> BulkDockerResultDTO:
         validated_id = validate_container_id(container_id)
-        prepared, slots = await self._prepare(node_ids)
+        resolved_ids = await self._resolve_node_ids(node_ids, list(node_tags or []))
+        prepared, slots = await self._prepare(resolved_ids)
 
         async def worker(
             node_id_str: str, node: NodeConnectionDTO
@@ -116,10 +140,16 @@ class DockerBulkService:
         return self._response(action, validated_id, results)
 
     async def bulk_exec(
-        self, node_ids: list[str], container_id: str, command: str, timeout: int = 30
+        self,
+        node_ids: list[str],
+        container_id: str,
+        command: str,
+        timeout: int = 30,
+        node_tags: list[str] | None = None,
     ) -> BulkDockerResultDTO:
         validated_id = validate_container_id(container_id)
-        prepared, slots = await self._prepare(node_ids)
+        resolved_ids = await self._resolve_node_ids(node_ids, list(node_tags or []))
+        prepared, slots = await self._prepare(resolved_ids)
 
         async def worker(
             node_id_str: str, node: NodeConnectionDTO

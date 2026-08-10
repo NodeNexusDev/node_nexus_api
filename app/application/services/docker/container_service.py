@@ -13,6 +13,8 @@ import structlog
 
 from app.application.command_policy import command_fingerprint
 from app.application.dto.docker import (
+    ContainerCreatedDTO,
+    ContainerCreateRequestDTO,
     DockerContainerConfigDTO,
     DockerContainerDTO,
     DockerContainerInspectDTO,
@@ -29,8 +31,18 @@ from app.application.services.docker.parsers import (
     parse_json_lines,
 )
 from app.application.types import JsonObject
-from app.core.docker_validation import validate_container_id
-from app.core.exceptions import ContainerNotFoundError
+from app.core.docker_validation import (
+    validate_container_id,
+    validate_container_name,
+    validate_env_vars,
+    validate_image_name,
+    validate_labels,
+    validate_network_name,
+    validate_port_mappings,
+    validate_restart_policy,
+    validate_volume_mounts,
+)
+from app.core.exceptions import ContainerNotFoundError, DockerValidationError
 
 audit = structlog.get_logger("audit")
 
@@ -85,6 +97,96 @@ class DockerContainerService:
             await self._audit.log_required(
                 action=action, node_id=node_id, details=details
             )
+
+    @staticmethod
+    def _build_create_args(request: ContainerCreateRequestDTO) -> str:
+        """Assemble a fully-shell-quoted ``docker create`` argument string."""
+        parts: list[str] = []
+        if request.name is not None:
+            parts.append(f"--name {shlex.quote(request.name)}")
+        if request.restart_policy is not None:
+            parts.append(f"--restart {shlex.quote(request.restart_policy)}")
+        for container_spec, host_port in request.ports:
+            parts.append(f"-p {shlex.quote(host_port)}:{shlex.quote(container_spec)}")
+        for host_path, bind, mode in request.volumes:
+            parts.append(
+                f"-v {shlex.quote(host_path)}:{shlex.quote(bind)}:{shlex.quote(mode)}"
+            )
+        for entry in request.env:
+            parts.append(f"-e {shlex.quote(entry)}")
+        for key, value in request.labels:
+            parts.append(f"--label {shlex.quote(f'{key}={value}')}")
+        if request.network is not None:
+            parts.append(f"--network {shlex.quote(request.network)}")
+        parts.append(shlex.quote(request.image))
+        if request.command:
+            parts.append(shlex.quote(request.command))
+        return "create " + " ".join(parts)
+
+    async def create_container(
+        self, request: ContainerCreateRequestDTO
+    ) -> ContainerCreatedDTO:
+        """Create a container via ``docker create`` and return its ID."""
+        validated_image = validate_image_name(request.image)
+        name: str | None = None
+        if request.name is not None:
+            name = validate_container_name(request.name)
+        ports = validate_port_mappings(dict(request.ports))
+        volumes = validate_volume_mounts(
+            {hp: {"bind": b, "mode": m} for hp, b, m in request.volumes}
+        )
+        env = validate_env_vars(list(request.env))
+        labels = validate_labels(dict(request.labels))
+        network = validate_network_name(request.network) if request.network else None
+        restart_policy = (
+            validate_restart_policy(request.restart_policy)
+            if request.restart_policy
+            else None
+        )
+        normalized = ContainerCreateRequestDTO(
+            node_id=request.node_id,
+            image=validated_image,
+            name=name,
+            command=request.command,
+            ports=tuple(ports.items()),
+            volumes=tuple((hp, v["bind"], v["mode"]) for hp, v in volumes.items()),
+            env=tuple(env),
+            labels=tuple(labels.items()),
+            network=network,
+            restart_policy=restart_policy,
+        )
+        node = await self._runner.get_target(request.node_id)
+        args = self._build_create_args(normalized)
+        cmd = self._runner.build_command(node, args)
+        await self._log_required(
+            "docker.container.create.requested",
+            request.node_id,
+            {"image": validated_image, "name": name or ""},
+        )
+        stdout, stderr, exit_code = await self._runner.execute(node, cmd, timeout=120)
+        raise_for_docker_error(stderr, exit_code)
+        container_id = stdout.strip().splitlines()[-1].strip() if stdout.strip() else ""
+        if not container_id:
+            raise DockerValidationError(
+                f"docker create produced no container id: {stderr.strip()}"
+            )
+        audit.info(
+            "docker.container.create",
+            node_id=str(request.node_id),
+            image=validated_image,
+            container_id=container_id,
+        )
+        await self._log(
+            "docker.container.create",
+            request.node_id,
+            {"container_id": container_id, "image": validated_image},
+        )
+        return ContainerCreatedDTO(
+            id=container_id,
+            name=name or container_id,
+            image=validated_image,
+            status="created",
+        )
 
     async def list_containers(
         self, node_id: UUID, *, all: bool = False
