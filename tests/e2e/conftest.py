@@ -137,6 +137,34 @@ async def postgres_connection(
         await connection.close()
 
 
+_E2E_MARKERS = frozenset({"docker", "e2e_smoke", "e2e_full", "e2e_resilience"})
+
+
+@pytest.fixture(autouse=True)
+async def e2e_db_isolation(
+    request: pytest.FixtureRequest,
+    postgres_connection: asyncpg.Connection,
+) -> AsyncGenerator[None]:
+    """Truncate mutable tables after each E2E test for full DB isolation.
+
+    The scheduler owns PostgreSQL advisory locks and its own state outside of
+    these tables, so scheduler_state / advisory_lock are intentionally NOT
+    truncated. If the audit outbox worker holds a row lock, TRUNCATE may
+    briefly block; this is acceptable because E2E tests are docker-marked and
+    run against a dedicated stack.
+    """
+    yield
+    if not any(request.node.get_closest_marker(marker) for marker in _E2E_MARKERS):
+        return
+    await postgres_connection.execute(
+        """
+        TRUNCATE audit_logs, audit_outbox, script_executions,
+                 script_schedules, scripts, commands, nodes, api_keys
+        RESTART IDENTITY CASCADE
+        """
+    )
+
+
 @pytest.fixture(scope="session", autouse=True)
 def docker_service_controller(
     docker_compose_project_name: str,

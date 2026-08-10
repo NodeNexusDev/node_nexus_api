@@ -6,15 +6,18 @@ from importlib.metadata import PackageNotFoundError
 from importlib.metadata import version as pkg_version
 
 from dishka.integrations.fastapi import setup_dishka
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from fastapi.routing import APIRoute
 from prometheus_fastapi_instrumentator import Instrumentator
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.adapters.lifecycle.application_startup import ApplicationStartup
 from app.api.error_mapping import domain_error_handler
 from app.api.middleware import (
     RateLimitMiddleware,
+    RequestIdMiddleware,
     RequestLoggingMiddleware,
     TimeoutMiddleware,
 )
@@ -104,6 +107,7 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+    app.add_middleware(RequestIdMiddleware)
     app.add_middleware(RequestLoggingMiddleware)
     app.add_middleware(TimeoutMiddleware, timeout=settings.REQUEST_TIMEOUT)
     app.add_middleware(
@@ -123,6 +127,34 @@ def create_app() -> FastAPI:
             "max-age=31536000; includeSubDomains"
         )
         return response
+
+    @app.exception_handler(HTTPException)
+    async def _http_exception_handler(request: Request, exc: HTTPException):
+        """Return HTTPException detail together with the request id."""
+        request_id = getattr(request.state, "request_id", None)
+        content: dict[str, object] = {"detail": exc.detail}
+        if request_id:
+            content["request_id"] = request_id
+        return JSONResponse(
+            status_code=exc.status_code,
+            content=content,
+            headers=exc.headers or {},
+        )
+
+    @app.exception_handler(StarletteHTTPException)
+    async def _starlette_http_exception_handler(
+        request: Request, exc: StarletteHTTPException
+    ):
+        """Return Starlette HTTPException detail together with the request id."""
+        request_id = getattr(request.state, "request_id", None)
+        content: dict[str, object] = {"detail": exc.detail}
+        if request_id:
+            content["request_id"] = request_id
+        return JSONResponse(
+            status_code=exc.status_code,
+            content=content,
+            headers=exc.headers or {},
+        )
 
     app.add_exception_handler(DomainError, domain_error_handler)
 

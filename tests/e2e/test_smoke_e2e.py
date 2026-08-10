@@ -15,12 +15,15 @@ def test_health(e2e_client: httpx.Client) -> None:
 
 
 def test_readiness(e2e_client: httpx.Client) -> None:
-    """Readiness probe checks database connectivity."""
+    """Readiness probe checks database connectivity and scheduler state."""
     resp = e2e_client.get("/ready")
     assert resp.status_code == 200
     data = resp.json()
     assert data["status"] == "ready"
-    assert data["checks"]["database"] == "ok"
+    assert data["checks"]["database"]["status"] == "ok"
+    assert data["checks"]["database"]["detail"]
+    assert data["checks"]["scheduler"]["status"] == "ok"
+    assert data["checks"]["scheduler"]["detail"]
 
 
 def test_readiness_no_auth(e2e_client_no_auth: httpx.Client) -> None:
@@ -29,6 +32,7 @@ def test_readiness_no_auth(e2e_client_no_auth: httpx.Client) -> None:
     assert resp.status_code == 200
     data = resp.json()
     assert data["status"] == "ready"
+    assert data["checks"]["database"]["status"] == "ok"
 
 
 def test_security_headers(e2e_client: httpx.Client) -> None:
@@ -70,12 +74,15 @@ def test_cors_preflight(e2e_client: httpx.Client) -> None:
 
 
 def test_readiness_probe(e2e_client: httpx.Client) -> None:
-    """GET /ready checks database connectivity."""
+    """GET /ready checks database connectivity and scheduler state."""
     resp = e2e_client.get("/ready")
     assert resp.status_code == 200
     data = resp.json()
     assert data["status"] == "ready"
-    assert data["checks"]["database"] == "ok"
+    assert data["checks"]["database"]["status"] == "ok"
+    assert data["checks"]["database"]["detail"]
+    assert data["checks"]["scheduler"]["status"] == "ok"
+    assert data["checks"]["scheduler"]["detail"]
 
 
 # ---------------------------------------------------------------------------
