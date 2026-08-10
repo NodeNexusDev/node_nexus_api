@@ -1,7 +1,7 @@
 """Unit tests for timeout middleware."""
 
 from collections.abc import AsyncGenerator
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from dishka import Provider, Scope, make_async_container, provide
@@ -68,7 +68,8 @@ async def test_ready_endpoint_no_timeout(client: AsyncClient) -> None:
     from app.application.services.health_service import HealthService
 
     mock_health = AsyncMock(spec=HealthService)
-    mock_health.check_db.return_value = True
+    mock_health.check_db.return_value = ("ok", "database reachable")
+    mock_health.check_scheduler = MagicMock(return_value=("ok", "scheduler disabled"))
 
     app = FastAPI()
     app.include_router(health_router)
@@ -104,7 +105,8 @@ async def test_timeout_middleware_excludes_ready(
     from app.application.services.health_service import HealthService
 
     mock_health = AsyncMock(spec=HealthService)
-    mock_health.check_db.return_value = True
+    mock_health.check_db.return_value = ("ok", "database reachable")
+    mock_health.check_scheduler = MagicMock(return_value=("ok", "scheduler disabled"))
 
     app = FastAPI()
     app.include_router(health_router)
