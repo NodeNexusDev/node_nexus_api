@@ -137,7 +137,9 @@ async def postgres_connection(
         await connection.close()
 
 
-_E2E_MARKERS = frozenset({"docker", "e2e_smoke", "e2e_full", "e2e_resilience"})
+_E2E_MARKERS = frozenset(
+    {"docker", "e2e_smoke", "e2e_full", "e2e_resilience", "e2e_slow"}
+)
 
 
 @pytest.fixture(autouse=True)

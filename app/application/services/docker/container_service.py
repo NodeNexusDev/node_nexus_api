@@ -143,7 +143,7 @@ class DockerContainerService:
             parts.append(f"--network {shlex.quote(request.network)}")
         parts.append(shlex.quote(request.image))
         if request.command:
-            parts.append(shlex.quote(request.command))
+            parts.extend(shlex.quote(token) for token in shlex.split(request.command))
         return "create " + " ".join(parts)
 
     async def create_container(

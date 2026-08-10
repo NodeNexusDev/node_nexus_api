@@ -6,7 +6,9 @@ from importlib.metadata import PackageNotFoundError
 from importlib.metadata import version as pkg_version
 
 from dishka.integrations.fastapi import setup_dishka
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, status
+from fastapi.encoders import jsonable_encoder
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.routing import APIRoute
@@ -144,6 +146,20 @@ def create_app() -> FastAPI:
             status_code=exc.status_code,
             content=content,
             headers=exc.headers or {},
+        )
+
+    @app.exception_handler(RequestValidationError)
+    async def _validation_exception_handler(
+        request: Request, exc: RequestValidationError
+    ):
+        """Return validation errors together with the request id."""
+        request_id = getattr(request.state, "request_id", None)
+        content: dict[str, object] = {"detail": jsonable_encoder(exc.errors())}
+        if request_id:
+            content["request_id"] = request_id
+        return JSONResponse(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            content=content,
         )
 
     @app.exception_handler(StarletteHTTPException)
