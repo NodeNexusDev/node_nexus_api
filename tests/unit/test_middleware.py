@@ -10,6 +10,7 @@ from starlette.routing import Route
 
 from app.api.middleware import (
     RateLimitMiddleware,
+    RequestIdMiddleware,
     RequestLoggingMiddleware,
     TimeoutMiddleware,
 )
@@ -138,6 +139,33 @@ class TestCORS:
         assert resp.headers.get("access-control-allow-origin") != "http://evil.com"
 
 
+class TestRequestIdMiddleware:
+    async def test_generates_request_id_header(self) -> None:
+        app = Starlette(routes=[Route("/ok", _ok_handler)])
+        app.add_middleware(RequestIdMiddleware)
+
+        async with AsyncClient(
+            transport=ASGITransport(app=app),
+            base_url="http://test",
+        ) as ac:
+            resp = await ac.get("/ok")
+            assert resp.status_code == 200
+            assert "x-request-id" in resp.headers
+            assert resp.headers["x-request-id"]
+
+    async def test_propagates_client_request_id_header(self) -> None:
+        app = Starlette(routes=[Route("/ok", _ok_handler)])
+        app.add_middleware(RequestIdMiddleware)
+
+        async with AsyncClient(
+            transport=ASGITransport(app=app),
+            base_url="http://test",
+        ) as ac:
+            resp = await ac.get("/ok", headers={"X-Request-ID": "client-id-123"})
+            assert resp.status_code == 200
+            assert resp.headers["x-request-id"] == "client-id-123"
+
+
 class TestRequestLoggingMiddleware:
     async def test_logs_successful_request(self, error_app) -> None:
         async with AsyncClient(
@@ -155,6 +183,49 @@ class TestRequestLoggingMiddleware:
             resp = await ac.get("/ok")
             assert resp.status_code == 200
             assert resp.json() == {"status": "ok"}
+
+
+async def _not_found_handler(request):
+    from fastapi import HTTPException
+
+    raise HTTPException(status_code=404, detail="not found")
+
+
+class TestRequestIdInErrorResponses:
+    async def test_not_found_includes_request_id(self, client: AsyncClient) -> None:
+        """404 responses for unknown paths include request_id header and body."""
+        resp = await client.get("/this-path-does-not-exist")
+        assert resp.status_code == 404
+        assert "x-request-id" in resp.headers
+        body = resp.json()
+        assert body["request_id"] == resp.headers["x-request-id"]
+        assert "detail" in body
+
+    async def test_domain_error_includes_request_id(self) -> None:
+        """DomainError responses include request_id header and body."""
+        from fastapi import FastAPI
+
+        from app.api.error_mapping import domain_error_handler
+        from app.core.exceptions import NodeNotFoundError
+
+        async def _raise_domain_error(request):
+            raise NodeNotFoundError("node not found")
+
+        app = FastAPI()
+        app.add_middleware(RequestIdMiddleware)
+        app.add_exception_handler(NodeNotFoundError, domain_error_handler)
+        app.add_route("/node", _raise_domain_error)
+
+        async with AsyncClient(
+            transport=ASGITransport(app=app),
+            base_url="http://test",
+        ) as ac:
+            resp = await ac.get("/node")
+            assert resp.status_code == 404
+            assert "x-request-id" in resp.headers
+            body = resp.json()
+            assert body["request_id"] == resp.headers["x-request-id"]
+            assert body["detail"] == "node not found"
 
 
 async def _slow_handler(request):

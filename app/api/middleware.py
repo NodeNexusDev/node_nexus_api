@@ -1,6 +1,7 @@
-"""HTTP request logging, timeout, and rate limiting middleware."""
+"""HTTP request id, logging, timeout, and rate limiting middleware."""
 
 import asyncio
+import json
 import time
 import uuid
 from collections import defaultdict
@@ -12,13 +13,26 @@ from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoin
 logger = structlog.get_logger()
 
 
+class RequestIdMiddleware(BaseHTTPMiddleware):
+    """Assign or propagate a request id and expose it on the response."""
+
+    async def dispatch(
+        self, request: Request, call_next: RequestResponseEndpoint
+    ) -> Response:
+        request_id = request.headers.get("X-Request-ID") or str(uuid.uuid4())
+        request.state.request_id = request_id
+        response = await call_next(request)
+        response.headers["X-Request-ID"] = request_id
+        return response
+
+
 class RequestLoggingMiddleware(BaseHTTPMiddleware):
     """Log every HTTP request with request_id, method, path, status, duration."""
 
     async def dispatch(
         self, request: Request, call_next: RequestResponseEndpoint
     ) -> Response:
-        request_id = str(uuid.uuid4())
+        request_id = getattr(request.state, "request_id", None) or str(uuid.uuid4())
         client_ip = request.client.host if request.client else "unknown"
 
         structlog.contextvars.clear_contextvars()
@@ -72,14 +86,18 @@ class TimeoutMiddleware(BaseHTTPMiddleware):
             response = await asyncio.wait_for(call_next(request), timeout=self._timeout)
             return response
         except TimeoutError:
+            request_id = getattr(request.state, "request_id", None) or ""
             logger.warning(
                 "http.request.timeout",
                 path=request.url.path,
                 timeout=self._timeout,
             )
             return Response(
-                content='{"detail": "Request timed out"}',
+                content=json.dumps(
+                    {"detail": "Request timed out", "request_id": request_id}
+                ),
                 status_code=504,
+                headers={"X-Request-ID": request_id} if request_id else {},
                 media_type="application/json",
             )
 
@@ -126,20 +144,26 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
         if current_count >= self._requests:
             retry_after = int(self._window - (now - self._ip_counts[client_ip][0]))
+            request_id = getattr(request.state, "request_id", None) or ""
             logger.warning(
                 "http.request.rate_limited",
                 ip=client_ip,
                 path=request.url.path,
                 count=current_count,
             )
+            headers = {
+                "X-RateLimit-Limit": str(self._requests),
+                "X-RateLimit-Remaining": "0",
+                "Retry-After": str(max(1, retry_after)),
+            }
+            if request_id:
+                headers["X-Request-ID"] = request_id
             return Response(
-                content='{"detail": "Rate limit exceeded"}',
+                content=json.dumps(
+                    {"detail": "Rate limit exceeded", "request_id": request_id}
+                ),
                 status_code=429,
-                headers={
-                    "X-RateLimit-Limit": str(self._requests),
-                    "X-RateLimit-Remaining": "0",
-                    "Retry-After": str(max(1, retry_after)),
-                },
+                headers=headers,
                 media_type="application/json",
             )
 
