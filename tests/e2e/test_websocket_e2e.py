@@ -25,11 +25,26 @@ from tests.e2e.helpers.websocket import WebSocketClientFactory
 
 pytestmark = [pytest.mark.docker, pytest.mark.e2e_smoke]
 
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
 _WS_PATH = "/api/v1/nodes/{node_id}/exec-stream"
+
+
+def _close_code(exc: websockets.exceptions.ConnectionClosed) -> int | None:
+    """Return the received close frame code, tolerating missing close frames.
+
+    ``ConnectionClosed.code`` is deprecated since websockets 13.1. We read the
+    received close code instead, falling back to the sent code when the remote
+    endpoint dropped the connection without a close frame (``rcvd is None``).
+    """
+    if exc.rcvd is not None:
+        return exc.rcvd.code
+    if exc.sent is not None:
+        return exc.sent.code
+    return None
 
 
 def _ws_url(service_ports: ServicePorts, node_id: str, token: str) -> str:
@@ -153,7 +168,7 @@ async def test_ws_missing_token_closed(
         with pytest.raises(websockets.exceptions.ConnectionClosedError) as exc_info:
             async with websockets.connect(url) as ws:
                 await ws.recv()
-        assert exc_info.value.code == 4001
+        assert _close_code(exc_info.value) == 4001
     finally:
         e2e_client.delete(f"/api/v1/nodes/{node['id']}")
 
@@ -169,7 +184,7 @@ async def test_ws_invalid_token_closed(
         with pytest.raises(websockets.exceptions.ConnectionClosedError) as exc_info:
             async with websockets.connect(url) as ws:
                 await ws.recv()
-        assert exc_info.value.code == 4003
+        assert _close_code(exc_info.value) == 4003
     finally:
         e2e_client.delete(f"/api/v1/nodes/{node['id']}")
 
@@ -199,7 +214,7 @@ async def test_ws_inactive_managed_key_closed(
     with pytest.raises(websockets.exceptions.ConnectionClosedError) as exc_info:
         async with websockets.connect(url) as ws:
             await ws.recv()
-    assert exc_info.value.code == 4003
+    assert _close_code(exc_info.value) == 4003
 
 
 @pytest.mark.asyncio
@@ -221,7 +236,7 @@ async def test_ws_readonly_key_closed(
         with pytest.raises(websockets.exceptions.ConnectionClosedError) as exc_info:
             async with websockets.connect(url) as ws:
                 await ws.recv()
-        assert exc_info.value.code == 4003
+        assert _close_code(exc_info.value) == 4003
     finally:
         e2e_client.delete(f"/api/v1/nodes/{node['id']}")
         e2e_client.delete(f"/api/v1/api-keys/{key_id}")
@@ -345,7 +360,7 @@ async def test_ws_oversized_message_closed(
             await ws.send(json.dumps(payload))
             with pytest.raises(websockets.exceptions.ConnectionClosedError) as exc_info:
                 await ws.recv()
-            assert exc_info.value.code == 1009
+            assert _close_code(exc_info.value) == 1009
     finally:
         e2e_client.delete(f"/api/v1/nodes/{node['id']}")
 
@@ -492,7 +507,7 @@ async def test_ws_unknown_node_closed(
         # Connection should close after error
         with pytest.raises(websockets.exceptions.ConnectionClosedError) as exc_info:
             await ws.recv()
-        assert exc_info.value.code == 4004
+        assert _close_code(exc_info.value) == 4004
 
 
 @pytest.mark.asyncio
