@@ -1,7 +1,7 @@
 """Unit tests for health check endpoints."""
 
 from collections.abc import AsyncGenerator
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from dishka import Provider, Scope, make_async_container, provide
@@ -96,28 +96,35 @@ async def test_readiness_check_db_ok(
     client: AsyncClient, mock_service: AsyncMock
 ) -> None:
     """GET /ready returns 200 when database is reachable."""
-    mock_service.check_db.return_value = True
+    mock_service.check_db.return_value = ("ok", "database reachable")
+    mock_service.check_scheduler = MagicMock(return_value=("ok", "scheduler disabled"))
     resp = await client.get("/ready")
     assert resp.status_code == 200
     data = resp.json()
     assert data["status"] == "ready"
-    assert data["checks"]["database"] == "ok"
+    assert data["checks"]["database"]["status"] == "ok"
+    assert data["checks"]["database"]["detail"] == "database reachable"
 
 
 async def test_readiness_check_db_down(
     client: AsyncClient, mock_service: AsyncMock
 ) -> None:
     """GET /ready returns 503 when database is unreachable."""
-    mock_service.check_db.return_value = False
+    mock_service.check_db.return_value = ("error", "OperationalError")
+    mock_service.check_scheduler = MagicMock(return_value=("ok", "scheduler disabled"))
     resp = await client.get("/ready")
     assert resp.status_code == 503
     data = resp.json()
     assert data["status"] == "not_ready"
-    assert data["checks"]["database"] == "error"
+    assert data["checks"]["database"]["status"] == "error"
 
 
-async def test_readiness_check_no_auth_required(client_no_auth: AsyncClient) -> None:
+async def test_readiness_check_no_auth_required(
+    client_no_auth: AsyncClient, mock_service: AsyncMock
+) -> None:
     """GET /ready works without API key."""
+    mock_service.check_db.return_value = ("ok", "database reachable")
+    mock_service.check_scheduler = MagicMock(return_value=("ok", "scheduler disabled"))
     resp = await client_no_auth.get("/ready")
     assert resp.status_code == 200
     data = resp.json()
