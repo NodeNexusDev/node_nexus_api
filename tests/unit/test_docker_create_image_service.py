@@ -16,8 +16,19 @@ from app.application.services.docker.container_service import (
     DockerContainerService,
     parse_since,
 )
-from app.application.services.docker.image_service import DockerImageService
-from app.core.exceptions import DockerValidationError, ImageNotFoundError
+from app.application.services.docker.image_service import (
+    DockerImageService,
+    _integer,
+    _json_object,
+    _optional_string,
+    _string,
+    _string_tuple,
+)
+from app.core.exceptions import (
+    ConnectionFailedError,
+    DockerValidationError,
+    ImageNotFoundError,
+)
 
 NODE = uuid.UUID("00000000-0000-0000-0000-000000000001")
 
@@ -180,6 +191,37 @@ class TestInspectImage:
         with pytest.raises(DockerValidationError):
             await service.inspect_image(NODE, "alpine; rm -rf")
 
+    async def test_non_string_fields_use_defaults(self) -> None:
+        inspect_json = (
+            '{"Id":123,"RepoTags":["a"],'
+            '"Size":"big","Created":false,"Architecture":null,"Os":[]}'
+        )
+        runner = _make_runner(stdout=inspect_json)
+        service = DockerImageService(runner)
+        result = await service.inspect_image(NODE, "a")
+        assert result.id == ""
+        assert result.size == 0
+        assert result.created == ""
+        assert result.architecture == ""
+        assert result.os == ""
+
+
+class TestPullImage:
+    async def test_success(self) -> None:
+        runner = _make_runner(stdout="Downloaded", stderr="", exit_code=0)
+        service = DockerImageService(runner)
+        result = await service.pull_image(NODE, "alpine:latest")
+        assert result.success is True
+        assert result.image == "alpine:latest"
+
+    async def test_connection_failed_returns_failure(self) -> None:
+        runner = _make_runner()
+        runner.execute = AsyncMock(side_effect=ConnectionFailedError("ssh unreachable"))
+        service = DockerImageService(runner)
+        result = await service.pull_image(NODE, "alpine:latest")
+        assert result.success is False
+        assert "ssh unreachable" in result.output
+
 
 class TestRemoveImage:
     async def test_success(self) -> None:
@@ -260,6 +302,27 @@ class TestBuildImage:
         )
         assert result.image_id == "abc123def456"
 
+    async def test_success_parses_sha_from_inline_token(self) -> None:
+        stdout = "Step 1/1: FROM alpine\nBuilt intermediate image sha256:inline123\n"
+        runner = _make_runner(stdout=stdout)
+        service = DockerImageService(runner)
+        result = await service.build_image(
+            DockerImageBuildRequestDTO(
+                node_id=NODE, dockerfile="FROM alpine", tag="img:1"
+            )
+        )
+        assert result.image_id == "sha256:inline123"
+
+    async def test_no_image_id_returns_empty(self) -> None:
+        runner = _make_runner(stdout="Step 1/1: FROM alpine\n")
+        service = DockerImageService(runner)
+        result = await service.build_image(
+            DockerImageBuildRequestDTO(
+                node_id=NODE, dockerfile="FROM alpine", tag="img:1"
+            )
+        )
+        assert result.image_id == ""
+
     async def test_build_args_quoted(self) -> None:
         runner = _make_runner(stdout="Successfully built sha256:zzz\n")
         service = DockerImageService(runner)
@@ -301,6 +364,33 @@ class TestBuildImage:
                     build_args=(("1BAD", "v"),),
                 )
             )
+
+
+class TestImageHelpers:
+    def test_optional_string(self) -> None:
+        assert _optional_string("x") == "x"
+        assert _optional_string(123) is None
+
+    def test_string(self) -> None:
+        assert _string("x") == "x"
+        assert _string(123) == ""
+        assert _string(None, "default") == "default"
+
+    def test_integer(self) -> None:
+        assert _integer(42) == 42
+        assert _integer(True) == 0
+        assert _integer("42") == 0
+        assert _integer(None, 5) == 5
+
+    def test_json_object(self) -> None:
+        assert _json_object({"a": 1}) == {"a": 1}
+        assert _json_object({1: "a"}) == {"1": "a"}
+        assert _json_object("not dict") == {}
+
+    def test_string_tuple(self) -> None:
+        assert _string_tuple(["a", "b"]) == ("a", "b")
+        assert _string_tuple(["a", 1]) == ("a",)
+        assert _string_tuple("not list") == ()
 
 
 # ---------------------------------------------------------------------------
