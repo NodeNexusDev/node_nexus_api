@@ -4,9 +4,10 @@ from importlib.metadata import PackageNotFoundError
 from importlib.metadata import version as pkg_version
 
 from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
-from fastapi import APIRouter, Response
+from fastapi import APIRouter
 
 from app.application.services.health_service import HealthService
+from app.schemas.health import ReadyCheck, ReadyResponse
 
 router = APIRouter(route_class=DishkaRoute)
 
@@ -32,29 +33,18 @@ async def health_check() -> dict[str, str]:
 @inject
 async def readiness_check(
     service: FromDishka[HealthService],
-) -> Response:
-    """Readiness probe — checks database connectivity.
+) -> ReadyResponse:
+    """Readiness probe — checks database connectivity and scheduler state.
 
     No authentication required (for Kubernetes readiness probes).
     """
-    db_ok = await service.check_db()
-    scheduler_ok = service.check_scheduler()
-    if db_ok and scheduler_ok:
-        return Response(
-            content=(
-                '{"status": "ready", "checks": {"database": "ok", "scheduler": "ok"}}'
-            ),
-            status_code=200,
-            media_type="application/json",
-        )
-    database_state = "ok" if db_ok else "error"
-    scheduler_state = "ok" if scheduler_ok else "degraded"
-    return Response(
-        content=(
-            f'{{"status": "not_ready", "checks": '
-            f'{{"database": "{database_state}", '
-            f'"scheduler": "{scheduler_state}"}}}}'
-        ),
-        status_code=503,
-        media_type="application/json",
+    db_status, db_detail = await service.check_db()
+    scheduler_status, scheduler_detail = service.check_scheduler()
+    overall = "ready" if db_status == "ok" and scheduler_status == "ok" else "not_ready"
+    return ReadyResponse(
+        status=overall,
+        checks={
+            "database": ReadyCheck(status=db_status, detail=db_detail),
+            "scheduler": ReadyCheck(status=scheduler_status, detail=scheduler_detail),
+        },
     )

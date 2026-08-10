@@ -18,18 +18,19 @@ class HealthService:
         self._scheduler = scheduler
         self._scheduler_enabled = scheduler_enabled
 
-    async def check_db(self) -> bool:
-        """Check database connectivity.
+    async def check_db(self) -> tuple[str, str]:
+        """Check database connectivity and return a public-safe status/detail."""
+        ok, detail = await self._repository.ping()
+        return ("ok" if ok else "error"), detail
 
-        Returns:
-            True if database is reachable, False otherwise.
-        """
-        return await self._repository.ping()
-
-    def check_scheduler(self) -> bool:
-        """Check that initial persistent schedule restoration succeeded."""
-        return (
-            not self._scheduler_enabled
-            or self._scheduler is not None
-            and self._scheduler.is_ready()
-        )
+    def check_scheduler(self) -> tuple[str, str]:
+        """Check scheduler state and return a public-safe status/detail."""
+        if not self._scheduler_enabled:
+            return "ok", "scheduler disabled"
+        if self._scheduler is None:
+            return "error", "scheduler unavailable"
+        ready = self._scheduler.is_ready()
+        owns = self._scheduler.owns_execution()
+        jobs = len(self._scheduler.inspect())
+        detail = f"ready={ready}, owns={owns}, jobs={jobs}"
+        return ("ok" if ready else "error"), detail
