@@ -335,12 +335,17 @@ class TestBuildImage:
                 no_cache=True,
             )
         )
-        args = runner.build_command.call_args[0][1]
-        assert "--tag img:1" in args
-        assert "--build-arg VERSION=1.0" in args
-        assert "--no-cache" in args
-        assert args.endswith(" -")
-        assert "printf %s 'FROM alpine'" in args
+        docker_args = runner.build_command.call_args[0][1]
+        assert "build" in docker_args
+        assert "--tag img:1" in docker_args
+        assert "--build-arg VERSION=1.0" in docker_args
+        assert "--no-cache" in docker_args
+        assert docker_args.endswith(" -")
+        executed_cmd = runner.execute.call_args[0][1]
+        assert "printf %s 'FROM alpine'" in executed_cmd
+        assert executed_cmd.endswith(
+            "docker build --tag img:1 --build-arg VERSION=1.0 --no-cache -"
+        )
 
     async def test_invalid_tag_raises(self) -> None:
         runner = _make_runner()

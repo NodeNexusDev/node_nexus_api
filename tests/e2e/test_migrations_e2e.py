@@ -25,7 +25,8 @@ class TestMigrationFreshDB:
         assert resp.status_code == 200
         data = resp.json()
         assert data["status"] == "ready"
-        assert data["checks"]["database"] == "ok"
+        assert data["checks"]["database"]["status"] == "ok"
+        assert data["checks"]["database"]["detail"]
 
     @pytest.mark.asyncio
     async def test_fresh_db_has_all_tables(
