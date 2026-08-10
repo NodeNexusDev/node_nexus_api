@@ -9,6 +9,7 @@ from starlette.responses import JSONResponse
 from starlette.routing import Route
 
 from app.api.middleware import (
+    ApiVersionMiddleware,
     RateLimitMiddleware,
     RequestIdMiddleware,
     RequestLoggingMiddleware,
@@ -226,6 +227,59 @@ class TestRequestIdInErrorResponses:
             body = resp.json()
             assert body["request_id"] == resp.headers["x-request-id"]
             assert body["detail"] == "node not found"
+
+
+class TestApiVersionMiddleware:
+    async def test_defaults_to_version_1(self) -> None:
+        app = Starlette(routes=[Route("/api/v1/nodes", _ok_handler)])
+        app.add_middleware(ApiVersionMiddleware)
+
+        async with AsyncClient(
+            transport=ASGITransport(app=app),
+            base_url="http://test",
+        ) as ac:
+            resp = await ac.get("/api/v1/nodes")
+            assert resp.status_code == 200
+            assert resp.headers["x-api-version"] == "1"
+
+    async def test_explicit_supported_version_accepted(self) -> None:
+        app = Starlette(routes=[Route("/api/v1/nodes", _ok_handler)])
+        app.add_middleware(ApiVersionMiddleware, supported_versions=["1", "2"])
+
+        async with AsyncClient(
+            transport=ASGITransport(app=app),
+            base_url="http://test",
+        ) as ac:
+            resp = await ac.get("/api/v1/nodes", headers={"X-API-Version": "2"})
+            assert resp.status_code == 200
+            assert resp.headers["x-api-version"] == "2"
+
+    async def test_unsupported_version_rejected(self) -> None:
+        app = Starlette(routes=[Route("/api/v1/nodes", _ok_handler)])
+        app.add_middleware(ApiVersionMiddleware)
+
+        async with AsyncClient(
+            transport=ASGITransport(app=app),
+            base_url="http://test",
+        ) as ac:
+            resp = await ac.get("/api/v1/nodes", headers={"X-API-Version": "99"})
+            assert resp.status_code == 400
+            assert resp.headers["x-api-version"] == "1"
+            assert "Unsupported API version: 99" in resp.json()["detail"]
+
+    async def test_health_excluded_from_versioning(self) -> None:
+        async def _health(request):
+            return JSONResponse({"status": "healthy"})
+
+        app = Starlette(routes=[Route("/health", _health)])
+        app.add_middleware(ApiVersionMiddleware)
+
+        async with AsyncClient(
+            transport=ASGITransport(app=app),
+            base_url="http://test",
+        ) as ac:
+            resp = await ac.get("/health", headers={"X-API-Version": "99"})
+            assert resp.status_code == 200
 
 
 async def _slow_handler(request):
