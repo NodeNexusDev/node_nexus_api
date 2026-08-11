@@ -2,7 +2,7 @@
 title: Compatibility and support
 status: stable
 translation_key: reference.compatibility
-source_revision: "2026-07-30"
+source_revision: "2026-08-11"
 ---
 
 # Compatibility and support
@@ -16,11 +16,18 @@ strategy.
 Python 3.13 and PostgreSQL are supported. Client generators should consume the
 OpenAPI artifact produced for the exact release.
 
+## API versioning
+
+The API supports header-based versioning through `X-API-Version`. The default
+version is `1`. Unsupported versions return `400 Bad Request`. Health, readiness,
+and metrics endpoints are excluded from version enforcement.
+
 ## Changelog
 
-| Version | Date | Type |
-|---------|------|------|
-| 0.7.1 | 2026-07-30 | Patch |
+| Version | Date | Type | Highlights |
+|---------|------|------|------------|
+| 0.8.0 | 2026-08-11 | Minor | Docker create/image build, bulk by tags, detailed readiness, request id in errors, API versioning |
+| 0.7.1 | 2026-07-30 | Patch | Documentation fixes |
 | 0.7.0 | 2026-07-29 | Minor |
 | 0.6.4 | 2026-07-29 | Patch |
 | 0.6.3 | 2026-07-29 | Patch |
