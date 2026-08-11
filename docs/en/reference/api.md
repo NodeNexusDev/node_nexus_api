@@ -7,8 +7,14 @@ source_revision: "2026-07-30"
 
 # HTTP API
 
-The versioned base path is `/api/v1`. Requests and responses use JSON unless an
-endpoint documents otherwise. Protected operations require `X-API-Key`.
+The base path is `/api/v1`. Requests and responses use JSON unless an endpoint
+documents otherwise. Protected operations require `X-API-Key`.
+
+## API versioning
+
+Clients may send an `X-API-Version` header. The only supported version is `1`;
+missing header defaults to `1`. Unsupported versions return `400 Bad Request`.
+`/health`, `/ready`, and `/metrics` ignore this header.
 
 Runtime contract links:
 

@@ -2,7 +2,7 @@
 title: Совместимость и поддержка
 status: stable
 translation_key: reference.compatibility
-source_revision: "2026-07-30"
+source_revision: "2026-08-11"
 ---
 
 # Совместимость и поддержка
@@ -15,11 +15,18 @@ breaking change и требует contract review и стратегии major ve
 Поддерживаются Python 3.13 и PostgreSQL. Client generators должны использовать
 OpenAPI artifact конкретного release.
 
+## Версионирование API
+
+API поддерживает версионирование через заголовок `X-API-Version`. Версия по
+умолчанию — `1`. Неподдерживаемые версии возвращают `400 Bad Request`. Endpoints
+health, readiness и metrics исключены из проверки версии.
+
 ## Changelog
 
-| Версия | Дата | Тип |
-|--------|------|-----|
-| 0.7.1 | 2026-07-30 | Patch |
+| Версия | Дата | Тип | Основные изменения |
+|--------|------|-----|--------------------|
+| 0.8.0 | 2026-08-11 | Minor | Docker create/сборка image, bulk по тегам, детальный readiness, request id в ошибках, версионирование API |
+| 0.7.1 | 2026-07-30 | Patch | Исправления документации |
 | 0.7.0 | 2026-07-29 | Minor |
 | 0.6.4 | 2026-07-29 | Patch |
 | 0.6.3 | 2026-07-29 | Patch |

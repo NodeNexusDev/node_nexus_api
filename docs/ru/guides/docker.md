@@ -2,7 +2,7 @@
 title: Управление удалённым Docker
 status: stable
 translation_key: guides.docker
-source_revision: "2026-07-29"
+source_revision: "2026-08-11"
 ---
 
 # Управление удалённым Docker
@@ -12,7 +12,9 @@ Docker daemon на целевом хосте. Сначала проверьте 
 контейнеров. Bulk-вызовы возвращают отдельные результаты; частичная ошибка не
 откатывает успешные удалённые операции.
 
-## Проверка перед изменением состояния
+## Контейнеры
+
+Список запущенных контейнеров:
 
 ```bash
 curl --fail-with-body \
@@ -20,8 +22,30 @@ curl --fail-with-body \
   "${NODE_NEXUS_URL}/api/v1/nodes/${NODE_ID}/docker/containers"
 ```
 
-Используйте возвращённый ID контейнера в путях `/start`, `/stop`, `/restart`,
-`/logs`, `/stats` и `/exec`. Для изменения состояния нужен ключ `read-write`:
+Создание контейнера из image. Строка `command` разбивается на отдельные
+аргументы перед отправкой в Docker:
+
+```bash
+curl --fail-with-body -X POST \
+  "${NODE_NEXUS_URL}/api/v1/nodes/${NODE_ID}/docker/containers" \
+  -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "image": "alpine:latest",
+    "name": "my-ctr",
+    "command": "sleep 60",
+    "ports": {"80/tcp": "8080"},
+    "volumes": {"/host": {"bind": "/container", "mode": "rw"}},
+    "env": ["ENV_VAR=value"],
+    "labels": {"com.example.foo": "bar"},
+    "network": "bridge",
+    "restart_policy": "always"
+  }'
+```
+
+Используйте возвращённый ID или имя контейнера в путях `/start`, `/stop`,
+`/restart`, `/logs`, `/stats` и `/exec`. Для изменения состояния нужен ключ
+`read-write`:
 
 ```bash
 curl --fail-with-body -X POST \
@@ -31,7 +55,74 @@ curl --fail-with-body -X POST \
   -d '{"command": "id", "timeout": 30}'
 ```
 
+## Images
+
+Pull, inspect, tag, remove и сборка image:
+
+```bash
+# Pull
+curl --fail-with-body -X POST \
+  "${NODE_NEXUS_URL}/api/v1/nodes/${NODE_ID}/docker/images/pull" \
+  -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
+  -H 'Content-Type: application/json' \
+  -d '{"image": "alpine:latest", "timeout": 120}'
+
+# Inspect
+curl --fail-with-body \
+  -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
+  "${NODE_NEXUS_URL}/api/v1/nodes/${NODE_ID}/docker/images/alpine:latest"
+
+# Tag
+curl --fail-with-body -X POST \
+  "${NODE_NEXUS_URL}/api/v1/nodes/${NODE_ID}/docker/images/alpine:latest/tag" \
+  -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
+  -H 'Content-Type: application/json' \
+  -d '{"repo": "local/alpine", "tag": "v1.0"}'
+
+# Сборка из Dockerfile, переданного через stdin
+curl --fail-with-body -X POST \
+  "${NODE_NEXUS_URL}/api/v1/nodes/${NODE_ID}/docker/images/build" \
+  -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "dockerfile": "FROM alpine:latest\nRUN echo hello > /marker",
+    "tag": "local/built:v1",
+    "build_args": {"VERSION": "1.0"},
+    "no_cache": true
+  }'
+
+# Remove
+curl --fail-with-body -X DELETE \
+  -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
+  "${NODE_NEXUS_URL}/api/v1/nodes/${NODE_ID}/docker/images/local/alpine:v1.0"
+```
+
+## Bulk-операции
+
+Bulk endpoints под `/api/v1/docker/bulk/` работают с несколькими нодами. Можно
+передать явные `node_ids`, `node_tags` или оба варианта. Теги разрешаются в
+Docker-ноды и объединяются с явными ID. Результаты возвращаются по нодам;
+частичная ошибка не откатывает успешные удалённые операции.
+
+```bash
+curl --fail-with-body -X POST \
+  "${NODE_NEXUS_URL}/api/v1/docker/bulk/restart" \
+  -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "node_ids": [],
+    "node_tags": ["prod"],
+    "container_id": "app-ctr",
+    "timeout": 30
+  }'
+```
+
+Требуется хотя бы одно из полей `node_ids` или `node_tags`. Для `bulk/exec`
+также обязательно поле `command`.
+
+## Валидация и безопасность
+
 Идентификаторы, имена images и тайм-ауты валидируются до построения удалённой
 команды. Тем не менее используйте SSH-учётную запись с минимальными правами и
-считайте выполнение в контейнере привилегированным доступом. Bulk endpoints под
-`/api/v1/docker/bulk/` могут завершиться частично; проверяйте каждый `results`.
+считайте выполнение в контейнере привилегированным доступом. После bulk-вызова
+проверяйте каждый элемент `results`.
