@@ -319,10 +319,8 @@ def _get_master_key() -> str:
 
 def test_audit_log_endpoint(e2e_client: httpx.Client) -> None:
     _create_node(e2e_client, name="audit-probe")
+    data = _wait_for_audit(e2e_client)
 
-    resp = e2e_client.get("/api/v1/audit/")
-    assert resp.status_code == 200
-    data = resp.json()
     assert "items" in data and "total" in data
     assert "page" in data and "size" in data
     assert data["total"] >= 1
@@ -382,6 +380,7 @@ def test_delete_creates_audit_log_and_removes_node(
 
 def test_audit_log_filter_by_action(e2e_client: httpx.Client) -> None:
     node = _create_node(e2e_client, name="audit-filter")
+    _wait_for_audit(e2e_client, action="create")
 
     resp = e2e_client.get("/api/v1/audit/?action=create")
     assert resp.status_code == 200
@@ -399,11 +398,13 @@ def test_audit_log_pagination(e2e_client: httpx.Client) -> None:
         node = _create_node(e2e_client, name=f"audit-page-{i}")
         created.append(node["id"])
 
+    data = _wait_for_audit(e2e_client, minimum_total=3)
+    assert data["total"] >= 3
+
     resp = e2e_client.get("/api/v1/audit/?page=1&size=2")
     assert resp.status_code == 200
     data = resp.json()
     assert len(data["items"]) == 2
-    assert data["total"] >= 3
     assert data["page"] == 1
     assert data["size"] == 2
 
