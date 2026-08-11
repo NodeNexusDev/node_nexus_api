@@ -60,26 +60,26 @@ curl --fail-with-body -X POST \
 Pull, inspect, tag, remove и сборка image:
 
 ```bash
-# Pull
+## Pull
 curl --fail-with-body -X POST \
   "${NODE_NEXUS_URL}/api/v1/nodes/${NODE_ID}/docker/images/pull" \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
   -H 'Content-Type: application/json' \
   -d '{"image": "alpine:latest", "timeout": 120}'
 
-# Inspect
+## Inspect
 curl --fail-with-body \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
   "${NODE_NEXUS_URL}/api/v1/nodes/${NODE_ID}/docker/images/alpine:latest"
 
-# Tag
+## Tag
 curl --fail-with-body -X POST \
   "${NODE_NEXUS_URL}/api/v1/nodes/${NODE_ID}/docker/images/alpine:latest/tag" \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
   -H 'Content-Type: application/json' \
   -d '{"repo": "local/alpine", "tag": "v1.0"}'
 
-# Сборка из Dockerfile, переданного через stdin
+## Сборка из Dockerfile, переданного через stdin
 curl --fail-with-body -X POST \
   "${NODE_NEXUS_URL}/api/v1/nodes/${NODE_ID}/docker/images/build" \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
@@ -91,7 +91,7 @@ curl --fail-with-body -X POST \
     "no_cache": true
   }'
 
-# Remove
+## Remove
 curl --fail-with-body -X DELETE \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
   "${NODE_NEXUS_URL}/api/v1/nodes/${NODE_ID}/docker/images/local/alpine:v1.0"
