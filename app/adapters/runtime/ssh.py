@@ -2,6 +2,7 @@
 
 import asyncio
 import shlex
+import tempfile
 from collections.abc import AsyncGenerator, AsyncIterator
 from pathlib import Path
 from types import TracebackType
@@ -200,7 +201,7 @@ class SSHConnector:
         if not self._connection:
             raise RuntimeError("Not connected")
         queue: asyncio.Queue[RemoteStreamEventDTO] = asyncio.Queue(_STREAM_QUEUE_SIZE)
-        group_file = f"/tmp/node-nexus-stream-{uuid4().hex}.pid"
+        group_file = f"{tempfile.gettempdir()}/node-nexus-stream-{uuid4().hex}.pid"
         grouped_command = f"printf '%s' \"$$\" > {group_file}; {command}"
         remote_command = (
             f'setsid sh -c {shlex.quote(grouped_command)}; status=$?; exit "$status"'
