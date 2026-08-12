@@ -3,8 +3,8 @@
 from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
 from fastapi import APIRouter, Depends
 
-from app.application.ports.audit_outbox_controller import AuditOutboxController
 from app.api.deps import get_current_api_key
+from app.application.ports.audit_outbox_controller import AuditOutboxController
 
 router = APIRouter(
     prefix="/internal/e2e",

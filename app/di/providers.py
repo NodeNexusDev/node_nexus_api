@@ -19,7 +19,6 @@ from app.adapters.persistence.audit import (
     SqlAlchemyAuditLogGateway,
 )
 from app.adapters.persistence.audit_outbox_worker import AuditOutboxWorker
-from app.application.ports.audit_outbox_controller import AuditOutboxController
 from app.adapters.persistence.command_history import SqlAlchemyCommandHistoryGateway
 from app.adapters.persistence.command_management import SqlAlchemyCommandGateway
 from app.adapters.persistence.command_reader import ScopedCommandTemplateReader
@@ -47,6 +46,7 @@ from app.adapters.security import AesGcmCredentialCipher, Sha256APIKeyHasher
 from app.application.ports.api_key import APIKeyReader, APIKeyWriter
 from app.application.ports.api_key_hasher import APIKeyHasher
 from app.application.ports.audit_log import AuditLogReader, AuditLogWriter
+from app.application.ports.audit_outbox_controller import AuditOutboxController
 from app.application.ports.audit_sink import AuditEventSink
 from app.application.ports.command_history import (
     CommandHistoryReader,
