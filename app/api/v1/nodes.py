@@ -17,6 +17,7 @@ from app.application.dto.node_management import (
     NodeUpdateDTO,
 )
 from app.application.dto.node_view import NodeViewDTO
+from app.application.services.command_history_service import CommandHistoryService
 from app.application.services.node_bulk_command_service import NodeBulkCommandService
 from app.application.services.node_command_service import NodeCommandService
 from app.application.services.node_management_service import NodeManagementService
@@ -26,6 +27,7 @@ from app.schemas.node import (
     BulkCommandRequest,
     BulkCommandResult,
     BulkNodeResult,
+    CommandHistoryResponse,
     CommandRequest,
     CommandResult,
     CpuMetrics,
@@ -284,6 +286,44 @@ async def execute_command(
         stdout=result.stdout,
         stderr=result.stderr,
         exit_code=result.exit_code,
+    )
+
+
+@router.get(
+    "/{node_id}/commands/history",
+    response_model=PaginatedResponse[CommandHistoryResponse],
+)
+@inject
+async def get_command_history(
+    node_id: uuid.UUID,
+    service: FromDishka[CommandHistoryService],
+    page: int = Query(1, ge=1),
+    size: int = Query(20, ge=1, le=100),
+    _key: str = Security(get_current_api_key),
+) -> PaginatedResponse[CommandHistoryResponse]:
+    """Get command execution history for a node."""
+    audit.info("api.nodes.commands.history", node_id=str(node_id), page=page, size=size)
+    page_dto = await service.get_node_history(node_id, page=page, size=size)
+    return PaginatedResponse(
+        items=[
+            CommandHistoryResponse(
+                id=item.id,
+                command_fingerprint=item.command_fingerprint,
+                exit_code=item.exit_code,
+                stdout=item.stdout,
+                stderr=item.stderr,
+                stdout_bytes=item.stdout_bytes,
+                stderr_bytes=item.stderr_bytes,
+                truncated=item.truncated,
+                started_at=item.started_at,
+                finished_at=item.finished_at,
+                created_at=item.created_at,
+            )
+            for item in page_dto.items
+        ],
+        total=page_dto.total,
+        page=page,
+        size=size,
     )
 
 

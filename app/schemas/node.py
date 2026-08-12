@@ -140,6 +140,24 @@ class BulkCommandResult(BaseModel):
     failed: int
 
 
+class CommandHistoryResponse(BaseModel):
+    """One command execution record in a node's history."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    command_fingerprint: str
+    exit_code: int
+    stdout: str
+    stderr: str
+    stdout_bytes: int
+    stderr_bytes: int
+    truncated: bool
+    started_at: datetime
+    finished_at: datetime | None
+    created_at: datetime
+
+
 class CpuMetrics(BaseModel):
     """CPU metrics from a node."""
 

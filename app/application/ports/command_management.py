@@ -23,6 +23,10 @@ class CommandReader(Protocol):
         """Return one command page."""
         ...
 
+    async def list_tags(self) -> list[str]:
+        """Return all unique command tags."""
+        ...
+
 
 class CommandWriter(Protocol):
     """Persist command mutations."""

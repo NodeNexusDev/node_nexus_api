@@ -102,11 +102,18 @@ class TestManagement:
         command_gateway.list_commands.return_value = CommandPageDTO(
             items=(command,), total=1
         )
-        commands, total = await service.get_all_commands(page=2, size=10, tags=["ops"])
+        commands, total = await service.get_all_commands(
+            page=2, size=10, tags=["ops"], search="disk"
+        )
         assert commands == [command]
         assert total == 1
         query = command_gateway.list_commands.await_args.args[0]
-        assert (query.offset, query.limit, query.tags) == (10, 10, ("ops",))
+        assert (query.offset, query.limit, query.tags, query.search) == (
+            10,
+            10,
+            ("ops",),
+            "disk",
+        )
 
     async def test_create_delegates_dto(
         self, service: CommandManagementService, command_gateway: AsyncMock
@@ -116,6 +123,13 @@ class TestManagement:
         result = await service.create_command(data)
         assert result.name == "check_disk"
         command_gateway.create_command.assert_awaited_once_with(data)
+
+    async def test_get_all_tags_delegates_to_reader(
+        self, service: CommandManagementService, command_gateway: AsyncMock
+    ) -> None:
+        command_gateway.list_tags.return_value = ["ops", "prod"]
+        assert await service.get_all_tags() == ["ops", "prod"]
+        command_gateway.list_tags.assert_awaited_once_with()
 
     async def test_update_delegates_dto(
         self, service: CommandManagementService, command_gateway: AsyncMock
@@ -231,6 +245,57 @@ class TestExecuteCommand:
             await execution_service.execute_command(
                 command_id, CommandExecuteRequestDTO(node_id=node_id)
             )
+
+
+class TestHistory:
+    async def test_saves_execution_record(
+        self,
+        command_gateway: AsyncMock,
+        node_reader: AsyncMock,
+        connector_factory: Mock,
+    ) -> None:
+        history_writer = AsyncMock()
+        command_id = uuid.uuid4()
+        node_id = uuid.uuid4()
+        command_gateway.get_template.return_value = CommandTemplateDTO(
+            id=command_id,
+            command="echo {msg}",
+            parameters=({"name": "msg", "type": "string", "required": True},),
+        )
+        node_reader.get_connection.return_value = NodeConnectionDTO(
+            id=node_id,
+            name="node",
+            host="127.0.0.1",
+            port=22,
+            connection_type="ssh",
+            username="root",
+        )
+        connector = AsyncMock()
+        connector.execute_command.return_value = ("hi", "", 0)
+        connector_factory.create_ssh.return_value = connector
+
+        service = CommandExecutionService(
+            command_reader=command_gateway,
+            node_reader=node_reader,
+            credential_cipher=AesGcmCredentialCipher(),
+            connector_factory=connector_factory,
+            history_writer=history_writer,
+        )
+
+        result = await service.execute_command(
+            command_id,
+            CommandExecuteRequestDTO(node_id=node_id, params=(("msg", "hi"),)),
+        )
+
+        assert result.exit_code == 0
+        history_writer.save.assert_awaited_once()
+        saved = history_writer.save.await_args.args[0]
+        assert saved.node_id == node_id
+        assert saved.command_id == command_id
+        assert saved.exit_code == 0
+        assert saved.stdout == "hi"
+        assert saved.command_fingerprint is not None
+        assert len(saved.command_fingerprint) == 64
 
 
 class TestLogWithAudit:

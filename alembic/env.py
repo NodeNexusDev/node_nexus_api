@@ -13,6 +13,7 @@ from app.models.audit_log import AuditLogModel  # noqa: F401
 from app.models.audit_outbox import AuditOutboxModel  # noqa: F401
 from app.models.base import Base
 from app.models.command import CommandModel  # noqa: F401
+from app.models.command_execution import CommandExecutionModel  # noqa: F401
 from app.models.node import NodeModel  # noqa: F401
 from app.models.script import ScriptModel  # noqa: F401
 from app.models.script_execution import ScriptExecutionModel  # noqa: F401

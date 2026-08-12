@@ -68,6 +68,7 @@ class CommandListQueryDTO:
     offset: int
     limit: int
     tags: tuple[str, ...] = ()
+    search: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
