@@ -149,7 +149,37 @@ class TestGetScripts:
     ) -> None:
         mock_service.get_all_scripts.return_value = ([], 0)
         await client.get("/api/v1/scripts?page=2&size=10")
-        mock_service.get_all_scripts.assert_called_once_with(page=2, size=10, tags=None)
+        mock_service.get_all_scripts.assert_called_once_with(
+            page=2, size=10, tags=None, search=None
+        )
+
+    async def test_search_param(
+        self, client: AsyncClient, mock_service: AsyncMock
+    ) -> None:
+        mock_service.get_all_scripts.return_value = ([], 0)
+        await client.get("/api/v1/scripts?search=deploy")
+        mock_service.get_all_scripts.assert_called_once_with(
+            page=1, size=20, tags=None, search="deploy"
+        )
+
+    async def test_tag_param(
+        self, client: AsyncClient, mock_service: AsyncMock
+    ) -> None:
+        mock_service.get_all_scripts.return_value = ([], 0)
+        await client.get("/api/v1/scripts?tag=ops")
+        mock_service.get_all_scripts.assert_called_once_with(
+            page=1, size=20, tags=["ops"], search=None
+        )
+
+
+class TestGetScriptTags:
+    async def test_returns_tags(
+        self, client: AsyncClient, mock_service: AsyncMock
+    ) -> None:
+        mock_service.get_all_tags.return_value = ["ops", "prod"]
+        response = await client.get("/api/v1/scripts/tags")
+        assert response.status_code == 200
+        assert response.json() == ["ops", "prod"]
 
 
 # --- GET /scripts/{id} ---

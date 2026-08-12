@@ -31,6 +31,7 @@ from app.api.v1.config import router as config_router
 from app.api.v1.docker import router as docker_router
 from app.api.v1.docker_bulk import router as docker_bulk_router
 from app.api.v1.health import router as health_router
+from app.api.v1.internal import router as internal_router
 from app.api.v1.nodes import router as nodes_router
 from app.api.v1.scripts import router as scripts_router
 from app.api.v1.websocket import router as ws_router
@@ -190,6 +191,8 @@ def create_app() -> FastAPI:
     app.include_router(docker_router, prefix="/api/v1")
     app.include_router(docker_bulk_router, prefix="/api/v1")
     app.include_router(ws_router, prefix="/api/v1")
+    if settings.E2E_ENABLED:
+        app.include_router(internal_router, prefix="/api/v1")
 
     # Prometheus metrics (sits inside all custom middleware)
     if settings.PROMETHEUS_ENABLED:

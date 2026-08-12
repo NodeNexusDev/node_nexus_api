@@ -73,8 +73,39 @@ async def test_list_scripts_maps_query_and_page() -> None:
         )
 
     assert result.total == 1
-    repository.get_all.assert_awaited_once_with(skip=10, limit=5, tags=["ops"])
-    repository.count.assert_awaited_once_with(tags=["ops"])
+    repository.get_all.assert_awaited_once_with(
+        skip=10, limit=5, tags=["ops"], search=None
+    )
+    repository.count.assert_awaited_once_with(tags=["ops"], search=None)
+
+
+async def test_list_scripts_with_search() -> None:
+    factory, _ = _sessionmaker()
+    script = _script()
+    with patch("app.adapters.persistence.script_gateway.ScriptRepository") as repo_type:
+        repository = repo_type.return_value
+        repository.get_all = AsyncMock(return_value=[script])
+        repository.count = AsyncMock(return_value=1)
+        result = await SqlAlchemyScriptGateway(factory).list_scripts(
+            ScriptListQueryDTO(offset=0, limit=10, search="deploy")
+        )
+
+    assert result.total == 1
+    repository.get_all.assert_awaited_once_with(
+        skip=0, limit=10, tags=None, search="deploy"
+    )
+    repository.count.assert_awaited_once_with(tags=None, search="deploy")
+
+
+async def test_list_tags_delegates_to_repository() -> None:
+    factory, _ = _sessionmaker()
+    with patch("app.adapters.persistence.script_gateway.ScriptRepository") as repo_type:
+        repository = repo_type.return_value
+        repository.get_all_tags = AsyncMock(return_value=["ops", "prod"])
+        result = await SqlAlchemyScriptGateway(factory).list_tags()
+
+    assert result == ["ops", "prod"]
+    repository.get_all_tags.assert_awaited_once_with()
 
 
 async def test_create_script_normalizes_steps_and_tags() -> None:

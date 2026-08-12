@@ -53,12 +53,19 @@ async def test_management_get_and_list_use_reader(
     gateway.list_scripts.return_value = ScriptPageDTO(items=(script,), total=1)
 
     assert await management.get_script(script.id) == script
-    scripts, total = await management.get_all_scripts(page=2, size=10, tags=["ops"])
+    scripts, total = await management.get_all_scripts(
+        page=2, size=10, tags=["ops"], search="deploy"
+    )
 
     assert scripts == [script]
     assert total == 1
     query = gateway.list_scripts.await_args.args[0]
-    assert (query.offset, query.limit, query.tags) == (10, 10, ("ops",))
+    assert (query.offset, query.limit, query.tags, query.search) == (
+        10,
+        10,
+        ("ops",),
+        "deploy",
+    )
 
 
 async def test_management_create_update_delete_use_writer(
@@ -77,6 +84,14 @@ async def test_management_create_update_delete_use_writer(
     gateway.create_script.assert_awaited_once_with(create)
     gateway.update_script.assert_awaited_once_with(script.id, update)
     gateway.delete_script.assert_awaited_once_with(script.id)
+
+
+async def test_management_get_all_tags_delegates_to_reader(
+    management: ScriptManagementService, gateway: AsyncMock
+) -> None:
+    gateway.list_tags.return_value = ["ops", "prod"]
+    assert await management.get_all_tags() == ["ops", "prod"]
+    gateway.list_tags.assert_awaited_once_with()
 
 
 async def test_management_raises_when_script_is_missing(

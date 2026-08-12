@@ -2,7 +2,7 @@
 title: Переиспользуемые команды
 status: stable
 translation_key: guides.commands
-source_revision: "2026-07-29"
+source_revision: "2026-08-12"
 ---
 
 # Переиспользуемые команды
@@ -44,3 +44,29 @@ curl --fail-with-body -X POST \
 Код `exit_code: 0` означает успех. Сохраняйте `stderr`: утилиты могут записывать
 туда предупреждения. Поддерживаются параметры `string`, `integer` и `boolean`;
 отсутствие обязательного значения приводит к ошибке до SSH-выполнения.
+
+## Поиск команд
+
+Добавьте параметр `search` для фильтрации по имени или описанию:
+
+```bash
+curl --fail-with-body --get \
+  -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
+  --data-urlencode 'search=disk' \
+  "${NODE_NEXUS_URL}/api/v1/commands/"
+```
+
+Поиск выполняется по полям `name` и `description` с помощью case-insensitive
+сопоставления (ILIKE). Ответ возвращает только те шаблоны, у которых имя или
+описание содержат подстроку поиска.
+
+## Глобальный список тегов команд
+
+```bash
+curl --fail-with-body \
+  -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
+  "${NODE_NEXUS_URL}/api/v1/commands/tags"
+```
+
+Возвращает отсортированный список уникальных тегов, используемых во всех
+шаблонах команд. Подходит для построения автокомплита и фильтров в UI.

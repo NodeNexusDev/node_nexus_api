@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import asyncio
+import uuid
+from collections.abc import Sequence
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 import structlog
@@ -10,6 +13,7 @@ import structlog
 if TYPE_CHECKING:
     from app.application.dto.node_connection import NodeConnectionDTO
     from app.application.ports.audit_sink import AuditEventSink
+    from app.application.ports.command_history import CommandHistoryWriter
     from app.application.ports.credential_cipher import CredentialCipher
     from app.application.ports.node_reader import NodeConnectionReader
     from app.application.ports.remote_command import RemoteConnectorFactory
@@ -20,6 +24,8 @@ from app.application.dto.command_execution import (
     BulkCommandResultDTO,
     CommandExecutionDTO,
 )
+from app.application.dto.command_history import CommandHistoryCreateDTO
+from app.application.policies.output import bound_output
 from app.application.types import JsonObject
 from app.core.exceptions import ConnectionFailedError, NodeNotFoundError
 
@@ -35,17 +41,22 @@ class NodeBulkCommandService:
         credential_cipher: CredentialCipher,
         connector_factory: RemoteConnectorFactory,
         audit_service: AuditEventSink | None = None,
+        history_writer: CommandHistoryWriter | None = None,
     ) -> None:
         self._node_reader = node_reader
         self._credential_cipher = credential_cipher
         self._audit = audit_service
         self._connector_factory = connector_factory
+        self._history_writer = history_writer
 
     async def execute(self, data: BulkCommandRequestDTO) -> BulkCommandResultDTO:
         """Execute a command on all matching nodes in parallel."""
         target_nodes = await self._resolve_targets(data)
         if not target_nodes:
             raise NodeNotFoundError("No nodes matched the given criteria")
+
+        batch_id = uuid.uuid4()
+        started_at = datetime.now(UTC)
 
         if self._audit:
             fingerprint = command_fingerprint(data.command)
@@ -59,6 +70,13 @@ class NodeBulkCommandService:
         results = await asyncio.gather(
             *(self._execute_on_single_node(node, data.command) for node in target_nodes)
         )
+
+        finished_at = datetime.now(UTC)
+
+        if self._history_writer:
+            await self._save_history(
+                data.command, results, batch_id, started_at, finished_at
+            )
 
         # Audit uses the request-scoped session and therefore remains outside
         # concurrent workers.
@@ -168,3 +186,34 @@ class NodeBulkCommandService:
             stderr=str(exc),
             exit_code=1,
         )
+
+    async def _save_history(
+        self,
+        command: str,
+        results: Sequence[CommandExecutionDTO],
+        batch_id: uuid.UUID,
+        started_at: datetime,
+        finished_at: datetime,
+    ) -> None:
+        """Persist each node execution result as a history record."""
+        if self._history_writer is None:
+            return
+        fingerprint = command_fingerprint(command)
+        for result in results:
+            bounded = bound_output(result.stdout)
+            stderr_bounded = bound_output(result.stderr)
+            await self._history_writer.save(
+                CommandHistoryCreateDTO(
+                    node_id=result.node_id,
+                    command_fingerprint=fingerprint,
+                    exit_code=result.exit_code,
+                    stdout=bounded.value,
+                    stderr=stderr_bounded.value,
+                    stdout_bytes=bounded.original_bytes,
+                    stderr_bytes=stderr_bounded.original_bytes,
+                    truncated=bounded.truncated or stderr_bounded.truncated,
+                    batch_id=batch_id,
+                    started_at=started_at,
+                    finished_at=finished_at,
+                )
+            )

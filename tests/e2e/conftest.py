@@ -146,25 +146,34 @@ _E2E_MARKERS = frozenset(
 async def e2e_db_isolation(
     request: pytest.FixtureRequest,
     postgres_connection: asyncpg.Connection,
+    api_base_url: str,
 ) -> AsyncGenerator[None]:
     """Truncate mutable tables after each E2E test for full DB isolation.
 
-    The scheduler owns PostgreSQL advisory locks and its own state outside of
-    these tables, so scheduler_state / advisory_lock are intentionally NOT
-    truncated. If the audit outbox worker holds a row lock, TRUNCATE may
-    briefly block; this is acceptable because E2E tests are docker-marked and
-    run against a dedicated stack.
+    Background workers (audit outbox delivery and the script scheduler) are
+    paused before truncation and resumed afterwards so that their concurrent
+    locks cannot deadlock with the TRUNCATE statement.
     """
     yield
     if not any(request.node.get_closest_marker(marker) for marker in _E2E_MARKERS):
         return
-    await postgres_connection.execute(
-        """
-        TRUNCATE audit_logs, audit_outbox, script_executions,
-                 script_schedules, scripts, commands, nodes, api_keys
-        RESTART IDENTITY CASCADE
-        """
-    )
+    async with httpx.AsyncClient(
+        base_url=api_base_url,
+        timeout=30.0,
+        headers={"X-API-Key": _MASTER_API_KEY},
+    ) as client:
+        await client.post("/api/v1/internal/e2e/pause-background")
+        try:
+            await postgres_connection.execute(
+                """
+                TRUNCATE audit_logs, audit_outbox, script_executions,
+                         command_executions, script_schedules, scripts, commands,
+                         nodes, api_keys
+                RESTART IDENTITY CASCADE
+                """
+            )
+        finally:
+            await client.post("/api/v1/internal/e2e/resume-background")
 
 
 @pytest.fixture(scope="session", autouse=True)
