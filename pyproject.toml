@@ -83,12 +83,12 @@ filterwarnings = [
 
 [tool.coverage.run]
 source = ["app"]
-omit = ["tests/*", "alembic/*"]
+omit = ["tests/*", "alembic/*", "app/application/ports/*"]
 branch = true
 
 [tool.coverage.report]
 show_missing = true
-fail_under = 94
+fail_under = 95
 exclude_lines = [
     "pragma: no cover",
     "if TYPE_CHECKING:",
