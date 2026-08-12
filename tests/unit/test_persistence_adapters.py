@@ -12,6 +12,7 @@ from app.adapters.persistence.script_gateway import (
     ScopedScriptExecutionWriter,
 )
 from app.application.dto.command_history import (
+    BulkCommandHistoryQueryDTO,
     CommandHistoryCreateDTO,
     CommandHistoryQueryDTO,
 )
@@ -202,3 +203,84 @@ async def test_command_history_list_by_node_returns_page() -> None:
     assert page.items[0].id == execution.id
     repository.list_by_node.assert_awaited_once_with(node_id, skip=0, limit=10)
     repository.count_by_node.assert_awaited_once_with(node_id)
+
+
+async def test_command_history_list_by_batch_returns_page() -> None:
+    batch_id = uuid4()
+    execution = SimpleNamespace(
+        id=uuid4(),
+        node_id=uuid4(),
+        command_id=None,
+        batch_id=batch_id,
+        command_fingerprint="f" * 64,
+        exit_code=0,
+        stdout="ok",
+        stderr="",
+        stdout_bytes=2,
+        stderr_bytes=0,
+        truncated=False,
+        started_at=None,
+        finished_at=None,
+        created_at=None,
+    )
+    repository = MagicMock()
+    repository.list_by_batch = AsyncMock(return_value=[execution])
+    repository.count_by_batch = AsyncMock(return_value=1)
+    boundary = context_factory(object())
+    with patch(
+        "app.adapters.persistence.command_history.CommandExecutionRepository",
+        return_value=repository,
+    ):
+        gateway = SqlAlchemyCommandHistoryGateway(boundary)
+        page = await gateway.list_by_batch(
+            BulkCommandHistoryQueryDTO(batch_id=batch_id, offset=0, limit=10)
+        )
+    assert page.total == 1
+    assert len(page.items) == 1
+    assert page.items[0].batch_id == batch_id
+    repository.list_by_batch.assert_awaited_once_with(batch_id, skip=0, limit=10)
+    repository.count_by_batch.assert_awaited_once_with(batch_id)
+
+
+async def test_command_history_get_by_id_found() -> None:
+    execution = SimpleNamespace(
+        id=uuid4(),
+        node_id=uuid4(),
+        command_id=None,
+        batch_id=None,
+        command_fingerprint="f" * 64,
+        exit_code=0,
+        stdout="ok",
+        stderr="",
+        stdout_bytes=2,
+        stderr_bytes=0,
+        truncated=False,
+        started_at=None,
+        finished_at=None,
+        created_at=None,
+    )
+    repository = MagicMock()
+    repository.get_by_id = AsyncMock(return_value=execution)
+    boundary = context_factory(object())
+    with patch(
+        "app.adapters.persistence.command_history.CommandExecutionRepository",
+        return_value=repository,
+    ):
+        gateway = SqlAlchemyCommandHistoryGateway(boundary)
+        result = await gateway.get_by_id(execution.id)
+    assert result is not None
+    assert result.id == execution.id
+    repository.get_by_id.assert_awaited_once_with(execution.id)
+
+
+async def test_command_history_get_by_id_not_found() -> None:
+    repository = MagicMock()
+    repository.get_by_id = AsyncMock(return_value=None)
+    boundary = context_factory(object())
+    with patch(
+        "app.adapters.persistence.command_history.CommandExecutionRepository",
+        return_value=repository,
+    ):
+        gateway = SqlAlchemyCommandHistoryGateway(boundary)
+        result = await gateway.get_by_id(uuid4())
+    assert result is None
