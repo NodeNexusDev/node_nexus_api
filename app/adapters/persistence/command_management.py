@@ -37,12 +37,18 @@ class SqlAlchemyCommandGateway:
                 skip=query.offset,
                 limit=query.limit,
                 tags=tags,
+                search=query.search,
             )
-            total = await repository.count(tags=tags)
+            total = await repository.count(tags=tags, search=query.search)
             return CommandPageDTO(
                 items=tuple(self._to_view(command) for command in commands),
                 total=total,
             )
+
+    async def list_tags(self) -> list[str]:
+        """Return all unique command tags."""
+        async with self._sessionmaker() as session:
+            return await CommandRepository(session).get_all_tags()
 
     async def create_command(self, data: CommandCreateDTO) -> CommandViewDTO:
         async with self._sessionmaker.begin() as session:

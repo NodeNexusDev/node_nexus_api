@@ -113,8 +113,36 @@ class TestGetCommands:
         mock_service.get_all_commands.return_value = ([], 0)
         await client.get("/api/v1/commands?page=2&size=10")
         mock_service.get_all_commands.assert_called_once_with(
-            page=2, size=10, tags=None
+            page=2, size=10, tags=None, search=None
         )
+
+    async def test_search_param(
+        self, client: AsyncClient, mock_service: AsyncMock
+    ) -> None:
+        mock_service.get_all_commands.return_value = ([], 0)
+        await client.get("/api/v1/commands?search=disk")
+        mock_service.get_all_commands.assert_called_once_with(
+            page=1, size=20, tags=None, search="disk"
+        )
+
+    async def test_tag_param(
+        self, client: AsyncClient, mock_service: AsyncMock
+    ) -> None:
+        mock_service.get_all_commands.return_value = ([], 0)
+        await client.get("/api/v1/commands?tag=ops")
+        mock_service.get_all_commands.assert_called_once_with(
+            page=1, size=20, tags=["ops"], search=None
+        )
+
+
+class TestGetCommandTags:
+    async def test_returns_tags(
+        self, client: AsyncClient, mock_service: AsyncMock
+    ) -> None:
+        mock_service.get_all_tags.return_value = ["ops", "prod"]
+        response = await client.get("/api/v1/commands/tags")
+        assert response.status_code == 200
+        assert response.json() == ["ops", "prod"]
 
 
 # --- GET /commands/{id} ---

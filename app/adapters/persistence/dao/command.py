@@ -3,7 +3,7 @@
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.command import CommandModel
@@ -21,24 +21,56 @@ class CommandRepository:
         )
         return result.scalar_one_or_none()
 
-    async def get_all(
-        self, skip: int = 0, limit: int = 100, tags: list[str] | None = None
-    ) -> list[CommandModel]:
-        query = select(CommandModel)
+    def _apply_filters(
+        self,
+        query,
+        tags: list[str] | None = None,
+        search: str | None = None,
+    ):
         if tags:
             for tag in tags:
                 query = query.where(CommandModel.tags.op("@>")([tag]))
+        if search:
+            pattern = f"%{search}%"
+            query = query.where(
+                or_(
+                    CommandModel.name.ilike(pattern),
+                    CommandModel.description.ilike(pattern),
+                )
+            )
+        return query
+
+    async def get_all(
+        self,
+        skip: int = 0,
+        limit: int = 100,
+        tags: list[str] | None = None,
+        search: str | None = None,
+    ) -> list[CommandModel]:
+        query = self._apply_filters(select(CommandModel), tags=tags, search=search)
         query = query.offset(skip).limit(limit)
         result = await self._session.execute(query)
         return list(result.scalars().all())
 
-    async def count(self, tags: list[str] | None = None) -> int:
-        query = select(func.count(CommandModel.id))
-        if tags:
-            for tag in tags:
-                query = query.where(CommandModel.tags.op("@>")([tag]))
+    async def count(
+        self, tags: list[str] | None = None, search: str | None = None
+    ) -> int:
+        query = self._apply_filters(
+            select(func.count(CommandModel.id)), tags=tags, search=search
+        )
         result = await self._session.execute(query)
         return result.scalar_one()
+
+    async def get_all_tags(self) -> list[str]:
+        """Get all unique tags across all commands.
+
+        Uses PostgreSQL unnest() — not testable with SQLite.
+        """
+        # pragma: no cover — PostgreSQL-only function (unnest)
+        result = await self._session.execute(
+            select(func.unnest(CommandModel.tags)).distinct()
+        )
+        return sorted(row[0] for row in result.all() if row[0])
 
     async def create(self, data: dict[str, Any]) -> CommandModel:
         command = CommandModel(**data)

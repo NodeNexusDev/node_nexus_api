@@ -75,12 +75,18 @@ class SqlAlchemyScriptGateway:
                 skip=query.offset,
                 limit=query.limit,
                 tags=tags,
+                search=query.search,
             )
-            total = await repository.count(tags=tags)
+            total = await repository.count(tags=tags, search=query.search)
             return ScriptPageDTO(
                 items=tuple(self._to_view(script) for script in scripts),
                 total=total,
             )
+
+    async def list_tags(self) -> list[str]:
+        """Return all unique script tags."""
+        async with self._sessionmaker() as session:
+            return await ScriptRepository(session).get_all_tags()
 
     async def create_script(self, data: ScriptCreateDTO) -> ScriptViewDTO:
         async with self._sessionmaker.begin() as session:

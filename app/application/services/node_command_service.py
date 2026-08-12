@@ -18,9 +18,16 @@ if TYPE_CHECKING:
 
 from app.application.command_policy import command_fingerprint
 from app.application.dto.command_execution import CommandRequestDTO, CommandResultDTO
+from app.application.dto.command_history import (
+    CommandHistoryCreateDTO,
+)
 from app.application.dto.node_view import NodeViewDTO
+from app.application.policies.output import bound_output
 from app.application.types import JsonObject
 from app.core.exceptions import ConnectionFailedError, NodeNotFoundError
+
+if TYPE_CHECKING:
+    from app.application.ports.command_history import CommandHistoryWriter
 
 audit = structlog.get_logger("audit")
 
@@ -35,12 +42,14 @@ class NodeCommandService:
         credential_cipher: CredentialCipher,
         connector_factory: RemoteConnectorFactory,
         audit_service: AuditEventSink | None = None,
+        history_writer: CommandHistoryWriter | None = None,
     ) -> None:
         self._node_reader = node_reader
         self._status_writer = status_writer
         self._credential_cipher = credential_cipher
         self._audit = audit_service
         self._connector_factory = connector_factory
+        self._history_writer = history_writer
 
     async def _log(
         self,
@@ -119,10 +128,16 @@ class NodeCommandService:
             )
 
         try:
+            from datetime import UTC, datetime
+
+            started_at = datetime.now(UTC)
             async with connector:
                 stdout, stderr, exit_code = await connector.execute_command(
                     data.command
                 )
+            finished_at = datetime.now(UTC)
+            bounded_stdout = bound_output(stdout)
+            bounded_stderr = bound_output(stderr)
             audit.info(
                 "node.command.executed",
                 node_id=str(node_id),
@@ -133,6 +148,21 @@ class NodeCommandService:
                 node_id,
                 {"command": data.command, "exit_code": exit_code},
             )
+            if self._history_writer is not None:
+                await self._history_writer.save(
+                    CommandHistoryCreateDTO(
+                        node_id=node_id,
+                        command_fingerprint=command_fingerprint(data.command),
+                        exit_code=exit_code,
+                        stdout=bounded_stdout.value,
+                        stderr=bounded_stderr.value,
+                        stdout_bytes=bounded_stdout.original_bytes,
+                        stderr_bytes=bounded_stderr.original_bytes,
+                        truncated=bounded_stdout.truncated or bounded_stderr.truncated,
+                        started_at=started_at,
+                        finished_at=finished_at,
+                    )
+                )
             return CommandResultDTO(
                 stdout=stdout,
                 stderr=stderr,

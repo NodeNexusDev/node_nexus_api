@@ -158,18 +158,41 @@ async def get_scripts(
     page: int = Query(1, ge=1),
     size: int = Query(20, ge=1, le=100),
     tag: str | None = Query(None, description="Filter by tag (AND)"),
+    search: str | None = Query(None, description="Search by name or description"),
     _key: str = Security(get_current_api_key),
 ) -> PaginatedResponse[ScriptResponse]:
-    """Get all scripts with pagination."""
+    """Get all scripts with pagination and optional search."""
     tag_list = [t.strip() for t in tag.split(",")] if tag else None
-    audit.info("api.scripts.list", page=page, size=size, tags=tag_list)
-    scripts, total = await service.get_all_scripts(page=page, size=size, tags=tag_list)
+    audit.info(
+        "api.scripts.list",
+        page=page,
+        size=size,
+        tags=tag_list,
+        search=search,
+    )
+    scripts, total = await service.get_all_scripts(
+        page=page,
+        size=size,
+        tags=tag_list,
+        search=search,
+    )
     return PaginatedResponse(
         items=[_script_response(script) for script in scripts],
         total=total,
         page=page,
         size=size,
     )
+
+
+@router.get("/tags", response_model=list[str])
+@inject
+async def get_script_tags(
+    service: FromDishka[ScriptManagementService],
+    _key: str = Security(get_current_api_key),
+) -> list[str]:
+    """Get all unique tags across all scripts."""
+    audit.info("api.scripts.tags.list")
+    return await service.get_all_tags()
 
 
 @router.get("/{script_id}", response_model=ScriptResponse)
