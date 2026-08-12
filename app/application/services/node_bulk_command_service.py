@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import uuid
+from collections.abc import Sequence
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
@@ -189,12 +190,14 @@ class NodeBulkCommandService:
     async def _save_history(
         self,
         command: str,
-        results: tuple[CommandExecutionDTO, ...],
+        results: Sequence[CommandExecutionDTO],
         batch_id: uuid.UUID,
         started_at: datetime,
         finished_at: datetime,
     ) -> None:
         """Persist each node execution result as a history record."""
+        if self._history_writer is None:
+            return
         fingerprint = command_fingerprint(command)
         for result in results:
             bounded = bound_output(result.stdout)
