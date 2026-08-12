@@ -43,11 +43,33 @@ class CommandExecutionRepository:
         )
         return list(result.scalars().all())
 
+    async def list_by_batch(
+        self, batch_id: UUID, skip: int = 0, limit: int = 100
+    ) -> list[CommandExecutionModel]:
+        """Get paginated records for one bulk batch ordered by created_at DESC."""
+        result = await self._session.execute(
+            select(CommandExecutionModel)
+            .where(CommandExecutionModel.batch_id == batch_id)
+            .order_by(CommandExecutionModel.created_at.desc())
+            .offset(skip)
+            .limit(limit)
+        )
+        return list(result.scalars().all())
+
     async def count_by_node(self, node_id: UUID) -> int:
         """Count execution records for one node."""
         result = await self._session.execute(
             select(func.count(CommandExecutionModel.id)).where(
                 CommandExecutionModel.node_id == node_id
+            )
+        )
+        return result.scalar_one()
+
+    async def count_by_batch(self, batch_id: UUID) -> int:
+        """Count execution records for one bulk batch."""
+        result = await self._session.execute(
+            select(func.count(CommandExecutionModel.id)).where(
+                CommandExecutionModel.batch_id == batch_id
             )
         )
         return result.scalar_one()

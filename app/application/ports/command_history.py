@@ -4,6 +4,7 @@ from typing import Protocol
 from uuid import UUID
 
 from app.application.dto.command_history import (
+    BulkCommandHistoryQueryDTO,
     CommandHistoryCreateDTO,
     CommandHistoryDTO,
     CommandHistoryPageDTO,
@@ -26,6 +27,12 @@ class CommandHistoryReader(Protocol):
         self, query: CommandHistoryQueryDTO
     ) -> CommandHistoryPageDTO:
         """Return a paginated history page for one node."""
+        ...
+
+    async def list_by_batch(
+        self, query: BulkCommandHistoryQueryDTO
+    ) -> CommandHistoryPageDTO:
+        """Return a paginated history page for one bulk batch."""
         ...
 
     async def get_by_id(self, execution_id: UUID) -> CommandHistoryDTO | None:

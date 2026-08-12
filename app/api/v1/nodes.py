@@ -1,6 +1,7 @@
 """Node API endpoints."""
 
 import uuid
+from typing import Annotated
 
 import structlog
 from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
@@ -17,6 +18,9 @@ from app.application.dto.node_management import (
     NodeUpdateDTO,
 )
 from app.application.dto.node_view import NodeViewDTO
+from app.application.services.bulk_command_history_service import (
+    BulkCommandHistoryService,
+)
 from app.application.services.command_history_service import CommandHistoryService
 from app.application.services.node_bulk_command_service import NodeBulkCommandService
 from app.application.services.node_command_service import NodeCommandService
@@ -24,6 +28,8 @@ from app.application.services.node_management_service import NodeManagementServi
 from app.application.services.node_metrics_service import NodeMetricsService
 from app.schemas.common import CursorPage, decode_cursor, encode_cursor
 from app.schemas.node import (
+    BulkCommandHistoryItem,
+    BulkCommandHistoryResponse,
     BulkCommandRequest,
     BulkCommandResult,
     BulkNodeResult,
@@ -234,6 +240,25 @@ async def bulk_execute_command(
         total=result.total,
         succeeded=result.succeeded,
         failed=result.failed,
+    )
+
+
+@router.get("/bulk/history", response_model=BulkCommandHistoryResponse)
+@inject
+async def get_bulk_command_history(
+    batch_id: Annotated[uuid.UUID, Query(description="Batch ID to retrieve")],
+    service: FromDishka[BulkCommandHistoryService],
+    _key: str = Security(get_current_api_key),
+    page: Annotated[int, Query(ge=1)] = 1,
+    size: Annotated[int, Query(ge=1, le=100)] = 20,
+) -> BulkCommandHistoryResponse:
+    """Return paginated command execution history for one bulk batch."""
+    result = await service.get_batch_history(batch_id, page=page, size=size)
+    return BulkCommandHistoryResponse(
+        items=[BulkCommandHistoryItem.model_validate(item) for item in result.items],
+        total=result.total,
+        page=page,
+        size=size,
     )
 
 

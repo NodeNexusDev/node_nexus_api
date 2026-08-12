@@ -28,6 +28,7 @@ def _make_history(**overrides: Any) -> CommandHistoryDTO:
         "id": uuid.uuid4(),
         "node_id": node_id,
         "command_id": None,
+        "batch_id": None,
         "command_fingerprint": "a" * 64,
         "exit_code": 0,
         "stdout": "ok",

@@ -178,6 +178,7 @@ def test_service_provider_resolves() -> None:
         factory,
         node_reader,
         credential_cipher,
+        MagicMock(),
     )
     node_metrics_svc = svc_provider.get_node_metrics_service(
         factory,

@@ -18,9 +18,11 @@ class CommandExecutionModel(Base):
         Index("ix_command_executions_node_id", "node_id"),
         Index("ix_command_executions_created_at", "created_at"),
         Index("ix_command_executions_fingerprint", "command_fingerprint"),
+        Index("ix_command_executions_batch_id", "batch_id"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    batch_id: Mapped[uuid.UUID | None] = mapped_column(nullable=True)
     node_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("nodes.id", ondelete="SET NULL"),
         nullable=True,
