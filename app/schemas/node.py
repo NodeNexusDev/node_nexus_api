@@ -147,6 +147,7 @@ class BulkCommandHistoryItem(BaseModel):
 
     id: uuid.UUID
     node_id: uuid.UUID | None = None
+    batch_id: uuid.UUID | None = None
     command_fingerprint: str
     exit_code: int
     stdout: str
