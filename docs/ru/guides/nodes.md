@@ -2,7 +2,7 @@
 title: Управление нодами
 status: stable
 translation_key: guides.nodes
-source_revision: "2026-07-30"
+source_revision: "2026-08-12"
 ---
 
 # Управление нодами
@@ -77,5 +77,18 @@ curl --fail-with-body \
 ```
 
 Возвращает информацию о CPU, памяти, дисках и нагрузке с удалённого хоста.
+
+## История команд ноды
+
+```bash
+curl --fail-with-body \
+  -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
+  "${NODE_NEXUS_URL}/api/v1/nodes/${NODE_ID}/commands/history?page=1&size=20"
+```
+
+Возвращает пагинированный список выполненных команд на данной ноде. Каждая
+запись содержит fingerprint команды, exit code, обрезанные stdout/stderr с
+оригинальными byte count, а также время выполнения. Вывод ограничивается
+политикой `bound_output()` для защиты от переполнения.
 
 Актуальные схемы запросов и ответов смотрите в Swagger UI (`/docs`).
