@@ -91,3 +91,44 @@ def test_script_search_and_tags(e2e_client: httpx.Client, e2e_resources) -> None
     tags_resp = e2e_client.get("/api/v1/scripts/tags")
     assert tags_resp.status_code == 200
     assert unique_tag in tags_resp.json()
+
+
+# ---------------------------------------------------------------------------
+# Bulk command history
+# ---------------------------------------------------------------------------
+
+
+def test_bulk_execute_and_history(e2e_client: httpx.Client, e2e_resources) -> None:
+    """Bulk execute a command on SSH nodes and retrieve batch history."""
+    node1 = e2e_resources.create_ssh_node(name=e2e_resources.unique_name("bulk-1"))
+    node2 = e2e_resources.create_ssh_node(name=e2e_resources.unique_name("bulk-2"))
+
+    bulk_resp = e2e_client.post(
+        "/api/v1/nodes/bulk/execute",
+        json={
+            "command": "echo bulk-ok",
+            "node_ids": [node1["id"], node2["id"]],
+        },
+    )
+    assert bulk_resp.status_code == 200
+    bulk_data = bulk_resp.json()
+    assert bulk_data["total"] == 2
+    assert bulk_data["succeeded"] == 2
+
+    # Verify each node's history
+    for node in (node1, node2):
+        hist_resp = e2e_client.get(f"/api/v1/nodes/{node['id']}/commands/history")
+        assert hist_resp.status_code == 200
+        assert hist_resp.json()["total"] >= 1
+
+
+def test_bulk_history_empty_batch(e2e_client: httpx.Client) -> None:
+    """Bulk history for a nonexistent batch_id returns empty list."""
+    resp = e2e_client.get(
+        "/api/v1/nodes/bulk/history",
+        params={"batch_id": "00000000-0000-0000-0000-000000000000"},
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["items"] == []
+    assert data["total"] == 0
