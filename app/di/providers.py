@@ -19,6 +19,7 @@ from app.adapters.persistence.audit import (
     SqlAlchemyAuditLogGateway,
 )
 from app.adapters.persistence.audit_outbox_worker import AuditOutboxWorker
+from app.application.ports.audit_outbox_controller import AuditOutboxController
 from app.adapters.persistence.command_history import SqlAlchemyCommandHistoryGateway
 from app.adapters.persistence.command_management import SqlAlchemyCommandGateway
 from app.adapters.persistence.command_reader import ScopedCommandTemplateReader
@@ -875,6 +876,13 @@ class SchedulerProvider(Provider):
             yield worker
         finally:
             await worker.stop()
+
+    @provide(scope=Scope.APP)
+    def get_audit_outbox_controller(
+        self, worker: AuditOutboxWorker
+    ) -> AuditOutboxController:
+        """Expose audit outbox lifecycle through the application port."""
+        return worker
 
     @provide(scope=Scope.APP)
     def get_application_startup(
