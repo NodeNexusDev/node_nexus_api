@@ -66,6 +66,8 @@ services:
     ports:
       - "${HOST_PORT_E2E:-8001}:${PORT:-8000}"
     env_file: ../.env.e2e
+    environment:
+      - E2E_ENABLED=true
     depends_on:
       db:
         condition: service_healthy
@@ -86,6 +88,8 @@ services:
     profiles: ["failover"]
     build: ..
     env_file: ../.env.e2e
+    environment:
+      - E2E_ENABLED=true
     depends_on:
       db:
         condition: service_healthy

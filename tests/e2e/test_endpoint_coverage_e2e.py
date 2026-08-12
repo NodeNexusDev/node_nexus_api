@@ -38,12 +38,14 @@ COVERED_ENDPOINTS: set[str] = {
     "POST /api/v1/nodes/{node_id}/execute",
     "POST /api/v1/nodes/{node_id}/check",
     "GET /api/v1/nodes/{node_id}/metrics",
+    "GET /api/v1/nodes/{node_id}/commands/history",
     "POST /api/v1/nodes/bulk/execute",
     "GET /api/v1/nodes/tags",
     "POST /api/v1/nodes/{node_id}/tags",
     "DELETE /api/v1/nodes/{node_id}/tags",
     # Commands
     "GET /api/v1/commands/",
+    "GET /api/v1/commands/tags",
     "POST /api/v1/commands/",
     "GET /api/v1/commands/{command_id}",
     "PUT /api/v1/commands/{command_id}",
@@ -51,6 +53,7 @@ COVERED_ENDPOINTS: set[str] = {
     "POST /api/v1/commands/{command_id}/execute",
     # Scripts
     "GET /api/v1/scripts/",
+    "GET /api/v1/scripts/tags",
     "POST /api/v1/scripts/",
     "GET /api/v1/scripts/{script_id}",
     "PUT /api/v1/scripts/{script_id}",
