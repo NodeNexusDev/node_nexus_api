@@ -19,6 +19,7 @@ from app.adapters.persistence.audit import (
     SqlAlchemyAuditLogGateway,
 )
 from app.adapters.persistence.audit_outbox_worker import AuditOutboxWorker
+from app.adapters.persistence.command_history import SqlAlchemyCommandHistoryGateway
 from app.adapters.persistence.command_management import SqlAlchemyCommandGateway
 from app.adapters.persistence.command_reader import ScopedCommandTemplateReader
 from app.adapters.persistence.config import SqlAlchemyConfigGateway
@@ -45,7 +46,12 @@ from app.adapters.security import AesGcmCredentialCipher, Sha256APIKeyHasher
 from app.application.ports.api_key import APIKeyReader, APIKeyWriter
 from app.application.ports.api_key_hasher import APIKeyHasher
 from app.application.ports.audit_log import AuditLogReader, AuditLogWriter
+from app.application.ports.audit_outbox_controller import AuditOutboxController
 from app.application.ports.audit_sink import AuditEventSink
+from app.application.ports.command_history import (
+    CommandHistoryReader,
+    CommandHistoryWriter,
+)
 from app.application.ports.command_management import CommandReader, CommandWriter
 from app.application.ports.command_reader import CommandTemplateReader
 from app.application.ports.config_persistence import (
@@ -81,7 +87,11 @@ from app.application.services.api_key_management import APIKeyManagementService
 from app.application.services.audit_cleanup_job import AuditCleanupJob
 from app.application.services.audit_event_service import AuditEventService
 from app.application.services.audit_log_service import AuditLogService
+from app.application.services.bulk_command_history_service import (
+    BulkCommandHistoryService,
+)
 from app.application.services.command_execution_service import CommandExecutionService
+from app.application.services.command_history_service import CommandHistoryService
 from app.application.services.command_management_service import CommandManagementService
 from app.application.services.config_service import ConfigService
 from app.application.services.docker.bulk_service import DockerBulkService
@@ -248,6 +258,27 @@ class RepositoryProvider(Provider):
         self, gateway: SqlAlchemyCommandGateway
     ) -> CommandTemplateReader:
         """Bind command execution templates to the management gateway."""
+        return gateway
+
+    @provide(scope=Scope.APP)
+    def get_command_history_gateway(
+        self, sessionmaker: async_sessionmaker[AsyncSession]
+    ) -> SqlAlchemyCommandHistoryGateway:
+        """Get the short-scope command history gateway."""
+        return SqlAlchemyCommandHistoryGateway(sessionmaker)
+
+    @provide(scope=Scope.APP, provides=CommandHistoryReader)
+    def get_command_history_reader(
+        self, gateway: SqlAlchemyCommandHistoryGateway
+    ) -> CommandHistoryReader:
+        """Bind command history reads to the persistence gateway."""
+        return gateway
+
+    @provide(scope=Scope.APP, provides=CommandHistoryWriter)
+    def get_command_history_writer(
+        self, gateway: SqlAlchemyCommandHistoryGateway
+    ) -> CommandHistoryWriter:
+        """Bind command history writes to the persistence gateway."""
         return gateway
 
     @provide(scope=Scope.APP)
@@ -453,6 +484,7 @@ class ServiceProvider(Provider):
         connector_factory: RemoteConnectorFactory,
         node_reader: NodeConnectionReader,
         credential_cipher: CredentialCipher,
+        history_writer: CommandHistoryWriter,
     ) -> NodeBulkCommandService:
         """Get the bulk SSH command service."""
         return NodeBulkCommandService(
@@ -460,6 +492,7 @@ class ServiceProvider(Provider):
             connector_factory=connector_factory,
             node_reader=node_reader,
             credential_cipher=credential_cipher,
+            history_writer=history_writer,
         )
 
     @provide(scope=Scope.REQUEST)
@@ -470,6 +503,7 @@ class ServiceProvider(Provider):
         node_reader: NodeConnectionReader,
         status_writer: NodeStatusWriter,
         credential_cipher: CredentialCipher,
+        history_writer: CommandHistoryWriter,
     ) -> NodeCommandService:
         """Get the single-node SSH command service."""
         return NodeCommandService(
@@ -478,6 +512,7 @@ class ServiceProvider(Provider):
             node_reader=node_reader,
             status_writer=status_writer,
             credential_cipher=credential_cipher,
+            history_writer=history_writer,
         )
 
     @provide(scope=Scope.APP)
@@ -533,6 +568,22 @@ class ServiceProvider(Provider):
         return AuditLogService(reader, writer)
 
     @provide(scope=Scope.APP)
+    def get_command_history_service(
+        self,
+        reader: CommandHistoryReader,
+    ) -> CommandHistoryService:
+        """Get command execution history query use cases."""
+        return CommandHistoryService(reader)
+
+    @provide(scope=Scope.APP)
+    def get_bulk_command_history_service(
+        self,
+        reader: CommandHistoryReader,
+    ) -> BulkCommandHistoryService:
+        """Get bulk command batch history query use cases."""
+        return BulkCommandHistoryService(reader)
+
+    @provide(scope=Scope.APP)
     def get_audit_cleanup_job(
         self,
         writer: AuditLogWriter,
@@ -579,6 +630,7 @@ class ServiceProvider(Provider):
         command_reader: CommandTemplateReader,
         node_reader: NodeConnectionReader,
         credential_cipher: CredentialCipher,
+        history_writer: CommandHistoryWriter,
     ) -> CommandExecutionService:
         """Get command execution service."""
         return CommandExecutionService(
@@ -587,6 +639,7 @@ class ServiceProvider(Provider):
             node_reader=node_reader,
             credential_cipher=credential_cipher,
             audit_service=audit_service,
+            history_writer=history_writer,
         )
 
     @provide(scope=Scope.REQUEST)
@@ -823,6 +876,13 @@ class SchedulerProvider(Provider):
             yield worker
         finally:
             await worker.stop()
+
+    @provide(scope=Scope.APP)
+    def get_audit_outbox_controller(
+        self, worker: AuditOutboxWorker
+    ) -> AuditOutboxController:
+        """Expose audit outbox lifecycle through the application port."""
+        return worker
 
     @provide(scope=Scope.APP)
     def get_application_startup(

@@ -71,13 +71,23 @@ async def get_commands(
     page: int = Query(1, ge=1),
     size: int = Query(20, ge=1, le=100),
     tag: str | None = Query(None, description="Filter by tag (AND)"),
+    search: str | None = Query(None, description="Search by name or description"),
     _key: str = Security(get_current_api_key),
 ) -> PaginatedResponse[CommandResponse]:
-    """Get all commands with pagination."""
+    """Get all commands with pagination and optional search."""
     tag_list = [t.strip() for t in tag.split(",")] if tag else None
-    audit.info("api.commands.list", page=page, size=size, tags=tag_list)
+    audit.info(
+        "api.commands.list",
+        page=page,
+        size=size,
+        tags=tag_list,
+        search=search,
+    )
     commands, total = await service.get_all_commands(
-        page=page, size=size, tags=tag_list
+        page=page,
+        size=size,
+        tags=tag_list,
+        search=search,
     )
     return PaginatedResponse(
         items=[_command_response(command) for command in commands],
@@ -85,6 +95,17 @@ async def get_commands(
         page=page,
         size=size,
     )
+
+
+@router.get("/tags", response_model=list[str])
+@inject
+async def get_command_tags(
+    service: FromDishka[CommandManagementService],
+    _key: str = Security(get_current_api_key),
+) -> list[str]:
+    """Get all unique tags across all command templates."""
+    audit.info("api.commands.tags.list")
+    return await service.get_all_tags()
 
 
 @router.get("/{command_id}", response_model=CommandResponse)

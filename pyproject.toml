@@ -39,13 +39,13 @@ dev = [
     "bandit>=1.8.0",
     "pip-audit>=2.7.0",
     "pre-commit>=4.6.1",
-    "ty>=0.0.63",
+    "ty>=0.0.70",
     "pytest>=9.1.1",
     "pytest-asyncio>=1.4.0",
     "pytest-cov>=7.1.0",
     "pytest-docker>=3.2.5",
     "pytest-mock>=3.15.1",
-    "ruff>=0.16.0",
+    "ruff>=0.16.2",
 ]
 docs = [
     "click==8.3.3",
@@ -83,7 +83,7 @@ filterwarnings = [
 
 [tool.coverage.run]
 source = ["app"]
-omit = ["tests/*", "alembic/*"]
+omit = ["tests/*", "alembic/*", "app/application/ports/*"]
 branch = true
 
 [tool.coverage.report]

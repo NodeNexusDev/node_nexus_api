@@ -56,8 +56,43 @@ async def test_list_commands_maps_query_and_page() -> None:
 
     assert result.items[0].id == command.id
     assert result.total == 1
-    repository.get_all.assert_awaited_once_with(skip=10, limit=5, tags=["ops"])
-    repository.count.assert_awaited_once_with(tags=["ops"])
+    repository.get_all.assert_awaited_once_with(
+        skip=10, limit=5, tags=["ops"], search=None
+    )
+    repository.count.assert_awaited_once_with(tags=["ops"], search=None)
+
+
+async def test_list_commands_with_search() -> None:
+    factory, _ = _sessionmaker()
+    command = make_orm_command()
+    with patch(
+        "app.adapters.persistence.command_management.CommandRepository"
+    ) as repository_type:
+        repository = repository_type.return_value
+        repository.get_all = AsyncMock(return_value=[command])
+        repository.count = AsyncMock(return_value=1)
+        result = await SqlAlchemyCommandGateway(factory).list_commands(
+            CommandListQueryDTO(offset=0, limit=10, search="disk")
+        )
+
+    assert result.total == 1
+    repository.get_all.assert_awaited_once_with(
+        skip=0, limit=10, tags=None, search="disk"
+    )
+    repository.count.assert_awaited_once_with(tags=None, search="disk")
+
+
+async def test_list_tags_delegates_to_repository() -> None:
+    factory, _ = _sessionmaker()
+    with patch(
+        "app.adapters.persistence.command_management.CommandRepository"
+    ) as repository_type:
+        repository = repository_type.return_value
+        repository.get_all_tags = AsyncMock(return_value=["ops", "prod"])
+        result = await SqlAlchemyCommandGateway(factory).list_tags()
+
+    assert result == ["ops", "prod"]
+    repository.get_all_tags.assert_awaited_once_with()
 
 
 async def test_create_command_normalizes_immutable_values() -> None:

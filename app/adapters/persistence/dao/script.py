@@ -3,7 +3,7 @@
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.script import ScriptModel
@@ -21,24 +21,56 @@ class ScriptRepository:
         )
         return result.scalar_one_or_none()
 
-    async def get_all(
-        self, skip: int = 0, limit: int = 100, tags: list[str] | None = None
-    ) -> list[ScriptModel]:
-        query = select(ScriptModel)
+    def _apply_filters(
+        self,
+        query,
+        tags: list[str] | None = None,
+        search: str | None = None,
+    ):
         if tags:
             for tag in tags:
                 query = query.where(ScriptModel.tags.op("@>")([tag]))
+        if search:
+            pattern = f"%{search}%"
+            query = query.where(
+                or_(
+                    ScriptModel.name.ilike(pattern),
+                    ScriptModel.description.ilike(pattern),
+                )
+            )
+        return query
+
+    async def get_all(
+        self,
+        skip: int = 0,
+        limit: int = 100,
+        tags: list[str] | None = None,
+        search: str | None = None,
+    ) -> list[ScriptModel]:
+        query = self._apply_filters(select(ScriptModel), tags=tags, search=search)
         query = query.offset(skip).limit(limit)
         result = await self._session.execute(query)
         return list(result.scalars().all())
 
-    async def count(self, tags: list[str] | None = None) -> int:
-        query = select(func.count(ScriptModel.id))
-        if tags:
-            for tag in tags:
-                query = query.where(ScriptModel.tags.op("@>")([tag]))
+    async def count(
+        self, tags: list[str] | None = None, search: str | None = None
+    ) -> int:
+        query = self._apply_filters(
+            select(func.count(ScriptModel.id)), tags=tags, search=search
+        )
         result = await self._session.execute(query)
         return result.scalar_one()
+
+    async def get_all_tags(self) -> list[str]:
+        """Get all unique tags across all scripts.
+
+        Uses PostgreSQL unnest() — not testable with SQLite.
+        """
+        # pragma: no cover — PostgreSQL-only function (unnest)
+        result = await self._session.execute(
+            select(func.unnest(ScriptModel.tags)).distinct()
+        )
+        return sorted(row[0] for row in result.all() if row[0])
 
     async def create(self, data: dict[str, Any]) -> ScriptModel:
         script = ScriptModel(**data)

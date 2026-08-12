@@ -47,16 +47,25 @@ class ScriptManagementService:
         return script
 
     async def get_all_scripts(
-        self, page: int = 1, size: int = 20, tags: list[str] | None = None
+        self,
+        page: int = 1,
+        size: int = 20,
+        tags: list[str] | None = None,
+        search: str | None = None,
     ) -> tuple[list[ScriptViewDTO], int]:
         result = await self._reader.list_scripts(
             ScriptListQueryDTO(
                 offset=(page - 1) * size,
                 limit=size,
                 tags=tuple(tags or ()),
+                search=search,
             )
         )
         return list(result.items), result.total
+
+    async def get_all_tags(self) -> list[str]:
+        """Return all unique script tags."""
+        return await self._reader.list_tags()
 
     async def create_script(self, data: ScriptCreateDTO) -> ScriptViewDTO:
         script = await self._writer.create_script(data)

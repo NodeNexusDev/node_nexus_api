@@ -60,6 +60,9 @@ class Settings(BaseSettings):
     # API versioning
     SUPPORTED_API_VERSIONS: list[str] = Field(default=["1"])
 
+    # E2E test harness endpoints (disable in production)
+    E2E_ENABLED: bool = False
+
 
 @lru_cache
 def get_settings() -> Settings:

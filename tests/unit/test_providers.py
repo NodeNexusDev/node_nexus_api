@@ -171,12 +171,14 @@ def test_service_provider_resolves() -> None:
         node_reader,
         MagicMock(),
         credential_cipher,
+        MagicMock(),
     )
     node_bulk_command_svc = svc_provider.get_node_bulk_command_service(
         audit_svc,
         factory,
         node_reader,
         credential_cipher,
+        MagicMock(),
     )
     node_metrics_svc = svc_provider.get_node_metrics_service(
         factory,
@@ -205,6 +207,7 @@ def test_service_provider_resolves() -> None:
         command_reader,
         node_reader,
         credential_cipher,
+        MagicMock(),
     )
     assert isinstance(command_management_svc, CommandManagementService)
     assert isinstance(command_execution_svc, CommandExecutionService)

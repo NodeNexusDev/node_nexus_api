@@ -2,7 +2,7 @@
 title: Скрипты и расписания
 status: stable
 translation_key: guides.scripts
-source_revision: "2026-07-29"
+source_revision: "2026-08-12"
 ---
 
 # Скрипты и расписания
@@ -20,3 +20,29 @@ runtime-проекцией. Реплики выбирают одного owner �
 До выполнения проверяются все целевые ноды. Ноды обрабатываются с ограниченной
 конкурентностью. История хранит fingerprint вместо rendered command, не
 сохраняет параметры и обрезает слишком большой вывод с исходным byte count.
+
+## Поиск скриптов
+
+Добавьте параметр `search` для фильтрации по имени или описанию:
+
+```bash
+curl --fail-with-body --get \
+  -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
+  --data-urlencode 'search=deploy' \
+  "${NODE_NEXUS_URL}/api/v1/scripts/"
+```
+
+Поиск выполняется по полям `name` и `description` с помощью case-insensitive
+сопоставления (ILIKE). Ответ возвращает только те скрипты, у которых имя или
+описание содержат подстроку поиска.
+
+## Глобальный список тегов скриптов
+
+```bash
+curl --fail-with-body \
+  -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
+  "${NODE_NEXUS_URL}/api/v1/scripts/tags"
+```
+
+Возвращает отсортированный список уникальных тегов, используемых во всех
+скриптах. Подходит для построения автокомплита и фильтров в UI.

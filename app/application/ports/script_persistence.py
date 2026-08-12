@@ -29,6 +29,10 @@ class ScriptReader(Protocol):
         """Return one page of scripts."""
         ...
 
+    async def list_tags(self) -> list[str]:
+        """Return all unique script tags."""
+        ...
+
 
 class ScriptWriter(Protocol):
     """Persist script mutations."""

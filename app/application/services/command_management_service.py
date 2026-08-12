@@ -47,16 +47,25 @@ class CommandManagementService:
         return command
 
     async def get_all_commands(
-        self, page: int = 1, size: int = 20, tags: list[str] | None = None
+        self,
+        page: int = 1,
+        size: int = 20,
+        tags: list[str] | None = None,
+        search: str | None = None,
     ) -> tuple[list[CommandViewDTO], int]:
         result = await self._reader.list_commands(
             CommandListQueryDTO(
                 offset=(page - 1) * size,
                 limit=size,
                 tags=tuple(tags or ()),
+                search=search,
             )
         )
         return list(result.items), result.total
+
+    async def get_all_tags(self) -> list[str]:
+        """Return all unique command tags."""
+        return await self._reader.list_tags()
 
     async def create_command(self, data: CommandCreateDTO) -> CommandViewDTO:
         command = await self._writer.create_command(data)

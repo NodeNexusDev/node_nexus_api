@@ -2,7 +2,7 @@
 title: Manage nodes
 status: stable
 translation_key: guides.nodes
-source_revision: "2026-07-30"
+source_revision: "2026-08-12"
 ---
 
 # Manage nodes
@@ -74,5 +74,18 @@ curl --fail-with-body \
 ```
 
 Returns CPU, memory, disk, and load information from the remote host.
+
+## Command history
+
+```bash
+curl --fail-with-body \
+  -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
+  "${NODE_NEXUS_URL}/api/v1/nodes/${NODE_ID}/commands/history?page=1&size=20"
+```
+
+Returns a paginated list of commands executed on this node. Each record contains
+the command fingerprint, exit code, truncated stdout/stderr with original byte
+counts, and execution time. Output is bounded by the `bound_output()` policy to
+prevent unbounded growth.
 
 Use Swagger UI at `/docs` for the current request and response schemas.
