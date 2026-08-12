@@ -1,7 +1,7 @@
 # Node Nexus API
 
 [![CI](https://github.com/NodeNexusDev/node_nexus_api/actions/workflows/ci.yml/badge.svg)](https://github.com/NodeNexusDev/node_nexus_api/actions/workflows/ci.yml)
-[![Coverage](https://img.shields.io/badge/coverage-95%25-brightgreen)](.agents/workflow.md)
+[![Coverage](https://img.shields.io/badge/coverage-94%25-brightgreen)](.agents/workflow.md)
 [![Version](https://img.shields.io/badge/version-0.8.0-blue)](https://github.com/NodeNexusDev/node_nexus_api)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
