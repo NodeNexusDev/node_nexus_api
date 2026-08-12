@@ -18,6 +18,7 @@ class CommandHistoryCreateDTO:
     stderr_bytes: int
     truncated: bool
     command_id: UUID | None = None
+    batch_id: UUID | None = None
     started_at: datetime | None = None
     finished_at: datetime | None = None
 
@@ -29,6 +30,7 @@ class CommandHistoryDTO:
     id: UUID
     node_id: UUID | None
     command_id: UUID | None
+    batch_id: UUID | None
     command_fingerprint: str
     exit_code: int
     stdout: str
@@ -46,6 +48,15 @@ class CommandHistoryQueryDTO:
     """Immutable query for one node's command execution history."""
 
     node_id: UUID
+    offset: int
+    limit: int
+
+
+@dataclass(frozen=True, slots=True)
+class BulkCommandHistoryQueryDTO:
+    """Immutable query for a bulk command batch history."""
+
+    batch_id: UUID
     offset: int
     limit: int
 

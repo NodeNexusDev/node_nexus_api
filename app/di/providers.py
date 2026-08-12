@@ -86,6 +86,9 @@ from app.application.services.api_key_management import APIKeyManagementService
 from app.application.services.audit_cleanup_job import AuditCleanupJob
 from app.application.services.audit_event_service import AuditEventService
 from app.application.services.audit_log_service import AuditLogService
+from app.application.services.bulk_command_history_service import (
+    BulkCommandHistoryService,
+)
 from app.application.services.command_execution_service import CommandExecutionService
 from app.application.services.command_history_service import CommandHistoryService
 from app.application.services.command_management_service import CommandManagementService
@@ -480,6 +483,7 @@ class ServiceProvider(Provider):
         connector_factory: RemoteConnectorFactory,
         node_reader: NodeConnectionReader,
         credential_cipher: CredentialCipher,
+        history_writer: CommandHistoryWriter,
     ) -> NodeBulkCommandService:
         """Get the bulk SSH command service."""
         return NodeBulkCommandService(
@@ -487,6 +491,7 @@ class ServiceProvider(Provider):
             connector_factory=connector_factory,
             node_reader=node_reader,
             credential_cipher=credential_cipher,
+            history_writer=history_writer,
         )
 
     @provide(scope=Scope.REQUEST)
@@ -568,6 +573,14 @@ class ServiceProvider(Provider):
     ) -> CommandHistoryService:
         """Get command execution history query use cases."""
         return CommandHistoryService(reader)
+
+    @provide(scope=Scope.APP)
+    def get_bulk_command_history_service(
+        self,
+        reader: CommandHistoryReader,
+    ) -> BulkCommandHistoryService:
+        """Get bulk command batch history query use cases."""
+        return BulkCommandHistoryService(reader)
 
     @provide(scope=Scope.APP)
     def get_audit_cleanup_job(

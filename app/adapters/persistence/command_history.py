@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.adapters.persistence.dao.command_execution import CommandExecutionRepository
 from app.application.dto.command_history import (
+    BulkCommandHistoryQueryDTO,
     CommandHistoryCreateDTO,
     CommandHistoryDTO,
     CommandHistoryPageDTO,
@@ -27,6 +28,7 @@ class SqlAlchemyCommandHistoryGateway:
                 {
                     "node_id": data.node_id,
                     "command_id": data.command_id,
+                    "batch_id": data.batch_id,
                     "command_fingerprint": data.command_fingerprint,
                     "exit_code": data.exit_code,
                     "stdout": data.stdout,
@@ -57,6 +59,23 @@ class SqlAlchemyCommandHistoryGateway:
                 total=total,
             )
 
+    async def list_by_batch(
+        self, query: BulkCommandHistoryQueryDTO
+    ) -> CommandHistoryPageDTO:
+        """Return one paginated page for a bulk batch outside the request scope."""
+        async with self._sessionmaker() as session:
+            repository = CommandExecutionRepository(session)
+            executions = await repository.list_by_batch(
+                query.batch_id,
+                skip=query.offset,
+                limit=query.limit,
+            )
+            total = await repository.count_by_batch(query.batch_id)
+            return CommandHistoryPageDTO(
+                items=tuple(self._to_dto(execution) for execution in executions),
+                total=total,
+            )
+
     async def get_by_id(self, execution_id: UUID) -> CommandHistoryDTO | None:
         """Return one execution record by ID."""
         async with self._sessionmaker() as session:
@@ -72,6 +91,7 @@ class SqlAlchemyCommandHistoryGateway:
             id=execution.id,
             node_id=execution.node_id,
             command_id=execution.command_id,
+            batch_id=execution.batch_id,
             command_fingerprint=execution.command_fingerprint,
             exit_code=execution.exit_code,
             stdout=execution.stdout or "",

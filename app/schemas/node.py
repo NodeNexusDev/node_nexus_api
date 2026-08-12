@@ -140,6 +140,31 @@ class BulkCommandResult(BaseModel):
     failed: int
 
 
+class BulkCommandHistoryItem(BaseModel):
+    """Single command execution record in a bulk batch history."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    node_id: uuid.UUID | None = None
+    command_fingerprint: str
+    exit_code: int
+    stdout: str
+    stderr: str
+    stdout_bytes: int
+    stderr_bytes: int
+    truncated: bool
+    started_at: datetime
+    finished_at: datetime | None
+    created_at: datetime
+
+
+class BulkCommandHistoryResponse(PaginatedResponse[BulkCommandHistoryItem]):
+    """Paginated response for bulk command batch history."""
+
+    pass
+
+
 class CommandHistoryResponse(BaseModel):
     """One command execution record in a node's history."""
 

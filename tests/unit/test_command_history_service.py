@@ -33,6 +33,7 @@ async def test_get_node_history_builds_query(
         id=uuid.uuid4(),
         node_id=node_id,
         command_id=None,
+        batch_id=None,
         command_fingerprint="abc",
         exit_code=0,
         stdout="ok",
