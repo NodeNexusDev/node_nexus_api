@@ -40,6 +40,7 @@ COVERED_ENDPOINTS: set[str] = {
     "GET /api/v1/nodes/{node_id}/metrics",
     "GET /api/v1/nodes/{node_id}/commands/history",
     "POST /api/v1/nodes/bulk/execute",
+    "GET /api/v1/nodes/bulk/history",
     "GET /api/v1/nodes/tags",
     "POST /api/v1/nodes/{node_id}/tags",
     "DELETE /api/v1/nodes/{node_id}/tags",
