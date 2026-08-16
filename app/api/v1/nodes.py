@@ -17,6 +17,7 @@ from app.application.dto.node_management import (
     NodeTagDTO,
     NodeUpdateDTO,
 )
+from app.application.dto.node_validation import NodeValidationRequestDTO
 from app.application.dto.node_view import NodeViewDTO
 from app.application.services.bulk_command_history_service import (
     BulkCommandHistoryService,
@@ -26,6 +27,7 @@ from app.application.services.node_bulk_command_service import NodeBulkCommandSe
 from app.application.services.node_command_service import NodeCommandService
 from app.application.services.node_management_service import NodeManagementService
 from app.application.services.node_metrics_service import NodeMetricsService
+from app.application.services.node_validation_service import NodeValidationService
 from app.schemas.common import CursorPage, decode_cursor, encode_cursor
 from app.schemas.node import (
     BulkCommandHistoryItem,
@@ -43,6 +45,8 @@ from app.schemas.node import (
     NodeMetrics,
     NodeResponse,
     NodeUpdate,
+    NodeValidateRequest,
+    NodeValidateResponse,
     PaginatedResponse,
     TagAdd,
     TagRemove,
@@ -287,6 +291,31 @@ async def check_node(
         tags=list(result.tags),
         created_at=result.created_at,
         updated_at=result.updated_at,
+    )
+
+
+@router.post("/validate-credentials", response_model=NodeValidateResponse)
+@inject
+async def validate_credentials(
+    data: NodeValidateRequest,
+    service: FromDishka[NodeValidationService],
+    _key: str = Security(require_write_scope),
+) -> NodeValidateResponse:
+    """Validate SSH credentials without saving a node."""
+    audit.info("api.nodes.validate_credentials", host=data.host, port=data.port)
+    result = await service.validate_credentials(
+        NodeValidationRequestDTO(
+            host=data.host,
+            port=data.port,
+            connection_type=data.connection_type,
+            username=data.username,
+            password=data.password,
+            ssh_key=data.ssh_key,
+        )
+    )
+    return NodeValidateResponse(
+        status=result.status,
+        message=result.message,
     )
 
 

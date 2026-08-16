@@ -33,6 +33,7 @@ from app.adapters.persistence.node_management import (
     SqlAlchemyNodeManagementGateway,
 )
 from app.adapters.persistence.node_reader import ScopedNodeConnectionReader
+from app.adapters.persistence.node_validation import SshCredentialValidator
 from app.adapters.persistence.schedule import SqlAlchemyScheduleGateway
 from app.adapters.persistence.script_gateway import (
     ScopedScriptDefinitionReader,
@@ -68,6 +69,7 @@ from app.application.ports.node_management import (
     NodeManagementWriter,
 )
 from app.application.ports.node_reader import NodeConnectionReader, NodeStatusWriter
+from app.application.ports.node_validation import NodeCredentialValidator
 from app.application.ports.remote_command import RemoteConnectorFactory
 from app.application.ports.remote_stream import RemoteStreamingConnectorFactory
 from app.application.ports.schedule import (
@@ -107,6 +109,7 @@ from app.application.services.node_bulk_command_service import NodeBulkCommandSe
 from app.application.services.node_command_service import NodeCommandService
 from app.application.services.node_management_service import NodeManagementService
 from app.application.services.node_metrics_service import NodeMetricsService
+from app.application.services.node_validation_service import NodeValidationService
 from app.application.services.schedule_management import (
     ScheduleManagementService,
 )
@@ -481,6 +484,14 @@ class ConnectorProvider(Provider):
         """Bind Docker CLI execution to the SSH runtime adapter."""
         return SshDockerRuntime(connector_factory, credential_cipher)
 
+    @provide(scope=Scope.APP, provides=NodeCredentialValidator)
+    def get_node_credential_validator(
+        self,
+        connector_factory: RemoteConnectorFactory,
+    ) -> NodeCredentialValidator:
+        """Bind credential validation to the SSH adapter."""
+        return SshCredentialValidator(connector_factory)
+
 
 class ServiceProvider(Provider):
     """Service providers."""
@@ -811,6 +822,14 @@ class ServiceProvider(Provider):
     ) -> DashboardService:
         """Get dashboard overview service."""
         return DashboardService(reader=reader)
+
+    @provide(scope=Scope.APP)
+    def get_node_validation_service(
+        self,
+        validator: NodeCredentialValidator,
+    ) -> NodeValidationService:
+        """Get node credential validation service."""
+        return NodeValidationService(validator=validator)
 
 
 class ConfigProvider(Provider):
