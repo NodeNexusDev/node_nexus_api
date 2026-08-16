@@ -12,6 +12,7 @@ from app.application.dto.config import (
     CommandConfigDTO,
     ConfigImportResultDTO,
     ConfigTransferDTO,
+    DryRunPreviewDTO,
     NodeConfigDTO,
     ScriptConfigDTO,
 )
@@ -166,5 +167,63 @@ class SqlAlchemyConfigGateway:
             nodes_created=nodes_created,
             commands_created=commands_created,
             scripts_created=scripts_created,
+            errors=tuple(errors),
+        )
+
+    async def preview_import(self, data: ConfigTransferDTO) -> DryRunPreviewDTO:
+        """Preview what an import would do without writing to the database."""
+        would_create_nodes: list[NodeConfigDTO] = []
+        would_create_commands: list[CommandConfigDTO] = []
+        would_create_scripts: list[ScriptConfigDTO] = []
+        duplicates: list[str] = []
+        errors: list[str] = []
+
+        async with self._sessionmaker() as session:
+            node_repository = NodeRepository(session)
+            command_repository = CommandRepository(session)
+            script_repository = ScriptRepository(session)
+
+            existing_node_names = {
+                item.name
+                for item in (
+                    await self._load_all(node_repository) if data.nodes else ()
+                )
+            }
+            existing_command_names = {
+                item.name
+                for item in (
+                    await self._load_all(command_repository) if data.commands else ()
+                )
+            }
+            existing_script_names = {
+                item.name
+                for item in (
+                    await self._load_all(script_repository) if data.scripts else ()
+                )
+            }
+
+            for node in data.nodes:
+                if node.name in existing_node_names:
+                    duplicates.append(f"Node '{node.name}' already exists")
+                else:
+                    would_create_nodes.append(node)
+
+            for command in data.commands:
+                if command.name in existing_command_names:
+                    duplicates.append(f"Command '{command.name}' already exists")
+                else:
+                    would_create_commands.append(command)
+
+            for script in data.scripts:
+                if script.name in existing_script_names:
+                    duplicates.append(f"Script '{script.name}' already exists")
+                else:
+                    would_create_scripts.append(script)
+
+        return DryRunPreviewDTO(
+            would_create_nodes=tuple(would_create_nodes),
+            would_create_commands=tuple(would_create_commands),
+            would_create_scripts=tuple(would_create_scripts),
+            duplicates=tuple(duplicates),
             errors=tuple(errors),
         )

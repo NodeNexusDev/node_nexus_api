@@ -13,11 +13,21 @@ from app.application.dto.config import (
     CommandConfigDTO,
     ConfigImportResultDTO,
     ConfigTransferDTO,
+    DryRunPreviewDTO,
     NodeConfigDTO,
     ScriptConfigDTO,
 )
 from app.application.services.config_service import ConfigService
-from app.schemas.config import ConfigExport, ConfigImport, ImportResult
+from app.schemas.config import (
+    ConfigExport,
+    ConfigImport,
+    DryRunCommandPreview,
+    DryRunImportResult,
+    DryRunNodePreview,
+    DryRunScriptPreview,
+    DryRunWouldCreate,
+    ImportResult,
+)
 
 audit = structlog.get_logger("audit")
 
@@ -47,15 +57,16 @@ async def export_config(
     )
 
 
-@router.post("/import", response_model=ImportResult)
+@router.post("/import", response_model=ImportResult | DryRunImportResult)
 @inject
 async def import_config(
     data: ConfigImport,
     service: FromDishka[ConfigService],
     _key: str = Security(require_write_scope),
-) -> ImportResult:
+) -> ImportResult | DryRunImportResult:
     """Import nodes, commands, and scripts configuration.
 
+    Set `dry_run=true` to preview what would be imported without writing.
     Duplicates (by name) are skipped and reported in errors.
     """
     audit.info(
@@ -63,6 +74,7 @@ async def import_config(
         nodes=len(data.nodes),
         commands=len(data.commands),
         scripts=len(data.scripts),
+        dry_run=data.dry_run,
     )
     result = await service.import_config(
         ConfigTransferDTO(
@@ -86,8 +98,11 @@ async def import_config(
                 )
                 for item in data.scripts
             ),
-        )
+        ),
+        dry_run=data.dry_run,
     )
+    if isinstance(result, DryRunPreviewDTO):
+        return _dry_run_response(result)
     return _import_response(result)
 
 
@@ -96,5 +111,43 @@ def _import_response(result: ConfigImportResultDTO) -> ImportResult:
         nodes_created=result.nodes_created,
         commands_created=result.commands_created,
         scripts_created=result.scripts_created,
+        errors=list(result.errors),
+    )
+
+
+def _dry_run_response(result: DryRunPreviewDTO) -> DryRunImportResult:
+    return DryRunImportResult(
+        dry_run=True,
+        would_create=DryRunWouldCreate(
+            nodes=[
+                DryRunNodePreview(
+                    name=n.name,
+                    host=n.host,
+                    port=n.port,
+                    connection_type=n.connection_type,
+                    username=n.username,
+                    tags=list(n.tags),
+                )
+                for n in result.would_create_nodes
+            ],
+            commands=[
+                DryRunCommandPreview(
+                    name=c.name,
+                    description=c.description,
+                    command=c.command,
+                    tags=list(c.tags),
+                )
+                for c in result.would_create_commands
+            ],
+            scripts=[
+                DryRunScriptPreview(
+                    name=s.name,
+                    description=s.description,
+                    tags=list(s.tags),
+                )
+                for s in result.would_create_scripts
+            ],
+        ),
+        duplicates=list(result.duplicates),
         errors=list(result.errors),
     )
