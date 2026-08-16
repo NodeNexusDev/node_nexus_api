@@ -2,7 +2,7 @@
 title: Скрипты и расписания
 status: stable
 translation_key: guides.scripts
-source_revision: "2026-08-12"
+source_revision: "2026-08-16"
 ---
 
 # Скрипты и расписания
@@ -46,3 +46,60 @@ curl --fail-with-body \
 
 Возвращает отсортированный список уникальных тегов, используемых во всех
 скриптах. Подходит для построения автокомплита и фильтров в UI.
+
+## Выполнение по тегам
+
+Скрипт можно выполнить на нодах, отфильтрованных по тегам, вместо перечисления
+ID. Параметры `node_ids` и `node_tags` можно комбинировать — результат будет
+пересечением (AND).
+
+### Выполнение по ID (как раньше)
+
+```bash
+curl --fail-with-body -X POST \
+  -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{"node_ids": ["<node-id-1>", "<node-id-2>"], "params": {"branch": "main"}}' \
+  "${NODE_NEXUS_URL}/api/v1/scripts/<script_id>/execute"
+```
+
+### Выполнение по тегам
+
+```bash
+curl --fail-with-body -X POST \
+  -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{"node_tags": ["web", "production"], "params": {"branch": "main"}}' \
+  "${NODE_NEXUS_URL}/api/v1/scripts/<script_id>/execute"
+```
+
+Выполнится на всех нодах, имеющих оба тега `web` И `production`.
+
+### Смешанный режим
+
+```bash
+curl --fail-with-body -X POST \
+  -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{"node_ids": ["<node-id>"], "node_tags": ["web"], "params": {}}' \
+  "${NODE_NEXUS_URL}/api/v1/scripts/<script_id>/execute"
+```
+
+Результат — пересечение: ноды из `node_ids`, которые также имеют все указанные
+теги. Хотя бы один из параметров `node_ids` или `node_tags` обязателен.
+
+### Ответ
+
+```json
+{
+  "script_id": "...",
+  "total_nodes": 3,
+  "results": [
+    {"node_id": "...", "node_name": "web-1", "exit_code": 0, "stdout": "...", "stderr": ""},
+    {"node_id": "...", "node_name": "web-2", "exit_code": 0, "stdout": "...", "stderr": ""}
+  ]
+}
+```
+
+Поля `exit_code`, `stdout`, `stderr` присутствуют для каждого шага, но на уровне
+пакетного ответа `results` содержит агрегированные данные по нодам.

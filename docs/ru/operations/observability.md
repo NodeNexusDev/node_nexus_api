@@ -2,7 +2,7 @@
 title: Наблюдаемость
 status: stable
 translation_key: operations.observability
-source_revision: "2026-08-11"
+source_revision: "2026-08-16"
 ---
 
 # Наблюдаемость
@@ -35,3 +35,66 @@ overlap и задержка относительно планового врем
 scheduler. Значение `node_nexus_scheduler_owner 0` у non-owner реплики само по
 себе не является ошибкой, если advisory lock удерживает другая исправная
 реплика.
+
+## Dashboard
+
+Агрегированный обзор системы доступен через `GET /api/v1/dashboard/`. Эндпоинт
+возвращает статистику по нодам, Docker-контейнерам, скриптам, командам и
+последним действиям в журнале аудита.
+
+```bash
+curl --fail-with-body \
+  -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
+  "${NODE_NEXUS_URL}/api/v1/dashboard/"
+```
+
+### Ответ
+
+```json
+{
+  "nodes": {
+    "total": 12,
+    "active": 10,
+    "unreachable": 2
+  },
+  "docker": {
+    "total": 25,
+    "running": 18,
+    "stopped": 7
+  },
+  "scripts": {
+    "total": 8
+  },
+  "commands": {
+    "total": 15
+  },
+  "recent_activity": [
+    {
+      "id": "...",
+      "action": "create",
+      "node_id": "...",
+      "user": "admin",
+      "details": "{\"name\": \"web-1\"}",
+      "created_at": "2026-08-16T10:00:00Z"
+    }
+  ]
+}
+```
+
+### Поля
+
+| Поле | Описание |
+|------|----------|
+| `nodes.total` | Общее количество нод |
+| `nodes.active` | Ноды со статусом `active` |
+| `nodes.unreachable` | Ноды со статусом `unreachable` |
+| `docker.total` | Общее количество Docker-контейнеров на всех Docker-нодах |
+| `docker.running` | Запущенные контейнеры |
+| `docker.stopped` | Остановленные контейнеры |
+| `scripts.total` | Количество скриптов |
+| `commands.total` | Количество команд |
+| `recent_activity` | Последние 10 записей журнала аудита |
+
+Docker-статистика собирается путём выполнения `docker ps -a` на каждой
+Docker-ноде. Если нода недоступна, её контейнеры не учитываются (ошибки
+обрабатываются грациозно).
