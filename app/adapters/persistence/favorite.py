@@ -13,9 +13,9 @@ from app.models.favorite import FavoriteModel
 
 def _dto(m: FavoriteModel) -> FavoriteDTO:
     return FavoriteDTO(
-        id=m.id,
+        id=uuid.UUID(str(m.id)),
         target_type=m.target_type,
-        target_id=m.target_id,
+        target_id=uuid.UUID(str(m.target_id)),
         note=m.note,
         created_at=m.created_at,
     )

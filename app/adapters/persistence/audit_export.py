@@ -30,7 +30,7 @@ class SqlAlchemyAuditExporter:
             AuditExportRowDTO(
                 id=str(log.id),
                 action=log.action,
-                node_id=log.node_id,
+                node_id=str(log.node_id) if log.node_id else None,
                 user=log.user,
                 details=log.details,
                 created_at=str(log.created_at),

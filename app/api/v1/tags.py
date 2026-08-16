@@ -17,7 +17,7 @@ router = APIRouter(tags=["tags"], route_class=DishkaRoute)
 async def rename_tag(
     tag_name: str,
     new_name: str = Body(..., embed=True),
-    service: FromDishka[TagManagementService] = None,
+    service: FromDishka[TagManagementService] = None,  # ty: ignore[invalid-parameter-default]
     _key: str = Security(require_write_scope),
 ) -> dict:
     audit.info("api.tags.rename", old=tag_name, new=new_name)
@@ -33,7 +33,7 @@ async def rename_tag(
 @inject
 async def delete_tag(
     tag_name: str,
-    service: FromDishka[TagManagementService] = None,
+    service: FromDishka[TagManagementService] = None,  # ty: ignore[invalid-parameter-default]
     _key: str = Security(require_write_scope),
 ) -> dict:
     audit.info("api.tags.delete", tag=tag_name)

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sqlalchemy import func, update
+from sqlalchemy import func, text, update
 from sqlalchemy.dialects.postgresql import array as pg_array
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -18,20 +18,20 @@ class SqlAlchemyTagManager:
         for model in (NodeModel, CommandModel, ScriptModel):
             stmt = (
                 update(model)
-                .where(model.tags.any(old_name))
+                .where(text(":name = ANY(tags)"))
                 .values(
                     tags=func.array_remove(model.tags, old_name),
                 )
-            )
+            ).bindparams(name=old_name)  # ty: ignore[unresolved-attribute]
             result = await self._session.execute(stmt)
-            total += result.rowcount
+            total += result.rowcount  # ty: ignore[unresolved-attribute]
             stmt_add = (
                 update(model)
-                .where(~model.tags.any(new_name))
+                .where(text("NOT (:name = ANY(tags))"))
                 .values(
                     tags=func.array_cat(model.tags, pg_array([new_name])),
                 )
-            )
+            ).bindparams(name=new_name)  # ty: ignore[unresolved-attribute]
             await self._session.execute(stmt_add)
         await self._session.flush()
         return total
@@ -41,12 +41,12 @@ class SqlAlchemyTagManager:
         for model in (NodeModel, CommandModel, ScriptModel):
             stmt = (
                 update(model)
-                .where(model.tags.any(tag_name))
+                .where(text(":name = ANY(tags)"))
                 .values(
                     tags=func.array_remove(model.tags, tag_name),
                 )
-            )
+            ).bindparams(name=tag_name)  # ty: ignore[unresolved-attribute]
             result = await self._session.execute(stmt)
-            total += result.rowcount
+            total += result.rowcount  # ty: ignore[unresolved-attribute]
         await self._session.flush()
         return total
