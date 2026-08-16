@@ -2,7 +2,7 @@
 title: Observability
 status: stable
 translation_key: operations.observability
-source_revision: "2026-08-16"
+source_revision: "2026-08-17"
 ---
 
 # Observability
@@ -97,3 +97,22 @@ curl --fail-with-body \
 Docker statistics are collected by running `docker ps -a` on each Docker node.
 If a node is unreachable, its containers are not counted (errors are handled
 gracefully).
+
+## Dashboard metrics
+
+Time-series execution metrics are available at `GET /api/v1/dashboard/metrics`.
+Supports `hour`, `day`, `week`, and `month` bucket granularity with optional
+`date_from` and `date_to` range filters. Returns command and script metrics
+with `total`, `success`, `failure` counts per bucket.
+
+## SSE event stream
+
+Live server-sent events are available at `GET /api/v1/events/stream`. Events
+include `node.status_changed`, `execution.completed`, `execution.failed`,
+`script.scheduled`, and `job.progress`. Subscribe for real-time monitoring
+without polling.
+
+## Audit export
+
+Audit log entries can be exported at `GET /api/v1/audit/export` with `fmt=json`
+or `fmt=csv`. Use for external SIEM integration or compliance reporting.

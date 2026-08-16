@@ -12,7 +12,7 @@ source_revision: "2026-07-30"
 | `400` | Некорректный или неподдерживаемый request |
 | `401` | API key отсутствует, невалиден, истёк или отозван |
 | `403` | API key не имеет write scope |
-| `404` | Node, command, script, container, image, tag или schedule не найден |
+| `404` | Node, command, script, container, image, tag, schedule, favorite, note или execution не найден |
 | `409` | Конфликт имени ноды |
 | `422` | Ошибка schema, template, Docker, schedule, config format или domain validation |
 | `429` | Превышен process-local rate limit |

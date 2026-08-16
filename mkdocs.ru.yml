@@ -38,6 +38,8 @@ nav:
       - Журнал аудита: guides/audit-log.md
       - WebSocket: guides/websocket.md
       - Импорт и экспорт: guides/configuration-import-export.md
+      - Избранное, заметки, теги: guides/favorites-notes-tags.md
+      - Дашборд, поиск, метрики: guides/dashboard-search-metrics.md
       - Решение проблем: guides/troubleshooting.md
       - Частые вопросы: guides/faq.md
   - Эксплуатация:

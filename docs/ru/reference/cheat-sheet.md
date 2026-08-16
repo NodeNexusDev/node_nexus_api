@@ -2,7 +2,7 @@
 title: Шпаргалка
 status: stable
 translation_key: reference.cheat-sheet
-source_revision: "2026-08-16"
+source_revision: "2026-08-17"
 ---
 
 # Шпаргалка
@@ -95,6 +95,7 @@ export NODE_NEXUS_API_KEY='your-key'
 
 | Задача | Команда |
 |--------|---------|
+| Обзор дашборда | `curl -H "X-API-Key: ${NODE_NEXUS_API_KEY}" "${NODE_NEXUS_URL}/api/v1/dashboard/"` |
 | Метрики дашборда | `curl -H "X-API-Key: ${NODE_NEXUS_API_KEY}" "${NODE_NEXUS_URL}/api/v1/dashboard/metrics?group_by=day"` |
 | Глобальный поиск | `curl -H "X-API-Key: ${NODE_NEXUS_API_KEY}" "${NODE_NEXUS_URL}/api/v1/search?q=deploy"` |
 
@@ -106,7 +107,21 @@ export NODE_NEXUS_API_KEY='your-key'
 | Статистика скрипта | `curl -H "X-API-Key: ${NODE_NEXUS_API_KEY}" "${NODE_NEXUS_URL}/api/v1/scripts/${SCRIPT_ID}/stats"` |
 | Статистика ноды | `curl -H "X-API-Key: ${NODE_NEXUS_API_KEY}" "${NODE_NEXUS_URL}/api/v1/nodes/${NODE_ID}/stats"` |
 
-## Теги
+## Теги нод
+
+| Задача | Команда |
+|--------|---------|
+| Список тегов нод | `curl -H "X-API-Key: ${NODE_NEXUS_API_KEY}" "${NODE_NEXUS_URL}/api/v1/nodes/tags"` |
+| Добавить теги | `curl -X POST -H "X-API-Key: ${NODE_NEXUS_API_KEY}" -H 'Content-Type: application/json' -d '{"tags":["staging"]}' "${NODE_NEXUS_URL}/api/v1/nodes/${NODE_ID}/tags"` |
+| Удалить теги | `curl -X DELETE -H "X-API-Key: ${NODE_NEXUS_API_KEY}" -H 'Content-Type: application/json' -d '{"tags":["staging"]}' "${NODE_NEXUS_URL}/api/v1/nodes/${NODE_ID}/tags"` |
+
+## SSE поток событий
+
+| Задача | Команда |
+|--------|---------|
+| Подписка на события | `curl -H "X-API-Key: ${NODE_NEXUS_API_KEY}" "${NODE_NEXUS_URL}/api/v1/events/stream"` |
+
+## Управление тегами
 
 | Задача | Команда |
 |--------|---------|

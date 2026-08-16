@@ -2,7 +2,7 @@
 title: Cheat sheet
 status: stable
 translation_key: reference.cheat-sheet
-source_revision: "2026-08-16"
+source_revision: "2026-08-17"
 ---
 
 # Cheat sheet
@@ -95,6 +95,7 @@ export NODE_NEXUS_API_KEY='your-key'
 
 | Task | Command |
 |------|---------|
+| Dashboard overview | `curl -H "X-API-Key: ${NODE_NEXUS_API_KEY}" "${NODE_NEXUS_URL}/api/v1/dashboard/"` |
 | Dashboard metrics | `curl -H "X-API-Key: ${NODE_NEXUS_API_KEY}" "${NODE_NEXUS_URL}/api/v1/dashboard/metrics?group_by=day"` |
 | Global search | `curl -H "X-API-Key: ${NODE_NEXUS_API_KEY}" "${NODE_NEXUS_URL}/api/v1/search?q=deploy"` |
 
@@ -106,7 +107,21 @@ export NODE_NEXUS_API_KEY='your-key'
 | Script stats | `curl -H "X-API-Key: ${NODE_NEXUS_API_KEY}" "${NODE_NEXUS_URL}/api/v1/scripts/${SCRIPT_ID}/stats"` |
 | Node stats | `curl -H "X-API-Key: ${NODE_NEXUS_API_KEY}" "${NODE_NEXUS_URL}/api/v1/nodes/${NODE_ID}/stats"` |
 
-## Tags
+## Node Tags
+
+| Task | Command |
+|------|---------|
+| List node tags | `curl -H "X-API-Key: ${NODE_NEXUS_API_KEY}" "${NODE_NEXUS_URL}/api/v1/nodes/tags"` |
+| Add tags to node | `curl -X POST -H "X-API-Key: ${NODE_NEXUS_API_KEY}" -H 'Content-Type: application/json' -d '{"tags":["staging"]}' "${NODE_NEXUS_URL}/api/v1/nodes/${NODE_ID}/tags"` |
+| Remove tags from node | `curl -X DELETE -H "X-API-Key: ${NODE_NEXUS_API_KEY}" -H 'Content-Type: application/json' -d '{"tags":["staging"]}' "${NODE_NEXUS_URL}/api/v1/nodes/${NODE_ID}/tags"` |
+
+## SSE Event Stream
+
+| Task | Command |
+|------|---------|
+| Subscribe to events | `curl -H "X-API-Key: ${NODE_NEXUS_API_KEY}" "${NODE_NEXUS_URL}/api/v1/events/stream"` |
+
+## Tag management
 
 | Task | Command |
 |------|---------|
