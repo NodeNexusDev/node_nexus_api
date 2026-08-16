@@ -1,6 +1,7 @@
 """Command API endpoints."""
 
 import uuid
+from datetime import datetime
 
 import structlog
 from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
@@ -17,6 +18,7 @@ from app.application.dto.command_management import (
 )
 from app.application.services.command_execution_service import CommandExecutionService
 from app.application.services.command_management_service import CommandManagementService
+from app.application.services.execution_stats_service import ExecutionStatsService
 from app.schemas.command import (
     CommandCreate,
     CommandExecuteRequest,
@@ -25,6 +27,7 @@ from app.schemas.command import (
     CommandResult,
     CommandUpdate,
 )
+from app.schemas.execution_stats import ExecutionStatsResponse
 from app.schemas.node import PaginatedResponse
 
 audit = structlog.get_logger("audit")
@@ -203,3 +206,19 @@ async def execute_command(
         stderr=result.stderr,
         exit_code=result.exit_code,
     )
+
+
+@router.get("/{command_id}/stats", response_model=ExecutionStatsResponse)
+@inject
+async def get_command_stats(
+    command_id: uuid.UUID,
+    stats_service: FromDishka[ExecutionStatsService],
+    date_from: datetime | None = Query(None),
+    date_to: datetime | None = Query(None),
+    _key: str = Security(get_current_api_key),
+) -> ExecutionStatsResponse:
+    audit.info("api.commands.stats", command_id=str(command_id))
+    stats = await stats_service.get_command_stats(
+        command_id=command_id, date_from=date_from, date_to=date_to
+    )
+    return ExecutionStatsResponse.model_validate(stats)

@@ -1,6 +1,7 @@
 """Script API endpoints."""
 
 import uuid
+from datetime import datetime
 
 import structlog
 from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
@@ -26,12 +27,14 @@ from app.application.dto.script_management import (
 from app.application.services.execution_lifecycle_service import (
     ExecutionLifecycleService,
 )
+from app.application.services.execution_stats_service import ExecutionStatsService
 from app.application.services.schedule_management import (
     ScheduleManagementService,
 )
 from app.application.services.script_execution_service import ScriptExecutionService
 from app.application.services.script_history_service import ScriptHistoryService
 from app.application.services.script_management_service import ScriptManagementService
+from app.schemas.execution_stats import ExecutionStatsResponse
 from app.schemas.node import PaginatedResponse
 from app.schemas.scheduler import ScheduledJob, ScheduleRequest, ScheduleResponse
 from app.schemas.script import (
@@ -189,6 +192,22 @@ async def get_scripts(
         page=page,
         size=size,
     )
+
+
+@router.get("/{script_id}/stats", response_model=ExecutionStatsResponse)
+@inject
+async def get_script_stats(
+    script_id: uuid.UUID,
+    stats_service: FromDishka[ExecutionStatsService],
+    date_from: datetime | None = Query(None),
+    date_to: datetime | None = Query(None),
+    _key: str = Security(get_current_api_key),
+) -> ExecutionStatsResponse:
+    audit.info("api.scripts.stats", script_id=str(script_id))
+    stats = await stats_service.get_script_stats(
+        script_id=script_id, date_from=date_from, date_to=date_to
+    )
+    return ExecutionStatsResponse.model_validate(stats)
 
 
 @router.get("/tags", response_model=list[str])
