@@ -23,6 +23,8 @@ class NoteReader(Protocol):
 class NoteWriter(Protocol):
     async def create_note(self, data: NoteCreateDTO) -> NoteDTO: ...
     async def update_note(
-        self, note_id: uuid.UUID, data: NoteUpdateDTO,
+        self,
+        note_id: uuid.UUID,
+        data: NoteUpdateDTO,
     ) -> NoteDTO | None: ...
     async def delete_note(self, note_id: uuid.UUID) -> bool: ...

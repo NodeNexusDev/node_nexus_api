@@ -11,17 +11,21 @@ from app.application.dto.execution_stats import (
 
 class ExecutionStatsReader(Protocol):
     async def get_command_stats(
-        self, query: CommandStatsQueryDTO,
+        self,
+        query: CommandStatsQueryDTO,
     ) -> ExecutionStatsDTO: ...
 
     async def get_script_stats(
-        self, query: ScriptStatsQueryDTO,
+        self,
+        query: ScriptStatsQueryDTO,
     ) -> ExecutionStatsDTO: ...
 
     async def get_node_command_stats(
-        self, query: CommandStatsQueryDTO,
+        self,
+        query: CommandStatsQueryDTO,
     ) -> ExecutionStatsDTO: ...
 
     async def get_node_script_stats(
-        self, query: ScriptStatsQueryDTO,
+        self,
+        query: ScriptStatsQueryDTO,
     ) -> ExecutionStatsDTO: ...

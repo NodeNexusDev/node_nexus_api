@@ -10,5 +10,6 @@ from app.application.dto.dashboard_metrics import (
 
 class DashboardMetricsReader(Protocol):
     async def get_metrics(
-        self, query: MetricsQueryDTO,
+        self,
+        query: MetricsQueryDTO,
     ) -> DashboardMetricsDTO: ...

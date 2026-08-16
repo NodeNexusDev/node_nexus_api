@@ -22,7 +22,9 @@ class NoteService:
         self._writer = writer
 
     async def list_notes(
-        self, target_type: str, target_id: str,
+        self,
+        target_type: str,
+        target_id: str,
     ) -> list[NoteDTO]:
         return await self._reader.list_notes(target_type, UUID(target_id))
 
@@ -36,7 +38,9 @@ class NoteService:
         return await self._writer.create_note(data)
 
     async def update_note(
-        self, note_id: str, data: NoteUpdateDTO,
+        self,
+        note_id: str,
+        data: NoteUpdateDTO,
     ) -> NoteDTO:
         note = await self._writer.update_note(UUID(note_id), data)
         if note is None:

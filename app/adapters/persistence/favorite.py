@@ -46,7 +46,9 @@ class SqlAlchemyFavoriteGateway:
         return [_dto(r) for r in rows], total
 
     async def get_favorite(
-        self, target_type: str, target_id: uuid.UUID,
+        self,
+        target_type: str,
+        target_id: uuid.UUID,
     ) -> FavoriteDTO | None:
         q = select(FavoriteModel).where(
             FavoriteModel.target_type == target_type,
@@ -67,7 +69,9 @@ class SqlAlchemyFavoriteGateway:
         return _dto(model)
 
     async def remove_favorite(
-        self, target_type: str, target_id: uuid.UUID,
+        self,
+        target_type: str,
+        target_id: uuid.UUID,
     ) -> bool:
         q = select(FavoriteModel).where(
             FavoriteModel.target_type == target_type,

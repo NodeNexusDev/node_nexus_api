@@ -28,7 +28,9 @@ async def list_favorites(
 ) -> PaginatedResponse[FavoriteResponse]:
     audit.info("api.favorites.list", target_type=target_type)
     items, total = await service.list_favorites(
-        target_type=target_type, page=page, size=size,
+        target_type=target_type,
+        page=page,
+        size=size,
     )
     return PaginatedResponse(
         items=[

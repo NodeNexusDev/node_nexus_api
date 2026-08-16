@@ -12,7 +12,9 @@ class GlobalSearchService:
         self._reader = reader
 
     async def search(
-        self, q: str, limit: int = 20,
+        self,
+        q: str,
+        limit: int = 20,
     ) -> GlobalSearchResultDTO:
         return await self._reader.search(
             GlobalSearchQueryDTO(q=q, limit=limit),

@@ -501,44 +501,32 @@ class RepositoryProvider(Provider):
         return gateway
 
     @provide(scope=Scope.REQUEST, provides=AuditExporter)
-    def get_audit_exporter(
-        self, session: AsyncSession
-    ) -> AuditExporter:
+    def get_audit_exporter(self, session: AsyncSession) -> AuditExporter:
         """Bind audit export to the persistence adapter."""
         return SqlAlchemyAuditExporter(session)
 
     @provide(scope=Scope.REQUEST, provides=TagManager)
-    def get_tag_manager(
-        self, session: AsyncSession
-    ) -> TagManager:
+    def get_tag_manager(self, session: AsyncSession) -> TagManager:
         """Bind tag management to the persistence adapter."""
         return SqlAlchemyTagManager(session)
 
     @provide(scope=Scope.REQUEST, provides=FavoriteReader)
-    def get_favorite_reader(
-        self, session: AsyncSession
-    ) -> FavoriteReader:
+    def get_favorite_reader(self, session: AsyncSession) -> FavoriteReader:
         """Bind favorite reader to the persistence adapter."""
         return SqlAlchemyFavoriteGateway(session)
 
     @provide(scope=Scope.REQUEST, provides=FavoriteWriter)
-    def get_favorite_writer(
-        self, session: AsyncSession
-    ) -> FavoriteWriter:
+    def get_favorite_writer(self, session: AsyncSession) -> FavoriteWriter:
         """Bind favorite writer to the persistence adapter."""
         return SqlAlchemyFavoriteGateway(session)
 
     @provide(scope=Scope.REQUEST, provides=NoteReader)
-    def get_note_reader(
-        self, session: AsyncSession
-    ) -> NoteReader:
+    def get_note_reader(self, session: AsyncSession) -> NoteReader:
         """Bind note reader to the persistence adapter."""
         return SqlAlchemyNoteGateway(session)
 
     @provide(scope=Scope.REQUEST, provides=NoteWriter)
-    def get_note_writer(
-        self, session: AsyncSession
-    ) -> NoteWriter:
+    def get_note_writer(self, session: AsyncSession) -> NoteWriter:
         """Bind note writer to the persistence adapter."""
         return SqlAlchemyNoteGateway(session)
 

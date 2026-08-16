@@ -10,5 +10,6 @@ from app.application.dto.global_search import (
 
 class GlobalSearchReader(Protocol):
     async def search(
-        self, query: GlobalSearchQueryDTO,
+        self,
+        query: GlobalSearchQueryDTO,
     ) -> GlobalSearchResultDTO: ...

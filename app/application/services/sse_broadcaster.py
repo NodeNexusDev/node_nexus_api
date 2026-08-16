@@ -42,7 +42,7 @@ class SseBroadcaster:
         sse_event = SseEvent(event=event, data=data)
         self._history.append(sse_event)
         if len(self._history) > self._max_history:
-            self._history = self._history[-self._max_history:]
+            self._history = self._history[-self._max_history :]
         dead: list[str] = []
         for sub_id, queue in self._queues.items():
             try:

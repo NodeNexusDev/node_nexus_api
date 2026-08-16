@@ -36,14 +36,16 @@ class FavoriteService:
         return await self._writer.add_favorite(data)
 
     async def remove_favorite(
-        self, target_type: str, target_id: str,
+        self,
+        target_type: str,
+        target_id: str,
     ) -> bool:
         import uuid
+
         removed = await self._writer.remove_favorite(
-            target_type, uuid.UUID(target_id),
+            target_type,
+            uuid.UUID(target_id),
         )
         if not removed:
-            raise FavoriteNotFoundError(
-                f"Favorite {target_type}:{target_id} not found"
-            )
+            raise FavoriteNotFoundError(f"Favorite {target_type}:{target_id} not found")
         return True

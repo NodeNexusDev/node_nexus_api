@@ -423,9 +423,7 @@ async def retry_script(
 ) -> dict:
     """Retry a script execution."""
     audit.info("api.scripts.executions.retry", execution_id=str(execution_id))
-    result = await service.retry_script(
-        RetryScriptDTO(execution_id=execution_id)
-    )
+    result = await service.retry_script(RetryScriptDTO(execution_id=execution_id))
     return {
         "execution_id": result["execution_id"],
         "status": result["status"],
@@ -442,9 +440,7 @@ async def cancel_script(
 ) -> dict:
     """Cancel a running script execution."""
     audit.info("api.scripts.executions.cancel", execution_id=str(execution_id))
-    await service.cancel_execution(
-        CancelExecutionDTO(execution_id=execution_id)
-    )
+    await service.cancel_execution(CancelExecutionDTO(execution_id=execution_id))
     return {
         "execution_id": str(execution_id),
         "status": "cancelled",

@@ -9,10 +9,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.command_execution import CommandExecutionModel
 from app.models.script_execution import ScriptExecutionModel
 
-_DUR = func.extract(
-    text("epoch"),
-    CommandExecutionModel.finished_at - CommandExecutionModel.started_at,
-) * 1000
+_DUR = (
+    func.extract(
+        text("epoch"),
+        CommandExecutionModel.finished_at - CommandExecutionModel.started_at,
+    )
+    * 1000
+)
 
 
 class ExecutionStatsRepository:
@@ -27,9 +30,13 @@ class ExecutionStatsRepository:
         date_to: datetime | None = None,
     ) -> dict:
         cmd = CommandExecutionModel
-        dur = func.extract(
-            text("epoch"), cmd.finished_at - cmd.started_at,
-        ) * 1000
+        dur = (
+            func.extract(
+                text("epoch"),
+                cmd.finished_at - cmd.started_at,
+            )
+            * 1000
+        )
         ok = case((cmd.exit_code == 0, 1), else_=0)
         fail = case((cmd.exit_code != 0, 1), else_=0)
         stmt = select(
@@ -61,9 +68,13 @@ class ExecutionStatsRepository:
         date_to: datetime | None = None,
     ) -> dict:
         scr = ScriptExecutionModel
-        dur = func.extract(
-            text("epoch"), scr.finished_at - scr.started_at,
-        ) * 1000
+        dur = (
+            func.extract(
+                text("epoch"),
+                scr.finished_at - scr.started_at,
+            )
+            * 1000
+        )
         ok = case((scr.status == "completed", 1), else_=0)
         fail = case((scr.status != "completed", 1), else_=0)
         stmt = select(

@@ -59,7 +59,9 @@ class SqlAlchemyNoteGateway:
         return _dto(model)
 
     async def update_note(
-        self, note_id: uuid.UUID, data: NoteUpdateDTO,
+        self,
+        note_id: uuid.UUID,
+        data: NoteUpdateDTO,
     ) -> NoteDTO | None:
         q = select(NoteModel).where(NoteModel.id == note_id)
         row = (await self._session.execute(q)).scalar_one_or_none()

@@ -13,12 +13,14 @@ from app.application.dto.dashboard_metrics import (
 
 class SqlAlchemyDashboardMetricsGateway:
     def __init__(
-        self, sessionmaker: async_sessionmaker[AsyncSession],
+        self,
+        sessionmaker: async_sessionmaker[AsyncSession],
     ) -> None:
         self._sessionmaker = sessionmaker
 
     async def get_metrics(
-        self, query: MetricsQueryDTO,
+        self,
+        query: MetricsQueryDTO,
     ) -> DashboardMetricsDTO:
         async with self._sessionmaker() as session:
             repo = DashboardMetricsRepository(session)
