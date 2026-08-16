@@ -23,8 +23,10 @@ def test_validate_credentials_success(e2e_client: httpx.Client) -> None:
     assert "successful" in data["message"].lower()
 
 
-def test_validate_credentials_failure(e2e_client: httpx.Client) -> None:
-    """POST /api/v1/nodes/validate-credentials returns unreachable for bad credentials."""
+def test_validate_credentials_failure(
+    e2e_client: httpx.Client,
+) -> None:
+    """Returns unreachable for bad credentials."""
     resp = e2e_client.post(
         "/api/v1/nodes/validate-credentials",
         json={
@@ -39,8 +41,10 @@ def test_validate_credentials_failure(e2e_client: httpx.Client) -> None:
     assert data["status"] == "unreachable"
 
 
-def test_validate_credentials_connection_refused(e2e_client: httpx.Client) -> None:
-    """POST /api/v1/nodes/validate-credentials returns unreachable for unreachable host."""
+def test_validate_credentials_connection_refused(
+    e2e_client: httpx.Client,
+) -> None:
+    """Returns unreachable for unreachable host."""
     resp = e2e_client.post(
         "/api/v1/nodes/validate-credentials",
         json={
@@ -49,6 +53,7 @@ def test_validate_credentials_connection_refused(e2e_client: httpx.Client) -> No
             "username": "testuser",
             "password": "testpass",
         },
+        timeout=60.0,
     )
     assert resp.status_code == 200
     data = resp.json()
