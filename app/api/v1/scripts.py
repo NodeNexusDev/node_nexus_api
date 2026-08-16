@@ -269,16 +269,18 @@ async def execute_script(
     service: FromDishka[ScriptExecutionService],
     _key: str = Security(get_current_api_key),
 ) -> ScriptExecutionBatchResult:
-    """Execute a script on multiple nodes."""
+    """Execute a script on multiple nodes by IDs and/or tags."""
     audit.info(
         "api.scripts.execute",
         script_id=str(script_id),
-        node_count=len(data.node_ids),
+        node_count=len(data.node_ids or ()),
+        node_tags=data.node_tags,
     )
     result = await service.execute_script(
         script_id,
         ScriptExecutionRequestDTO(
-            node_ids=tuple(data.node_ids),
+            node_ids=tuple(data.node_ids or ()),
+            tags=tuple(data.node_tags or ()),
             params=tuple(data.params.items()),
         ),
     )

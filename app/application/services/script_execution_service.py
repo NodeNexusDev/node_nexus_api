@@ -10,6 +10,7 @@ from uuid import UUID
 import structlog
 
 from app.application.command_policy import command_fingerprint
+from app.application.dto.node_connection import NodeConnectionDTO
 from app.application.dto.script_execution import (
     ResolvedScriptStepDTO,
     ScriptExecutionBatchResultDTO,
@@ -76,12 +77,9 @@ class ScriptExecutionService:
         resolved_steps = tuple(
             [await self._resolve_step(step, params) for step in definition.steps]
         )
-        nodes = []
-        for node_id in request.node_ids:
-            node = await self._node_reader.get_connection(node_id)
-            if node is None:
-                raise NodeNotFoundError(f"Node {node_id} not found")
-            nodes.append(node)
+        nodes = await self._resolve_targets(request)
+        if not nodes and request.node_ids:
+            raise NodeNotFoundError("Node not found")
 
         targets: list[ScriptExecutionTargetDTO] = []
         for node in nodes:
@@ -126,6 +124,29 @@ class ScriptExecutionService:
             script_id=script_id,
             results=tuple(results),
         )
+
+    async def _resolve_targets(
+        self, request: ScriptExecutionRequestDTO
+    ) -> list[NodeConnectionDTO]:
+        """Resolve target nodes from IDs and tags."""
+        nodes_by_ids = None
+        if request.node_ids:
+            nodes_by_ids = await self._node_reader.get_connections_by_ids(
+                list(request.node_ids)
+            )
+
+        nodes_by_tags = None
+        if request.tags:
+            nodes_by_tags = await self._node_reader.get_connections_by_tags(
+                list(request.tags)
+            )
+
+        if nodes_by_ids is not None and nodes_by_tags is not None:
+            tag_ids = {node.id for node in nodes_by_tags}
+            return [node for node in nodes_by_ids if node.id in tag_ids]
+        if nodes_by_ids is not None:
+            return nodes_by_ids
+        return nodes_by_tags or []
 
     async def _resolve_step(
         self,

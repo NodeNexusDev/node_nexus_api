@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class ScriptStep(BaseModel):
@@ -53,8 +53,15 @@ class ScriptResponse(BaseModel):
 class ScriptExecuteRequest(BaseModel):
     """Request to execute a script on multiple nodes."""
 
-    node_ids: list[uuid.UUID] = Field(..., min_length=1)
+    node_ids: list[uuid.UUID] | None = Field(default=None, min_length=1)
+    node_tags: list[str] | None = Field(default=None, min_length=1)
     params: dict[str, Any] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def check_targets(self) -> "ScriptExecuteRequest":
+        if not self.node_ids and not self.node_tags:
+            raise ValueError("At least one of node_ids or node_tags must be provided")
+        return self
 
 
 class ScriptStepResult(BaseModel):
