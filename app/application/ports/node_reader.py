@@ -26,6 +26,12 @@ class NodeConnectionReader(Protocol):
         """Return connection data for nodes matching all tags."""
         ...
 
+    async def get_connections_by_type(
+        self, connection_type: str
+    ) -> list[NodeConnectionDTO]:
+        """Return connection data for nodes of a given type."""
+        ...
+
 
 class NodeStatusWriter(Protocol):
     """Persist node connectivity status in a short transaction."""
