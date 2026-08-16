@@ -2,7 +2,7 @@
 title: Compatibility and support
 status: stable
 translation_key: reference.compatibility
-source_revision: "2026-08-11"
+source_revision: "2026-08-17"
 ---
 
 # Compatibility and support
@@ -26,6 +26,11 @@ and metrics endpoints are excluded from version enforcement.
 
 | Version | Date | Type | Highlights |
 |---------|------|------|------------|
+| 0.13.1 | 2026-08-17 | Patch | Fix Stage F E2E test failures, SQLAlchemy cache key issues |
+| 0.13.0 | 2026-08-15 | Minor | Favorites, notes, tag management, clone, dashboard metrics, global search, execution statistics, SSE stream, audit export |
+| 0.11.0 | 2026-08-13 | Minor | Dry-run config import, validate-credentials endpoint |
+| 0.10.0 | 2026-08-12 | Minor | Real Docker container stats on dashboard |
+| 0.9.0 | 2026-08-12 | Minor | Dashboard endpoint, audit user/date filters, bulk execute by tags |
 | 0.8.0 | 2026-08-11 | Minor | Docker create/image build, bulk by tags, detailed readiness, request id in errors, API versioning |
 | 0.7.1 | 2026-07-30 | Patch | Documentation fixes |
 | 0.7.0 | 2026-07-29 | Minor |

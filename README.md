@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/NodeNexusDev/node_nexus_api/actions/workflows/ci.yml/badge.svg)](https://github.com/NodeNexusDev/node_nexus_api/actions/workflows/ci.yml)
 [![Coverage](https://img.shields.io/badge/coverage-95%25-brightgreen)](.agents/workflow.md)
-[![Version](https://img.shields.io/badge/version-0.8.0-blue)](https://github.com/NodeNexusDev/node_nexus_api)
+[![Version](https://img.shields.io/badge/version-0.13.1-blue)](https://github.com/NodeNexusDev/node_nexus_api)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 REST API for centrally managing server nodes, SSH commands, reusable scripts,
@@ -27,6 +27,10 @@ encrypted credentials, audit logging, and fine-grained API keys.
 - API key scopes, audit log, encrypted SSH credentials, and rate limiting
 - WebSocket command output, Prometheus metrics, and OpenTelemetry tracing
 - Configuration import/export without secret material
+- Favorites, notes, tag management, command/script cloning
+- Dashboard metrics with time-based grouping and global search
+- Execution statistics with success rate and average duration
+- Audit export (JSON/CSV) and SSE metrics stream
 
 ## Quick start
 
