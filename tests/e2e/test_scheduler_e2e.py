@@ -190,8 +190,8 @@ def test_schedule_replace_removes_old_runtime_job(
     assert schedule["cron"] == "* * * * *"
     assert schedule["next_run_at"] is not None
 
-    # Wait for execution from the new cron
-    executions = _wait_for_execution(e2e_client, script["id"])
+    # Wait for execution from the new cron (must be completed, not just started)
+    executions = _wait_for_completed_execution(e2e_client, script["id"])
     assert len(executions) == 1
     assert executions[0]["status"] == "completed"
     assert "replace-ok" in executions[0]["steps"][0]["stdout"]

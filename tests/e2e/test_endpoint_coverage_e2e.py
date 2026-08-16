@@ -113,12 +113,40 @@ COVERED_ENDPOINTS: set[str] = {
     "POST /api/v1/docker/bulk/stop",
     "POST /api/v1/docker/bulk/restart",
     "POST /api/v1/docker/bulk/exec",
+    # Favorites (Stage F)
+    "GET /api/v1/favorites",
+    "POST /api/v1/favorites",
+    "DELETE /api/v1/favorites/{target_type}/{target_id}",
+    # Notes (Stage F)
+    "GET /api/v1/notes/{target_type}/{target_id}",
+    "POST /api/v1/notes/{target_type}/{target_id}",
+    "PUT /api/v1/notes/{note_id}",
+    "DELETE /api/v1/notes/{note_id}",
+    # Tag Management (Stage F)
+    "PATCH /api/v1/tags/{tag_name}",
+    "DELETE /api/v1/tags/{tag_name}",
+    # Global Search (Stage F)
+    "GET /api/v1/search",
+    # Audit Export (Stage F)
+    "GET /api/v1/audit/export",
+    # Dashboard Metrics (Stage F)
+    "GET /api/v1/dashboard/metrics",
+    # Node Stats (Stage F)
+    "GET /api/v1/nodes/{node_id}/stats",
+    # Command Stats + Clone (Stage F)
+    "GET /api/v1/commands/{command_id}/stats",
+    "POST /api/v1/commands/{command_id}/clone",
+    # Script Stats + Clone (Stage F)
+    "GET /api/v1/scripts/{script_id}/stats",
+    "POST /api/v1/scripts/{script_id}/clone",
 }
 
 # Endpoints NOT covered by E2E tests, with justification.
 EXCLUDED_ENDPOINTS: dict[str, str] = {
-    # Add entries like:
-    # "METHOD /path": "Justification for exclusion",
+    "GET /api/v1/events/stream": (
+        "SSE streaming endpoint — TestClient blocks indefinitely on "
+        "streaming responses; covered by unit test for _event_generator."
+    ),
 }
 
 # WebSocket routes (not in OpenAPI, tracked separately).
