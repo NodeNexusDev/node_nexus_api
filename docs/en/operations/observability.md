@@ -2,7 +2,7 @@
 title: Observability
 status: stable
 translation_key: operations.observability
-source_revision: "2026-08-11"
+source_revision: "2026-08-16"
 ---
 
 # Observability
@@ -34,3 +34,66 @@ Alert on a growing `node_nexus_audit_pending` value, an increasing oldest
 pending age, scheduler registration failures, and a scheduler readiness value
 of zero. A non-owner replica normally reports `node_nexus_scheduler_owner 0`;
 this alone is not a failure when another healthy replica owns the advisory lock.
+
+## Dashboard
+
+An aggregated system overview is available at `GET /api/v1/dashboard/`. The
+endpoint returns statistics for nodes, Docker containers, scripts, commands,
+and recent audit log activity.
+
+```bash
+curl --fail-with-body \
+  -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
+  "${NODE_NEXUS_URL}/api/v1/dashboard/"
+```
+
+### Response
+
+```json
+{
+  "nodes": {
+    "total": 12,
+    "active": 10,
+    "unreachable": 2
+  },
+  "docker": {
+    "total": 25,
+    "running": 18,
+    "stopped": 7
+  },
+  "scripts": {
+    "total": 8
+  },
+  "commands": {
+    "total": 15
+  },
+  "recent_activity": [
+    {
+      "id": "...",
+      "action": "create",
+      "node_id": "...",
+      "user": "admin",
+      "details": "{\"name\": \"web-1\"}",
+      "created_at": "2026-08-16T10:00:00Z"
+    }
+  ]
+}
+```
+
+### Fields
+
+| Field | Description |
+|-------|-------------|
+| `nodes.total` | Total number of nodes |
+| `nodes.active` | Nodes with status `active` |
+| `nodes.unreachable` | Nodes with status `unreachable` |
+| `docker.total` | Total Docker containers across all Docker nodes |
+| `docker.running` | Running containers |
+| `docker.stopped` | Stopped containers |
+| `scripts.total` | Number of scripts |
+| `commands.total` | Number of commands |
+| `recent_activity` | Last 10 audit log entries |
+
+Docker statistics are collected by running `docker ps -a` on each Docker node.
+If a node is unreachable, its containers are not counted (errors are handled
+gracefully).

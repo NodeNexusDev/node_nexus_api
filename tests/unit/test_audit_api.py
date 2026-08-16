@@ -95,7 +95,13 @@ class TestGetAuditLogs:
         mock_service.get_logs.return_value = AuditLogPageDTO(items=(), total=0)
         await client.get(f"/api/v1/audit/?node_id={node_id}")
         mock_service.get_logs.assert_called_once_with(
-            node_id=node_id, action=None, page=1, size=20
+            node_id=node_id,
+            action=None,
+            user=None,
+            date_from=None,
+            date_to=None,
+            page=1,
+            size=20,
         )
 
     async def test_filter_by_action(
@@ -104,7 +110,13 @@ class TestGetAuditLogs:
         mock_service.get_logs.return_value = AuditLogPageDTO(items=(), total=0)
         await client.get("/api/v1/audit/?action=delete")
         mock_service.get_logs.assert_called_once_with(
-            node_id=None, action="delete", page=1, size=20
+            node_id=None,
+            action="delete",
+            user=None,
+            date_from=None,
+            date_to=None,
+            page=1,
+            size=20,
         )
 
     async def test_pagination_params(
@@ -113,7 +125,13 @@ class TestGetAuditLogs:
         mock_service.get_logs.return_value = AuditLogPageDTO(items=(), total=0)
         await client.get("/api/v1/audit/?page=3&size=10")
         mock_service.get_logs.assert_called_once_with(
-            node_id=None, action=None, page=3, size=10
+            node_id=None,
+            action=None,
+            user=None,
+            date_from=None,
+            date_to=None,
+            page=3,
+            size=10,
         )
 
 

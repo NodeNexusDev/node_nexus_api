@@ -1,6 +1,7 @@
 """Audit log API endpoints."""
 
 import uuid
+from datetime import datetime
 
 import structlog
 from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
@@ -23,6 +24,9 @@ async def get_audit_logs(
     service: FromDishka[AuditLogService],
     node_id: uuid.UUID | None = Query(None),
     action: str | None = Query(None),
+    user: str | None = Query(None, description="Filter by user"),
+    date_from: datetime | None = Query(None, description="Filter from date (ISO 8601)"),
+    date_to: datetime | None = Query(None, description="Filter to date (ISO 8601)"),
     page: int = Query(1, ge=1),
     size: int = Query(20, ge=1, le=100),
     _key: str = Security(get_current_api_key),
@@ -32,11 +36,18 @@ async def get_audit_logs(
         "api.audit.list",
         node_id=str(node_id) if node_id else None,
         action=action,
+        user=user,
         page=page,
         size=size,
     )
     result = await service.get_logs(
-        node_id=node_id, action=action, page=page, size=size
+        node_id=node_id,
+        action=action,
+        user=user,
+        date_from=date_from,
+        date_to=date_to,
+        page=page,
+        size=size,
     )
     return PaginatedResponse(
         items=[_to_response(item) for item in result.items],

@@ -60,7 +60,7 @@ async def test_remote_worker_runs_between_short_writer_calls() -> None:
     )
     command_reader = AsyncMock()
     node_reader = AsyncMock()
-    node_reader.get_connection.return_value = _node(node_id)
+    node_reader.get_connections_by_ids.return_value = [_node(node_id)]
     writer = AsyncMock()
     writer.create_execution.side_effect = lambda data: (
         events.append("create"),
@@ -119,7 +119,7 @@ async def test_command_templates_are_loaded_before_remote_execution() -> None:
 
     command_reader.get_template.side_effect = load_template
     node_reader = AsyncMock()
-    node_reader.get_connection.return_value = _node(node_id)
+    node_reader.get_connections_by_ids.return_value = [_node(node_id)]
     writer = AsyncMock()
     writer.create_execution.return_value = uuid.uuid4()
     connector = AsyncMock()
@@ -169,7 +169,7 @@ async def test_missing_node_stops_before_creating_execution() -> None:
         steps=({"label": "check", "type": "inline", "command": "true"},),
     )
     node_reader = AsyncMock()
-    node_reader.get_connection.return_value = None
+    node_reader.get_connections_by_ids.return_value = []
     writer = AsyncMock()
     service = _service(
         script_reader,
@@ -205,7 +205,7 @@ def _make_service_for_resolve(
         steps=({"label": "s1", "type": "inline", "command": "true"},),
     )
     node_reader = AsyncMock()
-    node_reader.get_connection.return_value = _node(node_id)
+    node_reader.get_connections_by_ids.return_value = [_node(node_id)]
     writer = AsyncMock()
     factory = Mock()
     if connector is None:

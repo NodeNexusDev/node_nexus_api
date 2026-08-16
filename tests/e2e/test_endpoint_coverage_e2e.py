@@ -75,6 +75,8 @@ COVERED_ENDPOINTS: set[str] = {
     # Config
     "GET /api/v1/config/export",
     "POST /api/v1/config/import",
+    # Dashboard
+    "GET /api/v1/dashboard/",
     # Docker Images
     "GET /api/v1/nodes/{node_id}/docker/images",
     "POST /api/v1/nodes/{node_id}/docker/images/pull",
