@@ -90,3 +90,35 @@ class CommandManagementService:
         await self._writer.delete_command(command_id)
         audit.info("command.delete.ok", command_id=str(command_id))
         return True
+
+    async def clone_command(
+        self, command_id: UUID, new_name: str | None = None,
+    ) -> CommandViewDTO:
+        original = await self._reader.get_command(command_id)
+        if original is None:
+            raise CommandNotFoundError(f"Command {command_id} not found")
+        clone_name = new_name or f"{original.name}-copy"
+        clone_data = CommandCreateDTO(
+            name=clone_name,
+            description=original.description,
+            command=original.command,
+            parameters=tuple(
+                CommandParameterDTO(
+                    name=p.name,
+                    type=p.type,
+                    required=p.required,
+                    default=p.default,
+                    description=p.description,
+                )
+                for p in original.parameters
+            ),
+            tags=original.tags,
+        )
+        cloned = await self._writer.create_command(clone_data)
+        audit.info(
+            "command.clone.ok",
+            command_id=str(cloned.id),
+            source=str(command_id),
+        )
+        await self._log("clone", {"entity": "command", "source": str(command_id)})
+        return cloned

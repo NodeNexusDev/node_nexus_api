@@ -90,3 +90,21 @@ class ScriptManagementService:
         await self._writer.delete_script(script_id)
         audit.info("script.delete.ok", script_id=str(script_id))
         return True
+
+    async def clone_script(
+        self, script_id: UUID, new_name: str | None = None,
+    ) -> ScriptViewDTO:
+        original = await self._reader.get_script(script_id)
+        if original is None:
+            raise ScriptNotFoundError(f"Script {script_id} not found")
+        clone_name = new_name or f"{original.name}-copy"
+        clone_data = ScriptCreateDTO(
+            name=clone_name,
+            description=original.description,
+            steps=original.steps,
+            tags=original.tags,
+        )
+        cloned = await self._writer.create_script(clone_data)
+        audit.info("script.clone.ok", script_id=str(cloned.id), source=str(script_id))
+        await self._log("clone", {"entity": "script", "source": str(script_id)})
+        return cloned

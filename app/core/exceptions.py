@@ -103,3 +103,11 @@ class ExecutionNotFoundError(DomainError):
 
 class AuditWriteError(DomainError):
     """Raised when an obligatory audit event cannot be persisted."""
+
+
+class FavoriteNotFoundError(DomainError):
+    """Raised when a favorite is not found."""
+
+
+class NoteNotFoundError(DomainError):
+    """Raised when a note is not found."""

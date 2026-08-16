@@ -337,3 +337,34 @@ def test_config_provider_returns_cached_settings() -> None:
     expected = MagicMock()
     with patch("app.di.providers.get_settings", return_value=expected):
         assert ConfigProvider().get_settings() is expected
+
+
+def test_tag_management_service_provider() -> None:
+    from app.application.services.tag_management_service import (
+        TagManagementService,
+    )
+
+    svc_provider = ServiceProvider()
+    tag_manager = MagicMock()
+    svc = svc_provider.get_tag_management_service(tag_manager)
+    assert isinstance(svc, TagManagementService)
+
+
+def test_favorite_service_provider() -> None:
+    from app.application.services.favorite_service import FavoriteService
+
+    svc_provider = ServiceProvider()
+    reader = MagicMock()
+    writer = MagicMock()
+    svc = svc_provider.get_favorite_service(reader, writer)
+    assert isinstance(svc, FavoriteService)
+
+
+def test_note_service_provider() -> None:
+    from app.application.services.note_service import NoteService
+
+    svc_provider = ServiceProvider()
+    reader = MagicMock()
+    writer = MagicMock()
+    svc = svc_provider.get_note_service(reader, writer)
+    assert isinstance(svc, NoteService)

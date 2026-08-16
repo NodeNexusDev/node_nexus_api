@@ -222,3 +222,16 @@ async def get_command_stats(
         command_id=command_id, date_from=date_from, date_to=date_to
     )
     return ExecutionStatsResponse.model_validate(stats)
+
+
+@router.post("/{command_id}/clone", response_model=CommandResponse)
+@inject
+async def clone_command(
+    command_id: uuid.UUID,
+    service: FromDishka[CommandManagementService],
+    new_name: str | None = Query(None),
+    _key: str = Security(require_write_scope),
+) -> CommandResponse:
+    audit.info("api.commands.clone", command_id=str(command_id))
+    cloned = await service.clone_command(command_id, new_name=new_name)
+    return _command_response(cloned)

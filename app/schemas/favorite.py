@@ -1,0 +1,21 @@
+"""Favorite API schemas."""
+
+from __future__ import annotations
+
+from datetime import datetime
+
+from pydantic import BaseModel
+
+
+class FavoriteCreate(BaseModel):
+    target_type: str
+    target_id: str
+    note: str | None = None
+
+
+class FavoriteResponse(BaseModel):
+    id: str
+    target_type: str
+    target_id: str
+    note: str | None
+    created_at: datetime
