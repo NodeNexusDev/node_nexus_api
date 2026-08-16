@@ -2,7 +2,7 @@
 title: Журнал аудита
 status: stable
 translation_key: guides.audit-log
-source_revision: "2026-07-29"
+source_revision: "2026-08-16"
 ---
 
 # Журнал аудита
@@ -29,6 +29,30 @@ curl --get --fail-with-body \
 
 Основные действия: `create`, `update`, `delete`, `check`, `execute` и
 `execute_failed`. При переборе страниц используйте `total`, `page` и `size`.
+
+### Фильтрация по пользователю и дате
+
+Дополнительные параметры запроса позволяют фильтровать по пользователю и
+диапазону дат:
+
+```bash
+curl --get --fail-with-body \
+  -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
+  --data-urlencode 'user=admin' \
+  --data-urlencode 'date_from=2026-08-01T00:00:00' \
+  --data-urlencode 'date_to=2026-08-16T23:59:59' \
+  "${NODE_NEXUS_URL}/api/v1/audit/"
+```
+
+Параметры:
+
+| Параметр | Описание | Пример |
+|----------|----------|--------|
+| `user` | Фильтр по идентификатору субъекта | `user=admin` |
+| `date_from` | Начало диапазона (ISO 8601) | `date_from=2026-08-01T00:00:00` |
+| `date_to` | Конец диапазона (ISO 8601) | `date_to=2026-08-31T23:59:59` |
+
+Фильтры можно комбинировать с существующими `node_id` и `action`.
 
 ## Срок хранения и удаление
 

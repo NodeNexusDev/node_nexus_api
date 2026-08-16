@@ -2,7 +2,7 @@
 title: Scripts and schedules
 status: stable
 translation_key: guides.scripts
-source_revision: "2026-08-12"
+source_revision: "2026-08-16"
 ---
 
 # Scripts and schedules
@@ -46,3 +46,60 @@ curl --fail-with-body \
 
 Returns a sorted list of unique tags used across all scripts. Useful for
 building autocomplete and filter UIs.
+
+## Execute by tags
+
+A script can be executed on nodes filtered by tags instead of listing IDs.
+The `node_ids` and `node_tags` parameters can be combined — the result is the
+intersection (AND).
+
+### Execute by IDs (as before)
+
+```bash
+curl --fail-with-body -X POST \
+  -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{"node_ids": ["<node-id-1>", "<node-id-2>"], "params": {"branch": "main"}}' \
+  "${NODE_NEXUS_URL}/api/v1/scripts/<script_id>/execute"
+```
+
+### Execute by tags
+
+```bash
+curl --fail-with-body -X POST \
+  -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{"node_tags": ["web", "production"], "params": {"branch": "main"}}' \
+  "${NODE_NEXUS_URL}/api/v1/scripts/<script_id>/execute"
+```
+
+Runs on all nodes that have both tags `web` AND `production`.
+
+### Mixed mode
+
+```bash
+curl --fail-with-body -X POST \
+  -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{"node_ids": ["<node-id>"], "node_tags": ["web"], "params": {}}' \
+  "${NODE_NEXUS_URL}/api/v1/scripts/<script_id>/execute"
+```
+
+The result is the intersection: nodes from `node_ids` that also have all
+specified tags. At least one of `node_ids` or `node_tags` is required.
+
+### Response
+
+```json
+{
+  "script_id": "...",
+  "total_nodes": 3,
+  "results": [
+    {"node_id": "...", "node_name": "web-1", "exit_code": 0, "stdout": "...", "stderr": ""},
+    {"node_id": "...", "node_name": "web-2", "exit_code": 0, "stdout": "...", "stderr": ""}
+  ]
+}
+```
+
+Fields `exit_code`, `stdout`, `stderr` are present per step, but the batch
+response `results` contains aggregated per-node data.
