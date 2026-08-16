@@ -22,7 +22,8 @@ class ResolvedScriptStepDTO:
 class ScriptExecutionRequestDTO:
     """Application input for executing a script on multiple nodes."""
 
-    node_ids: tuple[UUID, ...]
+    node_ids: tuple[UUID, ...] = ()
+    tags: tuple[str, ...] = ()
     params: tuple[tuple[str, JsonValue], ...] = ()
 
 
