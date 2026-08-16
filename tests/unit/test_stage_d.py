@@ -257,8 +257,8 @@ async def test_retry_command(
         RetryCommandDTO(execution_id=exec_id, node_id=node_id)
     )
     command_history_reader.get_by_id.assert_awaited_once_with(exec_id)
-    assert result["status"] == "retry_scheduled"
-    assert result["execution_id"] == str(exec_id)
+    assert result.status == "retry_scheduled"
+    assert result.execution_id == str(exec_id)
 
 
 @pytest.mark.asyncio()
@@ -282,8 +282,8 @@ async def test_retry_script(
 ) -> None:
     exec_id = uuid.uuid4()
     result = await lifecycle_service.retry_script(RetryScriptDTO(execution_id=exec_id))
-    assert result["status"] == "retry_scheduled"
-    assert result["execution_id"] == str(exec_id)
+    assert result.status == "retry_scheduled"
+    assert result.execution_id == str(exec_id)
 
 
 @pytest.mark.asyncio()
