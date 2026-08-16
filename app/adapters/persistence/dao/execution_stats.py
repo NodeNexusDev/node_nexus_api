@@ -3,19 +3,8 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import case, func, select, text
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from app.models.command_execution import CommandExecutionModel
-from app.models.script_execution import ScriptExecutionModel
-
-_DUR = (
-    func.extract(
-        text("epoch"),
-        CommandExecutionModel.finished_at - CommandExecutionModel.started_at,
-    )
-    * 1000
-)
 
 
 class ExecutionStatsRepository:
@@ -29,35 +18,36 @@ class ExecutionStatsRepository:
         date_from: datetime | None = None,
         date_to: datetime | None = None,
     ) -> dict:
-        cmd = CommandExecutionModel
-        dur = (
-            func.extract(
-                text("epoch"),
-                cmd.finished_at - cmd.started_at,
-            )
-            * 1000
-        )
-        ok = case((cmd.exit_code == 0, 1), else_=0)
-        fail = case((cmd.exit_code != 0, 1), else_=0)
-        stmt = select(
-            func.count().label("total"),
-            func.sum(ok).label("successful"),
-            func.sum(fail).label("failed"),
-            func.avg(dur).label("avg_duration_ms"),
-            func.min(dur).label("min_duration_ms"),
-            func.max(dur).label("max_duration_ms"),
-            func.max(cmd.finished_at).label("last_executed_at"),
-        )
+        params: dict = {}
+        where_clauses: list[str] = []
         if command_id is not None:
-            stmt = stmt.where(cmd.command_id == command_id)
+            where_clauses.append("ce.command_id = :command_id")
+            params["command_id"] = command_id
         if node_id is not None:
-            stmt = stmt.where(cmd.node_id == node_id)
+            where_clauses.append("ce.node_id = :node_id")
+            params["node_id"] = node_id
         if date_from is not None:
-            stmt = stmt.where(cmd.started_at >= date_from)
+            where_clauses.append("ce.started_at >= :date_from")
+            params["date_from"] = date_from
         if date_to is not None:
-            stmt = stmt.where(cmd.started_at <= date_to)
+            where_clauses.append("ce.started_at <= :date_to")
+            params["date_to"] = date_to
 
-        row = (await self._session.execute(stmt)).one()
+        where_sql = " AND ".join(where_clauses) if where_clauses else "TRUE"
+        dur = "EXTRACT(EPOCH FROM (ce.finished_at - ce.started_at)) * 1000"
+        sql = text(
+            "SELECT "
+            "  COUNT(*)::int AS total, "
+            "  COUNT(*) FILTER (WHERE ce.exit_code = 0)::int AS successful, "  # noqa: E501
+            "  COUNT(*) FILTER (WHERE ce.exit_code != 0)::int AS failed, "  # noqa: E501
+            f"  AVG({dur}) AS avg_duration_ms, "
+            f"  MIN({dur}) AS min_duration_ms, "
+            f"  MAX({dur}) AS max_duration_ms, "
+            "  MAX(ce.finished_at) AS last_executed_at "
+            "FROM command_executions ce "
+            f"WHERE {where_sql}"
+        )
+        row = (await self._session.execute(sql, params)).one()
         return dict(row._mapping)
 
     async def script_stats(
@@ -67,33 +57,34 @@ class ExecutionStatsRepository:
         date_from: datetime | None = None,
         date_to: datetime | None = None,
     ) -> dict:
-        scr = ScriptExecutionModel
-        dur = (
-            func.extract(
-                text("epoch"),
-                scr.finished_at - scr.started_at,
-            )
-            * 1000
-        )
-        ok = case((scr.status == "completed", 1), else_=0)
-        fail = case((scr.status != "completed", 1), else_=0)
-        stmt = select(
-            func.count().label("total"),
-            func.sum(ok).label("successful"),
-            func.sum(fail).label("failed"),
-            func.avg(dur).label("avg_duration_ms"),
-            func.min(dur).label("min_duration_ms"),
-            func.max(dur).label("max_duration_ms"),
-            func.max(scr.finished_at).label("last_executed_at"),
-        )
+        params: dict = {}
+        where_clauses: list[str] = []
         if script_id is not None:
-            stmt = stmt.where(scr.script_id == script_id)
+            where_clauses.append("se.script_id = :script_id")
+            params["script_id"] = script_id
         if node_id is not None:
-            stmt = stmt.where(scr.node_id == node_id)
+            where_clauses.append("se.node_id = :node_id")
+            params["node_id"] = node_id
         if date_from is not None:
-            stmt = stmt.where(scr.started_at >= date_from)
+            where_clauses.append("se.started_at >= :date_from")
+            params["date_from"] = date_from
         if date_to is not None:
-            stmt = stmt.where(scr.started_at <= date_to)
+            where_clauses.append("se.started_at <= :date_to")
+            params["date_to"] = date_to
 
-        row = (await self._session.execute(stmt)).one()
+        where_sql = " AND ".join(where_clauses) if where_clauses else "TRUE"
+        dur = "EXTRACT(EPOCH FROM (se.finished_at - se.started_at)) * 1000"
+        sql = text(
+            "SELECT "
+            "  COUNT(*)::int AS total, "
+            "  COUNT(*) FILTER (WHERE se.status = 'completed')::int AS successful, "  # noqa: E501
+            "  COUNT(*) FILTER (WHERE se.status != 'completed')::int AS failed, "  # noqa: E501
+            f"  AVG({dur}) AS avg_duration_ms, "
+            f"  MIN({dur}) AS min_duration_ms, "
+            f"  MAX({dur}) AS max_duration_ms, "
+            "  MAX(se.finished_at) AS last_executed_at "
+            "FROM script_executions se "
+            f"WHERE {where_sql}"
+        )
+        row = (await self._session.execute(sql, params)).one()
         return dict(row._mapping)

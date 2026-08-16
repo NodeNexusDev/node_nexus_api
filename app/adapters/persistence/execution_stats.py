@@ -59,9 +59,9 @@ class SqlAlchemyExecutionStatsGateway:
 
     @staticmethod
     def _to_stats_dto(row: dict) -> ExecutionStatsDTO:
-        total = row["total"] or 0
-        successful = row["successful"] or 0
-        failed = row["failed"] or 0
+        total = row["total"]
+        successful = row["successful"]
+        failed = row["failed"]
         return ExecutionStatsDTO(
             total=total,
             successful=successful,

@@ -56,6 +56,7 @@ class SqlAlchemyNoteGateway:
         )
         self._session.add(model)
         await self._session.flush()
+        await self._session.refresh(model)
         return _dto(model)
 
     async def update_note(
@@ -69,6 +70,7 @@ class SqlAlchemyNoteGateway:
             return None
         row.content = data.content
         await self._session.flush()
+        await self._session.refresh(row)
         return _dto(row)
 
     async def delete_note(self, note_id: uuid.UUID) -> bool:
