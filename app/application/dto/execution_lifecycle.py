@@ -20,3 +20,17 @@ class RetryScriptDTO:
 @dataclass(frozen=True, slots=True)
 class CancelExecutionDTO:
     execution_id: uuid.UUID
+
+
+@dataclass(frozen=True, slots=True)
+class RetryCommandResultDTO:
+    execution_id: str
+    node_id: str | None
+    command_fingerprint: str
+    status: str
+
+
+@dataclass(frozen=True, slots=True)
+class RetryScriptResultDTO:
+    execution_id: str
+    status: str
