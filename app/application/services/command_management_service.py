@@ -10,6 +10,7 @@ import structlog
 from app.application.dto.command_management import (
     CommandCreateDTO,
     CommandListQueryDTO,
+    CommandParameterDTO,
     CommandUpdateDTO,
     CommandViewDTO,
 )

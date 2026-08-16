@@ -23,7 +23,7 @@ async def _event_generator(sub_id: str, queue):
         while True:
             try:
                 event = await asyncio.wait_for(queue.get(), timeout=30)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 yield ": keepalive\n\n"
                 continue
             if event is None:

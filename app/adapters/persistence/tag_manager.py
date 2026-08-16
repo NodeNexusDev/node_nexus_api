@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from sqlalchemy import update, func, select
+from sqlalchemy import func, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.node import NodeModel
 from app.models.command import CommandModel
+from app.models.node import NodeModel
 from app.models.script import ScriptModel
 
 
