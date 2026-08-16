@@ -9,7 +9,8 @@ from app.application.dto.export import AuditExportQueryDTO, AuditExportRowDTO
 
 class AuditExporter(Protocol):
     async def export_audit(
-        self, query: AuditExportQueryDTO,
+        self,
+        query: AuditExportQueryDTO,
     ) -> list[AuditExportRowDTO]: ...
 
 
@@ -20,10 +21,16 @@ def rows_to_csv(rows: list[AuditExportRowDTO]) -> str:
     writer = csv.writer(buf)
     writer.writerow(["id", "action", "node_id", "user", "details", "created_at"])
     for row in rows:
-        writer.writerow([
-            row.id, row.action, row.node_id, row.user,
-            row.details, row.created_at,
-        ])
+        writer.writerow(
+            [
+                row.id,
+                row.action,
+                row.node_id,
+                row.user,
+                row.details,
+                row.created_at,
+            ]
+        )
     return buf.getvalue()
 
 

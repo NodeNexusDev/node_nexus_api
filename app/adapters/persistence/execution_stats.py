@@ -12,12 +12,14 @@ from app.application.dto.execution_stats import (
 
 class SqlAlchemyExecutionStatsGateway:
     def __init__(
-        self, sessionmaker: async_sessionmaker[AsyncSession],
+        self,
+        sessionmaker: async_sessionmaker[AsyncSession],
     ) -> None:
         self._sessionmaker = sessionmaker
 
     async def get_command_stats(
-        self, query: CommandStatsQueryDTO,
+        self,
+        query: CommandStatsQueryDTO,
     ) -> ExecutionStatsDTO:
         async with self._sessionmaker() as session:
             repo = ExecutionStatsRepository(session)
@@ -30,7 +32,8 @@ class SqlAlchemyExecutionStatsGateway:
             return self._to_stats_dto(row)
 
     async def get_script_stats(
-        self, query: ScriptStatsQueryDTO,
+        self,
+        query: ScriptStatsQueryDTO,
     ) -> ExecutionStatsDTO:
         async with self._sessionmaker() as session:
             repo = ExecutionStatsRepository(session)
@@ -43,12 +46,14 @@ class SqlAlchemyExecutionStatsGateway:
             return self._to_stats_dto(row)
 
     async def get_node_command_stats(
-        self, query: CommandStatsQueryDTO,
+        self,
+        query: CommandStatsQueryDTO,
     ) -> ExecutionStatsDTO:
         return await self.get_command_stats(query)
 
     async def get_node_script_stats(
-        self, query: ScriptStatsQueryDTO,
+        self,
+        query: ScriptStatsQueryDTO,
     ) -> ExecutionStatsDTO:
         return await self.get_script_stats(query)
 

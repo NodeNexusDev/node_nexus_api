@@ -18,7 +18,9 @@ class FavoriteReader(Protocol):
     ) -> tuple[list[FavoriteDTO], int]: ...
 
     async def get_favorite(
-        self, target_type: str, target_id: uuid.UUID,
+        self,
+        target_type: str,
+        target_id: uuid.UUID,
     ) -> FavoriteDTO | None: ...
 
 
@@ -26,5 +28,7 @@ class FavoriteReader(Protocol):
 class FavoriteWriter(Protocol):
     async def add_favorite(self, data: FavoriteCreateDTO) -> FavoriteDTO: ...
     async def remove_favorite(
-        self, target_type: str, target_id: uuid.UUID,
+        self,
+        target_type: str,
+        target_id: uuid.UUID,
     ) -> bool: ...

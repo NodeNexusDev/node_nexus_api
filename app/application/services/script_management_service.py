@@ -92,7 +92,9 @@ class ScriptManagementService:
         return True
 
     async def clone_script(
-        self, script_id: UUID, new_name: str | None = None,
+        self,
+        script_id: UUID,
+        new_name: str | None = None,
     ) -> ScriptViewDTO:
         original = await self._reader.get_script(script_id)
         if original is None:

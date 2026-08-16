@@ -516,9 +516,7 @@ async def bulk_delete_nodes(
         "api.nodes.bulk_delete",
         node_ids=[str(n) for n in data.node_ids],
     )
-    result = await service.bulk_delete(
-        BulkNodeDeleteDTO(node_ids=tuple(data.node_ids))
-    )
+    result = await service.bulk_delete(BulkNodeDeleteDTO(node_ids=tuple(data.node_ids)))
     return BulkNodeOperationResult(
         affected=result.affected,
         node_ids=list(result.node_ids),

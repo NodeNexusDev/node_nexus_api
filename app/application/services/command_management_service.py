@@ -93,7 +93,9 @@ class CommandManagementService:
         return True
 
     async def clone_command(
-        self, command_id: UUID, new_name: str | None = None,
+        self,
+        command_id: UUID,
+        new_name: str | None = None,
     ) -> CommandViewDTO:
         original = await self._reader.get_command(command_id)
         if original is None:

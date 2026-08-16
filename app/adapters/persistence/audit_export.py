@@ -12,7 +12,8 @@ class SqlAlchemyAuditExporter:
         self._session = session
 
     async def export_audit(
-        self, query: AuditExportQueryDTO,
+        self,
+        query: AuditExportQueryDTO,
     ) -> list[AuditExportRowDTO]:
         stmt = select(AuditLogModel)
         if query.date_from is not None:

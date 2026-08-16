@@ -23,14 +23,18 @@ class DashboardMetricsRepository:
         self._session = session
 
     async def command_metrics(
-        self, query: MetricsQueryDTO,
+        self,
+        query: MetricsQueryDTO,
     ) -> list[MetricsBucketDTO]:
         grp = _GROUP_MAP.get(query.group_by, "day")
         trunc = func.date_trunc(grp, CommandExecutionModel.started_at)
-        dur = func.extract(
-            text("epoch"),
-            CommandExecutionModel.finished_at - CommandExecutionModel.started_at,
-        ) * 1000
+        dur = (
+            func.extract(
+                text("epoch"),
+                CommandExecutionModel.finished_at - CommandExecutionModel.started_at,
+            )
+            * 1000
+        )
         ok = case((CommandExecutionModel.exit_code == 0, 1), else_=0)
         fail = case((CommandExecutionModel.exit_code != 0, 1), else_=0)
         stmt = select(
@@ -62,14 +66,18 @@ class DashboardMetricsRepository:
         ]
 
     async def script_metrics(
-        self, query: MetricsQueryDTO,
+        self,
+        query: MetricsQueryDTO,
     ) -> list[MetricsBucketDTO]:
         grp = _GROUP_MAP.get(query.group_by, "day")
         trunc = func.date_trunc(grp, ScriptExecutionModel.started_at)
-        dur = func.extract(
-            text("epoch"),
-            ScriptExecutionModel.finished_at - ScriptExecutionModel.started_at,
-        ) * 1000
+        dur = (
+            func.extract(
+                text("epoch"),
+                ScriptExecutionModel.finished_at - ScriptExecutionModel.started_at,
+            )
+            * 1000
+        )
         ok = case((ScriptExecutionModel.status == "completed", 1), else_=0)
         fail = case((ScriptExecutionModel.status != "completed", 1), else_=0)
         stmt = select(
