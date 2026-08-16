@@ -270,5 +270,116 @@ def test_config_import_unsupported_version(e2e_client: httpx.Client) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Dry-run import
+# ---------------------------------------------------------------------------
+
+
+def test_config_import_dry_run(e2e_client: httpx.Client) -> None:
+    """POST /api/v1/config/import with dry_run=true returns preview without writing."""
+    before_nodes = e2e_client.get("/api/v1/nodes/").json()["total"]
+
+    resp = e2e_client.post(
+        "/api/v1/config/import",
+        json={
+            "dry_run": True,
+            "nodes": [
+                {
+                    "name": "dry-node",
+                    "host": "10.0.0.60",
+                    "port": 22,
+                    "connection_type": "ssh",
+                }
+            ],
+            "commands": [{"name": "dry-cmd", "command": "echo dry"}],
+            "scripts": [{"name": "dry-script", "steps": []}],
+        },
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["dry_run"] is True
+    assert len(data["would_create"]["nodes"]) == 1
+    assert data["would_create"]["nodes"][0]["name"] == "dry-node"
+    assert len(data["would_create"]["commands"]) == 1
+    assert data["would_create"]["commands"][0]["name"] == "dry-cmd"
+    assert len(data["would_create"]["scripts"]) == 1
+    assert data["would_create"]["scripts"][0]["name"] == "dry-script"
+    assert data["duplicates"] == []
+    assert data["errors"] == []
+
+    # Verify nothing was actually created
+    after_nodes = e2e_client.get("/api/v1/nodes/").json()["total"]
+    assert after_nodes == before_nodes
+
+
+def test_config_import_dry_run_reports_duplicates(e2e_client: httpx.Client) -> None:
+    """Dry-run reports existing items as duplicates without writing."""
+    # Create a node first
+    resp = e2e_client.post(
+        "/api/v1/nodes/",
+        json={
+            "name": "dry-dup-node",
+            "host": "10.0.0.61",
+            "port": 22,
+            "connection_type": "ssh",
+        },
+    )
+    assert resp.status_code == 201
+    node_id = resp.json()["id"]
+
+    try:
+        resp = e2e_client.post(
+            "/api/v1/config/import",
+            json={
+                "dry_run": True,
+                "nodes": [
+                    {
+                        "name": "dry-dup-node",
+                        "host": "10.0.0.61",
+                        "port": 22,
+                        "connection_type": "ssh",
+                    },
+                    {
+                        "name": "dry-new-node",
+                        "host": "10.0.0.62",
+                        "port": 22,
+                        "connection_type": "ssh",
+                    },
+                ],
+            },
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["dry_run"] is True
+        # Only the new node would be created
+        assert len(data["would_create"]["nodes"]) == 1
+        assert data["would_create"]["nodes"][0]["name"] == "dry-new-node"
+        # Existing node reported as duplicate
+        assert len(data["duplicates"]) == 1
+        assert "dry-dup-node" in data["duplicates"][0]
+    finally:
+        e2e_client.delete(f"/api/v1/nodes/{node_id}")
+
+
+def test_config_import_dry_run_unsupported_version(e2e_client: httpx.Client) -> None:
+    """Dry-run still rejects unsupported format versions."""
+    resp = e2e_client.post(
+        "/api/v1/config/import",
+        json={
+            "dry_run": True,
+            "format_version": "99.0",
+            "nodes": [
+                {
+                    "name": "dry-v99",
+                    "host": "10.0.0.63",
+                    "port": 22,
+                    "connection_type": "ssh",
+                }
+            ],
+        },
+    )
+    assert resp.status_code == 422
+
+
+# ---------------------------------------------------------------------------
 # Script scheduling
 # ---------------------------------------------------------------------------
