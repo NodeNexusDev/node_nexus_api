@@ -31,6 +31,12 @@ class SqlAlchemyAuditLogGateway:
                 filters.append(AuditLogModel.node_id == query.node_id)
             if query.action is not None:
                 filters.append(AuditLogModel.action == query.action)
+            if query.user is not None:
+                filters.append(AuditLogModel.user == query.user)
+            if query.date_from is not None:
+                filters.append(AuditLogModel.created_at >= query.date_from)
+            if query.date_to is not None:
+                filters.append(AuditLogModel.created_at <= query.date_to)
             count_result = await session.execute(
                 select(func.count(AuditLogModel.id)).where(*filters)
             )

@@ -35,6 +35,9 @@ class AuditLogQueryDTO:
 
     node_id: UUID | None = None
     action: str | None = None
+    user: str | None = None
+    date_from: datetime | None = None
+    date_to: datetime | None = None
     offset: int = 0
     limit: int = 20
 
