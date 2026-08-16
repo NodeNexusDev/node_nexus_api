@@ -107,8 +107,9 @@ COVERED_ENDPOINTS: set[str] = {
 
 # Endpoints NOT covered by E2E tests, with justification.
 EXCLUDED_ENDPOINTS: dict[str, str] = {
-    # Add entries like:
-    # "METHOD /path": "Justification for exclusion",
+    "POST /api/v1/nodes/validate-credentials": (
+        "Requires a real SSH server; tested in unit tests with mocks"
+    ),
 }
 
 # WebSocket routes (not in OpenAPI, tracked separately).
