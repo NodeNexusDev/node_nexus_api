@@ -1,11 +1,10 @@
-"""Tests for Stage E/F services — favorite, note, tag, execution_stats, export, sse_broadcaster."""
+"""Tests for Stage E/F services: favorite, note, tag, stats, export, sse."""
 
 from __future__ import annotations
 
-import asyncio
 import uuid
 from datetime import UTC, datetime
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -27,7 +26,6 @@ from app.application.services.note_service import NoteService
 from app.application.services.sse_broadcaster import SseBroadcaster, SseEvent
 from app.application.services.tag_management_service import TagManagementService
 from app.core.exceptions import FavoriteNotFoundError, NoteNotFoundError
-
 
 # ─── FavoriteService ───
 
@@ -72,9 +70,7 @@ class TestFavoriteService:
         writer.add_favorite.return_value = expected
         svc = FavoriteService(reader=reader, writer=writer)
 
-        data = FavoriteCreateDTO(
-            target_type="command", target_id=uuid.uuid4()
-        )
+        data = FavoriteCreateDTO(target_type="command", target_id=uuid.uuid4())
         result = await svc.add_favorite(data)
         assert result == expected
 
@@ -157,9 +153,7 @@ class TestNoteService:
         svc = NoteService(reader=reader, writer=writer)
 
         result = await svc.create_note(
-            NoteCreateDTO(
-                target_type="node", target_id=uuid.uuid4(), content="test"
-            )
+            NoteCreateDTO(target_type="node", target_id=uuid.uuid4(), content="test")
         )
         assert result == expected
 
@@ -191,9 +185,7 @@ class TestNoteService:
         svc = NoteService(reader=reader, writer=writer)
 
         with pytest.raises(NoteNotFoundError):
-            await svc.update_note(
-                str(uuid.uuid4()), NoteUpdateDTO(content="x")
-            )
+            await svc.update_note(str(uuid.uuid4()), NoteUpdateDTO(content="x"))
 
     @pytest.mark.asyncio
     async def test_delete_note_found(self) -> None:
@@ -350,7 +342,9 @@ class TestGlobalSearchService:
     async def test_search(self) -> None:
         reader = AsyncMock()
         expected = GlobalSearchResultDTO(
-            nodes=(SearchResultItemDTO(id=uuid.uuid4(), name="web", entity_type="node"),),
+            nodes=(
+                SearchResultItemDTO(id=uuid.uuid4(), name="web", entity_type="node"),
+            ),
             commands=(),
             scripts=(),
             tags=("web",),

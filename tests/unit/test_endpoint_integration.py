@@ -118,8 +118,12 @@ class TestNoteEndpoints:
         mock_svc = AsyncMock(spec=NoteService)
         target_id = uuid.uuid4()
         mock_svc.create_note.return_value = NoteDTO(
-            id=uuid.uuid4(), target_type="command", target_id=target_id,
-            content="note", created_at=datetime.now(UTC), updated_at=datetime.now(UTC),
+            id=uuid.uuid4(),
+            target_type="command",
+            target_id=target_id,
+            content="note",
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
         )
 
         app = _build_app_with_service(NoteService, mock_svc)
@@ -145,10 +149,12 @@ class TestNoteEndpoints:
     def test_update(self) -> None:
         mock_svc = AsyncMock(spec=NoteService)
         mock_svc.update_note.return_value = NoteDTO(
-            id=uuid.uuid4(), target_type="command",
+            id=uuid.uuid4(),
+            target_type="command",
             target_id=uuid.uuid4(),
             content="updated",
-            created_at=datetime.now(UTC), updated_at=datetime.now(UTC),
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
         )
 
         app = _build_app_with_service(NoteService, mock_svc)
@@ -205,8 +211,11 @@ class TestFavoriteEndpoints:
     def test_add(self) -> None:
         mock_svc = AsyncMock(spec=FavoriteService)
         mock_svc.add_favorite.return_value = FavoriteDTO(
-            id=uuid.uuid4(), target_type="command", target_id=uuid.uuid4(),
-            note=None, created_at=datetime.now(UTC),
+            id=uuid.uuid4(),
+            target_type="command",
+            target_id=uuid.uuid4(),
+            note=None,
+            created_at=datetime.now(UTC),
         )
 
         app = _build_app_with_service(FavoriteService, mock_svc)
@@ -288,7 +297,10 @@ class TestSearchEndpoint:
     def test_search(self) -> None:
         mock_svc = AsyncMock(spec=GlobalSearchService)
         mock_svc.search.return_value = GlobalSearchResultDTO(
-            nodes=(), commands=(), scripts=(), tags=("web",),
+            nodes=(),
+            commands=(),
+            scripts=(),
+            tags=("web",),
         )
 
         app = _build_app_with_service(GlobalSearchService, mock_svc)
@@ -308,8 +320,13 @@ class TestCommandEndpoints:
     def test_stats(self) -> None:
         mock_svc = AsyncMock(spec=ExecutionStatsService)
         mock_svc.get_command_stats.return_value = ExecutionStatsDTO(
-            total=10, successful=8, failed=2, success_rate=0.8,
-            avg_duration_ms=100, min_duration_ms=50, max_duration_ms=200,
+            total=10,
+            successful=8,
+            failed=2,
+            success_rate=0.8,
+            avg_duration_ms=100,
+            min_duration_ms=50,
+            max_duration_ms=200,
             last_executed_at=datetime.now(UTC),
         )
 
@@ -331,9 +348,14 @@ class TestCommandEndpoints:
     def test_clone(self) -> None:
         mock_svc = AsyncMock(spec=CommandManagementService)
         mock_svc.clone_command.return_value = CommandViewDTO(
-            id=uuid.uuid4(), name="copy", description=None,
-            command="echo ok", parameters=(), tags=(),
-            created_at=datetime.now(UTC), updated_at=datetime.now(UTC),
+            id=uuid.uuid4(),
+            name="copy",
+            description=None,
+            command="echo ok",
+            parameters=(),
+            tags=(),
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
         )
 
         app = _build_app_with_service(CommandManagementService, mock_svc)
@@ -356,9 +378,13 @@ class TestScriptEndpoints:
     def test_clone(self) -> None:
         mock_svc = AsyncMock(spec=ScriptManagementService)
         mock_svc.clone_script.return_value = ScriptViewDTO(
-            id=uuid.uuid4(), name="copy", description=None,
-            steps=(), tags=(),
-            created_at=datetime.now(UTC), updated_at=datetime.now(UTC),
+            id=uuid.uuid4(),
+            name="copy",
+            description=None,
+            steps=(),
+            tags=(),
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
         )
 
         app = _build_app_with_service(ScriptManagementService, mock_svc)
