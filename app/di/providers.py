@@ -28,6 +28,7 @@ from app.adapters.persistence.dao.health import HealthRepository
 from app.adapters.persistence.dao.node import NodeRepository
 from app.adapters.persistence.dao.script import ScriptRepository
 from app.adapters.persistence.dao.script_execution import ScriptExecutionRepository
+from app.adapters.persistence.dashboard import SqlAlchemyDashboardGateway
 from app.adapters.persistence.node_management import (
     SqlAlchemyNodeManagementGateway,
 )
@@ -59,6 +60,7 @@ from app.application.ports.config_persistence import (
     ConfigurationImporter,
 )
 from app.application.ports.credential_cipher import CredentialCipher
+from app.application.ports.dashboard import DashboardReader
 from app.application.ports.docker_runtime import DockerRuntime
 from app.application.ports.health import DatabaseHealthProbe
 from app.application.ports.node_management import (
@@ -94,6 +96,7 @@ from app.application.services.command_execution_service import CommandExecutionS
 from app.application.services.command_history_service import CommandHistoryService
 from app.application.services.command_management_service import CommandManagementService
 from app.application.services.config_service import ConfigService
+from app.application.services.dashboard_service import DashboardService
 from app.application.services.docker.bulk_service import DockerBulkService
 from app.application.services.docker.command_runner import DockerCommandRunner
 from app.application.services.docker.container_service import DockerContainerService
@@ -364,6 +367,20 @@ class RepositoryProvider(Provider):
         self, gateway: SqlAlchemyAuditLogGateway
     ) -> AuditLogWriter:
         """Bind audit-log retention writes."""
+        return gateway
+
+    @provide(scope=Scope.APP)
+    def get_dashboard_gateway(
+        self, sessionmaker: async_sessionmaker[AsyncSession]
+    ) -> SqlAlchemyDashboardGateway:
+        """Get the dashboard aggregation gateway."""
+        return SqlAlchemyDashboardGateway(sessionmaker)
+
+    @provide(scope=Scope.APP, provides=DashboardReader)
+    def get_dashboard_reader(
+        self, gateway: SqlAlchemyDashboardGateway
+    ) -> DashboardReader:
+        """Bind dashboard reads to the persistence gateway."""
         return gateway
 
     @provide(scope=Scope.REQUEST)
@@ -781,6 +798,14 @@ class ServiceProvider(Provider):
     ) -> ConfigService:
         """Get configuration import/export service."""
         return ConfigService(exporter=exporter, importer=importer)
+
+    @provide(scope=Scope.APP)
+    def get_dashboard_service(
+        self,
+        reader: DashboardReader,
+    ) -> DashboardService:
+        """Get dashboard overview service."""
+        return DashboardService(reader=reader)
 
 
 class ConfigProvider(Provider):
