@@ -6,9 +6,11 @@ from datetime import datetime
 import structlog
 from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
 from fastapi import APIRouter, HTTPException, Query, Security
+from fastapi.responses import PlainTextResponse, Response
 
 from app.api.deps import get_current_api_key, require_write_scope
 from app.application.dto.audit import AuditLogDTO
+from app.application.ports.export import AuditExporter, rows_to_csv, rows_to_json
 from app.application.services.audit_log_service import AuditLogService
 from app.schemas.audit_log import AuditLogResponse
 from app.schemas.node import PaginatedResponse
@@ -93,3 +95,34 @@ def _to_response(log: AuditLogDTO) -> AuditLogResponse:
         details=log.details,
         created_at=log.created_at,
     )
+
+
+@router.get("/export")
+@inject
+async def export_audit(
+    exporter: FromDishka[AuditExporter],
+    from_date: datetime | None = Query(None),
+    to_date: datetime | None = Query(None),
+    action: str | None = Query(None),
+    node_id: uuid.UUID | None = Query(None),
+    fmt: str = Query("csv", pattern="^(csv|json)$"),
+    _key: str = Security(get_current_api_key),
+) -> Response:
+    """Export audit logs as CSV or JSON."""
+    from app.application.dto.export import AuditExportQueryDTO
+
+    audit.info("api.audit.export", format=fmt)
+    query = AuditExportQueryDTO(
+        date_from=from_date,
+        date_to=to_date,
+        action=action,
+        node_id=node_id,
+        fmt=fmt,
+    )
+    rows = await exporter.export_audit(query)
+    if fmt == "json":
+        return Response(
+            content=__import__("json").dumps(rows_to_json(rows), default=str),
+            media_type="application/json",
+        )
+    return PlainTextResponse(content=rows_to_csv(rows), media_type="text/csv")

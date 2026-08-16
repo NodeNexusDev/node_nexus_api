@@ -46,3 +46,20 @@ class DashboardResponse(BaseModel):
     scripts: EntityStats
     commands: EntityStats
     recent_activity: list[RecentActivity]
+
+
+class MetricsBucket(BaseModel):
+    """One time-series bucket."""
+
+    period: str
+    total: int
+    successful: int
+    failed: int
+    avg_duration_ms: float | None = None
+
+
+class DashboardMetricsResponse(BaseModel):
+    """Time-series execution metrics for charts."""
+
+    command_metrics: list[MetricsBucket]
+    script_metrics: list[MetricsBucket]
