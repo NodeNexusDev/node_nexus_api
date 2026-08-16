@@ -140,8 +140,11 @@ class SqlAlchemyScriptGateway:
                 query.script_id,
                 skip=query.offset,
                 limit=query.limit,
+                trigger=query.trigger,
             )
-            total = await repository.count_by_script_id(query.script_id)
+            total = await repository.count_by_script_id(
+                query.script_id, trigger=query.trigger
+            )
             return ScriptExecutionPageDTO(
                 items=tuple(self._to_execution(item) for item in executions),
                 total=total,

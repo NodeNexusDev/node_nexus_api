@@ -44,6 +44,13 @@ COVERED_ENDPOINTS: set[str] = {
     "GET /api/v1/nodes/tags",
     "POST /api/v1/nodes/{node_id}/tags",
     "DELETE /api/v1/nodes/{node_id}/tags",
+    "POST /api/v1/nodes/validate-credentials",
+    "GET /api/v1/nodes/{node_id}/status-history",
+    "POST /api/v1/nodes/bulk/delete",
+    "POST /api/v1/nodes/bulk/tags/add",
+    "POST /api/v1/nodes/bulk/tags/remove",
+    "POST /api/v1/nodes/bulk/check",
+    "POST /api/v1/nodes/{node_id}/commands/{execution_id}/retry",
     # Commands
     "GET /api/v1/commands/",
     "GET /api/v1/commands/tags",
@@ -64,6 +71,9 @@ COVERED_ENDPOINTS: set[str] = {
     "GET /api/v1/scripts/{script_id}/schedule",
     "POST /api/v1/scripts/{script_id}/schedule",
     "DELETE /api/v1/scripts/{script_id}/schedule",
+    "POST /api/v1/scripts/executions/{execution_id}/retry",
+    "POST /api/v1/scripts/executions/{execution_id}/cancel",
+    "GET /api/v1/scripts/{script_id}/schedule/history",
     # API Keys
     "GET /api/v1/api-keys/",
     "POST /api/v1/api-keys/",

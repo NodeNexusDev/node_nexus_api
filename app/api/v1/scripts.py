@@ -7,6 +7,10 @@ from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
 from fastapi import APIRouter, Query, Security
 
 from app.api.deps import get_current_api_key, require_write_scope
+from app.application.dto.execution_lifecycle import (
+    CancelExecutionDTO,
+    RetryScriptDTO,
+)
 from app.application.dto.schedule import ScheduleRequestDTO, ScheduleViewDTO
 from app.application.dto.script_execution import (
     ScriptExecutionBatchResultDTO,
@@ -18,6 +22,9 @@ from app.application.dto.script_management import (
     ScriptStepDTO,
     ScriptUpdateDTO,
     ScriptViewDTO,
+)
+from app.application.services.execution_lifecycle_service import (
+    ExecutionLifecycleService,
 )
 from app.application.services.schedule_management import (
     ScheduleManagementService,
@@ -369,3 +376,71 @@ async def get_schedule(
     """Get the schedule for a script."""
     audit.info("api.scripts.get_schedule", script_id=str(script_id))
     return _scheduled_job(await schedule_service.get(script_id))
+
+
+# --- Execution lifecycle ---
+
+
+@router.post("/executions/{execution_id}/retry")
+@inject
+async def retry_script(
+    execution_id: uuid.UUID,
+    service: FromDishka[ExecutionLifecycleService],
+    _key: str = Security(require_write_scope),
+) -> dict:
+    """Retry a script execution."""
+    audit.info("api.scripts.executions.retry", execution_id=str(execution_id))
+    result = await service.retry_script(
+        RetryScriptDTO(execution_id=execution_id)
+    )
+    return {
+        "execution_id": result["execution_id"],
+        "status": result["status"],
+        "message": "Script retry scheduled",
+    }
+
+
+@router.post("/executions/{execution_id}/cancel")
+@inject
+async def cancel_script(
+    execution_id: uuid.UUID,
+    service: FromDishka[ExecutionLifecycleService],
+    _key: str = Security(require_write_scope),
+) -> dict:
+    """Cancel a running script execution."""
+    audit.info("api.scripts.executions.cancel", execution_id=str(execution_id))
+    await service.cancel_execution(
+        CancelExecutionDTO(execution_id=execution_id)
+    )
+    return {
+        "execution_id": str(execution_id),
+        "status": "cancelled",
+        "message": "Execution cancelled",
+    }
+
+
+@router.get("/{script_id}/schedule/history")
+@inject
+async def get_scheduled_execution_history(
+    script_id: uuid.UUID,
+    service: FromDishka[ScriptHistoryService],
+    page: int = Query(1, ge=1),
+    size: int = Query(20, ge=1, le=100),
+    _key: str = Security(get_current_api_key),
+) -> PaginatedResponse[ScriptExecutionResponse]:
+    """Get scheduled execution history for a script."""
+    audit.info(
+        "api.scripts.schedule.history",
+        script_id=str(script_id),
+        page=page,
+        size=size,
+    )
+    executions, total = await service.get_executions(
+        script_id, page=page, size=size, trigger="scheduled"
+    )
+    return PaginatedResponse(
+        items=[_execution_response(execution) for execution in executions],
+        total=total,
+        page=page,
+        size=size,
+    )

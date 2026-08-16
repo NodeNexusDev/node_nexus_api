@@ -97,5 +97,9 @@ class SchedulePersistenceError(DomainError):
     """Raised when schedule persistence or registration fails."""
 
 
+class ExecutionNotFoundError(DomainError):
+    """Raised when an execution record is not found."""
+
+
 class AuditWriteError(DomainError):
     """Raised when an obligatory audit event cannot be persisted."""

@@ -172,6 +172,7 @@ def test_service_provider_resolves() -> None:
         MagicMock(),
         credential_cipher,
         MagicMock(),
+        MagicMock(),
     )
     node_bulk_command_svc = svc_provider.get_node_bulk_command_service(
         audit_svc,
@@ -193,6 +194,7 @@ def test_service_provider_resolves() -> None:
         MagicMock(),
         credential_cipher,
         audit_svc,
+        MagicMock(),
     )
     assert isinstance(node_svc, NodeManagementService)
 

@@ -8,7 +8,7 @@ from httpx2 import ASGITransport, AsyncClient
 from app.main import app
 
 OPENAPI_CONTRACT_SHA256 = (
-    "d466413a08a5a9a5dbdf4863599d6fcc8cc01d5b11b4ba1ca63d447f8702bfdd"
+    "af38043e06c54fe5811ac60ba3e327a04f1d052b2b67942068e629b69cf100ee"
 )
 
 

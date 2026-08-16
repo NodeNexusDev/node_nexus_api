@@ -15,6 +15,7 @@ from app.models.base import Base
 from app.models.command import CommandModel  # noqa: F401
 from app.models.command_execution import CommandExecutionModel  # noqa: F401
 from app.models.node import NodeModel  # noqa: F401
+from app.models.node_status_history import NodeStatusHistoryModel  # noqa: F401
 from app.models.script import ScriptModel  # noqa: F401
 from app.models.script_execution import ScriptExecutionModel  # noqa: F401
 from app.models.script_schedule import ScriptScheduleModel  # noqa: F401

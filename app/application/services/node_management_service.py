@@ -14,6 +14,7 @@ if TYPE_CHECKING:
         NodeManagementReader,
         NodeManagementWriter,
     )
+    from app.application.ports.node_status_history import NodeStatusHistoryWriter
 
 import structlog
 
@@ -43,11 +44,13 @@ class NodeManagementService:
         writer: NodeManagementWriter,
         credential_cipher: CredentialCipher,
         audit_service: AuditEventSink | None = None,
+        status_history_writer: NodeStatusHistoryWriter | None = None,
     ) -> None:
         self._reader = reader
         self._writer = writer
         self._credential_cipher = credential_cipher
         self._audit = audit_service
+        self._status_history_writer = status_history_writer
 
     async def _log(
         self,
@@ -127,6 +130,25 @@ class NodeManagementService:
                 for field, value in data.changes
             )
         )
+
+        # Record status change before updating
+        if self._status_history_writer is not None:
+            for field, value in secured.changes:
+                if field == "status":
+                    from app.application.dto.node_status_history import (
+                        NodeStatusChangeDTO,
+                    )
+
+                    await self._status_history_writer.save(
+                        NodeStatusChangeDTO(
+                            node_id=node_id,
+                            old_status=None,
+                            new_status=str(value),
+                            source="manual_update",
+                        )
+                    )
+                    break
+
         node = await self._writer.update_node(node_id, secured)
         if node is None:
             raise NodeNotFoundError(f"Node {node_id} not found")

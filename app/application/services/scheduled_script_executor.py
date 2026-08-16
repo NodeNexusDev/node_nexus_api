@@ -25,6 +25,7 @@ class ScheduledScriptExecutor:
         script_id: UUID,
         node_ids: list[UUID],
         params: dict[str, JsonValue],
+        schedule_id: UUID | None = None,
     ) -> None:
         await self._schedule_writer.mark_started(script_id, datetime.now(UTC))
         try:
@@ -33,6 +34,8 @@ class ScheduledScriptExecutor:
                 ScriptExecutionRequestDTO(
                     node_ids=tuple(node_ids),
                     params=tuple(params.items()),
+                    trigger="scheduled",
+                    schedule_id=schedule_id,
                 ),
             )
         except Exception as exc:
