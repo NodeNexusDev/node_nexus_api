@@ -2,7 +2,7 @@
 title: Наблюдаемость
 status: stable
 translation_key: operations.observability
-source_revision: "2026-08-16"
+source_revision: "2026-08-17"
 ---
 
 # Наблюдаемость
@@ -98,3 +98,23 @@ curl --fail-with-body \
 Docker-статистика собирается путём выполнения `docker ps -a` на каждой
 Docker-ноде. Если нода недоступна, её контейнеры не учитываются (ошибки
 обрабатываются грациозно).
+
+## Метрики дашборда
+
+Временные ряды метрик выполнения доступны через `GET /api/v1/dashboard/metrics`.
+Поддерживаются гранулярности `hour`, `day`, `week`, `month` с фильтрами
+`date_from` и `date_to`. Возвращаются метрики команд и скриптов с полями
+`total`, `success`, `failure` для каждого бакета.
+
+## SSE поток событий
+
+Поток серверных событий доступен через `GET /api/v1/events/stream`. События:
+`node.status_changed`, `execution.completed`, `execution.failed`,
+`script.scheduled`, `job.progress`. Подпишитесь для мониторинга в реальном
+времени без опроса.
+
+## Экспорт аудита
+
+Записи журнала аудита доступны для экспорта через `GET /api/v1/audit/export`
+с параметрами `fmt=json` или `fmt=csv`. Используйте для интеграции с SIEM
+или compliance-отчётности.

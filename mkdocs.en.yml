@@ -33,6 +33,8 @@ nav:
       - Audit log: guides/audit-log.md
       - WebSocket: guides/websocket.md
       - Import and export: guides/configuration-import-export.md
+      - Favorites, notes, tags: guides/favorites-notes-tags.md
+      - Dashboard, search, metrics: guides/dashboard-search-metrics.md
       - Troubleshooting: guides/troubleshooting.md
       - FAQ: guides/faq.md
   - Operations:

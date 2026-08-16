@@ -12,7 +12,7 @@ source_revision: "2026-07-30"
 | `400` | Malformed or unsupported request |
 | `401` | Missing, invalid, expired, or revoked API key |
 | `403` | API key lacks write scope |
-| `404` | Node, command, script, container, image, tag, or schedule not found |
+| `404` | Node, command, script, container, image, tag, schedule, favorite, note, or execution not found |
 | `409` | Node name conflict |
 | `422` | Schema, template, Docker, schedule, config format, or domain validation failed |
 | `429` | Process-local rate limit exceeded |
