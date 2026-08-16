@@ -1,7 +1,8 @@
 """SQLAlchemy adapter for the dashboard reader port."""
 
-from typing import Any
+from __future__ import annotations
 
+import structlog
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -13,25 +14,44 @@ from app.application.dto.dashboard import (
     DashboardNodeStatsDTO,
     DashboardRecentActivityDTO,
 )
+from app.application.services.docker.command_builder import build_docker_command
+from app.application.services.docker.parsers import json_string, parse_json_lines
 from app.models.command import CommandModel
 from app.models.node import NodeModel
 from app.models.script import ScriptModel
 
+if False:  # TYPE_CHECKING
+    from typing import TYPE_CHECKING
+
+    if TYPE_CHECKING:
+        from app.application.dto.node_connection import NodeConnectionDTO
+        from app.application.ports.docker_runtime import DockerRuntime
+        from app.application.ports.node_reader import NodeConnectionReader
+
+log = structlog.get_logger("dashboard")
+
 
 class SqlAlchemyDashboardGateway:
-    """Aggregate dashboard statistics from existing tables."""
+    """Aggregate dashboard statistics from existing tables and Docker nodes."""
 
-    def __init__(self, sessionmaker: async_sessionmaker[AsyncSession]) -> None:
+    def __init__(
+        self,
+        sessionmaker: async_sessionmaker[AsyncSession],
+        node_reader: NodeConnectionReader | None = None,
+        runtime: DockerRuntime | None = None,
+    ) -> None:
         self._sessionmaker = sessionmaker
         self._audit_gateway = SqlAlchemyAuditLogGateway(sessionmaker)
+        self._node_reader = node_reader
+        self._runtime = runtime
 
     async def get_dashboard(self) -> DashboardDTO:
         async with self._sessionmaker() as session:
             nodes = await self._count_nodes(session)
-            docker = self._count_docker()
             scripts = await self._count_scripts(session)
             commands = await self._count_commands(session)
-            recent = await self._recent_activity()
+        docker = await self._count_docker()
+        recent = await self._recent_activity()
 
         return DashboardDTO(
             nodes=nodes,
@@ -55,10 +75,48 @@ class SqlAlchemyDashboardGateway:
             total=total, active=active, unreachable=unreachable
         )
 
-    @staticmethod
-    def _count_docker() -> DashboardDockerStatsDTO:
-        # TODO: implement real Docker container stats via DockerRuntime
-        return DashboardDockerStatsDTO(total=0, running=0, stopped=0)
+    async def _count_docker(self) -> DashboardDockerStatsDTO:
+        if self._node_reader is None or self._runtime is None:
+            return DashboardDockerStatsDTO(total=0, running=0, stopped=0)
+
+        try:
+            docker_nodes = await self._node_reader.get_connections_by_type("docker")
+        except Exception:
+            log.warning("dashboard.docker_nodes_query_failed")
+            return DashboardDockerStatsDTO(total=0, running=0, stopped=0)
+
+        total = 0
+        running = 0
+        stopped = 0
+
+        for node in docker_nodes:
+            try:
+                counts = await self._query_node_containers(node)
+                total += counts["total"]
+                running += counts["running"]
+                stopped += counts["stopped"]
+            except Exception:
+                log.warning(
+                    "dashboard.docker_query_failed",
+                    node_id=str(node.id),
+                    node_name=node.name,
+                )
+
+        return DashboardDockerStatsDTO(total=total, running=running, stopped=stopped)
+
+    async def _query_node_containers(self, node: NodeConnectionDTO) -> dict[str, int]:
+        """Query container stats from a single Docker node."""
+        cmd = build_docker_command(node, "ps -a --format '{{json .}}'")
+        result = await self._runtime.execute(node, cmd, timeout=10)
+
+        if result.exit_code != 0:
+            return {"total": 0, "running": 0, "stopped": 0}
+
+        items = parse_json_lines(result.stdout)
+        total = len(items)
+        running = sum(1 for item in items if json_string(item, "State") == "running")
+        stopped = total - running
+        return {"total": total, "running": running, "stopped": stopped}
 
     async def _count_scripts(self, session: AsyncSession) -> DashboardEntityStatsDTO:
         total = await self._scalar(session, select(func.count(ScriptModel.id)))
@@ -86,6 +144,6 @@ class SqlAlchemyDashboardGateway:
         )
 
     @staticmethod
-    async def _scalar(session: AsyncSession, stmt: Any) -> int:
+    async def _scalar(session: AsyncSession, stmt: func.count) -> int:
         result = await session.execute(stmt)
         return result.scalar_one()

@@ -371,10 +371,15 @@ class RepositoryProvider(Provider):
 
     @provide(scope=Scope.APP)
     def get_dashboard_gateway(
-        self, sessionmaker: async_sessionmaker[AsyncSession]
+        self,
+        sessionmaker: async_sessionmaker[AsyncSession],
+        node_reader: NodeConnectionReader,
+        runtime: DockerRuntime,
     ) -> SqlAlchemyDashboardGateway:
         """Get the dashboard aggregation gateway."""
-        return SqlAlchemyDashboardGateway(sessionmaker)
+        return SqlAlchemyDashboardGateway(
+            sessionmaker, node_reader=node_reader, runtime=runtime
+        )
 
     @provide(scope=Scope.APP, provides=DashboardReader)
     def get_dashboard_reader(
