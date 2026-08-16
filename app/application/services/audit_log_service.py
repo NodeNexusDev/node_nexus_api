@@ -18,6 +18,9 @@ class AuditLogService:
         self,
         node_id: UUID | None = None,
         action: str | None = None,
+        user: str | None = None,
+        date_from: datetime | None = None,
+        date_to: datetime | None = None,
         page: int = 1,
         size: int = 20,
     ) -> AuditLogPageDTO:
@@ -25,6 +28,9 @@ class AuditLogService:
             AuditLogQueryDTO(
                 node_id=node_id,
                 action=action,
+                user=user,
+                date_from=date_from,
+                date_to=date_to,
                 offset=(page - 1) * size,
                 limit=size,
             )
