@@ -123,4 +123,68 @@ the command fingerprint, exit code, truncated stdout/stderr with original byte
 counts, and execution time. Output is bounded by the `bound_output()` policy to
 prevent unbounded growth.
 
+## Status history
+
+Query the history of status changes (active/unreachable/error) for a node:
+
+```bash
+curl --fail-with-body \
+  -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
+  "${NODE_NEXUS_URL}/api/v1/nodes/${NODE_ID}/status-history?page=1&size=50"
+```
+
+Optional query parameters: `from` and `to` (ISO 8601 timestamps), `status`
+(e.g. `active`, `unreachable`). Returns a paginated list of status change records
+with `previous_status`, `new_status`, `reason`, and `changed_at`.
+
+Status changes are recorded automatically when you run connectivity checks or
+update a node.
+
+## Bulk operations
+
+Perform bulk actions on multiple nodes at once.
+
+### Bulk check connectivity
+
+```bash
+curl --fail-with-body -X POST \
+  -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{"node_ids": ["<id-1>", "<id-2>"]}' \
+  "${NODE_NEXUS_URL}/api/v1/nodes/bulk/check"
+```
+
+### Bulk add tags
+
+```bash
+curl --fail-with-body -X POST \
+  -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{"node_ids": ["<id-1>"], "tags": ["staging"]}' \
+  "${NODE_NEXUS_URL}/api/v1/nodes/bulk/tags/add"
+```
+
+### Bulk remove tags
+
+```bash
+curl --fail-with-body -X POST \
+  -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{"node_ids": ["<id-1>"], "tags": ["deprecated"]}' \
+  "${NODE_NEXUS_URL}/api/v1/nodes/bulk/tags/remove"
+```
+
+### Bulk delete
+
+```bash
+curl --fail-with-body -X POST \
+  -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{"node_ids": ["<id-1>", "<id-2>"]}' \
+  "${NODE_NEXUS_URL}/api/v1/nodes/bulk/delete"
+```
+
+All bulk endpoints accept `node_ids` and/or `node_tags` (AND intersection).
+Each response contains per-node `success`/`error` entries.
+
 Use Swagger UI at `/docs` for the current request and response schemas.

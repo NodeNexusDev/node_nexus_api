@@ -103,3 +103,53 @@ specified tags. At least one of `node_ids` or `node_tags` is required.
 
 Fields `exit_code`, `stdout`, `stderr` are present per step, but the batch
 response `results` contains aggregated per-node data.
+
+## Retry execution
+
+Re-run a failed command or script execution with the same parameters.
+
+### Retry a command execution
+
+```bash
+curl --fail-with-body -X POST \
+  -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
+  "${NODE_NEXUS_URL}/api/v1/nodes/${NODE_ID}/commands/${EXECUTION_ID}/retry"
+```
+
+### Retry a script execution
+
+```bash
+curl --fail-with-body -X POST \
+  -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
+  "${NODE_NEXUS_URL}/api/v1/scripts/executions/${EXECUTION_ID}/retry"
+```
+
+Returns a new execution with the same `script_id`, `node_id`, and `params`.
+
+## Cancel execution
+
+Cancel a still-running script execution:
+
+```bash
+curl --fail-with-body -X POST \
+  -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
+  "${NODE_NEXUS_URL}/api/v1/scripts/executions/${EXECUTION_ID}/cancel"
+```
+
+Only running executions can be cancelled. Already completed or failed executions
+return an error.
+
+## Schedule history
+
+View the execution history of a specific schedule (cron-triggered runs):
+
+```bash
+curl --fail-with-body \
+  -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
+  "${NODE_NEXUS_URL}/api/v1/scripts/${SCRIPT_ID}/schedule/history?page=1&size=20"
+```
+
+Optional query: `trigger` — filter by trigger type (`manual`, `scheduled`,
+`api`). Returns a paginated list of script executions with `trigger` and
+`schedule_id` fields. Only executions created by `execute` or the scheduler are
+included (command executions are not).
