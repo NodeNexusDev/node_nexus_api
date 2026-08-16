@@ -2,7 +2,7 @@
 title: Управление нодами
 status: stable
 translation_key: guides.nodes
-source_revision: "2026-08-12"
+source_revision: "2026-08-16"
 ---
 
 # Управление нодами
@@ -30,6 +30,41 @@ curl --fail-with-body -X POST "${NODE_NEXUS_URL}/api/v1/nodes/" \
 
 Сохраните возвращённый UUID для метрик, выполнения команд и проверок
 подключения.
+
+## Валидация учётных данных
+
+Проверьте SSH-подключение по предоставленным учётным данным без сохранения
+ноды в базу данных. Полезно перед созданием ноды для проверки доступности.
+
+```bash
+curl --fail-with-body -X POST "${NODE_NEXUS_URL}/api/v1/nodes/validate-credentials" \
+  -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "host": "192.0.2.10",
+    "port": 22,
+    "username": "ops",
+    "password": "change-me"
+  }'
+```
+
+Ответ:
+
+```json
+{
+  "status": "active",
+  "message": "SSH connection successful"
+}
+```
+
+При ошибке подключения:
+
+```json
+{
+  "status": "unreachable",
+  "message": "Connection refused"
+}
+```
 
 ## Список и фильтрация
 

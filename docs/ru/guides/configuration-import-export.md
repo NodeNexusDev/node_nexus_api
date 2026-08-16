@@ -2,7 +2,7 @@
 title: Импорт и экспорт конфигурации
 status: stable
 translation_key: guides.configuration-import-export
-source_revision: "2026-07-29"
+source_revision: "2026-08-16"
 ---
 
 # Импорт и экспорт конфигурации
@@ -15,3 +15,39 @@ source_revision: "2026-07-29"
 Envelope содержит независимые поля `format_version` и `application_version`.
 Перед любыми записями импорт проверяет формат и отклоняет неизвестную major
 version. Legacy-поле `version` временно сохранено для обратной совместимости.
+
+## Dry-run режим
+
+Добавьте `"dry_run": true` в тело импорта, чтобы получить.preview без записи
+в базу данных. Ответ содержит:
+
+- `would_create` — списки нод, команд и скриптов, которые были бы созданы
+- `duplicates` — имена сущностей, которые уже существуют и были бы пропущены
+- `errors` — ошибки валидации (например, несовместимая версия формата)
+
+Пример запроса:
+
+```json
+POST /api/v1/config/import
+{
+  "dry_run": true,
+  "nodes": [
+    {"name": "web-01", "host": "10.0.0.1", "port": 22, "connection_type": "ssh"}
+  ]
+}
+```
+
+Пример ответа:
+
+```json
+{
+  "dry_run": true,
+  "would_create": {
+    "nodes": [{"name": "web-01", "host": "10.0.0.1", "port": 22, "connection_type": "ssh"}],
+    "commands": [],
+    "scripts": []
+  },
+  "duplicates": [],
+  "errors": []
+}
+```
