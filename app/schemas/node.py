@@ -214,3 +214,21 @@ class NodeMetrics(BaseModel):
     memory: MemoryMetrics
     disk: DiskMetrics
     uptime_since: str
+
+
+class NodeValidateRequest(BaseModel):
+    """Request to validate SSH credentials without saving a node."""
+
+    host: str = Field(min_length=1, max_length=255)
+    port: int = Field(default=22, ge=1, le=65535)
+    connection_type: ConnectionType = "ssh"
+    username: str | None = None
+    password: str | None = None
+    ssh_key: str | None = None
+
+
+class NodeValidateResponse(BaseModel):
+    """Result of credential validation."""
+
+    status: NodeStatus
+    message: str
