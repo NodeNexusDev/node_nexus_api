@@ -116,6 +116,16 @@ def test_repository_provider_resolves() -> None:
     assert provider.get_command_management_reader(gateway) is gateway
     assert provider.get_command_management_writer(gateway) is gateway
     assert provider.get_command_template_reader(gateway) is gateway
+    from app.adapters.persistence.execution_stats import SqlAlchemyExecutionStatsGateway
+
+    stats_gateway = provider.get_execution_stats_gateway(MagicMock())
+    assert isinstance(stats_gateway, SqlAlchemyExecutionStatsGateway)
+    assert provider.get_execution_stats_reader(stats_gateway) is stats_gateway
+    from app.adapters.persistence.global_search import SqlAlchemyGlobalSearchGateway
+
+    search_gateway = provider.get_global_search_gateway(MagicMock())
+    assert isinstance(search_gateway, SqlAlchemyGlobalSearchGateway)
+    assert provider.get_global_search_reader(search_gateway) is search_gateway
 
 
 def test_connector_provider_resolves() -> None:
@@ -235,6 +245,16 @@ def test_service_provider_resolves() -> None:
         audit_svc,
     )
     assert isinstance(script_execution_svc, ScriptExecutionService)
+
+    from app.application.services.execution_stats_service import ExecutionStatsService
+
+    execution_stats_svc = svc_provider.get_execution_stats_service(MagicMock())
+    assert isinstance(execution_stats_svc, ExecutionStatsService)
+
+    from app.application.services.global_search_service import GlobalSearchService
+
+    global_search_svc = svc_provider.get_global_search_service(MagicMock())
+    assert isinstance(global_search_svc, GlobalSearchService)
 
     api_key_reader = MagicMock()
     api_key_writer = MagicMock()
