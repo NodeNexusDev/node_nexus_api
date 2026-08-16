@@ -12,18 +12,12 @@ import pytest
 from app.adapters.persistence.dao.command_execution import (
     CommandExecutionRepository,
 )
-from app.adapters.persistence.dao.dashboard_metrics import (
-    DashboardMetricsRepository,
-)
-from app.adapters.persistence.dao.execution_stats import ExecutionStatsRepository
 from app.adapters.persistence.dashboard import SqlAlchemyDashboardGateway
 from app.adapters.persistence.dashboard_metrics import (
     SqlAlchemyDashboardMetricsGateway,
 )
 from app.adapters.persistence.node_bulk_operator import SqlAlchemyNodeBulkOperator
 from app.models.command_execution import CommandExecutionModel
-from app.models.node_status_history import NodeStatusHistoryModel
-
 
 # ─── CommandExecutionRepository ───
 
@@ -168,8 +162,8 @@ class TestNodeBulkOperator:
 
         with patch(
             "app.adapters.persistence.node_bulk_operator.NodeRepository"
-        ) as MockRepo:
-            repo = MockRepo.return_value
+        ) as mock_repo:
+            repo = mock_repo.return_value
             repo.delete = AsyncMock(return_value=True)
             result = await gw.bulk_delete(
                 BulkNodeDeleteDTO(node_ids=(uuid.uuid4(), uuid.uuid4()))
@@ -192,8 +186,8 @@ class TestNodeBulkOperator:
         node_id = uuid.uuid4()
         with patch(
             "app.adapters.persistence.node_bulk_operator.NodeRepository"
-        ) as MockRepo:
-            repo = MockRepo.return_value
+        ) as mock_repo:
+            repo = mock_repo.return_value
             node = MagicMock()
             node.tags = ("existing",)
             repo.get_by_id = AsyncMock(return_value=node)
@@ -219,8 +213,8 @@ class TestNodeBulkOperator:
         node_id = uuid.uuid4()
         with patch(
             "app.adapters.persistence.node_bulk_operator.NodeRepository"
-        ) as MockRepo:
-            repo = MockRepo.return_value
+        ) as mock_repo:
+            repo = mock_repo.return_value
             node = MagicMock()
             node.tags = ("tag1",)
             repo.get_by_id = AsyncMock(return_value=node)
@@ -245,8 +239,8 @@ class TestNodeBulkOperator:
         node_id = uuid.uuid4()
         with patch(
             "app.adapters.persistence.node_bulk_operator.NodeRepository"
-        ) as MockRepo:
-            repo = MockRepo.return_value
+        ) as mock_repo:
+            repo = mock_repo.return_value
             node = MagicMock()
             node.tags = ("keep", "remove")
             repo.get_by_id = AsyncMock(return_value=node)
@@ -272,8 +266,8 @@ class TestNodeBulkOperator:
         node_id = uuid.uuid4()
         with patch(
             "app.adapters.persistence.node_bulk_operator.NodeRepository"
-        ) as MockRepo:
-            repo = MockRepo.return_value
+        ) as mock_repo:
+            repo = mock_repo.return_value
             node = MagicMock()
             node.tags = ("keep",)
             repo.get_by_id = AsyncMock(return_value=node)
@@ -297,12 +291,10 @@ class TestNodeBulkOperator:
 
         with patch(
             "app.adapters.persistence.node_bulk_operator.NodeRepository"
-        ) as MockRepo:
-            repo = MockRepo.return_value
+        ) as mock_repo:
+            repo = mock_repo.return_value
             repo.delete = AsyncMock(return_value=False)
-            result = await gw.bulk_delete(
-                BulkNodeDeleteDTO(node_ids=(uuid.uuid4(),))
-            )
+            result = await gw.bulk_delete(BulkNodeDeleteDTO(node_ids=(uuid.uuid4(),)))
             assert result.affected == 0
 
 
@@ -334,7 +326,9 @@ class TestDashboardGateway:
         session.execute.side_effect = count_results
 
         # Mock audit for recent activity
-        with patch.object(gw, "_recent_activity", new_callable=AsyncMock) as mock_recent:
+        with patch.object(
+            gw, "_recent_activity", new_callable=AsyncMock
+        ) as mock_recent:
             mock_recent.return_value = ()
             result = await gw.get_dashboard()
 
@@ -354,7 +348,9 @@ class TestDashboardGateway:
         sm = MagicMock()
         node_reader = AsyncMock()
         node_reader.get_connections_by_type = AsyncMock(side_effect=Exception("fail"))
-        gw = SqlAlchemyDashboardGateway(sm, node_reader=node_reader, runtime=MagicMock())
+        gw = SqlAlchemyDashboardGateway(
+            sm, node_reader=node_reader, runtime=MagicMock()
+        )
         result = await gw._count_docker()
         assert result.total == 0
 
@@ -377,14 +373,19 @@ class TestDashboardMetricsGateway:
 
         with patch(
             "app.adapters.persistence.dashboard_metrics.DashboardMetricsRepository"
-        ) as MockRepo:
-            repo = MockRepo.return_value
-            repo.command_metrics = AsyncMock(return_value=[
-                MetricsBucketDTO(
-                    period="2026-08-01", total=10, successful=8,
-                    failed=2, avg_duration_ms=100,
-                )
-            ])
+        ) as mock_repo:
+            repo = mock_repo.return_value
+            repo.command_metrics = AsyncMock(
+                return_value=[
+                    MetricsBucketDTO(
+                        period="2026-08-01",
+                        total=10,
+                        successful=8,
+                        failed=2,
+                        avg_duration_ms=100,
+                    )
+                ]
+            )
             repo.script_metrics = AsyncMock(return_value=[])
 
             from app.application.dto.dashboard_metrics import MetricsQueryDTO
@@ -413,9 +414,20 @@ class TestDashboardGatewayDocker:
         runtime.execute = AsyncMock(return_value=exec_result)
 
         gw = SqlAlchemyDashboardGateway(sm, node_reader=node_reader, runtime=runtime)
-        with patch("app.adapters.persistence.dashboard.build_docker_command", return_value="cmd"), \
-             patch("app.adapters.persistence.dashboard.parse_json_lines", return_value=[{"State": "running"}, {"State": "stopped"}]), \
-             patch("app.adapters.persistence.dashboard.json_string", side_effect=lambda d, k: d.get(k, "")):
+        with (
+            patch(
+                "app.adapters.persistence.dashboard.build_docker_command",
+                return_value="cmd",
+            ),
+            patch(
+                "app.adapters.persistence.dashboard.parse_json_lines",
+                return_value=[{"State": "running"}, {"State": "stopped"}],
+            ),
+            patch(
+                "app.adapters.persistence.dashboard.json_string",
+                side_effect=lambda d, k: d.get(k, ""),
+            ),
+        ):
             result = await gw._count_docker()
         assert result.total == 2
         assert result.running == 1
@@ -447,6 +459,9 @@ class TestDashboardGatewayDocker:
 
         gw = SqlAlchemyDashboardGateway(sm, runtime=runtime)
         node = MagicMock()
-        with patch("app.adapters.persistence.dashboard.build_docker_command", return_value="cmd"):
+        with patch(
+            "app.adapters.persistence.dashboard.build_docker_command",
+            return_value="cmd",
+        ):
             result = await gw._query_node_containers(node)
         assert result == {"total": 0, "running": 0, "stopped": 0}

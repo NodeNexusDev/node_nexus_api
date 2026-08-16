@@ -76,9 +76,7 @@ async def test_preview_import_does_not_write() -> None:
             return_value=script_repository,
         ),
     ):
-        result = await SqlAlchemyConfigGateway(
-            sessionmaker_mock
-        ).preview_import(data)
+        result = await SqlAlchemyConfigGateway(sessionmaker_mock).preview_import(data)
 
     assert isinstance(result, DryRunPreviewDTO)
     assert len(result.would_create_nodes) == 1
@@ -131,9 +129,7 @@ async def test_preview_import_reports_duplicates() -> None:
             return_value=script_repository,
         ),
     ):
-        result = await SqlAlchemyConfigGateway(
-            sessionmaker_mock
-        ).preview_import(data)
+        result = await SqlAlchemyConfigGateway(sessionmaker_mock).preview_import(data)
 
     assert len(result.would_create_nodes) == 1
     assert result.would_create_nodes[0].name == "new-node"
@@ -167,6 +163,7 @@ async def test_service_import_without_dry_run_calls_importer() -> None:
     importer = AsyncMock()
     exporter = AsyncMock()
     from app.application.dto.config import ConfigImportResultDTO
+
     expected = ConfigImportResultDTO(nodes_created=1)
     importer.import_config.return_value = expected
 
@@ -204,7 +201,9 @@ async def test_service_rejects_unsupported_version_on_dry_run() -> None:
 async def test_node_validation_service_success() -> None:
     """NodeValidationService should delegate to the validator port."""
     validator = AsyncMock()
-    expected = NodeValidationResultDTO(status="active", message="SSH connection successful")
+    expected = NodeValidationResultDTO(
+        status="active", message="SSH connection successful"
+    )
     validator.validate.return_value = expected
 
     service = NodeValidationService(validator=validator)
@@ -345,7 +344,11 @@ def test_dry_run_import_result_schema() -> None:
     result = DryRunImportResult(
         dry_run=True,
         would_create=DryRunWouldCreate(
-            nodes=[DryRunNodePreview(name="n", host="10.0.0.1", port=22, connection_type="ssh")],
+            nodes=[
+                DryRunNodePreview(
+                    name="n", host="10.0.0.1", port=22, connection_type="ssh"
+                )
+            ],
             commands=[DryRunCommandPreview(name="c", command="uptime")],
             scripts=[DryRunScriptPreview(name="s")],
         ),
@@ -367,7 +370,9 @@ def test_node_validate_request_schema() -> None:
     """NodeValidateRequest should validate correctly."""
     from app.schemas.node import NodeValidateRequest
 
-    req = NodeValidateRequest(host="10.0.0.1", port=22, username="root", password="secret")
+    req = NodeValidateRequest(
+        host="10.0.0.1", port=22, username="root", password="secret"
+    )
     assert req.host == "10.0.0.1"
     assert req.port == 22
     assert req.connection_type == "ssh"

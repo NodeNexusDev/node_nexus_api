@@ -1,7 +1,7 @@
 """Targeted tests for uncovered lines in node_command_service.py."""
+
 from __future__ import annotations
 
-import uuid
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest

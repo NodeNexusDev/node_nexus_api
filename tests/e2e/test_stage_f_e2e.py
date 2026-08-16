@@ -182,9 +182,7 @@ class TestTagManagement:
 
 
 class TestGlobalSearch:
-    def test_search_finds_node(
-        self, e2e_client: httpx.Client, e2e_resources
-    ) -> None:
+    def test_search_finds_node(self, e2e_client: httpx.Client, e2e_resources) -> None:
         node = e2e_resources.create_ssh_node()
 
         resp = e2e_client.get(f"/api/v1/search?q={node['name']}")
@@ -204,9 +202,7 @@ class TestGlobalSearch:
         cmd_ids = [c["id"] for c in data["commands"]]
         assert str(cmd["id"]) in cmd_ids
 
-    def test_search_finds_script(
-        self, e2e_client: httpx.Client, e2e_resources
-    ) -> None:
+    def test_search_finds_script(self, e2e_client: httpx.Client, e2e_resources) -> None:
         script = e2e_resources.create_script()
 
         resp = e2e_client.get(f"/api/v1/search?q={script['name']}")
@@ -224,9 +220,7 @@ class TestGlobalSearch:
 
 
 class TestExecutionStats:
-    def test_command_stats(
-        self, e2e_client: httpx.Client, e2e_resources
-    ) -> None:
+    def test_command_stats(self, e2e_client: httpx.Client, e2e_resources) -> None:
         node = e2e_resources.create_ssh_node()
         cmd = e2e_resources.create_command()
 
@@ -244,9 +238,7 @@ class TestExecutionStats:
         assert stats["total"] >= 1
         assert stats["successful"] >= 0
 
-    def test_node_stats(
-        self, e2e_client: httpx.Client, e2e_resources
-    ) -> None:
+    def test_node_stats(self, e2e_client: httpx.Client, e2e_resources) -> None:
         node = e2e_resources.create_ssh_node()
         cmd = e2e_resources.create_command()
 
@@ -263,9 +255,7 @@ class TestExecutionStats:
         stats = resp.json()
         assert stats["total"] >= 1
 
-    def test_script_stats(
-        self, e2e_client: httpx.Client, e2e_resources
-    ) -> None:
+    def test_script_stats(self, e2e_client: httpx.Client, e2e_resources) -> None:
         node = e2e_resources.create_ssh_node()
         script = e2e_resources.create_script()
 
@@ -287,9 +277,7 @@ class TestExecutionStats:
 
 
 class TestClone:
-    def test_clone_command(
-        self, e2e_client: httpx.Client, e2e_resources
-    ) -> None:
+    def test_clone_command(self, e2e_client: httpx.Client, e2e_resources) -> None:
         cmd = e2e_resources.create_command(command="echo clone-test")
 
         resp = e2e_client.post(f"/api/v1/commands/{cmd['id']}/clone")
@@ -311,9 +299,7 @@ class TestClone:
         assert resp.status_code == 200
         assert resp.json()["name"] == "my-custom-copy"
 
-    def test_clone_script(
-        self, e2e_client: httpx.Client, e2e_resources
-    ) -> None:
+    def test_clone_script(self, e2e_client: httpx.Client, e2e_resources) -> None:
         script = e2e_resources.create_script()
 
         resp = e2e_client.post(f"/api/v1/scripts/{script['id']}/clone")
@@ -338,9 +324,7 @@ class TestClone:
 
 
 class TestDashboardMetrics:
-    def test_dashboard_metrics(
-        self, e2e_client: httpx.Client, e2e_resources
-    ) -> None:
+    def test_dashboard_metrics(self, e2e_client: httpx.Client, e2e_resources) -> None:
         # Execute something to generate metrics
         node = e2e_resources.create_ssh_node()
         cmd = e2e_resources.create_command()
