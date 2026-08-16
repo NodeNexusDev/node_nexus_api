@@ -1109,7 +1109,7 @@ wheels = [
 
 [[package]]
 name = "node-nexus-api"
-version = "0.10.0"
+version = "0.10.1"
 source = { editable = "." }
 dependencies = [
     { name = "alembic" },
@@ -1155,11 +1155,6 @@ docs = [
     { name = "pymdown-extensions" },
 ]
 
-[package.dev-dependencies]
-dev = [
-    { name = "ty" },
-]
-
 [package.metadata]
 requires-dist = [
     { name = "aiosqlite", marker = "extra == 'dev'", specifier = ">=0.22.1" },
@@ -1199,9 +1194,6 @@ requires-dist = [
     { name = "websockets", specifier = ">=17.0" },
 ]
 provides-extras = ["dev", "docs"]
-
-[package.metadata.requires-dev]
-dev = [{ name = "ty", specifier = ">=0.0.72" }]
 
 [[package]]
 name = "nodeenv"
