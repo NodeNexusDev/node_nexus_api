@@ -1,0 +1,48 @@
+"""Dashboard schemas for API."""
+
+from datetime import datetime
+
+from pydantic import BaseModel
+
+
+class NodeStats(BaseModel):
+    """Aggregated node statistics."""
+
+    total: int
+    active: int
+    unreachable: int
+
+
+class DockerStats(BaseModel):
+    """Aggregated Docker container statistics."""
+
+    total: int
+    running: int
+    stopped: int
+
+
+class EntityStats(BaseModel):
+    """Generic entity count."""
+
+    total: int
+
+
+class RecentActivity(BaseModel):
+    """One recent audit log entry."""
+
+    id: str
+    action: str
+    node_id: str | None = None
+    user: str | None = None
+    details: str | None = None
+    created_at: datetime
+
+
+class DashboardResponse(BaseModel):
+    """Full dashboard overview response."""
+
+    nodes: NodeStats
+    docker: DockerStats
+    scripts: EntityStats
+    commands: EntityStats
+    recent_activity: list[RecentActivity]
