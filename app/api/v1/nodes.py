@@ -623,8 +623,8 @@ async def retry_command(
         RetryCommandDTO(execution_id=execution_id, node_id=node_id)
     )
     return ExecutionRetryResponse(
-        execution_id=result["execution_id"],
-        status=result["status"],
+        execution_id=result.execution_id,
+        status=result.status,
         message="Command retry scheduled",
     )
 

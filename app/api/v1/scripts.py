@@ -425,8 +425,8 @@ async def retry_script(
     audit.info("api.scripts.executions.retry", execution_id=str(execution_id))
     result = await service.retry_script(RetryScriptDTO(execution_id=execution_id))
     return {
-        "execution_id": result["execution_id"],
-        "status": result["status"],
+        "execution_id": result.execution_id,
+        "status": result.status,
         "message": "Script retry scheduled",
     }
 
