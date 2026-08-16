@@ -28,6 +28,7 @@ from app.api.v1.api_keys import router as api_keys_router
 from app.api.v1.audit import router as audit_router
 from app.api.v1.commands import router as commands_router
 from app.api.v1.config import router as config_router
+from app.api.v1.dashboard import router as dashboard_router
 from app.api.v1.docker import router as docker_router
 from app.api.v1.docker_bulk import router as docker_bulk_router
 from app.api.v1.health import router as health_router
@@ -186,6 +187,7 @@ def create_app() -> FastAPI:
     app.include_router(commands_router, prefix="/api/v1")
     app.include_router(scripts_router, prefix="/api/v1")
     app.include_router(audit_router, prefix="/api/v1")
+    app.include_router(dashboard_router, prefix="/api/v1")
     app.include_router(api_keys_router, prefix="/api/v1")
     app.include_router(config_router, prefix="/api/v1")
     app.include_router(docker_router, prefix="/api/v1")

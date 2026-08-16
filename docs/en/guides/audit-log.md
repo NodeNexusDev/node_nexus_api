@@ -2,7 +2,7 @@
 title: Audit log
 status: stable
 translation_key: guides.audit-log
-source_revision: "2026-07-29"
+source_revision: "2026-08-16"
 ---
 
 # Audit log
@@ -28,6 +28,29 @@ curl --get --fail-with-body \
 
 Common actions include `create`, `update`, `delete`, `check`, `execute`, and
 `execute_failed`. Use `total`, `page`, and `size` when iterating through results.
+
+### Filter by user and date
+
+Additional query parameters allow filtering by user and date range:
+
+```bash
+curl --get --fail-with-body \
+  -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
+  --data-urlencode 'user=admin' \
+  --data-urlencode 'date_from=2026-08-01T00:00:00' \
+  --data-urlencode 'date_to=2026-08-16T23:59:59' \
+  "${NODE_NEXUS_URL}/api/v1/audit/"
+```
+
+Parameters:
+
+| Parameter | Description | Example |
+|-----------|-------------|---------|
+| `user` | Filter by actor identifier | `user=admin` |
+| `date_from` | Start of date range (ISO 8601) | `date_from=2026-08-01T00:00:00` |
+| `date_to` | End of date range (ISO 8601) | `date_to=2026-08-31T23:59:59` |
+
+Filters can be combined with existing `node_id` and `action` parameters.
 
 ## Retention and deletion
 

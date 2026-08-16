@@ -432,6 +432,61 @@ def test_audit_log_combined_filters(e2e_client: httpx.Client) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Stage B: Audit filter by user and date
+# ---------------------------------------------------------------------------
+
+
+def test_audit_log_filter_by_user(e2e_client: httpx.Client) -> None:
+    """Filter audit logs by user field."""
+    # Create nodes to generate audit entries with user info
+    _create_node(e2e_client, name="audit-user-filter")
+    data = _wait_for_audit(e2e_client, action="create")
+    assert data["total"] >= 1
+
+    # Filter by user — audit events have user set from the API key
+    resp = e2e_client.get("/api/v1/audit/?user=e2e-master-key-12345")
+    assert resp.status_code == 200
+    # All results should have this user
+    for log in resp.json()["items"]:
+        assert log["user"] == "e2e-master-key-12345"
+
+
+def test_audit_log_filter_by_date_range(e2e_client: httpx.Client) -> None:
+    """Filter audit logs by date_from and date_to."""
+    _create_node(e2e_client, name="audit-date-filter")
+    _wait_for_audit(e2e_client, action="create")
+
+    # Filter with a wide date range that includes all records
+    resp = e2e_client.get(
+        "/api/v1/audit/?date_from=2020-01-01T00:00:00&date_to=2030-12-31T23:59:59"
+    )
+    assert resp.status_code == 200
+    assert resp.json()["total"] >= 1
+
+    # Filter with a narrow range that excludes everything
+    resp = e2e_client.get(
+        "/api/v1/audit/?date_from=2099-01-01T00:00:00&date_to=2099-12-31T23:59:59"
+    )
+    assert resp.status_code == 200
+    assert resp.json()["total"] == 0
+
+
+def test_audit_log_filter_by_action_and_date(e2e_client: httpx.Client) -> None:
+    """Combined action + date filter."""
+    _create_node(e2e_client, name="audit-combined-filter")
+    _wait_for_audit(e2e_client, action="create")
+
+    resp = e2e_client.get(
+        "/api/v1/audit/?action=create"
+        "&date_from=2020-01-01T00:00:00&date_to=2030-12-31T23:59:59"
+    )
+    assert resp.status_code == 200
+    assert resp.json()["total"] >= 1
+    for log in resp.json()["items"]:
+        assert log["action"] == "create"
+
+
+# ---------------------------------------------------------------------------
 # Command and script pagination
 # ---------------------------------------------------------------------------
 

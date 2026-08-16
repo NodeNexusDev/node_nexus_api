@@ -54,6 +54,16 @@ class NodeRepository:
         nodes = await self.get_by_tags(tags)
         return [self._to_connection_dto(node) for node in nodes]
 
+    async def get_connections_by_type(
+        self, connection_type: str
+    ) -> list[NodeConnectionDTO]:
+        """Get immutable connection data for nodes of a given type."""
+        result = await self._session.execute(
+            select(NodeModel).where(NodeModel.connection_type == connection_type)
+        )
+        nodes = list(result.scalars().all())
+        return [self._to_connection_dto(node) for node in nodes]
+
     async def get_by_id(self, id: UUID) -> NodeModel | None:
         """Get a node by ID."""
         result = await self._session.execute(
