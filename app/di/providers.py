@@ -18,6 +18,7 @@ from app.adapters.persistence.audit import (
     RequiredAuditOutbox,
     SqlAlchemyAuditLogGateway,
 )
+from app.adapters.persistence.audit_export import SqlAlchemyAuditExporter
 from app.adapters.persistence.audit_outbox_worker import AuditOutboxWorker
 from app.adapters.persistence.command_history import SqlAlchemyCommandHistoryGateway
 from app.adapters.persistence.command_management import SqlAlchemyCommandGateway
@@ -29,6 +30,9 @@ from app.adapters.persistence.dao.node import NodeRepository
 from app.adapters.persistence.dao.script import ScriptRepository
 from app.adapters.persistence.dao.script_execution import ScriptExecutionRepository
 from app.adapters.persistence.dashboard import SqlAlchemyDashboardGateway
+from app.adapters.persistence.dashboard_metrics import (
+    SqlAlchemyDashboardMetricsGateway,
+)
 from app.adapters.persistence.execution_lifecycle import (
     SqlAlchemyExecutionLifecycleGateway,
 )
@@ -71,9 +75,11 @@ from app.application.ports.config_persistence import (
 )
 from app.application.ports.credential_cipher import CredentialCipher
 from app.application.ports.dashboard import DashboardReader
+from app.application.ports.dashboard_metrics import DashboardMetricsReader
 from app.application.ports.docker_runtime import DockerRuntime
 from app.application.ports.execution_lifecycle import ExecutionLifecycleManager
 from app.application.ports.execution_stats import ExecutionStatsReader
+from app.application.ports.export import AuditExporter
 from app.application.ports.global_search import GlobalSearchReader
 from app.application.ports.health import DatabaseHealthProbe
 from app.application.ports.node_bulk_operator import NodeBulkOperator
@@ -115,6 +121,9 @@ from app.application.services.command_execution_service import CommandExecutionS
 from app.application.services.command_history_service import CommandHistoryService
 from app.application.services.command_management_service import CommandManagementService
 from app.application.services.config_service import ConfigService
+from app.application.services.dashboard_metrics_service import (
+    DashboardMetricsService,
+)
 from app.application.services.dashboard_service import DashboardService
 from app.application.services.docker.bulk_service import DockerBulkService
 from app.application.services.docker.command_runner import DockerCommandRunner
@@ -467,6 +476,27 @@ class RepositoryProvider(Provider):
     ) -> DashboardReader:
         """Bind dashboard reads to the persistence gateway."""
         return gateway
+
+    @provide(scope=Scope.APP)
+    def get_dashboard_metrics_gateway(
+        self, sessionmaker: async_sessionmaker[AsyncSession]
+    ) -> SqlAlchemyDashboardMetricsGateway:
+        """Get the short-scope dashboard metrics gateway."""
+        return SqlAlchemyDashboardMetricsGateway(sessionmaker)
+
+    @provide(scope=Scope.APP, provides=DashboardMetricsReader)
+    def get_dashboard_metrics_reader(
+        self, gateway: SqlAlchemyDashboardMetricsGateway
+    ) -> DashboardMetricsReader:
+        """Bind dashboard metrics reads to the persistence gateway."""
+        return gateway
+
+    @provide(scope=Scope.REQUEST, provides=AuditExporter)
+    def get_audit_exporter(
+        self, session: AsyncSession
+    ) -> AuditExporter:
+        """Bind audit export to the persistence adapter."""
+        return SqlAlchemyAuditExporter(session)
 
     @provide(scope=Scope.REQUEST)
     def get_command_repository(self, session: AsyncSession) -> CommandRepository:
@@ -984,6 +1014,14 @@ class ServiceProvider(Provider):
     ) -> GlobalSearchService:
         """Get global search service."""
         return GlobalSearchService(reader=reader)
+
+    @provide(scope=Scope.REQUEST)
+    def get_dashboard_metrics_service(
+        self,
+        reader: DashboardMetricsReader,
+    ) -> DashboardMetricsService:
+        """Get dashboard metrics service."""
+        return DashboardMetricsService(reader=reader)
 
 
 class ConfigProvider(Provider):

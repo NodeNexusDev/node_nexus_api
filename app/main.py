@@ -31,6 +31,7 @@ from app.api.v1.config import router as config_router
 from app.api.v1.dashboard import router as dashboard_router
 from app.api.v1.docker import router as docker_router
 from app.api.v1.docker_bulk import router as docker_bulk_router
+from app.api.v1.events import router as events_router
 from app.api.v1.health import router as health_router
 from app.api.v1.internal import router as internal_router
 from app.api.v1.nodes import router as nodes_router
@@ -193,6 +194,7 @@ def create_app() -> FastAPI:
     app.include_router(config_router, prefix="/api/v1")
     app.include_router(docker_router, prefix="/api/v1")
     app.include_router(docker_bulk_router, prefix="/api/v1")
+    app.include_router(events_router, prefix="/api/v1")
     app.include_router(ws_router, prefix="/api/v1")
     app.include_router(search_router, prefix="/api/v1")
     if settings.E2E_ENABLED:

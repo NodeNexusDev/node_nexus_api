@@ -1,18 +1,25 @@
 """Dashboard API endpoint."""
 
+from datetime import datetime
+
 import structlog
 from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
-from fastapi import APIRouter, Security
+from fastapi import APIRouter, Query, Security
 
 from app.api.deps import get_current_api_key
 from app.application.dto.dashboard import (
     DashboardDTO,
 )
+from app.application.services.dashboard_metrics_service import (
+    DashboardMetricsService,
+)
 from app.application.services.dashboard_service import DashboardService
 from app.schemas.dashboard import (
+    DashboardMetricsResponse,
     DashboardResponse,
     DockerStats,
     EntityStats,
+    MetricsBucket,
     NodeStats,
     RecentActivity,
 )
@@ -60,3 +67,32 @@ async def get_dashboard(
     audit.info("api.dashboard.get")
     dto = await service.get_dashboard()
     return _to_response(dto)
+
+
+@router.get("/metrics", response_model=DashboardMetricsResponse)
+@inject
+async def get_dashboard_metrics(
+    metrics_service: FromDishka[DashboardMetricsService],
+    date_from: datetime | None = Query(None),
+    date_to: datetime | None = Query(None),
+    group_by: str = Query("day", pattern="^(hour|day|week|month)$"),
+    _key: str = Security(get_current_api_key),
+) -> DashboardMetricsResponse:
+    """Get time-series execution metrics for charts."""
+    audit.info(
+        "api.dashboard.metrics",
+        group_by=group_by,
+    )
+    dto = await metrics_service.get_metrics(
+        date_from=date_from,
+        date_to=date_to,
+        group_by=group_by,
+    )
+    return DashboardMetricsResponse(
+        command_metrics=[
+            MetricsBucket.model_validate(b) for b in dto.command_metrics
+        ],
+        script_metrics=[
+            MetricsBucket.model_validate(b) for b in dto.script_metrics
+        ],
+    )
