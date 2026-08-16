@@ -37,8 +37,11 @@ from app.adapters.persistence.execution_lifecycle import (
     SqlAlchemyExecutionLifecycleGateway,
 )
 from app.adapters.persistence.execution_stats import SqlAlchemyExecutionStatsGateway
+from app.adapters.persistence.favorite import SqlAlchemyFavoriteGateway
 from app.adapters.persistence.global_search import SqlAlchemyGlobalSearchGateway
+from app.adapters.persistence.note import SqlAlchemyNoteGateway
 from app.adapters.persistence.node_bulk_operator import SqlAlchemyNodeBulkOperator
+from app.adapters.persistence.tag_manager import SqlAlchemyTagManager
 from app.adapters.persistence.node_management import (
     SqlAlchemyNodeManagementGateway,
 )
@@ -80,8 +83,11 @@ from app.application.ports.docker_runtime import DockerRuntime
 from app.application.ports.execution_lifecycle import ExecutionLifecycleManager
 from app.application.ports.execution_stats import ExecutionStatsReader
 from app.application.ports.export import AuditExporter
+from app.application.ports.favorite import FavoriteReader, FavoriteWriter
 from app.application.ports.global_search import GlobalSearchReader
 from app.application.ports.health import DatabaseHealthProbe
+from app.application.ports.note import NoteReader, NoteWriter
+from app.application.ports.tag_manager import TagManager
 from app.application.ports.node_bulk_operator import NodeBulkOperator
 from app.application.ports.node_management import (
     NodeManagementReader,
@@ -134,8 +140,11 @@ from app.application.services.execution_lifecycle_service import (
     ExecutionLifecycleService,
 )
 from app.application.services.execution_stats_service import ExecutionStatsService
+from app.application.services.favorite_service import FavoriteService
 from app.application.services.global_search_service import GlobalSearchService
 from app.application.services.health_service import HealthService
+from app.application.services.note_service import NoteService
+from app.application.services.tag_management_service import TagManagementService
 from app.application.services.node_bulk_command_service import NodeBulkCommandService
 from app.application.services.node_bulk_operation_service import (
     NodeBulkOperationService,
@@ -497,6 +506,41 @@ class RepositoryProvider(Provider):
     ) -> AuditExporter:
         """Bind audit export to the persistence adapter."""
         return SqlAlchemyAuditExporter(session)
+
+    @provide(scope=Scope.REQUEST, provides=TagManager)
+    def get_tag_manager(
+        self, session: AsyncSession
+    ) -> TagManager:
+        """Bind tag management to the persistence adapter."""
+        return SqlAlchemyTagManager(session)
+
+    @provide(scope=Scope.REQUEST, provides=FavoriteReader)
+    def get_favorite_reader(
+        self, session: AsyncSession
+    ) -> FavoriteReader:
+        """Bind favorite reader to the persistence adapter."""
+        return SqlAlchemyFavoriteGateway(session)
+
+    @provide(scope=Scope.REQUEST, provides=FavoriteWriter)
+    def get_favorite_writer(
+        self, session: AsyncSession
+    ) -> FavoriteWriter:
+        """Bind favorite writer to the persistence adapter."""
+        return SqlAlchemyFavoriteGateway(session)
+
+    @provide(scope=Scope.REQUEST, provides=NoteReader)
+    def get_note_reader(
+        self, session: AsyncSession
+    ) -> NoteReader:
+        """Bind note reader to the persistence adapter."""
+        return SqlAlchemyNoteGateway(session)
+
+    @provide(scope=Scope.REQUEST, provides=NoteWriter)
+    def get_note_writer(
+        self, session: AsyncSession
+    ) -> NoteWriter:
+        """Bind note writer to the persistence adapter."""
+        return SqlAlchemyNoteGateway(session)
 
     @provide(scope=Scope.REQUEST)
     def get_command_repository(self, session: AsyncSession) -> CommandRepository:
@@ -1022,6 +1066,32 @@ class ServiceProvider(Provider):
     ) -> DashboardMetricsService:
         """Get dashboard metrics service."""
         return DashboardMetricsService(reader=reader)
+
+    @provide(scope=Scope.REQUEST)
+    def get_tag_management_service(
+        self,
+        tag_manager: TagManager,
+    ) -> TagManagementService:
+        """Get tag management service."""
+        return TagManagementService(tag_manager=tag_manager)
+
+    @provide(scope=Scope.REQUEST)
+    def get_favorite_service(
+        self,
+        reader: FavoriteReader,
+        writer: FavoriteWriter,
+    ) -> FavoriteService:
+        """Get favorite service."""
+        return FavoriteService(reader=reader, writer=writer)
+
+    @provide(scope=Scope.REQUEST)
+    def get_note_service(
+        self,
+        reader: NoteReader,
+        writer: NoteWriter,
+    ) -> NoteService:
+        """Get note service."""
+        return NoteService(reader=reader, writer=writer)
 
 
 class ConfigProvider(Provider):

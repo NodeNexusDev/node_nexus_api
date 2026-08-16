@@ -287,6 +287,20 @@ async def delete_script(
     await service.delete_script(script_id)
 
 
+@router.post("/{script_id}/clone", response_model=ScriptResponse)
+@inject
+async def clone_script(
+    script_id: uuid.UUID,
+    service: FromDishka[ScriptManagementService],
+    new_name: str | None = Query(None),
+    _key: str = Security(require_write_scope),
+) -> ScriptResponse:
+    """Clone a script."""
+    audit.info("api.scripts.clone", script_id=str(script_id))
+    cloned = await service.clone_script(script_id, new_name=new_name)
+    return _script_response(cloned)
+
+
 @router.post("/{script_id}/execute", response_model=ScriptExecutionBatchResult)
 @inject
 async def execute_script(
