@@ -33,10 +33,10 @@ from app.api.v1.docker import router as docker_router
 from app.api.v1.docker_bulk import router as docker_bulk_router
 from app.api.v1.events import router as events_router
 from app.api.v1.favorites import router as favorites_router
-from app.api.v1.notes import router as notes_router
 from app.api.v1.health import router as health_router
 from app.api.v1.internal import router as internal_router
 from app.api.v1.nodes import router as nodes_router
+from app.api.v1.notes import router as notes_router
 from app.api.v1.scripts import router as scripts_router
 from app.api.v1.search import router as search_router
 from app.api.v1.tags import router as tags_router

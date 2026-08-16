@@ -39,9 +39,7 @@ from app.adapters.persistence.execution_lifecycle import (
 from app.adapters.persistence.execution_stats import SqlAlchemyExecutionStatsGateway
 from app.adapters.persistence.favorite import SqlAlchemyFavoriteGateway
 from app.adapters.persistence.global_search import SqlAlchemyGlobalSearchGateway
-from app.adapters.persistence.note import SqlAlchemyNoteGateway
 from app.adapters.persistence.node_bulk_operator import SqlAlchemyNodeBulkOperator
-from app.adapters.persistence.tag_manager import SqlAlchemyTagManager
 from app.adapters.persistence.node_management import (
     SqlAlchemyNodeManagementGateway,
 )
@@ -50,12 +48,14 @@ from app.adapters.persistence.node_status_history import (
     SqlAlchemyNodeStatusHistoryGateway,
 )
 from app.adapters.persistence.node_validation import SshCredentialValidator
+from app.adapters.persistence.note import SqlAlchemyNoteGateway
 from app.adapters.persistence.schedule import SqlAlchemyScheduleGateway
 from app.adapters.persistence.script_gateway import (
     ScopedScriptDefinitionReader,
     ScopedScriptExecutionWriter,
     SqlAlchemyScriptGateway,
 )
+from app.adapters.persistence.tag_manager import SqlAlchemyTagManager
 from app.adapters.runtime.apscheduler_runtime import ApschedulerRuntime
 from app.adapters.runtime.docker import SshDockerRuntime
 from app.adapters.runtime.scheduler import ApschedulerJobScheduler
@@ -86,8 +86,6 @@ from app.application.ports.export import AuditExporter
 from app.application.ports.favorite import FavoriteReader, FavoriteWriter
 from app.application.ports.global_search import GlobalSearchReader
 from app.application.ports.health import DatabaseHealthProbe
-from app.application.ports.note import NoteReader, NoteWriter
-from app.application.ports.tag_manager import TagManager
 from app.application.ports.node_bulk_operator import NodeBulkOperator
 from app.application.ports.node_management import (
     NodeManagementReader,
@@ -99,6 +97,7 @@ from app.application.ports.node_status_history import (
     NodeStatusHistoryWriter,
 )
 from app.application.ports.node_validation import NodeCredentialValidator
+from app.application.ports.note import NoteReader, NoteWriter
 from app.application.ports.remote_command import RemoteConnectorFactory
 from app.application.ports.remote_stream import RemoteStreamingConnectorFactory
 from app.application.ports.schedule import (
@@ -113,6 +112,7 @@ from app.application.ports.script_persistence import (
     ScriptReader,
     ScriptWriter,
 )
+from app.application.ports.tag_manager import TagManager
 from app.application.services.api_key_authentication import (
     APIKeyAuthenticationService,
 )
@@ -143,8 +143,6 @@ from app.application.services.execution_stats_service import ExecutionStatsServi
 from app.application.services.favorite_service import FavoriteService
 from app.application.services.global_search_service import GlobalSearchService
 from app.application.services.health_service import HealthService
-from app.application.services.note_service import NoteService
-from app.application.services.tag_management_service import TagManagementService
 from app.application.services.node_bulk_command_service import NodeBulkCommandService
 from app.application.services.node_bulk_operation_service import (
     NodeBulkOperationService,
@@ -156,6 +154,7 @@ from app.application.services.node_status_history_service import (
     NodeStatusHistoryService,
 )
 from app.application.services.node_validation_service import NodeValidationService
+from app.application.services.note_service import NoteService
 from app.application.services.schedule_management import (
     ScheduleManagementService,
 )
@@ -170,6 +169,7 @@ from app.application.services.script_execution_service import ScriptExecutionSer
 from app.application.services.script_history_service import ScriptHistoryService
 from app.application.services.script_management_service import ScriptManagementService
 from app.application.services.streaming_command_service import StreamingCommandService
+from app.application.services.tag_management_service import TagManagementService
 from app.core.config import Settings, get_settings
 
 

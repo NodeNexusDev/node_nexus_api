@@ -4,7 +4,6 @@ from sqlalchemy import case, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.dto.dashboard_metrics import (
-    DashboardMetricsDTO,
     MetricsBucketDTO,
     MetricsQueryDTO,
 )
