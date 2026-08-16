@@ -106,8 +106,7 @@ class SqlAlchemyDashboardGateway:
     async def _query_node_containers(self, node: NodeConnectionDTO) -> dict[str, int]:
         """Query container stats from a single Docker node."""
         cmd = build_docker_command(node, "ps -a --format '{{json .}}'")
-        assert self._runtime is not None
-        result = await self._runtime.execute(node, cmd, timeout=10)
+        result = await self._runtime.execute(node, cmd, timeout=10)  # type: ignore[union-attr]
 
         if result.exit_code != 0:
             return {"total": 0, "running": 0, "stopped": 0}

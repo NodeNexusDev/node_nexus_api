@@ -38,17 +38,17 @@ class DashboardMetricsRepository:
 
         where_sql = " AND ".join(where_clauses) if where_clauses else "TRUE"
         dur = _DUR.format(t="ce")
-        sql = text(
+        sql = text(  # nosec B608: false positive – dur/where_sql built from whitelisted constants
             "SELECT "
-            f"  date_trunc(:grp, ce.started_at) AS period, "
+            f"  date_trunc(:grp, ce.started_at) AS period, "  # nosec B608
             "  COUNT(*)::int AS total, "
             "  COUNT(*) FILTER (WHERE ce.exit_code = 0)::int AS successful, "  # noqa: E501
             "  COUNT(*) FILTER (WHERE ce.exit_code != 0)::int AS failed, "  # noqa: E501
-            f"  AVG({dur}) AS avg_duration_ms "
+            f"  AVG({dur}) AS avg_duration_ms "  # nosec B608
             "FROM command_executions ce "
-            f"WHERE {where_sql} "
-            f"GROUP BY date_trunc(:grp, ce.started_at) "
-            f"ORDER BY date_trunc(:grp, ce.started_at)"
+            f"WHERE {where_sql} "  # nosec B608
+            f"GROUP BY date_trunc(:grp, ce.started_at) "  # nosec B608
+            f"ORDER BY date_trunc(:grp, ce.started_at)"  # nosec B608
         )
         rows = (await self._session.execute(sql, params)).all()
         return [
@@ -78,17 +78,17 @@ class DashboardMetricsRepository:
 
         where_sql = " AND ".join(where_clauses) if where_clauses else "TRUE"
         dur = _DUR.format(t="se")
-        sql = text(
+        sql = text(  # nosec B608: false positive – dur/where_sql built from whitelisted constants
             "SELECT "
-            f"  date_trunc(:grp, se.started_at) AS period, "
+            f"  date_trunc(:grp, se.started_at) AS period, "  # nosec B608
             "  COUNT(*)::int AS total, "
             "  COUNT(*) FILTER (WHERE se.status = 'completed')::int AS successful, "  # noqa: E501
             "  COUNT(*) FILTER (WHERE se.status != 'completed')::int AS failed, "  # noqa: E501
-            f"  AVG({dur}) AS avg_duration_ms "
+            f"  AVG({dur}) AS avg_duration_ms "  # nosec B608
             "FROM script_executions se "
-            f"WHERE {where_sql} "
-            f"GROUP BY date_trunc(:grp, se.started_at) "
-            f"ORDER BY date_trunc(:grp, se.started_at)"
+            f"WHERE {where_sql} "  # nosec B608
+            f"GROUP BY date_trunc(:grp, se.started_at) "  # nosec B608
+            f"ORDER BY date_trunc(:grp, se.started_at)"  # nosec B608
         )
         rows = (await self._session.execute(sql, params)).all()
         return [

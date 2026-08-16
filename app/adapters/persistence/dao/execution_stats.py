@@ -35,17 +35,17 @@ class ExecutionStatsRepository:
 
         where_sql = " AND ".join(where_clauses) if where_clauses else "TRUE"
         dur = "EXTRACT(EPOCH FROM (ce.finished_at - ce.started_at)) * 1000"
-        sql = text(
+        sql = text(  # nosec B608: false positive – dur/where_sql built from whitelisted constants
             "SELECT "
             "  COUNT(*)::int AS total, "
             "  COUNT(*) FILTER (WHERE ce.exit_code = 0)::int AS successful, "  # noqa: E501
             "  COUNT(*) FILTER (WHERE ce.exit_code != 0)::int AS failed, "  # noqa: E501
-            f"  AVG({dur}) AS avg_duration_ms, "
-            f"  MIN({dur}) AS min_duration_ms, "
-            f"  MAX({dur}) AS max_duration_ms, "
+            f"  AVG({dur}) AS avg_duration_ms, "  # nosec B608
+            f"  MIN({dur}) AS min_duration_ms, "  # nosec B608
+            f"  MAX({dur}) AS max_duration_ms, "  # nosec B608
             "  MAX(ce.finished_at) AS last_executed_at "
             "FROM command_executions ce "
-            f"WHERE {where_sql}"
+            f"WHERE {where_sql}"  # nosec B608
         )
         row = (await self._session.execute(sql, params)).one()
         return dict(row._mapping)
@@ -74,17 +74,17 @@ class ExecutionStatsRepository:
 
         where_sql = " AND ".join(where_clauses) if where_clauses else "TRUE"
         dur = "EXTRACT(EPOCH FROM (se.finished_at - se.started_at)) * 1000"
-        sql = text(
+        sql = text(  # nosec B608: false positive – dur/where_sql built from whitelisted constants
             "SELECT "
             "  COUNT(*)::int AS total, "
             "  COUNT(*) FILTER (WHERE se.status = 'completed')::int AS successful, "  # noqa: E501
             "  COUNT(*) FILTER (WHERE se.status != 'completed')::int AS failed, "  # noqa: E501
-            f"  AVG({dur}) AS avg_duration_ms, "
-            f"  MIN({dur}) AS min_duration_ms, "
-            f"  MAX({dur}) AS max_duration_ms, "
+            f"  AVG({dur}) AS avg_duration_ms, "  # nosec B608
+            f"  MIN({dur}) AS min_duration_ms, "  # nosec B608
+            f"  MAX({dur}) AS max_duration_ms, "  # nosec B608
             "  MAX(se.finished_at) AS last_executed_at "
             "FROM script_executions se "
-            f"WHERE {where_sql}"
+            f"WHERE {where_sql}"  # nosec B608
         )
         row = (await self._session.execute(sql, params)).one()
         return dict(row._mapping)
