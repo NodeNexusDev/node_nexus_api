@@ -89,6 +89,53 @@ export NODE_NEXUS_API_KEY='your-key'
 | События | `curl -H "X-API-Key: ${NODE_NEXUS_API_KEY}" "${NODE_NEXUS_URL}/api/v1/audit/?page=1&size=50"` |
 | Фильтр по ноде | `curl -H "X-API-Key: ${NODE_NEXUS_API_KEY}" "${NODE_NEXUS_URL}/api/v1/audit/?node_id=${NODE_ID}"` |
 | Удалить журнал | `curl -X DELETE -H "X-API-Key: ${MASTER_API_KEY}" "${NODE_NEXUS_URL}/api/v1/audit/?confirm=yes"` |
+| Экспорт CSV | `curl -H "X-API-Key: ${NODE_NEXUS_API_KEY}" "${NODE_NEXUS_URL}/api/v1/audit/export?fmt=csv"` |
+
+## Дашборд и поиск
+
+| Задача | Команда |
+|--------|---------|
+| Метрики дашборда | `curl -H "X-API-Key: ${NODE_NEXUS_API_KEY}" "${NODE_NEXUS_URL}/api/v1/dashboard/metrics?group_by=day"` |
+| Глобальный поиск | `curl -H "X-API-Key: ${NODE_NEXUS_API_KEY}" "${NODE_NEXUS_URL}/api/v1/search?q=deploy"` |
+
+## Статистика выполнения
+
+| Задача | Команда |
+|--------|---------|
+| Статистика команды | `curl -H "X-API-Key: ${NODE_NEXUS_API_KEY}" "${NODE_NEXUS_URL}/api/v1/commands/${CMD_ID}/stats"` |
+| Статистика скрипта | `curl -H "X-API-Key: ${NODE_NEXUS_API_KEY}" "${NODE_NEXUS_URL}/api/v1/scripts/${SCRIPT_ID}/stats"` |
+| Статистика ноды | `curl -H "X-API-Key: ${NODE_NEXUS_API_KEY}" "${NODE_NEXUS_URL}/api/v1/nodes/${NODE_ID}/stats"` |
+
+## Теги
+
+| Задача | Команда |
+|--------|---------|
+| Переименовать тег | `curl -X PATCH -H "X-API-Key: ${NODE_NEXUS_API_KEY}" -H 'Content-Type: application/json' -d '{"new_name":"new-tag"}' "${NODE_NEXUS_URL}/api/v1/tags/old-tag"` |
+| Удалить тег | `curl -X DELETE -H "X-API-Key: ${NODE_NEXUS_API_KEY}" "${NODE_NEXUS_URL}/api/v1/tags/tag-to-delete"` |
+
+## Клонирование
+
+| Задача | Команда |
+|--------|---------|
+| Клонировать команду | `curl -X POST -H "X-API-Key: ${NODE_NEXUS_API_KEY}" "${NODE_NEXUS_URL}/api/v1/commands/${CMD_ID}/clone?new_name=my-copy"` |
+| Клонировать скрипт | `curl -X POST -H "X-API-Key: ${NODE_NEXUS_API_KEY}" "${NODE_NEXUS_URL}/api/v1/scripts/${SCRIPT_ID}/clone?new_name=my-copy"` |
+
+## Избранное
+
+| Задача | Команда |
+|--------|---------|
+| Список избранного | `curl -H "X-API-Key: ${NODE_NEXUS_API_KEY}" "${NODE_NEXUS_URL}/api/v1/favorites"` |
+| Добавить в избранное | `curl -X POST -H "X-API-Key: ${NODE_NEXUS_API_KEY}" -H 'Content-Type: application/json' -d '{"target_type":"command","target_id":"${CMD_ID}"}' "${NODE_NEXUS_URL}/api/v1/favorites"` |
+| Удалить из избранного | `curl -X DELETE -H "X-API-Key: ${NODE_NEXUS_API_KEY}" "${NODE_NEXUS_URL}/api/v1/favorites/command/${CMD_ID}"` |
+
+## Заметки
+
+| Задача | Команда |
+|--------|---------|
+| Список заметок | `curl -H "X-API-Key: ${NODE_NEXUS_API_KEY}" "${NODE_NEXUS_URL}/api/v1/notes/command/${CMD_ID}"` |
+| Создать заметку | `curl -X POST -H "X-API-Key: ${NODE_NEXUS_API_KEY}" -H 'Content-Type: application/json' -d '{"content":"TODO: review"}' "${NODE_NEXUS_URL}/api/v1/notes/command/${CMD_ID}"` |
+| Обновить заметку | `curl -X PUT -H "X-API-Key: ${NODE_NEXUS_API_KEY}" -H 'Content-Type: application/json' -d '{"content":"Обновлено"}' "${NODE_NEXUS_URL}/api/v1/notes/${NOTE_ID}"` |
+| Удалить заметку | `curl -X DELETE -H "X-API-Key: ${NODE_NEXUS_API_KEY}" "${NODE_NEXUS_URL}/api/v1/notes/${NOTE_ID}"` |
 
 ## Пробы
 

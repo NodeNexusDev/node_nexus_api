@@ -89,6 +89,53 @@ export NODE_NEXUS_API_KEY='your-key'
 | Query events | `curl -H "X-API-Key: ${NODE_NEXUS_API_KEY}" "${NODE_NEXUS_URL}/api/v1/audit/?page=1&size=50"` |
 | Filter by node | `curl -H "X-API-Key: ${NODE_NEXUS_API_KEY}" "${NODE_NEXUS_URL}/api/v1/audit/?node_id=${NODE_ID}"` |
 | Delete log | `curl -X DELETE -H "X-API-Key: ${MASTER_API_KEY}" "${NODE_NEXUS_URL}/api/v1/audit/?confirm=yes"` |
+| Export CSV | `curl -H "X-API-Key: ${NODE_NEXUS_API_KEY}" "${NODE_NEXUS_URL}/api/v1/audit/export?fmt=csv"` |
+
+## Dashboard & Search
+
+| Task | Command |
+|------|---------|
+| Dashboard metrics | `curl -H "X-API-Key: ${NODE_NEXUS_API_KEY}" "${NODE_NEXUS_URL}/api/v1/dashboard/metrics?group_by=day"` |
+| Global search | `curl -H "X-API-Key: ${NODE_NEXUS_API_KEY}" "${NODE_NEXUS_URL}/api/v1/search?q=deploy"` |
+
+## Execution Stats
+
+| Task | Command |
+|------|---------|
+| Command stats | `curl -H "X-API-Key: ${NODE_NEXUS_API_KEY}" "${NODE_NEXUS_URL}/api/v1/commands/${CMD_ID}/stats"` |
+| Script stats | `curl -H "X-API-Key: ${NODE_NEXUS_API_KEY}" "${NODE_NEXUS_URL}/api/v1/scripts/${SCRIPT_ID}/stats"` |
+| Node stats | `curl -H "X-API-Key: ${NODE_NEXUS_API_KEY}" "${NODE_NEXUS_URL}/api/v1/nodes/${NODE_ID}/stats"` |
+
+## Tags
+
+| Task | Command |
+|------|---------|
+| Rename tag | `curl -X PATCH -H "X-API-Key: ${NODE_NEXUS_API_KEY}" -H 'Content-Type: application/json' -d '{"new_name":"new-tag"}' "${NODE_NEXUS_URL}/api/v1/tags/old-tag"` |
+| Delete tag | `curl -X DELETE -H "X-API-Key: ${NODE_NEXUS_API_KEY}" "${NODE_NEXUS_URL}/api/v1/tags/tag-to-delete"` |
+
+## Clone
+
+| Task | Command |
+|------|---------|
+| Clone command | `curl -X POST -H "X-API-Key: ${NODE_NEXUS_API_KEY}" "${NODE_NEXUS_URL}/api/v1/commands/${CMD_ID}/clone?new_name=my-copy"` |
+| Clone script | `curl -X POST -H "X-API-Key: ${NODE_NEXUS_API_KEY}" "${NODE_NEXUS_URL}/api/v1/scripts/${SCRIPT_ID}/clone?new_name=my-copy"` |
+
+## Favorites
+
+| Task | Command |
+|------|---------|
+| List favorites | `curl -H "X-API-Key: ${NODE_NEXUS_API_KEY}" "${NODE_NEXUS_URL}/api/v1/favorites"` |
+| Add favorite | `curl -X POST -H "X-API-Key: ${NODE_NEXUS_API_KEY}" -H 'Content-Type: application/json' -d '{"target_type":"command","target_id":"${CMD_ID}"}' "${NODE_NEXUS_URL}/api/v1/favorites"` |
+| Remove favorite | `curl -X DELETE -H "X-API-Key: ${NODE_NEXUS_API_KEY}" "${NODE_NEXUS_URL}/api/v1/favorites/command/${CMD_ID}"` |
+
+## Notes
+
+| Task | Command |
+|------|---------|
+| List notes | `curl -H "X-API-Key: ${NODE_NEXUS_API_KEY}" "${NODE_NEXUS_URL}/api/v1/notes/command/${CMD_ID}"` |
+| Create note | `curl -X POST -H "X-API-Key: ${NODE_NEXUS_API_KEY}" -H 'Content-Type: application/json' -d '{"content":"TODO: review"}' "${NODE_NEXUS_URL}/api/v1/notes/command/${CMD_ID}"` |
+| Update note | `curl -X PUT -H "X-API-Key: ${NODE_NEXUS_API_KEY}" -H 'Content-Type: application/json' -d '{"content":"Updated"}' "${NODE_NEXUS_URL}/api/v1/notes/${NOTE_ID}"` |
+| Delete note | `curl -X DELETE -H "X-API-Key: ${NODE_NEXUS_API_KEY}" "${NODE_NEXUS_URL}/api/v1/notes/${NOTE_ID}"` |
 
 ## Health
 
