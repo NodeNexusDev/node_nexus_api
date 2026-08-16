@@ -18,7 +18,7 @@ router = APIRouter(tags=["search"], route_class=DishkaRoute)
 async def global_search(
     q: str = Query(..., min_length=1, description="Search query"),
     limit: int = Query(20, ge=1, le=100),
-    service: FromDishka[GlobalSearchService] = None,
+    service: FromDishka[GlobalSearchService] = None,  # ty: ignore[invalid-parameter-default]
     _key: str = Security(get_current_api_key),
 ) -> GlobalSearchResponse:
     audit.info("api.search", query=q, limit=limit)

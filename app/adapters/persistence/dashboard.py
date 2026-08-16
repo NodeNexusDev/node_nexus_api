@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import structlog
-from sqlalchemy import func, select
+from sqlalchemy import Executable, func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.adapters.persistence.audit import SqlAlchemyAuditLogGateway
@@ -20,13 +22,10 @@ from app.models.command import CommandModel
 from app.models.node import NodeModel
 from app.models.script import ScriptModel
 
-if False:  # TYPE_CHECKING
-    from typing import TYPE_CHECKING
-
-    if TYPE_CHECKING:
-        from app.application.dto.node_connection import NodeConnectionDTO
-        from app.application.ports.docker_runtime import DockerRuntime
-        from app.application.ports.node_reader import NodeConnectionReader
+if TYPE_CHECKING:
+    from app.application.dto.node_connection import NodeConnectionDTO
+    from app.application.ports.docker_runtime import DockerRuntime
+    from app.application.ports.node_reader import NodeConnectionReader
 
 log = structlog.get_logger("dashboard")
 
@@ -107,6 +106,7 @@ class SqlAlchemyDashboardGateway:
     async def _query_node_containers(self, node: NodeConnectionDTO) -> dict[str, int]:
         """Query container stats from a single Docker node."""
         cmd = build_docker_command(node, "ps -a --format '{{json .}}'")
+        assert self._runtime is not None
         result = await self._runtime.execute(node, cmd, timeout=10)
 
         if result.exit_code != 0:
@@ -144,6 +144,6 @@ class SqlAlchemyDashboardGateway:
         )
 
     @staticmethod
-    async def _scalar(session: AsyncSession, stmt: func.count) -> int:
+    async def _scalar(session: AsyncSession, stmt: Executable) -> int:
         result = await session.execute(stmt)
         return result.scalar_one()

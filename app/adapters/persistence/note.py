@@ -13,9 +13,9 @@ from app.models.note import NoteModel
 
 def _dto(m: NoteModel) -> NoteDTO:
     return NoteDTO(
-        id=m.id,
+        id=uuid.UUID(str(m.id)),
         target_type=m.target_type,
-        target_id=m.target_id,
+        target_id=uuid.UUID(str(m.target_id)),
         content=m.content,
         created_at=m.created_at,
         updated_at=m.updated_at,
