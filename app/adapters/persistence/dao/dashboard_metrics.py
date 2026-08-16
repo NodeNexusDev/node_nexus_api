@@ -1,14 +1,12 @@
 from __future__ import annotations
 
-from sqlalchemy import case, func, select, text
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.dto.dashboard_metrics import (
     MetricsBucketDTO,
     MetricsQueryDTO,
 )
-from app.models.command_execution import CommandExecutionModel
-from app.models.script_execution import ScriptExecutionModel
 
 _GROUP_MAP = {
     "day": "day",
@@ -16,6 +14,8 @@ _GROUP_MAP = {
     "week": "week",
     "month": "month",
 }
+
+_DUR = "EXTRACT(EPOCH FROM ({t}.finished_at - {t}.started_at)) * 1000"
 
 
 class DashboardMetricsRepository:
@@ -27,39 +27,36 @@ class DashboardMetricsRepository:
         query: MetricsQueryDTO,
     ) -> list[MetricsBucketDTO]:
         grp = _GROUP_MAP.get(query.group_by, "day")
-        trunc = func.date_trunc(grp, CommandExecutionModel.started_at)
-        dur = (
-            func.extract(
-                text("epoch"),
-                CommandExecutionModel.finished_at - CommandExecutionModel.started_at,
-            )
-            * 1000
-        )
-        ok = case((CommandExecutionModel.exit_code == 0, 1), else_=0)
-        fail = case((CommandExecutionModel.exit_code != 0, 1), else_=0)
-        stmt = select(
-            trunc.label("period"),
-            func.count().label("total"),
-            func.sum(ok).label("successful"),
-            func.sum(fail).label("failed"),
-            func.avg(dur).label("avg_duration_ms"),
-        ).group_by(trunc)
+        params: dict = {"grp": grp}
+        where_clauses: list[str] = []
         if query.date_from is not None:
-            stmt = stmt.where(
-                CommandExecutionModel.started_at >= query.date_from,
-            )
+            where_clauses.append("ce.started_at >= :date_from")
+            params["date_from"] = query.date_from
         if query.date_to is not None:
-            stmt = stmt.where(
-                CommandExecutionModel.started_at <= query.date_to,
-            )
-        stmt = stmt.order_by(trunc)
-        rows = (await self._session.execute(stmt)).all()
+            where_clauses.append("ce.started_at <= :date_to")
+            params["date_to"] = query.date_to
+
+        where_sql = " AND ".join(where_clauses) if where_clauses else "TRUE"
+        dur = _DUR.format(t="ce")
+        sql = text(
+            "SELECT "
+            f"  date_trunc(:grp, ce.started_at) AS period, "
+            "  COUNT(*)::int AS total, "
+            "  COUNT(*) FILTER (WHERE ce.exit_code = 0)::int AS successful, "  # noqa: E501
+            "  COUNT(*) FILTER (WHERE ce.exit_code != 0)::int AS failed, "  # noqa: E501
+            f"  AVG({dur}) AS avg_duration_ms "
+            "FROM command_executions ce "
+            f"WHERE {where_sql} "
+            f"GROUP BY date_trunc(:grp, ce.started_at) "
+            f"ORDER BY date_trunc(:grp, ce.started_at)"
+        )
+        rows = (await self._session.execute(sql, params)).all()
         return [
             MetricsBucketDTO(
                 period=str(row.period),
                 total=row.total,
-                successful=row.successful or 0,
-                failed=row.failed or 0,
+                successful=row.successful,
+                failed=row.failed,
                 avg_duration_ms=row.avg_duration_ms,
             )
             for row in rows
@@ -70,39 +67,36 @@ class DashboardMetricsRepository:
         query: MetricsQueryDTO,
     ) -> list[MetricsBucketDTO]:
         grp = _GROUP_MAP.get(query.group_by, "day")
-        trunc = func.date_trunc(grp, ScriptExecutionModel.started_at)
-        dur = (
-            func.extract(
-                text("epoch"),
-                ScriptExecutionModel.finished_at - ScriptExecutionModel.started_at,
-            )
-            * 1000
-        )
-        ok = case((ScriptExecutionModel.status == "completed", 1), else_=0)
-        fail = case((ScriptExecutionModel.status != "completed", 1), else_=0)
-        stmt = select(
-            trunc.label("period"),
-            func.count().label("total"),
-            func.sum(ok).label("successful"),
-            func.sum(fail).label("failed"),
-            func.avg(dur).label("avg_duration_ms"),
-        ).group_by(trunc)
+        params: dict = {"grp": grp}
+        where_clauses: list[str] = []
         if query.date_from is not None:
-            stmt = stmt.where(
-                ScriptExecutionModel.started_at >= query.date_from,
-            )
+            where_clauses.append("se.started_at >= :date_from")
+            params["date_from"] = query.date_from
         if query.date_to is not None:
-            stmt = stmt.where(
-                ScriptExecutionModel.started_at <= query.date_to,
-            )
-        stmt = stmt.order_by(trunc)
-        rows = (await self._session.execute(stmt)).all()
+            where_clauses.append("se.started_at <= :date_to")
+            params["date_to"] = query.date_to
+
+        where_sql = " AND ".join(where_clauses) if where_clauses else "TRUE"
+        dur = _DUR.format(t="se")
+        sql = text(
+            "SELECT "
+            f"  date_trunc(:grp, se.started_at) AS period, "
+            "  COUNT(*)::int AS total, "
+            "  COUNT(*) FILTER (WHERE se.status = 'completed')::int AS successful, "  # noqa: E501
+            "  COUNT(*) FILTER (WHERE se.status != 'completed')::int AS failed, "  # noqa: E501
+            f"  AVG({dur}) AS avg_duration_ms "
+            "FROM script_executions se "
+            f"WHERE {where_sql} "
+            f"GROUP BY date_trunc(:grp, se.started_at) "
+            f"ORDER BY date_trunc(:grp, se.started_at)"
+        )
+        rows = (await self._session.execute(sql, params)).all()
         return [
             MetricsBucketDTO(
                 period=str(row.period),
                 total=row.total,
-                successful=row.successful or 0,
-                failed=row.failed or 0,
+                successful=row.successful,
+                failed=row.failed,
                 avg_duration_ms=row.avg_duration_ms,
             )
             for row in rows

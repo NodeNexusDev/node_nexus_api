@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from sqlalchemy import func, or_, select
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import or_, select, text
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.application.dto.global_search import (
     GlobalSearchQueryDTO,
@@ -14,8 +14,8 @@ from app.models.script import ScriptModel
 
 
 class SqlAlchemyGlobalSearchGateway:
-    def __init__(self, session: AsyncSession) -> None:
-        self._session = session
+    def __init__(self, sessionmaker: async_sessionmaker[AsyncSession]) -> None:
+        self._sessionmaker = sessionmaker
 
     async def search(
         self,
@@ -24,71 +24,74 @@ class SqlAlchemyGlobalSearchGateway:
         pattern = f"%{query.q}%"
         limit = query.limit
 
-        node_stmt = (
-            select(NodeModel.id, NodeModel.name)
-            .where(
-                or_(
-                    NodeModel.name.ilike(pattern),
-                    NodeModel.host.ilike(pattern),
+        async with self._sessionmaker() as session:
+            node_stmt = (
+                select(NodeModel.id, NodeModel.name)
+                .where(
+                    or_(
+                        NodeModel.name.ilike(pattern),
+                        NodeModel.host.ilike(pattern),
+                    )
                 )
+                .limit(limit)
             )
-            .limit(limit)
-        )
-        cmd_stmt = (
-            select(CommandModel.id, CommandModel.name)
-            .where(
-                or_(
-                    CommandModel.name.ilike(pattern),
-                    CommandModel.description.ilike(pattern),
+            cmd_stmt = (
+                select(CommandModel.id, CommandModel.name)
+                .where(
+                    or_(
+                        CommandModel.name.ilike(pattern),
+                        CommandModel.description.ilike(pattern),
+                    )
                 )
+                .limit(limit)
             )
-            .limit(limit)
-        )
-        script_stmt = (
-            select(ScriptModel.id, ScriptModel.name)
-            .where(
-                or_(
-                    ScriptModel.name.ilike(pattern),
-                    ScriptModel.description.ilike(pattern),
+            script_stmt = (
+                select(ScriptModel.id, ScriptModel.name)
+                .where(
+                    or_(
+                        ScriptModel.name.ilike(pattern),
+                        ScriptModel.description.ilike(pattern),
+                    )
                 )
+                .limit(limit)
             )
-            .limit(limit)
-        )
 
-        nodes = [
-            SearchResultItemDTO(
-                id=row.id,
-                name=row.name,
-                entity_type="node",
-            )
-            for row in (await self._session.execute(node_stmt)).all()
-        ]
-        commands = [
-            SearchResultItemDTO(
-                id=row.id,
-                name=row.name,
-                entity_type="command",
-            )
-            for row in (await self._session.execute(cmd_stmt)).all()
-        ]
-        scripts = [
-            SearchResultItemDTO(
-                id=row.id,
-                name=row.name,
-                entity_type="script",
-            )
-            for row in (await self._session.execute(script_stmt)).all()
-        ]
+            nodes = [
+                SearchResultItemDTO(
+                    id=row.id,
+                    name=row.name,
+                    entity_type="node",
+                )
+                for row in (await session.execute(node_stmt)).all()
+            ]
+            commands = [
+                SearchResultItemDTO(
+                    id=row.id,
+                    name=row.name,
+                    entity_type="command",
+                )
+                for row in (await session.execute(cmd_stmt)).all()
+            ]
+            scripts = [
+                SearchResultItemDTO(
+                    id=row.id,
+                    name=row.name,
+                    entity_type="script",
+                )
+                for row in (await session.execute(script_stmt)).all()
+            ]
 
-        tag_stmt = (
-            select(func.unnest(NodeModel.tags).label("tag"))
-            .where(func.unnest(NodeModel.tags).ilike(pattern))
-            .distinct()
-            .limit(limit)
-        )
-        tags = [
-            row.tag for row in (await self._session.execute(tag_stmt)).all() if row.tag
-        ]
+            tag_rows = (
+                await session.execute(
+                    text(
+                        "SELECT DISTINCT t AS tag "
+                        "FROM nodes, unnest(tags) AS t "
+                        "WHERE t ILIKE :pattern LIMIT :limit"
+                    ),
+                    {"pattern": pattern, "limit": limit},
+                )
+            ).all()
+            tags = [row.tag for row in tag_rows if row.tag]
 
         return GlobalSearchResultDTO(
             nodes=tuple(nodes),

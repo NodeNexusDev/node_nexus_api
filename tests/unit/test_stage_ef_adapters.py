@@ -23,10 +23,10 @@ from app.adapters.persistence.execution_lifecycle import (
 from app.adapters.persistence.execution_stats import SqlAlchemyExecutionStatsGateway
 from app.adapters.persistence.favorite import SqlAlchemyFavoriteGateway
 from app.adapters.persistence.global_search import SqlAlchemyGlobalSearchGateway
-from app.adapters.persistence.note import SqlAlchemyNoteGateway
 from app.adapters.persistence.node_status_history import (
     SqlAlchemyNodeStatusHistoryGateway,
 )
+from app.adapters.persistence.note import SqlAlchemyNoteGateway
 from app.adapters.persistence.tag_manager import SqlAlchemyTagManager
 from app.application.dto.execution_stats import (
     CommandStatsQueryDTO,
@@ -38,18 +38,16 @@ from app.application.dto.favorite import FavoriteCreateDTO, FavoriteDTO
 from app.application.dto.global_search import (
     GlobalSearchQueryDTO,
     GlobalSearchResultDTO,
-    SearchResultItemDTO,
 )
-from app.application.dto.note import NoteCreateDTO, NoteDTO, NoteUpdateDTO
 from app.application.dto.node_status_history import (
     NodeStatusChangeDTO,
     NodeStatusHistoryPageDTO,
     NodeStatusHistoryQueryDTO,
 )
+from app.application.dto.note import NoteCreateDTO, NoteDTO, NoteUpdateDTO
 from app.models.favorite import FavoriteModel
-from app.models.note import NoteModel
 from app.models.node_status_history import NodeStatusHistoryModel
-
+from app.models.note import NoteModel
 
 # ─── Favorite adapter ───
 
@@ -420,9 +418,7 @@ class TestExecutionStatsGateway:
         mock_result.one.return_value = MagicMock(_mapping=row)
         session.execute.return_value = mock_result
 
-        result = await gw.get_script_stats(
-            ScriptStatsQueryDTO(script_id=uuid.uuid4())
-        )
+        result = await gw.get_script_stats(ScriptStatsQueryDTO(script_id=uuid.uuid4()))
         assert result.total == 3
 
     @pytest.mark.asyncio
@@ -473,7 +469,10 @@ class TestGlobalSearchGateway:
     @pytest.mark.asyncio
     async def test_search_returns_results(self) -> None:
         session = AsyncMock()
-        gw = SqlAlchemyGlobalSearchGateway(session)
+        sessionmaker = MagicMock()
+        sessionmaker.return_value.__aenter__ = AsyncMock(return_value=session)
+        sessionmaker.return_value.__aexit__ = AsyncMock(return_value=False)
+        gw = SqlAlchemyGlobalSearchGateway(sessionmaker)
 
         node_row = MagicMock()
         node_row.id = uuid.uuid4()
@@ -511,7 +510,10 @@ class TestGlobalSearchGateway:
     @pytest.mark.asyncio
     async def test_search_empty_results(self) -> None:
         session = AsyncMock()
-        gw = SqlAlchemyGlobalSearchGateway(session)
+        sessionmaker = MagicMock()
+        sessionmaker.return_value.__aenter__ = AsyncMock(return_value=session)
+        sessionmaker.return_value.__aexit__ = AsyncMock(return_value=False)
+        gw = SqlAlchemyGlobalSearchGateway(sessionmaker)
 
         empty = MagicMock()
         empty.all.return_value = []
@@ -577,9 +579,7 @@ class TestDashboardMetricsDAO:
 
         from app.application.dto.dashboard_metrics import MetricsQueryDTO
 
-        result = await repo.command_metrics(
-            MetricsQueryDTO(group_by="day")
-        )
+        result = await repo.command_metrics(MetricsQueryDTO(group_by="day"))
         assert isinstance(result, list)
         assert len(result) == 0
 
@@ -593,9 +593,7 @@ class TestDashboardMetricsDAO:
 
         from app.application.dto.dashboard_metrics import MetricsQueryDTO
 
-        result = await repo.script_metrics(
-            MetricsQueryDTO(group_by="hour")
-        )
+        result = await repo.script_metrics(MetricsQueryDTO(group_by="hour"))
         assert isinstance(result, list)
 
 
@@ -742,9 +740,7 @@ class TestNodeStatusHistoryGateway:
         list_result.scalars.return_value.all.return_value = [model]
         session.execute.side_effect = [list_result, count_result]
 
-        query = NodeStatusHistoryQueryDTO(
-            node_id=model.node_id, offset=0, limit=10
-        )
+        query = NodeStatusHistoryQueryDTO(node_id=model.node_id, offset=0, limit=10)
         result = await gw.list_by_node(query)
         assert isinstance(result, NodeStatusHistoryPageDTO)
         assert result.total == 1
@@ -776,9 +772,7 @@ class TestExecutionLifecycleGateway:
             "app.adapters.persistence.execution_lifecycle.CommandExecutionRepository",
             return_value=cmd_repo,
         ):
-            result = await gw.cancel_execution(
-                CancelExecutionDTO(execution_id=exec_id)
-            )
+            result = await gw.cancel_execution(CancelExecutionDTO(execution_id=exec_id))
             assert result is True
 
     @pytest.mark.asyncio
@@ -803,16 +797,17 @@ class TestExecutionLifecycleGateway:
         script_repo.get_by_id = AsyncMock(return_value=script_model)
         script_repo.update = AsyncMock()
 
-        with patch(
-            "app.adapters.persistence.execution_lifecycle.CommandExecutionRepository",
-            return_value=cmd_repo,
-        ), patch(
-            "app.adapters.persistence.execution_lifecycle.ScriptExecutionRepository",
-            return_value=script_repo,
+        with (
+            patch(
+                "app.adapters.persistence.execution_lifecycle.CommandExecutionRepository",
+                return_value=cmd_repo,
+            ),
+            patch(
+                "app.adapters.persistence.execution_lifecycle.ScriptExecutionRepository",
+                return_value=script_repo,
+            ),
         ):
-            result = await gw.cancel_execution(
-                CancelExecutionDTO(execution_id=exec_id)
-            )
+            result = await gw.cancel_execution(CancelExecutionDTO(execution_id=exec_id))
             assert result is True
 
     @pytest.mark.asyncio
@@ -836,16 +831,17 @@ class TestExecutionLifecycleGateway:
         script_model.status = "completed"
         script_repo.get_by_id = AsyncMock(return_value=script_model)
 
-        with patch(
-            "app.adapters.persistence.execution_lifecycle.CommandExecutionRepository",
-            return_value=cmd_repo,
-        ), patch(
-            "app.adapters.persistence.execution_lifecycle.ScriptExecutionRepository",
-            return_value=script_repo,
+        with (
+            patch(
+                "app.adapters.persistence.execution_lifecycle.CommandExecutionRepository",
+                return_value=cmd_repo,
+            ),
+            patch(
+                "app.adapters.persistence.execution_lifecycle.ScriptExecutionRepository",
+                return_value=script_repo,
+            ),
         ):
-            result = await gw.cancel_execution(
-                CancelExecutionDTO(execution_id=exec_id)
-            )
+            result = await gw.cancel_execution(CancelExecutionDTO(execution_id=exec_id))
             assert result is False
 
     @pytest.mark.asyncio
@@ -866,12 +862,15 @@ class TestExecutionLifecycleGateway:
         script_repo = MagicMock()
         script_repo.get_by_id = AsyncMock(return_value=None)
 
-        with patch(
-            "app.adapters.persistence.execution_lifecycle.CommandExecutionRepository",
-            return_value=cmd_repo,
-        ), patch(
-            "app.adapters.persistence.execution_lifecycle.ScriptExecutionRepository",
-            return_value=script_repo,
+        with (
+            patch(
+                "app.adapters.persistence.execution_lifecycle.CommandExecutionRepository",
+                return_value=cmd_repo,
+            ),
+            patch(
+                "app.adapters.persistence.execution_lifecycle.ScriptExecutionRepository",
+                return_value=script_repo,
+            ),
         ):
             result = await gw.cancel_execution(
                 CancelExecutionDTO(execution_id=uuid.uuid4())

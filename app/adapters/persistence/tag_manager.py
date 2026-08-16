@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from sqlalchemy import func, update
+from sqlalchemy.dialects.postgresql import array as pg_array
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.command import CommandModel
@@ -28,7 +29,7 @@ class SqlAlchemyTagManager:
                 update(model)
                 .where(~model.tags.any(new_name))
                 .values(
-                    tags=func.array_cat(model.tags, func.array[new_name]),
+                    tags=func.array_cat(model.tags, pg_array([new_name])),
                 )
             )
             await self._session.execute(stmt_add)

@@ -1,5 +1,6 @@
 """Dashboard API endpoint."""
 
+from dataclasses import asdict
 from datetime import datetime
 
 import structlog
@@ -89,6 +90,10 @@ async def get_dashboard_metrics(
         group_by=group_by,
     )
     return DashboardMetricsResponse(
-        command_metrics=[MetricsBucket.model_validate(b) for b in dto.command_metrics],
-        script_metrics=[MetricsBucket.model_validate(b) for b in dto.script_metrics],
+        command_metrics=[
+            MetricsBucket.model_validate(asdict(b)) for b in dto.command_metrics
+        ],
+        script_metrics=[
+            MetricsBucket.model_validate(asdict(b)) for b in dto.script_metrics
+        ],
     )
