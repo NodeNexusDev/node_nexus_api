@@ -53,3 +53,14 @@ class ConfigImportResultDTO:
     commands_created: int = 0
     scripts_created: int = 0
     errors: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class DryRunPreviewDTO:
+    """Preview of what a dry-run import would do without writing."""
+
+    would_create_nodes: tuple[NodeConfigDTO, ...] = ()
+    would_create_commands: tuple[CommandConfigDTO, ...] = ()
+    would_create_scripts: tuple[ScriptConfigDTO, ...] = ()
+    duplicates: tuple[str, ...] = ()
+    errors: tuple[str, ...] = ()

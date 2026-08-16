@@ -9,6 +9,7 @@ from app.application.dto.config import (
     LEGACY_CONFIG_VERSION,
     ConfigImportResultDTO,
     ConfigTransferDTO,
+    DryRunPreviewDTO,
 )
 from app.application.ports.config_persistence import (
     ConfigurationExporter,
@@ -39,7 +40,9 @@ class ConfigService:
             exported_at=datetime.now(UTC),
         )
 
-    async def import_config(self, data: ConfigTransferDTO) -> ConfigImportResultDTO:
+    async def import_config(
+        self, data: ConfigTransferDTO, *, dry_run: bool = False
+    ) -> ConfigImportResultDTO | DryRunPreviewDTO:
         """Validate the transfer format and delegate the coordinated import."""
         if data.format_version is not None:
             received_major = data.format_version.split(".", maxsplit=1)[0]
@@ -49,6 +52,8 @@ class ConfigService:
                     "Unsupported configuration format "
                     f"{data.format_version}; supported major is {supported_major}"
                 )
+        if dry_run:
+            return await self._importer.preview_import(data)
         return await self._importer.import_config(data)
 
 

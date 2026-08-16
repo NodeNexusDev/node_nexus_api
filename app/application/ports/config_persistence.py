@@ -2,7 +2,11 @@
 
 from typing import Protocol
 
-from app.application.dto.config import ConfigImportResultDTO, ConfigTransferDTO
+from app.application.dto.config import (
+    ConfigImportResultDTO,
+    ConfigTransferDTO,
+    DryRunPreviewDTO,
+)
 
 
 class ConfigurationExporter(Protocol):
@@ -15,3 +19,5 @@ class ConfigurationImporter(Protocol):
     """Import one configuration payload as a coordinated operation."""
 
     async def import_config(self, data: ConfigTransferDTO) -> ConfigImportResultDTO: ...
+
+    async def preview_import(self, data: ConfigTransferDTO) -> DryRunPreviewDTO: ...
