@@ -126,4 +126,67 @@ curl --fail-with-body \
 оригинальными byte count, а также время выполнения. Вывод ограничивается
 политикой `bound_output()` для защиты от переполнения.
 
+## История статусов
+
+Запросите историю изменений статуса (active/unreachable/error) для ноды:
+
+```bash
+curl --fail-with-body \
+  -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
+  "${NODE_NEXUS_URL}/api/v1/nodes/${NODE_ID}/status-history?page=1&size=50"
+```
+
+Необязательные параметры: `from` и `to` (ISO 8601), `status` (например,
+`active`, `unreachable`). Возвращает пагинированный список записей с
+`previous_status`, `new_status`, `reason` и `changed_at`.
+
+История записывается автоматически при проверке подключения или обновлении ноды.
+
+## Массовые операции
+
+Выполнение массовых действий на нескольких нодах одновременно.
+
+### Массовая проверка связи
+
+```bash
+curl --fail-with-body -X POST \
+  -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{"node_ids": ["<id-1>", "<id-2>"]}' \
+  "${NODE_NEXUS_URL}/api/v1/nodes/bulk/check"
+```
+
+### Массовое добавление тегов
+
+```bash
+curl --fail-with-body -X POST \
+  -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{"node_ids": ["<id-1>"], "tags": ["staging"]}' \
+  "${NODE_NEXUS_URL}/api/v1/nodes/bulk/tags/add"
+```
+
+### Массовое удаление тегов
+
+```bash
+curl --fail-with-body -X POST \
+  -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{"node_ids": ["<id-1>"], "tags": ["deprecated"]}' \
+  "${NODE_NEXUS_URL}/api/v1/nodes/bulk/tags/remove"
+```
+
+### Массовое удаление нод
+
+```bash
+curl --fail-with-body -X POST \
+  -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{"node_ids": ["<id-1>", "<id-2>"]}' \
+  "${NODE_NEXUS_URL}/api/v1/nodes/bulk/delete"
+```
+
+Все массовые endpoint'ы принимают `node_ids` и/или `node_tags` (пересечение AND).
+Ответ содержит `success`/`error` по каждой ноде.
+
 Актуальные схемы запросов и ответов смотрите в Swagger UI (`/docs`).

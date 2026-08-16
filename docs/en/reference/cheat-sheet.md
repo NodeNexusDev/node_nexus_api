@@ -30,6 +30,11 @@ export NODE_NEXUS_API_KEY='your-key'
 | Check connectivity | `curl -X POST -H "X-API-Key: ${NODE_NEXUS_API_KEY}" "${NODE_NEXUS_URL}/api/v1/nodes/${NODE_ID}/check/"` |
 | Validate credentials | `curl -X POST -H "X-API-Key: ${NODE_NEXUS_API_KEY}" -H 'Content-Type: application/json' -d '{"host":"192.0.2.10","port":22,"username":"ops","password":"..."}' "${NODE_NEXUS_URL}/api/v1/nodes/validate-credentials"` |
 | Get metrics | `curl -H "X-API-Key: ${NODE_NEXUS_API_KEY}" "${NODE_NEXUS_URL}/api/v1/nodes/${NODE_ID}/metrics/"` |
+| Status history | `curl -H "X-API-Key: ${NODE_NEXUS_API_KEY}" "${NODE_NEXUS_URL}/api/v1/nodes/${NODE_ID}/status-history?page=1&size=50"` |
+| Bulk check | `curl -X POST -H "X-API-Key: ${NODE_NEXUS_API_KEY}" -H 'Content-Type: application/json' -d '{"node_ids":["<id1>","<id2>"]}' "${NODE_NEXUS_URL}/api/v1/nodes/bulk/check"` |
+| Bulk add tags | `curl -X POST -H "X-API-Key: ${NODE_NEXUS_API_KEY}" -H 'Content-Type: application/json' -d '{"node_ids":["<id1>"],"tags":["staging"]}' "${NODE_NEXUS_URL}/api/v1/nodes/bulk/tags/add"` |
+| Bulk remove tags | `curl -X POST -H "X-API-Key: ${NODE_NEXUS_API_KEY}" -H 'Content-Type: application/json' -d '{"node_ids":["<id1>"],"tags":["deprecated"]}' "${NODE_NEXUS_URL}/api/v1/nodes/bulk/tags/remove"` |
+| Bulk delete | `curl -X POST -H "X-API-Key: ${NODE_NEXUS_API_KEY}" -H 'Content-Type: application/json' -d '{"node_ids":["<id1>","<id2>"]}' "${NODE_NEXUS_URL}/api/v1/nodes/bulk/delete"` |
 
 ## Commands
 
@@ -40,6 +45,7 @@ export NODE_NEXUS_API_KEY='your-key'
 | Create command template | `curl -X POST -H "X-API-Key: ${NODE_NEXUS_API_KEY}" -H 'Content-Type: application/json' -d '{"name":"disk","command":"df -h {{ mount }}","parameters":[{"name":"mount","type":"string","required":true}]}' "${NODE_NEXUS_URL}/api/v1/commands/"` |
 | List templates | `curl -H "X-API-Key: ${NODE_NEXUS_API_KEY}" "${NODE_NEXUS_URL}/api/v1/commands/?page=1&size=20"` |
 | Execute template | `curl -X POST -H "X-API-Key: ${NODE_NEXUS_API_KEY}" -H 'Content-Type: application/json' -d "{\"node_id\":\"${NODE_ID}\",\"params\":{\"mount\":\"/\"}}" "${NODE_NEXUS_URL}/api/v1/commands/${COMMAND_ID}/execute"` |
+| Retry command | `curl -X POST -H "X-API-Key: ${NODE_NEXUS_API_KEY}" "${NODE_NEXUS_URL}/api/v1/nodes/${NODE_ID}/commands/${EXECUTION_ID}/retry"` |
 
 ## Docker
 
@@ -50,6 +56,14 @@ export NODE_NEXUS_API_KEY='your-key'
 | Exec in container | `curl -X POST -H "X-API-Key: ${NODE_NEXUS_API_KEY}" -H 'Content-Type: application/json' -d '{"command":"id","timeout":30}' "${NODE_NEXUS_URL}/api/v1/nodes/${NODE_ID}/docker/containers/${CONTAINER_ID}/exec/"` |
 | Start container | `curl -X POST -H "X-API-Key: ${NODE_NEXUS_API_KEY}" "${NODE_NEXUS_URL}/api/v1/nodes/${NODE_ID}/docker/containers/${CONTAINER_ID}/start/"` |
 | Stop container | `curl -X POST -H "X-API-Key: ${NODE_NEXUS_API_KEY}" "${NODE_NEXUS_URL}/api/v1/nodes/${NODE_ID}/docker/containers/${CONTAINER_ID}/stop/"` |
+
+## Scripts
+
+| Task | Command |
+|------|---------|
+| Retry script | `curl -X POST -H "X-API-Key: ${NODE_NEXUS_API_KEY}" "${NODE_NEXUS_URL}/api/v1/scripts/executions/${EXECUTION_ID}/retry"` |
+| Cancel execution | `curl -X POST -H "X-API-Key: ${NODE_NEXUS_API_KEY}" "${NODE_NEXUS_URL}/api/v1/scripts/executions/${EXECUTION_ID}/cancel"` |
+| Schedule history | `curl -H "X-API-Key: ${NODE_NEXUS_API_KEY}" "${NODE_NEXUS_URL}/api/v1/scripts/${SCRIPT_ID}/schedule/history?page=1&size=20"` |
 
 ## Configuration
 

@@ -103,3 +103,53 @@ curl --fail-with-body -X POST \
 
 Поля `exit_code`, `stdout`, `stderr` присутствуют для каждого шага, но на уровне
 пакетного ответа `results` содержит агрегированные данные по нодам.
+
+## Повтор выполнения
+
+Повторный запуск завершившейся ошибкой команды или скрипта с теми же параметрами.
+
+### Повтор команды
+
+```bash
+curl --fail-with-body -X POST \
+  -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
+  "${NODE_NEXUS_URL}/api/v1/nodes/${NODE_ID}/commands/${EXECUTION_ID}/retry"
+```
+
+### Повтор скрипта
+
+```bash
+curl --fail-with-body -X POST \
+  -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
+  "${NODE_NEXUS_URL}/api/v1/scripts/executions/${EXECUTION_ID}/retry"
+```
+
+Возвращает новое выполнение с теми же `script_id`, `node_id` и `params`.
+
+## Отмена выполнения
+
+Отмена ещё выполняющегося скрипта:
+
+```bash
+curl --fail-with-body -X POST \
+  -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
+  "${NODE_NEXUS_URL}/api/v1/scripts/executions/${EXECUTION_ID}/cancel"
+```
+
+Отменить можно только выполняющиеся executions. Уже завершённые или упавшие
+вернут ошибку.
+
+## История расписаний
+
+Просмотр истории выполнений конкретного расписания (cron-запуски):
+
+```bash
+curl --fail-with-body \
+  -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
+  "${NODE_NEXUS_URL}/api/v1/scripts/${SCRIPT_ID}/schedule/history?page=1&size=20"
+```
+
+Необязательный параметр: `trigger` — фильтр по типу триггера (`manual`,
+`scheduled`, `api`). Возвращает пагинированный список выполнений скриптов с
+полями `trigger` и `schedule_id`. Включены только executions, созданные через
+`execute` или планировщик (выполнения команд не попадают).
