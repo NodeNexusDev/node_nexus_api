@@ -25,6 +25,8 @@ class ScriptExecutionRequestDTO:
     node_ids: tuple[UUID, ...] = ()
     tags: tuple[str, ...] = ()
     params: tuple[tuple[str, JsonValue], ...] = ()
+    trigger: str = "manual"
+    schedule_id: UUID | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -92,6 +94,7 @@ class ScriptExecutionQueryDTO:
     script_id: UUID
     offset: int
     limit: int
+    trigger: str | None = None
 
 
 @dataclass(frozen=True, slots=True)

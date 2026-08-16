@@ -29,10 +29,17 @@ from app.adapters.persistence.dao.node import NodeRepository
 from app.adapters.persistence.dao.script import ScriptRepository
 from app.adapters.persistence.dao.script_execution import ScriptExecutionRepository
 from app.adapters.persistence.dashboard import SqlAlchemyDashboardGateway
+from app.adapters.persistence.execution_lifecycle import (
+    SqlAlchemyExecutionLifecycleGateway,
+)
+from app.adapters.persistence.node_bulk_operator import SqlAlchemyNodeBulkOperator
 from app.adapters.persistence.node_management import (
     SqlAlchemyNodeManagementGateway,
 )
 from app.adapters.persistence.node_reader import ScopedNodeConnectionReader
+from app.adapters.persistence.node_status_history import (
+    SqlAlchemyNodeStatusHistoryGateway,
+)
 from app.adapters.persistence.node_validation import SshCredentialValidator
 from app.adapters.persistence.schedule import SqlAlchemyScheduleGateway
 from app.adapters.persistence.script_gateway import (
@@ -63,12 +70,18 @@ from app.application.ports.config_persistence import (
 from app.application.ports.credential_cipher import CredentialCipher
 from app.application.ports.dashboard import DashboardReader
 from app.application.ports.docker_runtime import DockerRuntime
+from app.application.ports.execution_lifecycle import ExecutionLifecycleManager
 from app.application.ports.health import DatabaseHealthProbe
+from app.application.ports.node_bulk_operator import NodeBulkOperator
 from app.application.ports.node_management import (
     NodeManagementReader,
     NodeManagementWriter,
 )
 from app.application.ports.node_reader import NodeConnectionReader, NodeStatusWriter
+from app.application.ports.node_status_history import (
+    NodeStatusHistoryReader,
+    NodeStatusHistoryWriter,
+)
 from app.application.ports.node_validation import NodeCredentialValidator
 from app.application.ports.remote_command import RemoteConnectorFactory
 from app.application.ports.remote_stream import RemoteStreamingConnectorFactory
@@ -104,11 +117,20 @@ from app.application.services.docker.command_runner import DockerCommandRunner
 from app.application.services.docker.container_service import DockerContainerService
 from app.application.services.docker.image_service import DockerImageService
 from app.application.services.docker.resource_service import DockerResourceService
+from app.application.services.execution_lifecycle_service import (
+    ExecutionLifecycleService,
+)
 from app.application.services.health_service import HealthService
 from app.application.services.node_bulk_command_service import NodeBulkCommandService
+from app.application.services.node_bulk_operation_service import (
+    NodeBulkOperationService,
+)
 from app.application.services.node_command_service import NodeCommandService
 from app.application.services.node_management_service import NodeManagementService
 from app.application.services.node_metrics_service import NodeMetricsService
+from app.application.services.node_status_history_service import (
+    NodeStatusHistoryService,
+)
 from app.application.services.node_validation_service import NodeValidationService
 from app.application.services.schedule_management import (
     ScheduleManagementService,
@@ -330,6 +352,55 @@ class RepositoryProvider(Provider):
         return gateway
 
     @provide(scope=Scope.APP)
+    def get_node_status_history_gateway(
+        self, sessionmaker: async_sessionmaker[AsyncSession]
+    ) -> SqlAlchemyNodeStatusHistoryGateway:
+        """Get the short-scope node status history gateway."""
+        return SqlAlchemyNodeStatusHistoryGateway(sessionmaker)
+
+    @provide(scope=Scope.APP, provides=NodeStatusHistoryReader)
+    def get_node_status_history_reader(
+        self, gateway: SqlAlchemyNodeStatusHistoryGateway
+    ) -> NodeStatusHistoryReader:
+        """Bind the node status history reader port."""
+        return gateway
+
+    @provide(scope=Scope.APP, provides=NodeStatusHistoryWriter)
+    def get_node_status_history_writer(
+        self, gateway: SqlAlchemyNodeStatusHistoryGateway
+    ) -> NodeStatusHistoryWriter:
+        """Bind the node status history writer port."""
+        return gateway
+
+    @provide(scope=Scope.APP)
+    def get_node_bulk_operator(
+        self, sessionmaker: async_sessionmaker[AsyncSession]
+    ) -> SqlAlchemyNodeBulkOperator:
+        """Get the short-scope bulk node operator."""
+        return SqlAlchemyNodeBulkOperator(sessionmaker)
+
+    @provide(scope=Scope.APP, provides=NodeBulkOperator)
+    def get_node_bulk_operator_port(
+        self, gateway: SqlAlchemyNodeBulkOperator
+    ) -> NodeBulkOperator:
+        """Bind the bulk node operator port."""
+        return gateway
+
+    @provide(scope=Scope.APP)
+    def get_execution_lifecycle_gateway(
+        self, sessionmaker: async_sessionmaker[AsyncSession]
+    ) -> SqlAlchemyExecutionLifecycleGateway:
+        """Get the short-scope execution lifecycle gateway."""
+        return SqlAlchemyExecutionLifecycleGateway(sessionmaker)
+
+    @provide(scope=Scope.APP, provides=ExecutionLifecycleManager)
+    def get_execution_lifecycle_manager(
+        self, gateway: SqlAlchemyExecutionLifecycleGateway
+    ) -> ExecutionLifecycleManager:
+        """Bind the execution lifecycle manager port."""
+        return gateway
+
+    @provide(scope=Scope.APP)
     def get_schedule_gateway(
         self, sessionmaker: async_sessionmaker[AsyncSession]
     ) -> SqlAlchemyScheduleGateway:
@@ -537,6 +608,7 @@ class ServiceProvider(Provider):
         status_writer: NodeStatusWriter,
         credential_cipher: CredentialCipher,
         history_writer: CommandHistoryWriter,
+        status_history_writer: NodeStatusHistoryWriter,
     ) -> NodeCommandService:
         """Get the single-node SSH command service."""
         return NodeCommandService(
@@ -546,7 +618,17 @@ class ServiceProvider(Provider):
             status_writer=status_writer,
             credential_cipher=credential_cipher,
             history_writer=history_writer,
+            status_history_writer=status_history_writer,
         )
+
+    @provide(scope=Scope.REQUEST)
+    def get_node_status_history_service(
+        self,
+        reader: NodeStatusHistoryReader,
+        writer: NodeStatusHistoryWriter,
+    ) -> NodeStatusHistoryService:
+        """Get the node status history service."""
+        return NodeStatusHistoryService(reader=reader, writer=writer)
 
     @provide(scope=Scope.APP)
     def get_streaming_command_service(
@@ -632,6 +714,7 @@ class ServiceProvider(Provider):
         writer: NodeManagementWriter,
         credential_cipher: CredentialCipher,
         audit_service: AuditEventSink,
+        status_history_writer: NodeStatusHistoryWriter,
     ) -> NodeManagementService:
         """Get the node management service."""
         return NodeManagementService(
@@ -639,6 +722,27 @@ class ServiceProvider(Provider):
             writer=writer,
             credential_cipher=credential_cipher,
             audit_service=audit_service,
+            status_history_writer=status_history_writer,
+        )
+
+    @provide(scope=Scope.REQUEST)
+    def get_node_bulk_operation_service(
+        self,
+        operator: NodeBulkOperator,
+    ) -> NodeBulkOperationService:
+        """Get the bulk node operation service."""
+        return NodeBulkOperationService(operator=operator)
+
+    @provide(scope=Scope.REQUEST)
+    def get_execution_lifecycle_service(
+        self,
+        manager: ExecutionLifecycleManager,
+        command_history_reader: CommandHistoryReader,
+    ) -> ExecutionLifecycleService:
+        """Get the execution lifecycle service."""
+        return ExecutionLifecycleService(
+            manager=manager,
+            command_history_reader=command_history_reader,
         )
 
     @provide(scope=Scope.REQUEST)

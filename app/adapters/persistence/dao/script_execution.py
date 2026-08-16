@@ -22,23 +22,31 @@ class ScriptExecutionRepository:
         return result.scalar_one_or_none()
 
     async def get_by_script_id(
-        self, script_id: UUID, skip: int = 0, limit: int = 50
+        self,
+        script_id: UUID,
+        skip: int = 0,
+        limit: int = 50,
+        trigger: str | None = None,
     ) -> list[ScriptExecutionModel]:
-        result = await self._session.execute(
+        query = (
             select(ScriptExecutionModel)
             .where(ScriptExecutionModel.script_id == script_id)
             .order_by(ScriptExecutionModel.started_at.desc())
-            .offset(skip)
-            .limit(limit)
         )
+        if trigger is not None:
+            query = query.where(ScriptExecutionModel.trigger == trigger)
+        result = await self._session.execute(query.offset(skip).limit(limit))
         return list(result.scalars().all())
 
-    async def count_by_script_id(self, script_id: UUID) -> int:
-        result = await self._session.execute(
-            select(func.count(ScriptExecutionModel.id)).where(
-                ScriptExecutionModel.script_id == script_id
-            )
+    async def count_by_script_id(
+        self, script_id: UUID, trigger: str | None = None
+    ) -> int:
+        query = select(func.count(ScriptExecutionModel.id)).where(
+            ScriptExecutionModel.script_id == script_id
         )
+        if trigger is not None:
+            query = query.where(ScriptExecutionModel.trigger == trigger)
+        result = await self._session.execute(query)
         return result.scalar_one()
 
     async def create(self, data: dict[str, Any]) -> ScriptExecutionModel:

@@ -89,6 +89,8 @@ class ScriptExecutionService:
                     "node_id": node.id,
                     "params": None,
                     "status": "running",
+                    "trigger": request.trigger,
+                    "schedule_id": request.schedule_id,
                     "steps": [],
                     "started_at": datetime.now(UTC),
                 }

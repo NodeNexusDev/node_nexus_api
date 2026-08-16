@@ -30,7 +30,7 @@ class ScriptHistoryService:
         self._execution_reader = execution_reader
 
     async def get_executions(
-        self, script_id: UUID, page: int = 1, size: int = 20
+        self, script_id: UUID, page: int = 1, size: int = 20, trigger: str | None = None
     ) -> tuple[list[ScriptExecutionDTO], int]:
         if await self._script_reader.get_script(script_id) is None:
             raise ScriptNotFoundError(f"Script {script_id} not found")
@@ -39,6 +39,7 @@ class ScriptHistoryService:
                 script_id=script_id,
                 offset=(page - 1) * size,
                 limit=size,
+                trigger=trigger,
             )
         )
         return list(result.items), result.total

@@ -8,14 +8,22 @@ from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
 from fastapi import APIRouter, HTTPException, Query, Security
 
 from app.api.deps import get_current_api_key, require_write_scope
+from app.application.dto.bulk_node_operation import (
+    BulkNodeDeleteDTO,
+    BulkNodeTagOperationDTO,
+)
 from app.application.dto.command_execution import (
     BulkCommandRequestDTO,
     CommandRequestDTO,
 )
+from app.application.dto.execution_lifecycle import RetryCommandDTO
 from app.application.dto.node_management import (
     NodeCreateDTO,
     NodeTagDTO,
     NodeUpdateDTO,
+)
+from app.application.dto.node_status_history import (
+    NodeStatusHistoryQueryDTO,
 )
 from app.application.dto.node_validation import NodeValidationRequestDTO
 from app.application.dto.node_view import NodeViewDTO
@@ -23,10 +31,19 @@ from app.application.services.bulk_command_history_service import (
     BulkCommandHistoryService,
 )
 from app.application.services.command_history_service import CommandHistoryService
+from app.application.services.execution_lifecycle_service import (
+    ExecutionLifecycleService,
+)
 from app.application.services.node_bulk_command_service import NodeBulkCommandService
+from app.application.services.node_bulk_operation_service import (
+    NodeBulkOperationService,
+)
 from app.application.services.node_command_service import NodeCommandService
 from app.application.services.node_management_service import NodeManagementService
 from app.application.services.node_metrics_service import NodeMetricsService
+from app.application.services.node_status_history_service import (
+    NodeStatusHistoryService,
+)
 from app.application.services.node_validation_service import NodeValidationService
 from app.schemas.common import CursorPage, decode_cursor, encode_cursor
 from app.schemas.node import (
@@ -34,16 +51,23 @@ from app.schemas.node import (
     BulkCommandHistoryResponse,
     BulkCommandRequest,
     BulkCommandResult,
+    BulkNodeCheckRequest,
+    BulkNodeDeleteRequest,
+    BulkNodeOperationResult,
     BulkNodeResult,
+    BulkNodeTagRequest,
     CommandHistoryResponse,
     CommandRequest,
     CommandResult,
     CpuMetrics,
     DiskMetrics,
+    ExecutionRetryResponse,
     MemoryMetrics,
     NodeCreate,
     NodeMetrics,
     NodeResponse,
+    NodeStatusHistoryItem,
+    NodeStatusHistoryResponse,
     NodeUpdate,
     NodeValidateRequest,
     NodeValidateResponse,
@@ -434,3 +458,171 @@ async def remove_tag(
     """Remove a tag from a node."""
     audit.info("api.nodes.tags.remove", node_id=str(node_id), tag=data.tag)
     return _node_response(await service.remove_tag(node_id, NodeTagDTO(tag=data.tag)))
+
+
+@router.get(
+    "/{node_id}/status-history",
+    response_model=NodeStatusHistoryResponse,
+)
+@inject
+async def get_node_status_history(
+    node_id: uuid.UUID,
+    service: FromDishka[NodeStatusHistoryService],
+    page: int = Query(1, ge=1),
+    size: int = Query(20, ge=1, le=100),
+    _key: str = Security(get_current_api_key),
+) -> NodeStatusHistoryResponse:
+    """Get status change history for a node."""
+    audit.info("api.nodes.status_history", node_id=str(node_id), page=page, size=size)
+    query = NodeStatusHistoryQueryDTO(
+        node_id=node_id,
+        offset=(page - 1) * size,
+        limit=size,
+    )
+    result = await service.get_history(query)
+    return NodeStatusHistoryResponse(
+        items=[
+            NodeStatusHistoryItem(
+                id=item.id,
+                node_id=item.node_id,
+                old_status=item.old_status,
+                new_status=item.new_status,
+                source=item.source,
+                changed_at=item.changed_at,
+            )
+            for item in result.items
+        ],
+        total=result.total,
+        page=page,
+        size=size,
+    )
+
+
+# --- Bulk node operations ---
+
+
+@router.post("/bulk/delete", response_model=BulkNodeOperationResult)
+@inject
+async def bulk_delete_nodes(
+    data: BulkNodeDeleteRequest,
+    service: FromDishka[NodeBulkOperationService],
+    _key: str = Security(require_write_scope),
+) -> BulkNodeOperationResult:
+    """Delete multiple nodes by IDs."""
+    audit.info(
+        "api.nodes.bulk_delete",
+        node_ids=[str(n) for n in data.node_ids],
+    )
+    result = await service.bulk_delete(
+        BulkNodeDeleteDTO(node_ids=tuple(data.node_ids))
+    )
+    return BulkNodeOperationResult(
+        affected=result.affected,
+        node_ids=list(result.node_ids),
+    )
+
+
+@router.post("/bulk/tags/add", response_model=BulkNodeOperationResult)
+@inject
+async def bulk_add_tags(
+    data: BulkNodeTagRequest,
+    service: FromDishka[NodeBulkOperationService],
+    _key: str = Security(require_write_scope),
+) -> BulkNodeOperationResult:
+    """Add tags to multiple nodes."""
+    audit.info(
+        "api.nodes.bulk_tags_add",
+        node_ids=[str(n) for n in data.node_ids],
+        tags=data.tags,
+    )
+    result = await service.bulk_add_tags(
+        BulkNodeTagOperationDTO(
+            node_ids=tuple(data.node_ids),
+            tags=tuple(data.tags),
+        )
+    )
+    return BulkNodeOperationResult(
+        affected=result.affected,
+        node_ids=list(result.node_ids),
+    )
+
+
+@router.post("/bulk/tags/remove", response_model=BulkNodeOperationResult)
+@inject
+async def bulk_remove_tags(
+    data: BulkNodeTagRequest,
+    service: FromDishka[NodeBulkOperationService],
+    _key: str = Security(require_write_scope),
+) -> BulkNodeOperationResult:
+    """Remove tags from multiple nodes."""
+    audit.info(
+        "api.nodes.bulk_tags_remove",
+        node_ids=[str(n) for n in data.node_ids],
+        tags=data.tags,
+    )
+    result = await service.bulk_remove_tags(
+        BulkNodeTagOperationDTO(
+            node_ids=tuple(data.node_ids),
+            tags=tuple(data.tags),
+        )
+    )
+    return BulkNodeOperationResult(
+        affected=result.affected,
+        node_ids=list(result.node_ids),
+    )
+
+
+@router.post("/bulk/check", response_model=BulkNodeOperationResult)
+@inject
+async def bulk_check_nodes(
+    data: BulkNodeCheckRequest,
+    service: FromDishka[NodeCommandService],
+    _key: str = Security(require_write_scope),
+) -> BulkNodeOperationResult:
+    """Check SSH connectivity for multiple nodes."""
+    import asyncio
+
+    audit.info(
+        "api.nodes.bulk_check",
+        node_ids=[str(n) for n in data.node_ids],
+    )
+    results = await asyncio.gather(
+        *(service.check_connectivity(node_id) for node_id in data.node_ids),
+        return_exceptions=True,
+    )
+    succeeded_ids = [
+        str(data.node_ids[i])
+        for i, r in enumerate(results)
+        if not isinstance(r, Exception)
+    ]
+    return BulkNodeOperationResult(
+        affected=len(succeeded_ids),
+        node_ids=data.node_ids,
+    )
+
+
+@router.post(
+    "/{node_id}/commands/{execution_id}/retry",
+    response_model=ExecutionRetryResponse,
+)
+@inject
+async def retry_command(
+    node_id: uuid.UUID,
+    execution_id: uuid.UUID,
+    service: FromDishka[ExecutionLifecycleService],
+    _key: str = Security(require_write_scope),
+) -> ExecutionRetryResponse:
+    """Retry a command execution."""
+    audit.info(
+        "api.nodes.commands.retry",
+        node_id=str(node_id),
+        execution_id=str(execution_id),
+    )
+    result = await service.retry_command(
+        RetryCommandDTO(execution_id=execution_id, node_id=node_id)
+    )
+    return ExecutionRetryResponse(
+        execution_id=result["execution_id"],
+        status=result["status"],
+        message="Command retry scheduled",
+    )

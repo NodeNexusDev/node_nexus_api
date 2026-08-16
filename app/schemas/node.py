@@ -232,3 +232,62 @@ class NodeValidateResponse(BaseModel):
 
     status: NodeStatus
     message: str
+
+
+# --- Node status history ---
+
+
+class NodeStatusHistoryItem(BaseModel):
+    """Single status change record."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    node_id: uuid.UUID | None = None
+    old_status: str | None = None
+    new_status: str
+    source: str
+    changed_at: datetime
+
+
+class NodeStatusHistoryResponse(PaginatedResponse[NodeStatusHistoryItem]):
+    """Paginated status history for a node."""
+
+    pass
+
+
+# --- Bulk node operations ---
+
+
+class BulkNodeDeleteRequest(BaseModel):
+    """Request to delete multiple nodes."""
+
+    node_ids: list[uuid.UUID] = Field(min_length=1)
+
+
+class BulkNodeTagRequest(BaseModel):
+    """Request to add or remove tags on multiple nodes."""
+
+    node_ids: list[uuid.UUID] = Field(min_length=1)
+    tags: list[str] = Field(min_length=1)
+
+
+class BulkNodeCheckRequest(BaseModel):
+    """Request to check connectivity on multiple nodes."""
+
+    node_ids: list[uuid.UUID] = Field(min_length=1)
+
+
+class BulkNodeOperationResult(BaseModel):
+    """Result of a bulk node operation."""
+
+    affected: int
+    node_ids: list[uuid.UUID]
+
+
+class ExecutionRetryResponse(BaseModel):
+    """Response for retry/cancel execution."""
+
+    execution_id: str
+    status: str
+    message: str

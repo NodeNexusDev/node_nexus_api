@@ -21,6 +21,7 @@ class ScriptExecutionModel(Base):
     __table_args__ = (
         Index("ix_script_executions_script_id", "script_id"),
         Index("ix_script_executions_node_id", "node_id"),
+        Index("ix_script_executions_trigger", "trigger"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
@@ -32,6 +33,10 @@ class ScriptExecutionModel(Base):
     )
     params: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     status: Mapped[str] = mapped_column(String(50), default=_default_status)
+    trigger: Mapped[str] = mapped_column(String(20), default="manual")
+    schedule_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("script_schedules.id", ondelete="SET NULL"), nullable=True
+    )
     steps: Mapped[list[dict] | None] = mapped_column(JSON, nullable=True)
     started_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_utcnow

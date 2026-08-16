@@ -205,5 +205,5 @@ async def test_list_executions_maps_history_page() -> None:
     assert result.total == 1
     assert result.items[0].steps[0].stdout == "ok"
     repository.get_by_script_id.assert_awaited_once_with(
-        execution.script_id, skip=20, limit=10
+        execution.script_id, skip=20, limit=10, trigger=None
     )

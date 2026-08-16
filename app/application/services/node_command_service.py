@@ -14,6 +14,7 @@ if TYPE_CHECKING:
         NodeConnectionReader,
         NodeStatusWriter,
     )
+    from app.application.ports.node_status_history import NodeStatusHistoryWriter
     from app.application.ports.remote_command import RemoteConnectorFactory
 
 from app.application.command_policy import command_fingerprint
@@ -43,6 +44,7 @@ class NodeCommandService:
         connector_factory: RemoteConnectorFactory,
         audit_service: AuditEventSink | None = None,
         history_writer: CommandHistoryWriter | None = None,
+        status_history_writer: NodeStatusHistoryWriter | None = None,
     ) -> None:
         self._node_reader = node_reader
         self._status_writer = status_writer
@@ -50,6 +52,7 @@ class NodeCommandService:
         self._audit = audit_service
         self._connector_factory = connector_factory
         self._history_writer = history_writer
+        self._status_history_writer = status_history_writer
 
     async def _log(
         self,
@@ -96,6 +99,20 @@ class NodeCommandService:
             )
 
         await self._log("check", node_id, {"status": new_status})
+
+        # Record status change in history before updating the node
+        if self._status_history_writer is not None:
+            from app.application.dto.node_status_history import NodeStatusChangeDTO
+
+            await self._status_history_writer.save(
+                NodeStatusChangeDTO(
+                    node_id=node_id,
+                    old_status=None,  # current status not fetched separately
+                    new_status=new_status,
+                    source="connectivity_check",
+                )
+            )
+
         updated = await self._status_writer.update_node_status(node_id, new_status)
         if updated is None:  # defensive: the node existed when the use case started
             raise NodeNotFoundError(f"Node {node_id} not found")
