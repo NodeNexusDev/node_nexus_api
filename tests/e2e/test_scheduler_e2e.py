@@ -118,7 +118,10 @@ def test_reconciliation_restores_schedule_after_restart(
     1. Schedule is registered with operational_state=registered.
     2. API restart clears all in-memory scheduler state.
     3. Reconciliation restores the schedule from DB.
-    4. Schedule executes exactly once after reconciliation.
+    4. Schedule executes exactly once when triggered via the E2E harness.
+
+    A far-future cron is used so the test does not depend on wall-clock
+    minute boundaries between restore and trigger-now.
     """
     node = e2e_resources.create_ssh_node()
     script = e2e_resources.create_script(
@@ -130,7 +133,7 @@ def test_reconciliation_restores_schedule_after_restart(
             }
         ]
     )
-    e2e_resources.create_schedule(script["id"], [node["id"]], cron="* * * * *")
+    e2e_resources.create_schedule(script["id"], [node["id"]], cron="0 9 * * *")
 
     # Verify initial state
     resp = e2e_client.get(_schedule_url(script["id"]))
@@ -138,7 +141,7 @@ def test_reconciliation_restores_schedule_after_restart(
     initial = resp.json()
     assert initial["enabled"] is True
     assert initial["operational_state"] == "registered"
-    assert initial["cron"] == "* * * * *"
+    assert initial["cron"] == "0 9 * * *"
 
     # Clear runtime state by restarting API
     docker_service_controller.restart("api")
@@ -150,7 +153,7 @@ def test_reconciliation_restores_schedule_after_restart(
     restored = resp.json()
     assert restored["enabled"] is True
     assert restored["operational_state"] == "registered"
-    assert restored["cron"] == "* * * * *"
+    assert restored["cron"] == "0 9 * * *"
     assert restored["next_run_at"] is not None
 
     # Trigger execution immediately via the E2E harness.
@@ -243,7 +246,11 @@ def test_persistent_schedule_recovers_after_api_restart(
     e2e_resources: UniqueResourceFactory,
     docker_service_controller: DockerServiceController,
 ) -> None:
-    """An empty runtime projection is restored from the persistent schedule."""
+    """An empty runtime projection is restored from the persistent schedule.
+
+    Execution is triggered through the E2E harness. A far-future cron avoids
+    a race with the minute boundary between restore and trigger-now.
+    """
     node = e2e_resources.create_ssh_node()
     script = e2e_resources.create_script(
         steps=[
@@ -255,9 +262,9 @@ def test_persistent_schedule_recovers_after_api_restart(
         ]
     )
     schedule = e2e_resources.create_schedule(
-        script["id"], [node["id"]], cron="* * * * *"
+        script["id"], [node["id"]], cron="0 9 * * *"
     )
-    assert schedule["cron"] == "* * * * *"
+    assert schedule["cron"] == "0 9 * * *"
 
     docker_service_controller.restart("api")
     _wait_for_api(e2e_client)
@@ -266,7 +273,7 @@ def test_persistent_schedule_recovers_after_api_restart(
     assert restored.status_code == 200, restored.text
     restored_schedule = restored.json()
     assert restored_schedule["enabled"] is True
-    assert restored_schedule["cron"] == "* * * * *"
+    assert restored_schedule["cron"] == "0 9 * * *"
     assert restored_schedule["next_run_at"] is not None
 
     resp = e2e_client.post(f"/api/v1/internal/e2e/scheduler/{script['id']}/trigger-now")
