@@ -19,7 +19,7 @@ _exec = exec_stream.__dishka_orig_func__  # type: ignore[attr-defined]
 
 def _make_ws(token: str | None = "test-key") -> AsyncMock:
     ws = AsyncMock()
-    ws.query_params = {"token": token} if token else {}
+    ws.headers = {"x-api-key": token} if token else {}
     return ws
 
 
