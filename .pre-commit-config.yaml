@@ -21,3 +21,13 @@ repos:
     rev: v4.4.0
     hooks:
       - id: commitizen
+
+  - repo: local
+    hooks:
+      - id: update-openapi-hash
+        name: Update OpenAPI contract hash
+        entry: env UPDATE_OPENAPI_HASH=1 uv run pytest tests/unit/test_openapi_contract.py::test_openapi_schema_matches_reviewed_snapshot -q
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit]
