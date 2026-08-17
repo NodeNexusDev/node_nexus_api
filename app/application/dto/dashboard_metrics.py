@@ -2,13 +2,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
+from typing import Literal
 
 
 @dataclass(frozen=True, slots=True)
 class MetricsQueryDTO:
     date_from: datetime | None = None
     date_to: datetime | None = None
-    group_by: str = "day"
+    group_by: Literal["day", "hour", "week", "month"] = "day"
 
 
 @dataclass(frozen=True, slots=True)

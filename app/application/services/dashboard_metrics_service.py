@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Literal
 
 from app.application.dto.dashboard_metrics import (
     DashboardMetricsDTO,
@@ -17,7 +18,7 @@ class DashboardMetricsService:
         self,
         date_from: datetime | None = None,
         date_to: datetime | None = None,
-        group_by: str = "day",
+        group_by: Literal["day", "hour", "week", "month"] = "day",
     ) -> DashboardMetricsDTO:
         return await self._reader.get_metrics(
             MetricsQueryDTO(

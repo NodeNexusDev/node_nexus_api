@@ -26,7 +26,7 @@ class DashboardMetricsRepository:
         self,
         query: MetricsQueryDTO,
     ) -> list[MetricsBucketDTO]:
-        grp = _GROUP_MAP.get(query.group_by, "day")
+        grp = _GROUP_MAP[query.group_by]
         params: dict = {"grp": grp}
         where_clauses: list[str] = []
         if query.date_from is not None:
@@ -66,7 +66,7 @@ class DashboardMetricsRepository:
         self,
         query: MetricsQueryDTO,
     ) -> list[MetricsBucketDTO]:
-        grp = _GROUP_MAP.get(query.group_by, "day")
+        grp = _GROUP_MAP[query.group_by]
         params: dict = {"grp": grp}
         where_clauses: list[str] = []
         if query.date_from is not None:
