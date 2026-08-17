@@ -388,7 +388,7 @@ class TestExecutionStatsGateway:
             "last_executed_at": datetime.now(UTC),
         }
         mock_result = MagicMock()
-        mock_result.one.return_value = MagicMock(_mapping=row)
+        mock_result.one_or_none.return_value = MagicMock(_mapping=row)
         session.execute.return_value = mock_result
 
         result = await gw.get_command_stats(
@@ -415,7 +415,7 @@ class TestExecutionStatsGateway:
             "last_executed_at": datetime.now(UTC),
         }
         mock_result = MagicMock()
-        mock_result.one.return_value = MagicMock(_mapping=row)
+        mock_result.one_or_none.return_value = MagicMock(_mapping=row)
         session.execute.return_value = mock_result
 
         result = await gw.get_script_stats(ScriptStatsQueryDTO(script_id=uuid.uuid4()))
@@ -615,7 +615,7 @@ class TestExecutionStatsDAO:
             "last_executed_at": datetime.now(UTC),
         }
         mock_result = MagicMock()
-        mock_result.one.return_value = MagicMock(_mapping=row)
+        mock_result.one_or_none.return_value = MagicMock(_mapping=row)
         session.execute.return_value = mock_result
 
         result = await repo.command_stats(command_id=uuid.uuid4())
@@ -635,7 +635,7 @@ class TestExecutionStatsDAO:
             "last_executed_at": datetime.now(UTC),
         }
         mock_result = MagicMock()
-        mock_result.one.return_value = MagicMock(_mapping=row)
+        mock_result.one_or_none.return_value = MagicMock(_mapping=row)
         session.execute.return_value = mock_result
 
         result = await repo.script_stats(script_id=uuid.uuid4())
