@@ -15,7 +15,7 @@ jobs:
   release:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
 
@@ -77,7 +77,7 @@ jobs:
 
       - name: Build Docker image
         if: steps.find_tag.outputs.skip == 'false'
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:
           context: .
           push: false
@@ -85,7 +85,7 @@ jobs:
 
       - name: Create GitHub Release
         if: steps.find_tag.outputs.skip == 'false'
-        uses: softprops/action-gh-release@v3
+        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3.0.2
         with:
           tag_name: ${{ steps.find_tag.outputs.tag }}
           generate_release_notes: true
