@@ -16,14 +16,14 @@ class SqlAlchemyTagManager:
     async def rename_tag(self, old_name: str, new_name: str) -> int:
         total = 0
         for model in (NodeModel, CommandModel, ScriptModel):
-            stmt = (
+            stmt_rm = (
                 update(model)
                 .where(text(":name = ANY(tags)"))
                 .values(
                     tags=func.array_remove(model.tags, old_name),
                 )
-            ).execution_options(bindparams={"name": old_name})
-            result = await self._session.execute(stmt)
+            )
+            result = await self._session.execute(stmt_rm, {"name": old_name})
             total += result.rowcount  # ty: ignore[unresolved-attribute]
             stmt_add = (
                 update(model)
@@ -31,8 +31,8 @@ class SqlAlchemyTagManager:
                 .values(
                     tags=func.array_cat(model.tags, pg_array([new_name])),
                 )
-            ).execution_options(bindparams={"name": new_name})
-            await self._session.execute(stmt_add)
+            )
+            await self._session.execute(stmt_add, {"name": new_name})
         await self._session.flush()
         return total
 
@@ -45,8 +45,8 @@ class SqlAlchemyTagManager:
                 .values(
                     tags=func.array_remove(model.tags, tag_name),
                 )
-            ).execution_options(bindparams={"name": tag_name})
-            result = await self._session.execute(stmt)
+            )
+            result = await self._session.execute(stmt, {"name": tag_name})
             total += result.rowcount  # ty: ignore[unresolved-attribute]
         await self._session.flush()
         return total
