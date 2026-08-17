@@ -18,21 +18,21 @@ class SqlAlchemyTagManager:
         for model in (NodeModel, CommandModel, ScriptModel):
             stmt_rm = (
                 update(model)
-                .where(text(":name = ANY(tags)"))
+                .where(text(":old_name = ANY(tags)"))
                 .values(
                     tags=func.array_remove(model.tags, old_name),
                 )
             )
-            result = await self._session.execute(stmt_rm, {"name": old_name})
+            result = await self._session.execute(stmt_rm, {"old_name": old_name})
             total += result.rowcount  # ty: ignore[unresolved-attribute]
             stmt_add = (
                 update(model)
-                .where(text("NOT (:name = ANY(tags))"))
+                .where(text("NOT (:new_name = ANY(tags))"))
                 .values(
                     tags=func.array_cat(model.tags, pg_array([new_name])),
                 )
             )
-            await self._session.execute(stmt_add, {"name": new_name})
+            await self._session.execute(stmt_add, {"new_name": new_name})
         await self._session.flush()
         return total
 
@@ -41,12 +41,12 @@ class SqlAlchemyTagManager:
         for model in (NodeModel, CommandModel, ScriptModel):
             stmt = (
                 update(model)
-                .where(text(":name = ANY(tags)"))
+                .where(text(":del_tag = ANY(tags)"))
                 .values(
                     tags=func.array_remove(model.tags, tag_name),
                 )
             )
-            result = await self._session.execute(stmt, {"name": tag_name})
+            result = await self._session.execute(stmt, {"del_tag": tag_name})
             total += result.rowcount  # ty: ignore[unresolved-attribute]
         await self._session.flush()
         return total
