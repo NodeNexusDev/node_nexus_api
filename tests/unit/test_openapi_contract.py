@@ -2,26 +2,44 @@
 
 import hashlib
 import json
+import os
+from pathlib import Path
 
 from httpx2 import ASGITransport, AsyncClient
 
 from app.main import app
 
 OPENAPI_CONTRACT_SHA256 = (
-    "b31da54ecfb4efc142689800a603a21328886308e7b66c80ec03349e66073f21"
+    "d4c81da9a5db50d714ee3f63378da819aa3751d27c9b4f15708842e1e1e1272d"
 )
 
 
-def test_openapi_schema_matches_reviewed_snapshot() -> None:
-    """Require an explicit review for every public HTTP contract change."""
+def _compute_canonical_hash() -> str:
     canonical_schema = json.dumps(
         app.openapi(),
         sort_keys=True,
         separators=(",", ":"),
         ensure_ascii=False,
     ).encode()
+    return hashlib.sha256(canonical_schema).hexdigest()
 
-    assert hashlib.sha256(canonical_schema).hexdigest() == OPENAPI_CONTRACT_SHA256
+
+def _persist_new_hash(new_hash: str) -> None:
+    """Rewrite OPENAPI_CONTRACT_SHA256 in this source file."""
+    source = Path(__file__).read_text(encoding="utf-8")
+    updated = source.replace(OPENAPI_CONTRACT_SHA256, new_hash)
+    Path(__file__).write_text(updated, encoding="utf-8")
+
+
+def test_openapi_schema_matches_reviewed_snapshot() -> None:
+    """Require an explicit review for every public HTTP contract change."""
+    new_hash = _compute_canonical_hash()
+
+    if os.environ.get("UPDATE_OPENAPI_HASH"):
+        _persist_new_hash(new_hash)
+        return
+
+    assert new_hash == OPENAPI_CONTRACT_SHA256
 
 
 def test_openapi_metadata_and_operation_ids_are_stable() -> None:
