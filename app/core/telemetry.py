@@ -30,7 +30,7 @@ def init_telemetry(app: FastAPI, settings: object) -> None:
         )
         from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
         from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
-        from opentelemetry.resources import Resource  # type: ignore[import-untyped]
+        from opentelemetry.resources import Resource  # type: ignore
         from opentelemetry.sdk.trace import TracerProvider
         from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
