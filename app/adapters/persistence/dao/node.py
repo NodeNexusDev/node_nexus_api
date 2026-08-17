@@ -10,6 +10,7 @@ from uuid import UUID
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.adapters.persistence.dao.base import escape_ilike
 from app.application.dto.node_connection import NodeConnectionDTO
 from app.models.node import NodeModel
 
@@ -132,11 +133,12 @@ class NodeRepository:
             for tag in tags:
                 query = query.where(NodeModel.tags.op("@>")([tag]))
         if search:
-            pattern = f"%{search}%"
+            escaped = escape_ilike(search)
+            pattern = f"%{escaped}%"
             query = query.where(
                 or_(
-                    NodeModel.name.ilike(pattern),
-                    NodeModel.host.ilike(pattern),
+                    NodeModel.name.ilike(pattern, escape="\\"),
+                    NodeModel.host.ilike(pattern, escape="\\"),
                 )
             )
         return query
@@ -228,5 +230,4 @@ class NodeRepository:
             return False
         await self._session.delete(node)
         await self._session.flush()
-        await self._session.commit()
         return True

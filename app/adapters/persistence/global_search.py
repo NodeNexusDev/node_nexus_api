@@ -3,6 +3,7 @@ from __future__ import annotations
 from sqlalchemy import or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from app.adapters.persistence.dao.base import escape_ilike
 from app.application.dto.global_search import (
     GlobalSearchQueryDTO,
     GlobalSearchResultDTO,
@@ -21,7 +22,8 @@ class SqlAlchemyGlobalSearchGateway:
         self,
         query: GlobalSearchQueryDTO,
     ) -> GlobalSearchResultDTO:
-        pattern = f"%{query.q}%"
+        escaped = escape_ilike(query.q)
+        pattern = f"%{escaped}%"
         limit = query.limit
 
         async with self._sessionmaker() as session:
@@ -29,8 +31,8 @@ class SqlAlchemyGlobalSearchGateway:
                 select(NodeModel.id, NodeModel.name)
                 .where(
                     or_(
-                        NodeModel.name.ilike(pattern),
-                        NodeModel.host.ilike(pattern),
+                        NodeModel.name.ilike(pattern, escape="\\"),
+                        NodeModel.host.ilike(pattern, escape="\\"),
                     )
                 )
                 .limit(limit)
@@ -39,8 +41,8 @@ class SqlAlchemyGlobalSearchGateway:
                 select(CommandModel.id, CommandModel.name)
                 .where(
                     or_(
-                        CommandModel.name.ilike(pattern),
-                        CommandModel.description.ilike(pattern),
+                        CommandModel.name.ilike(pattern, escape="\\"),
+                        CommandModel.description.ilike(pattern, escape="\\"),
                     )
                 )
                 .limit(limit)
@@ -49,8 +51,8 @@ class SqlAlchemyGlobalSearchGateway:
                 select(ScriptModel.id, ScriptModel.name)
                 .where(
                     or_(
-                        ScriptModel.name.ilike(pattern),
-                        ScriptModel.description.ilike(pattern),
+                        ScriptModel.name.ilike(pattern, escape="\\"),
+                        ScriptModel.description.ilike(pattern, escape="\\"),
                     )
                 )
                 .limit(limit)
@@ -86,7 +88,7 @@ class SqlAlchemyGlobalSearchGateway:
                     text(
                         "SELECT DISTINCT t AS tag "
                         "FROM nodes, unnest(tags) AS t "
-                        "WHERE t ILIKE :pattern LIMIT :limit"
+                        "WHERE t ILIKE :pattern ESCAPE '\\' LIMIT :limit"
                     ),
                     {"pattern": pattern, "limit": limit},
                 )
