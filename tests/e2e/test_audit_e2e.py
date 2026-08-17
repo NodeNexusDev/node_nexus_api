@@ -10,7 +10,6 @@ import asyncpg
 import httpx2 as httpx
 import pytest
 
-from tests.e2e.helpers.nodes import create_node as _create_node
 from tests.e2e.helpers.nodes import wait_for_audit as _wait_for_audit
 from tests.e2e.helpers.resources import UniqueResourceFactory
 from tests.e2e.helpers.service_controller import DockerServiceController
@@ -317,8 +316,11 @@ def _get_master_key() -> str:
     return "e2e-master-key-12345"
 
 
-def test_audit_log_endpoint(e2e_client: httpx.Client) -> None:
-    _create_node(e2e_client, name="audit-probe")
+def test_audit_log_endpoint(
+    e2e_client: httpx.Client,
+    e2e_resources: UniqueResourceFactory,
+) -> None:
+    e2e_resources.create_node(name="audit-probe")
     data = _wait_for_audit(e2e_client)
 
     assert "items" in data and "total" in data
@@ -332,8 +334,11 @@ def test_audit_log_endpoint(e2e_client: httpx.Client) -> None:
     assert "node_id" in log
 
 
-def test_audit_logs_track_crud_operations(e2e_client: httpx.Client) -> None:
-    node = _create_node(e2e_client, name="audit-crud")
+def test_audit_logs_track_crud_operations(
+    e2e_client: httpx.Client,
+    e2e_resources: UniqueResourceFactory,
+) -> None:
+    node = e2e_resources.create_node(name="audit-crud")
     node_id = node["id"]
 
     # create action recorded
@@ -358,9 +363,10 @@ def test_audit_logs_track_crud_operations(e2e_client: httpx.Client) -> None:
 
 def test_delete_creates_audit_log_and_removes_node(
     e2e_client: httpx.Client,
+    e2e_resources: UniqueResourceFactory,
 ) -> None:
     """Regression: FK violation used to roll back DELETE silently."""
-    node = _create_node(e2e_client, name="audit-fk-regression")
+    node = e2e_resources.create_node(name="audit-fk-regression")
     node_id = node["id"]
 
     total_before = e2e_client.get("/api/v1/audit/").json()["total"]
@@ -378,8 +384,11 @@ def test_delete_creates_audit_log_and_removes_node(
     assert "delete" in all_actions
 
 
-def test_audit_log_filter_by_action(e2e_client: httpx.Client) -> None:
-    node = _create_node(e2e_client, name="audit-filter")
+def test_audit_log_filter_by_action(
+    e2e_client: httpx.Client,
+    e2e_resources: UniqueResourceFactory,
+) -> None:
+    e2e_resources.create_node(name="audit-filter")
     _wait_for_audit(e2e_client, action="create")
 
     resp = e2e_client.get("/api/v1/audit/?action=create")
@@ -388,15 +397,14 @@ def test_audit_log_filter_by_action(e2e_client: httpx.Client) -> None:
     for log in resp.json()["items"]:
         assert log["action"] == "create"
 
-    e2e_client.delete(f"/api/v1/nodes/{node['id']}")
 
-
-def test_audit_log_pagination(e2e_client: httpx.Client) -> None:
+def test_audit_log_pagination(
+    e2e_client: httpx.Client,
+    e2e_resources: UniqueResourceFactory,
+) -> None:
     # Create multiple nodes to generate audit entries
-    created: list[str] = []
     for i in range(3):
-        node = _create_node(e2e_client, name=f"audit-page-{i}")
-        created.append(node["id"])
+        e2e_resources.create_node(name=f"audit-page-{i}")
 
     data = _wait_for_audit(e2e_client, minimum_total=3)
     assert data["total"] >= 3
@@ -408,12 +416,12 @@ def test_audit_log_pagination(e2e_client: httpx.Client) -> None:
     assert data["page"] == 1
     assert data["size"] == 2
 
-    for node_id in created:
-        e2e_client.delete(f"/api/v1/nodes/{node_id}")
 
-
-def test_audit_log_combined_filters(e2e_client: httpx.Client) -> None:
-    node = _create_node(e2e_client, name="audit-combined")
+def test_audit_log_combined_filters(
+    e2e_client: httpx.Client,
+    e2e_resources: UniqueResourceFactory,
+) -> None:
+    node = e2e_resources.create_node(name="audit-combined")
     node_id = node["id"]
 
     data = _wait_for_audit(
@@ -428,18 +436,19 @@ def test_audit_log_combined_filters(e2e_client: httpx.Client) -> None:
         if log["node_id"] is not None:
             assert log["node_id"] == node_id
 
-    e2e_client.delete(f"/api/v1/nodes/{node_id}")
-
 
 # ---------------------------------------------------------------------------
 # Stage B: Audit filter by user and date
 # ---------------------------------------------------------------------------
 
 
-def test_audit_log_filter_by_user(e2e_client: httpx.Client) -> None:
+def test_audit_log_filter_by_user(
+    e2e_client: httpx.Client,
+    e2e_resources: UniqueResourceFactory,
+) -> None:
     """Filter audit logs by user field."""
     # Create nodes to generate audit entries with user info
-    _create_node(e2e_client, name="audit-user-filter")
+    e2e_resources.create_node(name="audit-user-filter")
     data = _wait_for_audit(e2e_client, action="create")
     assert data["total"] >= 1
 
@@ -451,9 +460,12 @@ def test_audit_log_filter_by_user(e2e_client: httpx.Client) -> None:
         assert log["user"] == "e2e-master-key-12345"
 
 
-def test_audit_log_filter_by_date_range(e2e_client: httpx.Client) -> None:
+def test_audit_log_filter_by_date_range(
+    e2e_client: httpx.Client,
+    e2e_resources: UniqueResourceFactory,
+) -> None:
     """Filter audit logs by date_from and date_to."""
-    _create_node(e2e_client, name="audit-date-filter")
+    e2e_resources.create_node(name="audit-date-filter")
     _wait_for_audit(e2e_client, action="create")
 
     # Filter with a wide date range that includes all records
@@ -471,9 +483,12 @@ def test_audit_log_filter_by_date_range(e2e_client: httpx.Client) -> None:
     assert resp.json()["total"] == 0
 
 
-def test_audit_log_filter_by_action_and_date(e2e_client: httpx.Client) -> None:
+def test_audit_log_filter_by_action_and_date(
+    e2e_client: httpx.Client,
+    e2e_resources: UniqueResourceFactory,
+) -> None:
     """Combined action + date filter."""
-    _create_node(e2e_client, name="audit-combined-filter")
+    e2e_resources.create_node(name="audit-combined-filter")
     _wait_for_audit(e2e_client, action="create")
 
     resp = e2e_client.get(

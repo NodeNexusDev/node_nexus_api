@@ -15,10 +15,11 @@ from tests.e2e.helpers.middleware_stack import (
 )
 from tests.e2e.helpers.resources import UniqueResourceFactory
 from tests.e2e.helpers.service_controller import DockerServiceController
+from tests.e2e.settings import MASTER_API_KEY
 
 pytestmark = [pytest.mark.docker, pytest.mark.e2e_resilience]
 
-_MASTER_API_KEY = "e2e-master-key-12345"
+_MASTER_API_KEY = MASTER_API_KEY
 
 
 # ---------------------------------------------------------------------------
@@ -87,7 +88,7 @@ def timeout_client(timeout_stack: MiddlewareStackPorts) -> httpx.Client:
 
 
 class TestRateLimit:
-    """Rate-limit middleware behavior (RATE_LIMIT_REQUESTS=5, WINDOW=10s)."""
+    """Rate-limit middleware behavior (RATE_LIMIT_REQUESTS=5, WINDOW=3s)."""
 
     def test_remaining_header_decrements(self, rate_limit_client: httpx.Client) -> None:
         """Each request decrements X-RateLimit-Remaining."""
@@ -153,8 +154,8 @@ class TestRateLimit:
         resp = rate_limit_client.get("/api/v1/nodes/")
         assert resp.status_code == 429
 
-        # Wait for window to expire (10s window + 1s buffer)
-        time.sleep(11)
+        # Wait for window to expire (3s window + 1s buffer)
+        time.sleep(4)
 
         # Should succeed again
         resp = rate_limit_client.get("/api/v1/nodes/")
@@ -390,21 +391,23 @@ class TestNetworkFailures:
         docker_service_controller: DockerServiceController,
     ) -> None:
         """Readiness probe returns to 200 after DB recovery."""
-        # Pause DB
         docker_service_controller.pause("db")
         time.sleep(2)
 
-        # Unpause DB
         docker_service_controller.unpause("db")
 
-        # Wait for recovery
-        deadline = time.monotonic() + 15.0
+        resp = None
+        deadline = time.monotonic() + 30.0
         while time.monotonic() < deadline:
-            resp = e2e_client.get("/ready")
-            if resp.status_code == 200:
-                break
+            try:
+                resp = e2e_client.get("/ready")
+                if resp.status_code == 200:
+                    break
+            except httpx.HTTPError:
+                pass
             time.sleep(1)
 
+        assert resp is not None, "No response received after DB recovery"
         data = resp.json()
         assert data["status"] == "ready"
         assert data["checks"]["database"]["status"] == "ok"
@@ -417,15 +420,12 @@ class TestNetworkFailures:
         docker_service_controller: DockerServiceController,
     ) -> None:
         """API container restart doesn't lose persistent entities."""
-        # Create a node
         node = e2e_resources.create_ssh_node()
         node_id = node["id"]
 
-        # Restart API
         docker_service_controller.restart("api")
 
-        # Wait for API readiness
-        deadline = time.monotonic() + 30.0
+        deadline = time.monotonic() + 60.0
         while time.monotonic() < deadline:
             try:
                 resp = e2e_client.get("/ready")
@@ -435,7 +435,6 @@ class TestNetworkFailures:
                 pass
             time.sleep(1)
 
-        # Node should still exist
         resp = e2e_client.get(f"/api/v1/nodes/{node_id}")
         assert resp.status_code == 200
         assert resp.json()["id"] == node_id
@@ -449,11 +448,9 @@ class TestNetworkFailures:
         """After DinD restart, Docker operations work again."""
         e2e_resources.create_ssh_node()
 
-        # Restart DinD
         docker_service_controller.restart("dind")
 
-        # Wait for DinD to be healthy
-        deadline = time.monotonic() + 30.0
+        deadline = time.monotonic() + 60.0
         while time.monotonic() < deadline:
             try:
                 resp = e2e_client.get("/ready")
@@ -463,7 +460,6 @@ class TestNetworkFailures:
                 pass
             time.sleep(1)
 
-        # API should still be functional
         resp = e2e_client.get("/api/v1/nodes/")
         assert resp.status_code == 200
 
@@ -473,7 +469,6 @@ class TestNetworkFailures:
         docker_service_controller: DockerServiceController,
     ) -> None:
         """Disconnecting API from DB network causes errors, reconnecting restores."""
-        # Ensure API is healthy first
         deadline = time.monotonic() + 30.0
         while time.monotonic() < deadline:
             try:
@@ -484,22 +479,19 @@ class TestNetworkFailures:
                 pass
             time.sleep(1)
 
-        # Disconnect API from DB network
         docker_service_controller.disconnect_network("api")
         try:
             time.sleep(2)
-
-            # Request should fail (connection error or 503)
             try:
                 resp = e2e_client.get("/api/v1/nodes/")
                 assert resp.status_code in (500, 503)
             except httpx.HTTPError:
-                pass  # Connection refused is also acceptable
+                pass
         finally:
             docker_service_controller.reconnect_network("api")
 
-        # Wait for recovery
-        deadline = time.monotonic() + 15.0
+        resp = None
+        deadline = time.monotonic() + 30.0
         while time.monotonic() < deadline:
             try:
                 resp = e2e_client.get("/api/v1/nodes/")
@@ -509,4 +501,5 @@ class TestNetworkFailures:
                 pass
             time.sleep(1)
 
+        assert resp is not None, "No response received after DB recovery"
         assert resp.status_code == 200

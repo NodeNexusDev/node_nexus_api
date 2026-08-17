@@ -11,8 +11,7 @@ from uuid import uuid4
 import httpx2 as httpx
 import pytest
 
-from tests.e2e.helpers.nodes import create_docker_node as _create_docker_node
-from tests.e2e.helpers.nodes import create_ssh_node as _create_ssh_node
+from tests.e2e.helpers.resources import UniqueResourceFactory
 
 pytestmark = [pytest.mark.docker, pytest.mark.e2e_slow]
 
@@ -30,31 +29,32 @@ def _docker_pull_alpine(e2e_client: httpx.Client, node_id: str) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_large_stdout_ssh_command(e2e_client: httpx.Client) -> None:
+def test_large_stdout_ssh_command(
+    e2e_client: httpx.Client,
+    e2e_resources: UniqueResourceFactory,
+) -> None:
     """SSH command producing ~100KB stdout is received without truncation."""
-    node = _create_ssh_node(e2e_client)
-    try:
-        # Generate ~100KB of output (100 * 1024 bytes)
-        cmd = "dd if=/dev/zero bs=1K count=100 2>/dev/null | base64 | head -c 102400"
-        resp = e2e_client.post(
-            f"/api/v1/nodes/{node['id']}/execute",
-            json={"command": cmd},
-            timeout=60.0,
-        )
-        assert resp.status_code == 200, (
-            f"Large output command failed: {resp.status_code}"
-        )
-        result = resp.json()
-        stdout = result.get("stdout", "")
-        # Should get substantial output (not empty, not obviously truncated)
-        assert len(stdout) > 50000, f"Expected >50KB stdout, got {len(stdout)} bytes"
-    finally:
-        e2e_client.delete(f"/api/v1/nodes/{node['id']}")
+    node = e2e_resources.create_ssh_node()
+    # Generate ~100KB of output (100 * 1024 bytes)
+    cmd = "dd if=/dev/zero bs=1K count=100 2>/dev/null | base64 | head -c 102400"
+    resp = e2e_client.post(
+        f"/api/v1/nodes/{node['id']}/execute",
+        json={"command": cmd},
+        timeout=60.0,
+    )
+    assert resp.status_code == 200, f"Large output command failed: {resp.status_code}"
+    result = resp.json()
+    stdout = result.get("stdout", "")
+    # Should get substantial output (not empty, not obviously truncated)
+    assert len(stdout) > 50000, f"Expected >50KB stdout, got {len(stdout)} bytes"
 
 
-def test_large_stdout_docker_exec(e2e_client: httpx.Client) -> None:
+def test_large_stdout_docker_exec(
+    e2e_client: httpx.Client,
+    e2e_resources: UniqueResourceFactory,
+) -> None:
     """Docker exec producing ~100KB output is received without truncation."""
-    node = _create_docker_node(e2e_client)
+    node = e2e_resources.create_docker_node()
     try:
         _docker_pull_alpine(e2e_client, node["id"])
         # Start a container
@@ -82,7 +82,6 @@ def test_large_stdout_docker_exec(e2e_client: httpx.Client) -> None:
         e2e_client.delete(
             f"/api/v1/nodes/{node['id']}/docker/containers/lp-exec-large?force=true"
         )
-        e2e_client.delete(f"/api/v1/nodes/{node['id']}")
 
 
 # ---------------------------------------------------------------------------
@@ -154,23 +153,23 @@ def test_unicode_node_name(e2e_client: httpx.Client) -> None:
         e2e_client.delete(f"/api/v1/nodes/{node_id}")
 
 
-def test_special_chars_in_ssh_command(e2e_client: httpx.Client) -> None:
+def test_special_chars_in_ssh_command(
+    e2e_client: httpx.Client,
+    e2e_resources: UniqueResourceFactory,
+) -> None:
     """SSH command with quotes and special characters works correctly."""
-    node = _create_ssh_node(e2e_client)
-    try:
-        # Command with single quotes, double quotes, dollar sign
-        cmd = """echo 'single-quotes' && echo "double-quotes" && echo dollar-$"""
-        resp = e2e_client.post(
-            f"/api/v1/nodes/{node['id']}/execute",
-            json={"command": cmd},
-        )
-        assert resp.status_code == 200
-        result = resp.json()
-        stdout = result.get("stdout", "")
-        assert "single-quotes" in stdout
-        assert "double-quotes" in stdout
-    finally:
-        e2e_client.delete(f"/api/v1/nodes/{node['id']}")
+    node = e2e_resources.create_ssh_node()
+    # Command with single quotes, double quotes, dollar sign
+    cmd = """echo 'single-quotes' && echo "double-quotes" && echo dollar-$"""
+    resp = e2e_client.post(
+        f"/api/v1/nodes/{node['id']}/execute",
+        json={"command": cmd},
+    )
+    assert resp.status_code == 200
+    result = resp.json()
+    stdout = result.get("stdout", "")
+    assert "single-quotes" in stdout
+    assert "double-quotes" in stdout
 
 
 def test_null_byte_in_node_name_rejected(e2e_client: httpx.Client) -> None:

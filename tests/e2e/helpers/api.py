@@ -2,11 +2,13 @@
 
 import httpx2 as httpx
 
+from tests.e2e.settings import DEFAULT_TIMEOUT, MASTER_API_KEY
+
 
 def make_client(
     base_url: str,
-    api_key: str = "e2e-master-key-12345",
-    timeout: float = 30.0,
+    api_key: str = MASTER_API_KEY,
+    timeout: float = DEFAULT_TIMEOUT,
 ) -> httpx.Client:
     """Create a synchronous HTTP client with default auth headers."""
     return httpx.Client(

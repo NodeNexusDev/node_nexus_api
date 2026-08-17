@@ -20,7 +20,6 @@ import websockets
 from websockets.asyncio.client import ClientConnection
 
 from tests.e2e.conftest import ServicePorts
-from tests.e2e.helpers.nodes import create_ssh_node as _create_ssh_node
 from tests.e2e.helpers.resources import UniqueResourceFactory
 from tests.e2e.helpers.websocket import WebSocketClientFactory
 
@@ -118,7 +117,9 @@ async def test_ws_connect_with_master_key(
 
 @pytest.mark.asyncio
 async def test_ws_connect_with_managed_key(
-    service_ports: ServicePorts, e2e_client: httpx.Client
+    service_ports: ServicePorts,
+    e2e_client: httpx.Client,
+    e2e_resources: UniqueResourceFactory,
 ) -> None:
     """WebSocket connects with a managed read-write API key."""
     resp = e2e_client.post(
@@ -130,7 +131,7 @@ async def test_ws_connect_with_managed_key(
     key_token = api_key["key"]
     key_id = api_key["id"]
 
-    node = _create_ssh_node(e2e_client)
+    node = e2e_resources.create_ssh_node()
     try:
         url = _ws_url(service_ports, node["id"])
         async with websockets.connect(
@@ -140,58 +141,54 @@ async def test_ws_connect_with_managed_key(
             msg = await _receive_until_type(ws, "exit")
             assert msg.get("exit_code") == 0
     finally:
-        e2e_client.delete(f"/api/v1/nodes/{node['id']}")
         e2e_client.delete(f"/api/v1/api-keys/{key_id}")
 
 
 @pytest.mark.asyncio
 async def test_ws_query_token_rejected(
-    service_ports: ServicePorts, e2e_client: httpx.Client
+    service_ports: ServicePorts,
+    e2e_client: httpx.Client,
+    e2e_resources: UniqueResourceFactory,
 ) -> None:
     """Token passed as ?token= query parameter is no longer accepted."""
-    node = _create_ssh_node(e2e_client)
-    try:
-        url = f"{_ws_url(service_ports, node['id'])}?token=e2e-master-key-12345"
-        with pytest.raises(websockets.exceptions.ConnectionClosedError) as exc_info:
-            async with websockets.connect(url) as ws:
-                await ws.recv()
-        assert _close_code(exc_info.value) == 4001
-    finally:
-        e2e_client.delete(f"/api/v1/nodes/{node['id']}")
+    node = e2e_resources.create_ssh_node()
+    url = f"{_ws_url(service_ports, node['id'])}?token=e2e-master-key-12345"
+    with pytest.raises(websockets.exceptions.ConnectionClosedError) as exc_info:
+        async with websockets.connect(url) as ws:
+            await ws.recv()
+    assert _close_code(exc_info.value) == 4001
 
 
 @pytest.mark.asyncio
 async def test_ws_missing_token_closed(
-    service_ports: ServicePorts, e2e_client: httpx.Client
+    service_ports: ServicePorts,
+    e2e_client: httpx.Client,
+    e2e_resources: UniqueResourceFactory,
 ) -> None:
     """WebSocket without token is closed with code 4001."""
-    node = _create_ssh_node(e2e_client)
-    try:
-        url = _ws_url_no_token(service_ports, node["id"])
-        with pytest.raises(websockets.exceptions.ConnectionClosedError) as exc_info:
-            async with websockets.connect(url) as ws:
-                await ws.recv()
-        assert _close_code(exc_info.value) == 4001
-    finally:
-        e2e_client.delete(f"/api/v1/nodes/{node['id']}")
+    node = e2e_resources.create_ssh_node()
+    url = _ws_url_no_token(service_ports, node["id"])
+    with pytest.raises(websockets.exceptions.ConnectionClosedError) as exc_info:
+        async with websockets.connect(url) as ws:
+            await ws.recv()
+    assert _close_code(exc_info.value) == 4001
 
 
 @pytest.mark.asyncio
 async def test_ws_invalid_token_closed(
-    service_ports: ServicePorts, e2e_client: httpx.Client
+    service_ports: ServicePorts,
+    e2e_client: httpx.Client,
+    e2e_resources: UniqueResourceFactory,
 ) -> None:
     """WebSocket with invalid API key is closed with code 4003."""
-    node = _create_ssh_node(e2e_client)
-    try:
-        url = _ws_url(service_ports, node["id"])
-        with pytest.raises(websockets.exceptions.ConnectionClosedError) as exc_info:
-            async with websockets.connect(
-                url, additional_headers={"x-api-key": "invalid-key-xyz"}
-            ) as ws:
-                await ws.recv()
-        assert _close_code(exc_info.value) == 4003
-    finally:
-        e2e_client.delete(f"/api/v1/nodes/{node['id']}")
+    node = e2e_resources.create_ssh_node()
+    url = _ws_url(service_ports, node["id"])
+    with pytest.raises(websockets.exceptions.ConnectionClosedError) as exc_info:
+        async with websockets.connect(
+            url, additional_headers={"x-api-key": "invalid-key-xyz"}
+        ) as ws:
+            await ws.recv()
+    assert _close_code(exc_info.value) == 4003
 
 
 @pytest.mark.parametrize("credential_state", ["revoked", "expired"])
@@ -226,7 +223,9 @@ async def test_ws_inactive_managed_key_closed(
 
 @pytest.mark.asyncio
 async def test_ws_readonly_key_closed(
-    service_ports: ServicePorts, e2e_client: httpx.Client
+    service_ports: ServicePorts,
+    e2e_client: httpx.Client,
+    e2e_resources: UniqueResourceFactory,
 ) -> None:
     """WebSocket with read-only key is closed with code 4003."""
     resp = e2e_client.post(
@@ -237,7 +236,7 @@ async def test_ws_readonly_key_closed(
     ro_key = resp.json()["key"]
     key_id = resp.json()["id"]
 
-    node = _create_ssh_node(e2e_client)
+    node = e2e_resources.create_ssh_node()
     try:
         url = _ws_url(service_ports, node["id"])
         with pytest.raises(websockets.exceptions.ConnectionClosedError) as exc_info:
@@ -247,7 +246,6 @@ async def test_ws_readonly_key_closed(
                 await ws.recv()
         assert _close_code(exc_info.value) == 4003
     finally:
-        e2e_client.delete(f"/api/v1/nodes/{node['id']}")
         e2e_client.delete(f"/api/v1/api-keys/{key_id}")
 
 
@@ -258,157 +256,148 @@ async def test_ws_readonly_key_closed(
 
 @pytest.mark.asyncio
 async def test_ws_stdout_event(
-    service_ports: ServicePorts, e2e_client: httpx.Client
+    service_ports: ServicePorts,
+    e2e_client: httpx.Client,
+    e2e_resources: UniqueResourceFactory,
 ) -> None:
     """Command execution produces stdout events."""
-    node = _create_ssh_node(e2e_client)
-    try:
-        url = _ws_url(service_ports, node["id"])
-        async with websockets.connect(
-            url, additional_headers={"x-api-key": "e2e-master-key-12345"}
-        ) as ws:
-            await _send_command(ws, "echo hello-stdout")
-            msg = await _receive_until_type(ws, "stdout")
-            assert msg.get("version") == "1"
-            assert "hello-stdout" in msg.get("data", "")
-    finally:
-        e2e_client.delete(f"/api/v1/nodes/{node['id']}")
+    node = e2e_resources.create_ssh_node()
+    url = _ws_url(service_ports, node["id"])
+    async with websockets.connect(
+        url, additional_headers={"x-api-key": "e2e-master-key-12345"}
+    ) as ws:
+        await _send_command(ws, "echo hello-stdout")
+        msg = await _receive_until_type(ws, "stdout")
+        assert msg.get("version") == "1"
+        assert "hello-stdout" in msg.get("data", "")
 
 
 @pytest.mark.asyncio
 async def test_ws_stderr_event(
-    service_ports: ServicePorts, e2e_client: httpx.Client
+    service_ports: ServicePorts,
+    e2e_client: httpx.Client,
+    e2e_resources: UniqueResourceFactory,
 ) -> None:
     """Command producing stderr generates stderr events."""
-    node = _create_ssh_node(e2e_client)
-    try:
-        url = _ws_url(service_ports, node["id"])
-        async with websockets.connect(
-            url, additional_headers={"x-api-key": "e2e-master-key-12345"}
-        ) as ws:
-            await _send_command(ws, "echo hello-stderr >&2")
-            msg = await _receive_until_type(ws, "stderr")
-            assert msg.get("version") == "1"
-            assert "hello-stderr" in msg.get("data", "")
-    finally:
-        e2e_client.delete(f"/api/v1/nodes/{node['id']}")
+    node = e2e_resources.create_ssh_node()
+    url = _ws_url(service_ports, node["id"])
+    async with websockets.connect(
+        url, additional_headers={"x-api-key": "e2e-master-key-12345"}
+    ) as ws:
+        await _send_command(ws, "echo hello-stderr >&2")
+        msg = await _receive_until_type(ws, "stderr")
+        assert msg.get("version") == "1"
+        assert "hello-stderr" in msg.get("data", "")
 
 
 @pytest.mark.asyncio
 async def test_ws_exit_event_with_code(
-    service_ports: ServicePorts, e2e_client: httpx.Client
+    service_ports: ServicePorts,
+    e2e_client: httpx.Client,
+    e2e_resources: UniqueResourceFactory,
 ) -> None:
     """Command completion produces exit event with real exit code."""
-    node = _create_ssh_node(e2e_client)
-    try:
-        url = _ws_url(service_ports, node["id"])
-        async with websockets.connect(
-            url, additional_headers={"x-api-key": "e2e-master-key-12345"}
-        ) as ws:
-            await _send_command(ws, "exit 42")
-            msg = await _receive_until_type(ws, "exit")
-            assert msg.get("version") == "1"
-            assert msg.get("exit_code") == 42
-    finally:
-        e2e_client.delete(f"/api/v1/nodes/{node['id']}")
+    node = e2e_resources.create_ssh_node()
+    url = _ws_url(service_ports, node["id"])
+    async with websockets.connect(
+        url, additional_headers={"x-api-key": "e2e-master-key-12345"}
+    ) as ws:
+        await _send_command(ws, "exit 42")
+        msg = await _receive_until_type(ws, "exit")
+        assert msg.get("version") == "1"
+        assert msg.get("exit_code") == 42
 
 
 @pytest.mark.asyncio
 async def test_ws_invalid_json_does_not_disconnect(
-    service_ports: ServicePorts, e2e_client: httpx.Client
+    service_ports: ServicePorts,
+    e2e_client: httpx.Client,
+    e2e_resources: UniqueResourceFactory,
 ) -> None:
     """Sending invalid JSON returns error but keeps connection alive."""
-    node = _create_ssh_node(e2e_client)
-    try:
-        url = _ws_url(service_ports, node["id"])
-        async with websockets.connect(
-            url, additional_headers={"x-api-key": "e2e-master-key-12345"}
-        ) as ws:
-            await ws.send("this is not json {{{")
-            raw = await asyncio.wait_for(ws.recv(), timeout=5)
-            msg = json.loads(raw)
-            assert msg.get("type") == "error"
-            assert "invalid" in msg.get("message", "").lower()
-            # Connection should still be alive
-            await _send_command(ws, "echo still-alive")
-            msg2 = await _receive_until_type(ws, "exit")
-            assert msg2.get("exit_code") == 0
-    finally:
-        e2e_client.delete(f"/api/v1/nodes/{node['id']}")
+    node = e2e_resources.create_ssh_node()
+    url = _ws_url(service_ports, node["id"])
+    async with websockets.connect(
+        url, additional_headers={"x-api-key": "e2e-master-key-12345"}
+    ) as ws:
+        await ws.send("this is not json {{{")
+        raw = await asyncio.wait_for(ws.recv(), timeout=5)
+        msg = json.loads(raw)
+        assert msg.get("type") == "error"
+        assert "invalid" in msg.get("message", "").lower()
+        # Connection should still be alive
+        await _send_command(ws, "echo still-alive")
+        msg2 = await _receive_until_type(ws, "exit")
+        assert msg2.get("exit_code") == 0
 
 
 @pytest.mark.asyncio
 async def test_ws_invalid_command_does_not_disconnect(
     service_ports: ServicePorts,
     e2e_client: httpx.Client,
+    e2e_resources: UniqueResourceFactory,
 ) -> None:
     """Invalid command messages return an error and leave the session usable."""
-    node = _create_ssh_node(e2e_client)
-    try:
-        url = _ws_url(service_ports, node["id"])
-        async with websockets.connect(
-            url, additional_headers={"x-api-key": "e2e-master-key-12345"}
-        ) as ws:
-            await ws.send(json.dumps({"version": "1", "type": "command"}))
-            error = json.loads(await asyncio.wait_for(ws.recv(), timeout=5))
-            assert error["type"] == "error"
-            assert error["message"] == "Invalid command message"
+    node = e2e_resources.create_ssh_node()
+    url = _ws_url(service_ports, node["id"])
+    async with websockets.connect(
+        url, additional_headers={"x-api-key": "e2e-master-key-12345"}
+    ) as ws:
+        await ws.send(json.dumps({"version": "1", "type": "command"}))
+        error = json.loads(await asyncio.wait_for(ws.recv(), timeout=5))
+        assert error["type"] == "error"
+        assert error["message"] == "Invalid command message"
 
-            await _send_command(ws, "echo valid-after-error")
-            result = await _receive_until_type(ws, "exit")
-            assert result["exit_code"] == 0
-    finally:
-        e2e_client.delete(f"/api/v1/nodes/{node['id']}")
+        await _send_command(ws, "echo valid-after-error")
+        result = await _receive_until_type(ws, "exit")
+        assert result["exit_code"] == 0
 
 
 @pytest.mark.asyncio
 async def test_ws_oversized_message_closed(
     service_ports: ServicePorts,
     e2e_client: httpx.Client,
+    e2e_resources: UniqueResourceFactory,
 ) -> None:
     """Application messages larger than 16 KiB close with code 1009."""
-    node = _create_ssh_node(e2e_client)
-    try:
-        url = _ws_url(service_ports, node["id"])
-        async with websockets.connect(
-            url, additional_headers={"x-api-key": "e2e-master-key-12345"}
-        ) as ws:
-            payload = {
-                "version": "1",
-                "type": "command",
-                "command": "x" * 16_385,
-            }
-            await ws.send(json.dumps(payload))
-            with pytest.raises(websockets.exceptions.ConnectionClosedError) as exc_info:
-                await ws.recv()
-            assert _close_code(exc_info.value) == 1009
-    finally:
-        e2e_client.delete(f"/api/v1/nodes/{node['id']}")
+    node = e2e_resources.create_ssh_node()
+    url = _ws_url(service_ports, node["id"])
+    async with websockets.connect(
+        url, additional_headers={"x-api-key": "e2e-master-key-12345"}
+    ) as ws:
+        payload = {
+            "version": "1",
+            "type": "command",
+            "command": "x" * 16_385,
+        }
+        await ws.send(json.dumps(payload))
+        with pytest.raises(websockets.exceptions.ConnectionClosedError) as exc_info:
+            await ws.recv()
+        assert _close_code(exc_info.value) == 1009
 
 
 @pytest.mark.asyncio
 async def test_ws_second_command_rejected(
-    service_ports: ServicePorts, e2e_client: httpx.Client
+    service_ports: ServicePorts,
+    e2e_client: httpx.Client,
+    e2e_resources: UniqueResourceFactory,
 ) -> None:
     """Sending a second command while one is running returns error."""
-    node = _create_ssh_node(e2e_client)
-    try:
-        url = _ws_url(service_ports, node["id"])
-        async with websockets.connect(
-            url, additional_headers={"x-api-key": "e2e-master-key-12345"}
-        ) as ws:
-            # Start a long-running command
-            await _send_command(ws, "sleep 10")
-            # Send second command immediately
-            await asyncio.sleep(0.1)
-            await _send_command(ws, "echo second")
-            # Should receive error about active command
-            raw = await asyncio.wait_for(ws.recv(), timeout=5)
-            msg = json.loads(raw)
-            assert msg.get("type") == "error"
-            assert "already running" in msg.get("message", "").lower()
-    finally:
-        e2e_client.delete(f"/api/v1/nodes/{node['id']}")
+    node = e2e_resources.create_ssh_node()
+    url = _ws_url(service_ports, node["id"])
+    async with websockets.connect(
+        url, additional_headers={"x-api-key": "e2e-master-key-12345"}
+    ) as ws:
+        # Start a long-running command
+        await _send_command(ws, "sleep 10")
+        # Send second command immediately
+        await asyncio.sleep(0.1)
+        await _send_command(ws, "echo second")
+        # Should receive error about active command
+        raw = await asyncio.wait_for(ws.recv(), timeout=5)
+        msg = json.loads(raw)
+        assert msg.get("type") == "error"
+        assert "already running" in msg.get("message", "").lower()
 
 
 # ---------------------------------------------------------------------------
@@ -418,57 +407,55 @@ async def test_ws_second_command_rejected(
 
 @pytest.mark.asyncio
 async def test_ws_signal_sigint_ack(
-    service_ports: ServicePorts, e2e_client: httpx.Client
+    service_ports: ServicePorts,
+    e2e_client: httpx.Client,
+    e2e_resources: UniqueResourceFactory,
 ) -> None:
     """Sending SIGINT acknowledges the signal and completes the process."""
-    node = _create_ssh_node(e2e_client)
-    try:
-        url = _ws_url(service_ports, node["id"])
-        async with websockets.connect(
-            url, additional_headers={"x-api-key": "e2e-master-key-12345"}
-        ) as ws:
-            await _send_command(ws, "exec sleep 30")
-            await asyncio.sleep(0.2)
-            await _send_signal(ws, "SIGINT")
-            msg = await _receive_until_type(ws, "signal_ack")
-            assert msg.get("signal") == "SIGINT"
-            result = await _receive_until_type(ws, "exit")
-            assert "exit_code" in result
-    finally:
-        e2e_client.delete(f"/api/v1/nodes/{node['id']}")
+    node = e2e_resources.create_ssh_node()
+    url = _ws_url(service_ports, node["id"])
+    async with websockets.connect(
+        url, additional_headers={"x-api-key": "e2e-master-key-12345"}
+    ) as ws:
+        await _send_command(ws, "exec sleep 30")
+        await asyncio.sleep(0.2)
+        await _send_signal(ws, "SIGINT")
+        msg = await _receive_until_type(ws, "signal_ack")
+        assert msg.get("signal") == "SIGINT"
+        result = await _receive_until_type(ws, "exit")
+        assert "exit_code" in result
 
 
 @pytest.mark.asyncio
 async def test_ws_forbidden_signal_does_not_disconnect(
     service_ports: ServicePorts,
     e2e_client: httpx.Client,
+    e2e_resources: UniqueResourceFactory,
 ) -> None:
     """A forbidden signal is rejected while the connection remains usable."""
-    node = _create_ssh_node(e2e_client)
-    try:
-        url = _ws_url(service_ports, node["id"])
-        async with websockets.connect(
-            url, additional_headers={"x-api-key": "e2e-master-key-12345"}
-        ) as ws:
-            await _send_signal(ws, "SIGKILL")
-            error = json.loads(await asyncio.wait_for(ws.recv(), timeout=5))
-            assert error["type"] == "error"
-            assert error["message"] == "Signal rejected"
+    node = e2e_resources.create_ssh_node()
+    url = _ws_url(service_ports, node["id"])
+    async with websockets.connect(
+        url, additional_headers={"x-api-key": "e2e-master-key-12345"}
+    ) as ws:
+        await _send_signal(ws, "SIGKILL")
+        error = json.loads(await asyncio.wait_for(ws.recv(), timeout=5))
+        assert error["type"] == "error"
+        assert error["message"] == "Signal rejected"
 
-            await _send_command(ws, "echo alive-after-signal")
-            result = await _receive_until_type(ws, "exit")
-            assert result["exit_code"] == 0
-    finally:
-        e2e_client.delete(f"/api/v1/nodes/{node['id']}")
+        await _send_command(ws, "echo alive-after-signal")
+        result = await _receive_until_type(ws, "exit")
+        assert result["exit_code"] == 0
 
 
 @pytest.mark.asyncio
 async def test_ws_disconnect_terminates_remote_process(
     service_ports: ServicePorts,
     e2e_client: httpx.Client,
+    e2e_resources: UniqueResourceFactory,
 ) -> None:
     """Client disconnect cancels the command and terminates its SSH process."""
-    node = _create_ssh_node(e2e_client)
+    node = e2e_resources.create_ssh_node()
     pid_file = f"/tmp/ws-e2e-{uuid4().hex}.pid"
     try:
         url = _ws_url(service_ports, node["id"])
@@ -519,7 +506,6 @@ async def test_ws_disconnect_terminates_remote_process(
             f"/api/v1/nodes/{node['id']}/execute",
             json={"command": f"rm -f {pid_file}"},
         )
-        e2e_client.delete(f"/api/v1/nodes/{node['id']}")
 
 
 @pytest.mark.asyncio
@@ -577,28 +563,26 @@ async def test_ws_ssh_auth_failure_internal_error(
 
 @pytest.mark.asyncio
 async def test_ws_multiple_connections(
-    service_ports: ServicePorts, e2e_client: httpx.Client
+    service_ports: ServicePorts,
+    e2e_client: httpx.Client,
+    e2e_resources: UniqueResourceFactory,
 ) -> None:
     """Multiple simultaneous WebSocket connections to different nodes work."""
-    node_a = _create_ssh_node(e2e_client)
-    node_b = _create_ssh_node(e2e_client)
-    try:
+    node_a = e2e_resources.create_ssh_node()
+    node_b = e2e_resources.create_ssh_node()
 
-        async def run_command(node_id: str, marker: str) -> str:
-            url = _ws_url(service_ports, node_id)
-            async with websockets.connect(
-                url, additional_headers={"x-api-key": "e2e-master-key-12345"}
-            ) as ws:
-                await _send_command(ws, f"echo {marker}")
-                msg = await _receive_until_type(ws, "stdout", timeout=10)
-                return msg.get("data", "")
+    async def run_command(node_id: str, marker: str) -> str:
+        url = _ws_url(service_ports, node_id)
+        async with websockets.connect(
+            url, additional_headers={"x-api-key": "e2e-master-key-12345"}
+        ) as ws:
+            await _send_command(ws, f"echo {marker}")
+            msg = await _receive_until_type(ws, "stdout", timeout=10)
+            return msg.get("data", "")
 
-        results = await asyncio.gather(
-            run_command(node_a["id"], "node-a"),
-            run_command(node_b["id"], "node-b"),
-        )
-        assert "node-a" in results[0]
-        assert "node-b" in results[1]
-    finally:
-        e2e_client.delete(f"/api/v1/nodes/{node_a['id']}")
-        e2e_client.delete(f"/api/v1/nodes/{node_b['id']}")
+    results = await asyncio.gather(
+        run_command(node_a["id"], "node-a"),
+        run_command(node_b["id"], "node-b"),
+    )
+    assert "node-a" in results[0]
+    assert "node-b" in results[1]

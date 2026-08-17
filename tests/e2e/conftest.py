@@ -8,14 +8,77 @@ from pathlib import Path
 import asyncpg
 import httpx2 as httpx
 import pytest
-from pytest_docker.plugin import Services
+from pytest_docker.plugin import Services, get_cleanup_command
 
 from tests.e2e.helpers.resources import UniqueResourceFactory, resource_factory
 from tests.e2e.helpers.service_controller import DockerServiceController
 from tests.e2e.helpers.websocket import WebSocketClientFactory
+from tests.e2e.settings import MASTER_API_KEY
 from tests.helpers import is_port_open
 
-_MASTER_API_KEY = "e2e-master-key-12345"
+_MASTER_API_KEY = MASTER_API_KEY
+
+
+def pytest_addoption(parser: pytest.Parser) -> None:
+    """Add E2E-specific CLI options."""
+    group = parser.getgroup("e2e", "E2E test options")
+    group.addoption(
+        "--keep-stack",
+        action="store_true",
+        default=False,
+        help="Keep the Docker Compose stack running after tests for inspection.",
+    )
+
+
+@pytest.fixture(scope="session")
+def docker_cleanup(request: pytest.FixtureRequest) -> list[str] | str | None:
+    """Return cleanup command or skip teardown when --keep-stack is passed."""
+    if request.config.getoption("--keep-stack"):
+        return []
+    return get_cleanup_command()
+
+
+_E2E_COMPOSE_FILES = (
+    "docker-compose.e2e.yml",
+    "docker-compose.e2e-ratelimit.yml",
+    "docker-compose.e2e-timeout.yml",
+)
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _cleanup_orphaned_containers() -> None:
+    """Remove orphaned E2E containers and networks from previous failed runs."""
+    try:
+        result = subprocess.run(
+            ["docker", "ps", "-a", "--format", "{{.Names}}"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        names = result.stdout.strip().split("\n") if result.stdout.strip() else []
+        for name in names:
+            if "e2e" in name or "pytest" in name:
+                subprocess.run(
+                    ["docker", "rm", "-f", name],
+                    capture_output=True,
+                    timeout=10,
+                )
+        result = subprocess.run(
+            ["docker", "network", "ls", "--format", "{{.Name}}"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        networks = result.stdout.strip().split("\n") if result.stdout.strip() else []
+        for net in networks:
+            if "e2e" in net or "pytest" in net:
+                subprocess.run(
+                    ["docker", "network", "rm", net],
+                    capture_output=True,
+                    timeout=10,
+                )
+    except (subprocess.SubprocessError, OSError):
+        pass  # best effort cleanup
 
 
 @dataclass(frozen=True)
@@ -138,7 +201,14 @@ async def postgres_connection(
 
 
 _E2E_MARKERS = frozenset(
-    {"docker", "e2e_smoke", "e2e_full", "e2e_resilience", "e2e_slow"}
+    {
+        "docker",
+        "e2e_smoke",
+        "e2e_scheduler",
+        "e2e_resilience",
+        "e2e_migration",
+        "e2e_slow",
+    }
 )
 
 

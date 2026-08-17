@@ -6,9 +6,9 @@ services:
       - "5433:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 2s
+      interval: 1s
       timeout: 5s
-      retries: 10
+      retries: 20
     logging:
       driver: json-file
       options:
@@ -18,15 +18,16 @@ services:
   dind:
     image: docker:27-dind
     privileged: true
+    command: ["dockerd", "--host=unix:///var/run/docker.sock", "--host=tcp://0.0.0.0:2375", "--tls=false"]
     environment:
       DOCKER_TLS_CERTDIR: ""
     ports:
       - "2376:2375"
     healthcheck:
       test: ["CMD", "docker", "info"]
-      interval: 3s
+      interval: 1s
       timeout: 5s
-      retries: 10
+      retries: 20
     logging:
       driver: json-file
       options:
@@ -52,9 +53,9 @@ services:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "docker info"]
-      interval: 3s
+      interval: 1s
       timeout: 5s
-      retries: 10
+      retries: 20
     logging:
       driver: json-file
       options:
@@ -75,9 +76,10 @@ services:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request, os; req = urllib.request.Request('http://localhost:8000/health', headers={'X-API-Key': os.environ['MASTER_API_KEY']}); urllib.request.urlopen(req, timeout=5)\""]
-      interval: 3s
-      timeout: 10s
-      retries: 15
+      interval: 1s
+      timeout: 5s
+      retries: 20
+      start_period: 5s
     logging:
       driver: json-file
       options:
@@ -97,9 +99,10 @@ services:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request, os; req = urllib.request.Request('http://localhost:8000/health', headers={'X-API-Key': os.environ['MASTER_API_KEY']}); urllib.request.urlopen(req, timeout=5)\""]
-      interval: 3s
-      timeout: 10s
-      retries: 15
+      interval: 1s
+      timeout: 5s
+      retries: 20
+      start_period: 5s
     logging:
       driver: json-file
       options:

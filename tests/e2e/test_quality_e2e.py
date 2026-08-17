@@ -5,7 +5,7 @@ import uuid
 import httpx2 as httpx
 import pytest
 
-from tests.e2e.helpers.nodes import create_docker_node as _create_docker_node
+from tests.e2e.helpers.resources import UniqueResourceFactory
 
 pytestmark = [pytest.mark.docker, pytest.mark.e2e_smoke]
 
@@ -82,88 +82,88 @@ class TestConfigErrors:
 class TestDockerNegativePaths:
     """Negative Docker scenarios against a real DinD daemon."""
 
-    def test_docker_image_pull_not_found(self, e2e_client: httpx.Client) -> None:
+    def test_docker_image_pull_not_found(
+        self,
+        e2e_client: httpx.Client,
+        e2e_resources: UniqueResourceFactory,
+    ) -> None:
         """Pulling a non-existent image returns a DockerError, not 200."""
-        node = _create_docker_node(e2e_client)
-        try:
-            resp = e2e_client.post(
-                f"/api/v1/nodes/{node['id']}/docker/images/pull",
-                json={
-                    "image": "alpine:definitely-not-exists-abc123",
-                    "timeout": 60,
-                },
-            )
-            assert resp.status_code == 502
-            assert resp.json()["code"] == "DockerError"
-        finally:
-            e2e_client.delete(f"/api/v1/nodes/{node['id']}")
+        node = e2e_resources.create_docker_node()
+        resp = e2e_client.post(
+            f"/api/v1/nodes/{node['id']}/docker/images/pull",
+            json={
+                "image": "alpine:definitely-not-exists-abc123",
+                "timeout": 60,
+            },
+        )
+        assert resp.status_code == 502
+        assert resp.json()["code"] == "DockerError"
 
-    def test_docker_image_inspect_not_found(self, e2e_client: httpx.Client) -> None:
+    def test_docker_image_inspect_not_found(
+        self,
+        e2e_client: httpx.Client,
+        e2e_resources: UniqueResourceFactory,
+    ) -> None:
         """Inspecting a non-existent image returns 404."""
-        node = _create_docker_node(e2e_client)
-        try:
-            resp = e2e_client.get(
-                f"/api/v1/nodes/{node['id']}/docker/images/"
-                "alpine:definitely-not-exists-abc123"
-            )
-            assert resp.status_code == 404
-        finally:
-            e2e_client.delete(f"/api/v1/nodes/{node['id']}")
+        node = e2e_resources.create_docker_node()
+        resp = e2e_client.get(
+            f"/api/v1/nodes/{node['id']}/docker/images/"
+            "alpine:definitely-not-exists-abc123"
+        )
+        assert resp.status_code == 404
 
-    def test_docker_image_remove_not_found(self, e2e_client: httpx.Client) -> None:
+    def test_docker_image_remove_not_found(
+        self,
+        e2e_client: httpx.Client,
+        e2e_resources: UniqueResourceFactory,
+    ) -> None:
         """Removing a non-existent image returns 404."""
-        node = _create_docker_node(e2e_client)
-        try:
-            resp = e2e_client.delete(
-                f"/api/v1/nodes/{node['id']}/docker/images/"
-                "alpine:definitely-not-exists-abc123"
-            )
-            assert resp.status_code == 404
-        finally:
-            e2e_client.delete(f"/api/v1/nodes/{node['id']}")
+        node = e2e_resources.create_docker_node()
+        resp = e2e_client.delete(
+            f"/api/v1/nodes/{node['id']}/docker/images/"
+            "alpine:definitely-not-exists-abc123"
+        )
+        assert resp.status_code == 404
 
     def test_docker_image_build_invalid_dockerfile(
-        self, e2e_client: httpx.Client
+        self,
+        e2e_client: httpx.Client,
+        e2e_resources: UniqueResourceFactory,
     ) -> None:
         """Building from an invalid Dockerfile returns a DockerError."""
-        node = _create_docker_node(e2e_client)
-        try:
-            resp = e2e_client.post(
-                f"/api/v1/nodes/{node['id']}/docker/images/build",
-                json={"dockerfile": "INVALID DOCKERFILE", "tag": "local/fail:1"},
-            )
-            assert resp.status_code == 502
-            assert resp.json()["code"] == "DockerError"
-        finally:
-            e2e_client.delete(f"/api/v1/nodes/{node['id']}")
+        node = e2e_resources.create_docker_node()
+        resp = e2e_client.post(
+            f"/api/v1/nodes/{node['id']}/docker/images/build",
+            json={"dockerfile": "INVALID DOCKERFILE", "tag": "local/fail:1"},
+        )
+        assert resp.status_code == 502
+        assert resp.json()["code"] == "DockerError"
 
     def test_docker_create_container_invalid_image(
-        self, e2e_client: httpx.Client
+        self,
+        e2e_client: httpx.Client,
+        e2e_resources: UniqueResourceFactory,
     ) -> None:
         """Container creation with a shell-injection image name is rejected."""
-        node = _create_docker_node(e2e_client)
-        try:
-            resp = e2e_client.post(
-                f"/api/v1/nodes/{node['id']}/docker/containers",
-                json={"image": "nginx; rm -rf /", "name": "bad-ctr"},
-            )
-            assert resp.status_code == 422
-        finally:
-            e2e_client.delete(f"/api/v1/nodes/{node['id']}")
+        node = e2e_resources.create_docker_node()
+        resp = e2e_client.post(
+            f"/api/v1/nodes/{node['id']}/docker/containers",
+            json={"image": "nginx; rm -rf /", "name": "bad-ctr"},
+        )
+        assert resp.status_code == 422
 
     def test_docker_create_container_invalid_name(
-        self, e2e_client: httpx.Client
+        self,
+        e2e_client: httpx.Client,
+        e2e_resources: UniqueResourceFactory,
     ) -> None:
         """Container creation with an invalid name is rejected."""
-        node = _create_docker_node(e2e_client)
-        try:
-            resp = e2e_client.post(
-                f"/api/v1/nodes/{node['id']}/docker/containers",
-                json={"image": "alpine:latest", "name": "bad name"},
-            )
-            assert resp.status_code == 422
-        finally:
-            e2e_client.delete(f"/api/v1/nodes/{node['id']}")
+        node = e2e_resources.create_docker_node()
+        resp = e2e_client.post(
+            f"/api/v1/nodes/{node['id']}/docker/containers",
+            json={"image": "alpine:latest", "name": "bad name"},
+        )
+        assert resp.status_code == 422
 
 
 @pytest.mark.e2e_slow
@@ -187,10 +187,14 @@ class TestDockerBulk:
         )
         assert resp.status_code == 422
 
-    def test_docker_bulk_start_by_tags(self, e2e_client: httpx.Client) -> None:
+    def test_docker_bulk_start_by_tags(
+        self,
+        e2e_client: httpx.Client,
+        e2e_resources: UniqueResourceFactory,
+    ) -> None:
         """Bulk start resolves only nodes with matching tags."""
-        n1 = _create_docker_node(e2e_client, name="bulk-tag-1", tags=["bulk-zone"])
-        n2 = _create_docker_node(e2e_client, name="bulk-tag-2", tags=["other-zone"])
+        n1 = e2e_resources.create_docker_node(name="bulk-tag-1", tags=["bulk-zone"])
+        n2 = e2e_resources.create_docker_node(name="bulk-tag-2", tags=["other-zone"])
         try:
             for node in (n1, n2):
                 pull = e2e_client.post(
@@ -232,5 +236,4 @@ class TestDockerBulk:
                 f"/api/v1/nodes/{n1['id']}/docker/containers/{container_name}?force=true"
             )
         finally:
-            for node in (n1, n2):
-                e2e_client.delete(f"/api/v1/nodes/{node['id']}")
+            pass

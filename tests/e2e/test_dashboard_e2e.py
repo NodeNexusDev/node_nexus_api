@@ -3,7 +3,6 @@
 import httpx2 as httpx
 import pytest
 
-from tests.e2e.helpers.nodes import create_node as _create_node
 from tests.e2e.helpers.nodes import wait_for_audit as _wait_for_audit
 from tests.e2e.helpers.resources import UniqueResourceFactory
 
@@ -22,11 +21,14 @@ def test_dashboard_returns_200(e2e_client: httpx.Client) -> None:
     assert "recent_activity" in data
 
 
-def test_dashboard_counts_nodes(e2e_client: httpx.Client) -> None:
+def test_dashboard_counts_nodes(
+    e2e_client: httpx.Client,
+    e2e_resources: UniqueResourceFactory,
+) -> None:
     """Dashboard reflects the actual node count."""
     total_before = e2e_client.get("/api/v1/dashboard/").json()["nodes"]["total"]
-    _create_node(e2e_client, name="dash-node-1")
-    _create_node(e2e_client, name="dash-node-2")
+    e2e_resources.create_node(name="dash-node-1")
+    e2e_resources.create_node(name="dash-node-2")
 
     resp = e2e_client.get("/api/v1/dashboard/")
     assert resp.status_code == 200
@@ -64,9 +66,12 @@ def test_dashboard_counts_commands(
     assert data["commands"]["total"] >= total_before + 2
 
 
-def test_dashboard_recent_activity(e2e_client: httpx.Client) -> None:
+def test_dashboard_recent_activity(
+    e2e_client: httpx.Client,
+    e2e_resources: UniqueResourceFactory,
+) -> None:
     """Dashboard returns recent audit log entries."""
-    _create_node(e2e_client, name="dash-activity")
+    e2e_resources.create_node(name="dash-activity")
     _wait_for_audit(e2e_client, action="create")
 
     resp = e2e_client.get("/api/v1/dashboard/")

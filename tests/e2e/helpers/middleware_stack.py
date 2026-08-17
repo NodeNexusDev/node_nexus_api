@@ -8,9 +8,11 @@ from pathlib import Path
 import httpx2 as httpx
 import structlog
 
+from tests.e2e.settings import MASTER_API_KEY
+
 logger = structlog.get_logger()
 
-_MASTER_API_KEY = "e2e-master-key-12345"
+_MASTER_API_KEY = MASTER_API_KEY
 
 
 @dataclass(frozen=True)
@@ -55,9 +57,8 @@ class MiddlewareStackManager:
 
     def up(self) -> MiddlewareStackPorts:
         """Start the stack and wait until API is ready."""
-        self._compose("up", "-d", "--build", "--wait")
+        self._compose("up", "-d", "--wait")
 
-        # Wait for API readiness
         deadline = time.monotonic() + 120.0
         while time.monotonic() < deadline:
             try:
@@ -70,7 +71,7 @@ class MiddlewareStackManager:
                     break
             except httpx.HTTPError:
                 pass
-            time.sleep(1)
+            time.sleep(0.5)
         else:
             raise RuntimeError(f"Stack {self._project_name} API did not become ready")
 
@@ -92,5 +93,5 @@ class MiddlewareStackManager:
             )
 
     def service_logs(self, service: str, *, tail: int = 100) -> str:
-        """Return recent logs for a service."""
+        """Return recent logs for one service."""
         return self._compose("logs", "--no-color", "--tail", str(tail), service)

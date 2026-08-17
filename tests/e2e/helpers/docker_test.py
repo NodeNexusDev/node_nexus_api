@@ -4,6 +4,8 @@ These helpers create and manage Docker containers/images via the HTTP API,
 building on top of the existing e2e patterns (SSH exec for container run).
 """
 
+import uuid
+
 import httpx2 as httpx
 
 
@@ -41,7 +43,7 @@ def create_test_container(
 
     Returns the container name/ID as passed or auto-generated.
     """
-    container_name = name or f"e2e-ctr-{id(e2e_client):x}"
+    container_name = name or f"e2e-ctr-{uuid.uuid4().hex[:8]}"
     docker_cmd = f"docker run -d --name {container_name} {image} {command}"
     resp = e2e_client.post(
         f"/api/v1/nodes/{node_id}/execute",

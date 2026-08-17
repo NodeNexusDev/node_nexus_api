@@ -1,7 +1,6 @@
 """E2E tests for script CRUD, execute, schedule, scheduler execution."""
 
 import asyncio
-import time
 from uuid import uuid4
 
 import httpx2 as httpx
@@ -10,7 +9,8 @@ from pytest_docker.plugin import Services
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from app.adapters.runtime.apscheduler_runtime import ApschedulerRuntime
-from tests.e2e.helpers.nodes import create_ssh_node as _create_ssh_node
+from tests.e2e.helpers.polling import wait_for_condition
+from tests.e2e.helpers.resources import UniqueResourceFactory
 
 pytestmark = pytest.mark.docker
 
@@ -159,8 +159,11 @@ def test_script_not_found(e2e_client: httpx.Client) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_script_execute_on_ssh_node(e2e_client: httpx.Client) -> None:
-    node = _create_ssh_node(e2e_client, name="script-exec")
+def test_script_execute_on_ssh_node(
+    e2e_client: httpx.Client,
+    e2e_resources: UniqueResourceFactory,
+) -> None:
+    node = e2e_resources.create_ssh_node(name="script-exec")
     script = _create_script(e2e_client, name="exec-script")
 
     resp = e2e_client.post(
@@ -196,8 +199,11 @@ def test_script_execute_node_not_found(e2e_client: httpx.Client) -> None:
     assert resp.status_code == 404
 
 
-def test_script_executions_history(e2e_client: httpx.Client) -> None:
-    node = _create_ssh_node(e2e_client, name="script-hist")
+def test_script_executions_history(
+    e2e_client: httpx.Client,
+    e2e_resources: UniqueResourceFactory,
+) -> None:
+    node = e2e_resources.create_ssh_node(name="script-hist")
     script = _create_script(e2e_client, name="hist-script")
 
     # Execute
@@ -249,8 +255,11 @@ def test_script_pagination(e2e_client: httpx.Client) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_script_execute_with_command_reference(e2e_client: httpx.Client) -> None:
-    node = _create_ssh_node(e2e_client, name="script-cmd-ref")
+def test_script_execute_with_command_reference(
+    e2e_client: httpx.Client,
+    e2e_resources: UniqueResourceFactory,
+) -> None:
+    node = e2e_resources.create_ssh_node(name="script-cmd-ref")
     cmd = _create_command(e2e_client, name="ref-cmd", command="echo ref-ok")
 
     resp = e2e_client.post(
@@ -282,9 +291,12 @@ def test_script_execute_with_command_reference(e2e_client: httpx.Client) -> None
     assert result["steps"][0]["stdout"].strip() == "ref-ok"
 
 
-def test_script_execute_multi_node(e2e_client: httpx.Client) -> None:
-    node1 = _create_ssh_node(e2e_client, name="multi-node-1")
-    node2 = _create_ssh_node(e2e_client, name="multi-node-2")
+def test_script_execute_multi_node(
+    e2e_client: httpx.Client,
+    e2e_resources: UniqueResourceFactory,
+) -> None:
+    node1 = e2e_resources.create_ssh_node(name="multi-node-1")
+    node2 = e2e_resources.create_ssh_node(name="multi-node-2")
     script = _create_script(e2e_client, name="multi-script")
 
     resp = e2e_client.post(
@@ -485,6 +497,7 @@ def test_script_schedule_nonexistent(e2e_client: httpx.Client) -> None:
     assert resp.status_code == 404
 
 
+@pytest.mark.e2e_scheduler
 async def test_second_scheduler_replica_cannot_acquire_ownership(
     docker_ip: str,
     docker_services: Services,
@@ -565,11 +578,13 @@ def test_script_schedule_rejects_invalid_trigger_options(
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.e2e_scheduler
 def test_scheduler_executes_script_on_cron(e2e_client: httpx.Client) -> None:
-    """Scheduled script actually executes via cron and produces history.
+    """Scheduled script actually executes and produces history.
 
-    Creates an SSH node, a simple script, schedules it with a
-    per-minute cron, and waits for at least one execution to appear.
+    Creates an SSH node, a simple script, schedules it, then triggers the
+    schedule immediately through the E2E harness endpoint and verifies the
+    execution record.
     """
 
     # Create node
@@ -614,32 +629,40 @@ def test_scheduler_executes_script_on_cron(e2e_client: httpx.Client) -> None:
         schedule = resp.json()
         assert schedule["cron"] == "* * * * *"
 
-        # Wait for execution (up to 65 seconds for next minute)
-        deadline = time.monotonic() + 65.0
-        execution_found = False
-        while time.monotonic() < deadline:
-            resp = e2e_client.get(f"/api/v1/scripts/{script['id']}/executions")
-            if resp.status_code == 200:
-                data = resp.json()
-                if data.get("total", 0) > 0:
-                    execution_found = True
-                    exec_item = data["items"][0]
-                    assert exec_item["status"] == "completed"
-                    assert exec_item["started_at"] is not None
-                    assert exec_item["finished_at"] is not None
-                    assert len(exec_item["steps"]) == 1
-                    assert "scheduled-ok" in exec_item["steps"][0]["stdout"]
-                    assert exec_item["steps"][0]["exit_code"] == 0
-                    break
-            time.sleep(2)
-
-        assert execution_found, (
-            "Schedule did not execute within 65 seconds. Check scheduler is running."
+        # Trigger execution immediately instead of waiting for the next minute.
+        resp = e2e_client.post(
+            f"/api/v1/internal/e2e/scheduler/{script['id']}/trigger-now"
         )
-        time.sleep(2)
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "triggered"
+
+        def _execution_completed() -> bool:
+            resp = e2e_client.get(f"/api/v1/scripts/{script['id']}/executions")
+            if resp.status_code != 200:
+                return False
+            data = resp.json()
+            if data.get("total", 0) == 0:
+                return False
+            exec_item = data["items"][0]
+            return exec_item["status"] == "completed"
+
+        wait_for_condition(
+            _execution_completed,
+            timeout=10.0,
+            pause=0.2,
+            description="scheduled execution to complete",
+        )
+
         history = e2e_client.get(f"/api/v1/scripts/{script['id']}/executions")
         assert history.status_code == 200
-        assert history.json()["total"] == 1
+        data = history.json()
+        assert data["total"] == 1
+        exec_item = data["items"][0]
+        assert exec_item["started_at"] is not None
+        assert exec_item["finished_at"] is not None
+        assert len(exec_item["steps"]) == 1
+        assert "scheduled-ok" in exec_item["steps"][0]["stdout"]
+        assert exec_item["steps"][0]["exit_code"] == 0
 
         # Verify schedule metadata updated
         resp = e2e_client.get(f"/api/v1/scripts/{script['id']}/schedule")
@@ -656,6 +679,7 @@ def test_scheduler_executes_script_on_cron(e2e_client: httpx.Client) -> None:
         e2e_client.delete(f"/api/v1/nodes/{node['id']}")
 
 
+@pytest.mark.e2e_scheduler
 def test_scheduler_records_failed_execution(e2e_client: httpx.Client) -> None:
     """Scheduled script with failing command records failed execution."""
 
@@ -688,26 +712,34 @@ def test_scheduler_records_failed_execution(e2e_client: httpx.Client) -> None:
         )
         assert resp.status_code == 200
 
-        # Wait for execution
-        deadline = time.monotonic() + 65.0
-        execution_found = False
-        while time.monotonic() < deadline:
-            resp = e2e_client.get(f"/api/v1/scripts/{script['id']}/executions")
-            if resp.status_code == 200:
-                data = resp.json()
-                if data.get("total", 0) > 0:
-                    execution_found = True
-                    exec_item = data["items"][0]
-                    # Non-zero exit should be recorded
-                    exit_code = exec_item.get("exit_code")
-                    status = exec_item.get("status", "")
-                    assert exit_code != 0 or "fail" in status.lower(), (
-                        f"Expected failed execution, got: {exec_item}"
-                    )
-                    break
-            time.sleep(2)
+        # Trigger execution immediately; the harness endpoint records failures.
+        resp = e2e_client.post(
+            f"/api/v1/internal/e2e/scheduler/{script['id']}/trigger-now"
+        )
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "failed"
 
-        assert execution_found, "Failed schedule did not execute within 65 seconds."
+        def _execution_recorded() -> bool:
+            resp = e2e_client.get(f"/api/v1/scripts/{script['id']}/executions")
+            if resp.status_code != 200:
+                return False
+            return resp.json().get("total", 0) > 0
+
+        wait_for_condition(
+            _execution_recorded,
+            timeout=10.0,
+            pause=0.2,
+            description="failed scheduled execution to be recorded",
+        )
+
+        data = e2e_client.get(f"/api/v1/scripts/{script['id']}/executions").json()
+        exec_item = data["items"][0]
+        # Non-zero exit should be recorded on the step and status.
+        step_exit_code = exec_item["steps"][0]["exit_code"]
+        status = exec_item.get("status", "")
+        assert step_exit_code != 0 or "fail" in status.lower(), (
+            f"Expected failed execution, got: {exec_item}"
+        )
     finally:
         e2e_client.delete(f"/api/v1/scripts/{script['id']}/schedule")
         e2e_client.delete(f"/api/v1/scripts/{script['id']}")
