@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     MASTER_API_KEY: str = ""
 
     # Encryption
-    ENCRYPTION_SALT: str = "node-nexus-ssh-v1"  # Override in production via .env
+    ENCRYPTION_SALT: str  # Required — set via .env
 
     # SSH host verification
     SSH_STRICT_HOST_KEY_CHECKING: bool = True

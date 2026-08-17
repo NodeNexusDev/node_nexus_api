@@ -62,6 +62,12 @@ def decrypt_value(value: str | None) -> str | None:
         value
     )
     if not encrypted:
+        import structlog
+
+        structlog.get_logger("security").warning(
+            "credential.legacy_plaintext_detected",
+            hint="Re-encrypt credentials via API key rotation",
+        )
         return value
     try:
         return decrypt(value)
