@@ -30,7 +30,7 @@ from app.adapters.persistence.script_gateway import (
     ScopedScriptExecutionWriter,
     SqlAlchemyScriptGateway,
 )
-from app.adapters.security import AesGcmCredentialCipher, Sha256APIKeyHasher
+from app.adapters.security import AesGcmCredentialCipher, HmacSha256APIKeyHasher
 from app.api.error_mapping import domain_error_handler
 from app.api.v1.audit import router as audit_router
 from app.api.v1.commands import router as commands_router
@@ -182,7 +182,7 @@ class IntegrationDbProvider(Provider):
     def get_api_key_service(
         self, gateway: SqlAlchemyAPIKeyGateway
     ) -> APIKeyAuthenticationService:
-        return APIKeyAuthenticationService(gateway, gateway, Sha256APIKeyHasher())
+        return APIKeyAuthenticationService(gateway, gateway, HmacSha256APIKeyHasher())
 
 
 def _mock_settings(master_key: str = "") -> MagicMock:

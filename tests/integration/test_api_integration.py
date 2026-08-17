@@ -21,7 +21,7 @@ from app.adapters.persistence.api_key import SqlAlchemyAPIKeyGateway
 from app.adapters.persistence.dao.node import NodeRepository
 from app.adapters.persistence.node_management import SqlAlchemyNodeManagementGateway
 from app.adapters.persistence.node_reader import ScopedNodeConnectionReader
-from app.adapters.security import AesGcmCredentialCipher, Sha256APIKeyHasher
+from app.adapters.security import AesGcmCredentialCipher, HmacSha256APIKeyHasher
 from app.api.error_mapping import domain_error_handler
 from app.api.v1.health import router as health_router
 from app.api.v1.nodes import router as nodes_router
@@ -110,7 +110,7 @@ class IntegrationDbProvider(Provider):
     def get_api_key_service(
         self, gateway: SqlAlchemyAPIKeyGateway
     ) -> APIKeyAuthenticationService:
-        return APIKeyAuthenticationService(gateway, gateway, Sha256APIKeyHasher())
+        return APIKeyAuthenticationService(gateway, gateway, HmacSha256APIKeyHasher())
 
 
 def _mock_settings(master_key: str = "") -> MagicMock:

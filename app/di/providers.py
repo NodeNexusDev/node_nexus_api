@@ -60,7 +60,7 @@ from app.adapters.runtime.apscheduler_runtime import ApschedulerRuntime
 from app.adapters.runtime.docker import SshDockerRuntime
 from app.adapters.runtime.scheduler import ApschedulerJobScheduler
 from app.adapters.runtime.ssh import SSHConnectorFactory
-from app.adapters.security import AesGcmCredentialCipher, Sha256APIKeyHasher
+from app.adapters.security import AesGcmCredentialCipher, HmacSha256APIKeyHasher
 from app.application.ports.api_key import APIKeyReader, APIKeyWriter
 from app.application.ports.api_key_hasher import APIKeyHasher
 from app.application.ports.audit_log import AuditLogReader, AuditLogWriter
@@ -639,8 +639,8 @@ class ConnectorProvider(Provider):
 
     @provide(scope=Scope.APP, provides=APIKeyHasher)
     def get_api_key_hasher(self) -> APIKeyHasher:
-        """Bind API-key lookup hashing to the SHA-256 adapter."""
-        return Sha256APIKeyHasher()
+        """Bind API-key lookup hashing to the HMAC-SHA-256 adapter."""
+        return HmacSha256APIKeyHasher()
 
     @provide(scope=Scope.APP, provides=DockerRuntime)
     def get_docker_runtime(

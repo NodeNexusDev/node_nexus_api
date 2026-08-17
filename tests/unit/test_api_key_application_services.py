@@ -6,7 +6,7 @@ from uuid import uuid4
 
 import pytest
 
-from app.adapters.security import Sha256APIKeyHasher
+from app.adapters.security import HmacSha256APIKeyHasher
 from app.application.dto.api_key import (
     APIKeyAuthDTO,
     APIKeyCreateDTO,
@@ -54,7 +54,7 @@ def _view() -> APIKeyViewDTO:
 async def test_authentication_returns_principal_and_touches_usage() -> None:
     reader, writer = AsyncMock(), AsyncMock()
     reader.get_auth_by_hash.return_value = _auth()
-    service = APIKeyAuthenticationService(reader, writer, Sha256APIKeyHasher())
+    service = APIKeyAuthenticationService(reader, writer, HmacSha256APIKeyHasher())
 
     principal = await service.authenticate("nnk_secret")
 
@@ -83,14 +83,14 @@ async def test_authentication_errors_are_distinct(
         await APIKeyAuthenticationService(
             reader,
             writer,
-            Sha256APIKeyHasher(),
+            HmacSha256APIKeyHasher(),
         ).authenticate("invalid")
 
 
 async def test_management_create_returns_plain_key_once() -> None:
     reader, writer = AsyncMock(), AsyncMock()
     writer.create_api_key.return_value = _view()
-    service = APIKeyManagementService(reader, writer, Sha256APIKeyHasher())
+    service = APIKeyManagementService(reader, writer, HmacSha256APIKeyHasher())
 
     result = await service.create_api_key(APIKeyCreateDTO(name="automation"))
 
@@ -102,7 +102,7 @@ async def test_management_missing_update_and_revoke_use_not_found() -> None:
     reader, writer = AsyncMock(), AsyncMock()
     writer.update_api_key.return_value = None
     writer.revoke_api_key.return_value = False
-    service = APIKeyManagementService(reader, writer, Sha256APIKeyHasher())
+    service = APIKeyManagementService(reader, writer, HmacSha256APIKeyHasher())
 
     with pytest.raises(APIKeyNotFoundError):
         await service.update_api_key(uuid4(), APIKeyUpdateDTO(changes=()))
