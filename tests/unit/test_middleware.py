@@ -1,15 +1,18 @@
 """Tests for security headers and CORS middleware."""
 
 import asyncio
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from httpx2 import ASGITransport, AsyncClient
+from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.applications import Starlette
 from starlette.responses import JSONResponse
 from starlette.routing import Route
 
 from app.api.middleware import (
     ApiVersionMiddleware,
+    CommitOnResponseMiddleware,
     RateLimitMiddleware,
     RequestIdMiddleware,
     RequestLoggingMiddleware,
@@ -404,3 +407,162 @@ class TestRateLimitMiddleware:
             for _ in range(5):
                 resp = await ac.get("/health")
                 assert resp.status_code == 200
+
+
+class TestCommitOnResponseMiddleware:
+    @pytest.fixture
+    def session(self) -> MagicMock:
+        session = MagicMock(spec=AsyncSession)
+        session.new = []
+        session.dirty = []
+        session.deleted = []
+        session.commit = AsyncMock()
+        session.rollback = AsyncMock()
+        return session
+
+    @pytest.fixture
+    def container(self, session: MagicMock) -> MagicMock:
+        container = MagicMock()
+        container.get = AsyncMock(return_value=session)
+        return container
+
+    def _make_app(
+        self,
+        container: MagicMock,
+        handler: callable,
+    ) -> CommitOnResponseMiddleware:
+        async def app(scope, receive, send):  # noqa: ANN001
+            scope.setdefault("state", {})["dishka_container"] = container
+            await handler(scope, receive, send)
+
+        return CommitOnResponseMiddleware(app)
+
+    async def test_commit_before_send_on_response_start(
+        self,
+        container: MagicMock,
+        session: MagicMock,
+    ) -> None:
+        """Commit is invoked before the response start message is sent."""
+        session.new = [MagicMock()]
+        sent: list[dict] = []
+
+        async def handler(scope, receive, send):  # noqa: ANN001
+            await send({"type": "http.response.start", "status": 200})
+            await send({"type": "http.response.body", "body": b"ok"})
+
+        app = self._make_app(container, handler)
+
+        async def capture_send(message: dict) -> None:
+            sent.append(message)
+
+        await app({"type": "http", "path": "/api/v1/notes"}, None, capture_send)
+
+        container.get.assert_awaited_once_with(AsyncSession)
+        session.commit.assert_awaited_once()
+        assert len(sent) == 2
+        assert sent[0]["type"] == "http.response.start"
+
+    async def test_commit_only_once(
+        self,
+        container: MagicMock,
+        session: MagicMock,
+    ) -> None:
+        """Multiple send calls do not trigger more than one commit."""
+        session.new = [MagicMock()]
+
+        async def handler(scope, receive, send):  # noqa: ANN001
+            await send({"type": "http.response.start", "status": 200})
+            await send({"type": "http.response.body", "body": b"first"})
+            await send({"type": "http.response.body", "body": b"second"})
+
+        app = self._make_app(container, handler)
+        await app({"type": "http", "path": "/api/v1/notes"}, None, AsyncMock())
+
+        session.commit.assert_awaited_once()
+
+    async def test_no_commit_without_pending_changes(
+        self,
+        container: MagicMock,
+        session: MagicMock,
+    ) -> None:
+        """Read-only requests do not issue an empty commit."""
+        session.new = []
+        session.dirty = []
+        session.deleted = []
+
+        async def handler(scope, receive, send):  # noqa: ANN001
+            await send({"type": "http.response.start", "status": 200})
+
+        app = self._make_app(container, handler)
+        await app({"type": "http", "path": "/api/v1/notes"}, None, AsyncMock())
+
+        session.commit.assert_not_awaited()
+
+    async def test_excluded_paths_skip_commit(
+        self,
+        container: MagicMock,
+        session: MagicMock,
+    ) -> None:
+        """Health/readiness/metrics endpoints bypass the middleware."""
+
+        async def handler(scope, receive, send):  # noqa: ANN001
+            await send({"type": "http.response.start", "status": 200})
+
+        app = self._make_app(container, handler)
+        await app({"type": "http", "path": "/health"}, None, AsyncMock())
+
+        container.get.assert_not_called()
+        session.commit.assert_not_awaited()
+
+    async def test_rollback_and_raise_on_commit_failure(
+        self,
+        container: MagicMock,
+        session: MagicMock,
+    ) -> None:
+        """Failed commit rolls back and propagates the exception."""
+        session.new = [MagicMock()]
+        session.commit.side_effect = RuntimeError("commit failed")
+
+        async def handler(scope, receive, send):  # noqa: ANN001
+            await send({"type": "http.response.start", "status": 200})
+
+        app = self._make_app(container, handler)
+
+        with pytest.raises(RuntimeError, match="commit failed"):
+            await app({"type": "http", "path": "/api/v1/notes"}, None, AsyncMock())
+
+        session.rollback.assert_awaited_once()
+
+    async def test_non_http_scope_passes_through(
+        self,
+        container: MagicMock,
+        session: MagicMock,
+    ) -> None:
+        """WebSocket scopes are not touched by the middleware."""
+
+        async def handler(scope, receive, send):  # noqa: ANN001
+            await send({"type": "websocket.send", "text": "hello"})
+
+        app = self._make_app(container, handler)
+        await app({"type": "websocket", "path": "/ws"}, None, AsyncMock())
+
+        container.get.assert_not_called()
+        session.commit.assert_not_awaited()
+
+    async def test_unhandled_exception_does_not_commit(
+        self,
+        container: MagicMock,
+        session: MagicMock,
+    ) -> None:
+        """If the app raises before sending, no commit is attempted."""
+        session.new = [MagicMock()]
+
+        async def handler(scope, receive, send):  # noqa: ANN001
+            raise RuntimeError("boom")
+
+        app = self._make_app(container, handler)
+
+        with pytest.raises(RuntimeError, match="boom"):
+            await app({"type": "http", "path": "/api/v1/notes"}, None, AsyncMock())
+
+        session.commit.assert_not_awaited()

@@ -19,6 +19,7 @@ from app.adapters.lifecycle.application_startup import ApplicationStartup
 from app.api.error_mapping import domain_error_handler
 from app.api.middleware import (
     ApiVersionMiddleware,
+    CommitOnResponseMiddleware,
     RateLimitMiddleware,
     RequestIdMiddleware,
     RequestLoggingMiddleware,
@@ -129,6 +130,7 @@ def create_app() -> FastAPI:
         requests=settings.RATE_LIMIT_REQUESTS,
         window=settings.RATE_LIMIT_WINDOW,
     )
+    app.add_middleware(CommitOnResponseMiddleware)
 
     @app.middleware("http")
     async def _security_headers(request: Request, call_next):  # noqa: ANN001
