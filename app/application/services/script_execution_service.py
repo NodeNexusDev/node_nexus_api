@@ -20,6 +20,7 @@ from app.application.dto.script_execution import (
     ScriptStepResultDTO,
 )
 from app.application.policies.output import bound_output
+from app.application.services._target_resolver import resolve_targets
 from app.application.types import JsonObject, JsonValue, PersistenceObject
 from app.core.exceptions import (
     CommandNotFoundError,
@@ -131,24 +132,11 @@ class ScriptExecutionService:
         self, request: ScriptExecutionRequestDTO
     ) -> list[NodeConnectionDTO]:
         """Resolve target nodes from IDs and tags."""
-        nodes_by_ids = None
-        if request.node_ids:
-            nodes_by_ids = await self._node_reader.get_connections_by_ids(
-                list(request.node_ids)
-            )
-
-        nodes_by_tags = None
-        if request.tags:
-            nodes_by_tags = await self._node_reader.get_connections_by_tags(
-                list(request.tags)
-            )
-
-        if nodes_by_ids is not None and nodes_by_tags is not None:
-            tag_ids = {node.id for node in nodes_by_tags}
-            return [node for node in nodes_by_ids if node.id in tag_ids]
-        if nodes_by_ids is not None:
-            return nodes_by_ids
-        return nodes_by_tags or []
+        return await resolve_targets(
+            self._node_reader,
+            node_ids=request.node_ids,
+            tags=request.tags,
+        )
 
     async def _resolve_step(
         self,
