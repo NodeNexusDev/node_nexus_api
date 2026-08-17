@@ -112,7 +112,6 @@ jobs:
       DATABASE_URL: "sqlite+aiosqlite:///test.db"
       SECRET_KEY: test-secret-key-for-ci
       MASTER_API_KEY: test-master-key-for-ci
-      ENCRYPTION_SALT: test-salt-for-ci
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -176,7 +175,6 @@ jobs:
             -e DATABASE_URL=sqlite+aiosqlite:///test.db \
             -e SECRET_KEY=test-secret-key \
             -e MASTER_API_KEY=test-master-key \
-            -e ENCRYPTION_SALT=test-salt \
             node-nexus-api:test python -c "from app.main import app; print('App loaded successfully')"
 
   e2e-smoke:
