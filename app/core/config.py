@@ -34,6 +34,8 @@ class Settings(BaseSettings):
 
     # Persistent scheduler
     SCHEDULER_ENABLED: bool = True
+    SCHEDULER_OWNERSHIP_POLL_SECONDS: float = 5.0
+    SCHEDULER_RECONCILIATION_INTERVAL_SECONDS: float = 10.0
 
     # Request timeout
     REQUEST_TIMEOUT: int = 300  # seconds

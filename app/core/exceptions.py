@@ -97,6 +97,10 @@ class SchedulePersistenceError(DomainError):
     """Raised when schedule persistence or registration fails."""
 
 
+class ScheduledScriptExecutionError(DomainError):
+    """Raised when a scheduled script execution reports a failed result."""
+
+
 class ExecutionNotFoundError(DomainError):
     """Raised when an execution record is not found."""
 

@@ -72,7 +72,9 @@ class ApplicationStartup:
 
         self._scheduler.configure_reconciler(restore)
         await restore()
-        self._scheduler.start_reconciliation()
+        self._scheduler.start_reconciliation(
+            interval_seconds=self._settings.SCHEDULER_RECONCILIATION_INTERVAL_SECONDS,
+        )
 
     async def _cleanup_audit(self) -> None:
         try:
