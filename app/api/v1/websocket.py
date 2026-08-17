@@ -116,25 +116,18 @@ async def exec_stream(
 ) -> None:
     """Stream command output via WebSocket.
 
-    Authentication: ?token=<api_key>
+    Authentication: x-api-key header
     Client sends JSON: {"command": "ls -la"}
     Server sends: {"type": "stdout", "data": "..."} or
                   {"type": "done", "exit_code": 0}
 
     On disconnect, the SSH process is killed.
     """
-    header_token = (
+    token = (
         websocket.headers.get("x-api-key")
         if isinstance(websocket.headers, Mapping)
         else None
     )
-    token = (
-        header_token
-        if isinstance(header_token, str)
-        else websocket.query_params.get("token")
-    )
-    if websocket.query_params.get("token"):
-        logger.warning("ws.auth.query_token.deprecated")
     # Accept before application-level authentication so rejected clients
     # receive the documented WebSocket close codes instead of an HTTP 403
     # handshake rejection from the ASGI server.
