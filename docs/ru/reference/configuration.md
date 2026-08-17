@@ -2,7 +2,7 @@
 title: Справочник конфигурации
 status: stable
 translation_key: reference.configuration
-source_revision: "2026-07-29"
+source_revision: "2026-08-17"
 ---
 
 # Справочник конфигурации
@@ -18,10 +18,12 @@ source_revision: "2026-07-29"
 | `PORT` | `8000` | HTTP listen port |
 | `CORS_ORIGINS` | `http://localhost:3000` | Разрешённые browser origins |
 | `MASTER_API_KEY` | пусто | Bootstrap read-write key |
-| `ENCRYPTION_SALT` | `node-nexus-ssh-v1` | Salt derivation шифрования |
+| `ENCRYPTION_SALT` | пусто | Salt derivation шифрования (обязательно в production) |
 | `SSH_STRICT_HOST_KEY_CHECKING` | `true` | Обязательная проверка host key SSH-сервера |
 | `SSH_KNOWN_HOSTS_PATH` | `/app/.ssh/known_hosts` | Путь к файлу OpenSSH `known_hosts` |
 | `SCHEDULER_ENABLED` | `true` | Включить выполнение персистентных расписаний |
+| `SCHEDULER_OWNERSHIP_POLL_SECONDS` | `5.0` | Интервал опроса владельца планировщика (сек) |
+| `SCHEDULER_RECONCILIATION_INTERVAL_SECONDS` | `10.0` | Интервалconciliation расписаний (сек) |
 | `REQUEST_TIMEOUT` | `300` | Global timeout в секундах |
 | `RATE_LIMIT_REQUESTS` | `100` | Requests на process-local window |
 | `RATE_LIMIT_WINDOW` | `60` | Rate-limit window в секундах |
@@ -32,5 +34,7 @@ source_revision: "2026-07-29"
 | `OTEL_ENABLED` | `false` | Включить OpenTelemetry |
 | `OTEL_ENDPOINT` | `http://localhost:4317` | OTLP gRPC collector |
 | `OTEL_SERVICE_NAME` | `node-nexus-api` | Trace service name |
+| `SUPPORTED_API_VERSIONS` | `["1"]` | Поддерживаемые версии API |
+| `E2E_ENABLED` | `false` | Включить endpoints E2E test harness |
 
 В production переопределите все secrets и environment-specific URLs.

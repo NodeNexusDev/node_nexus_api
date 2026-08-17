@@ -25,6 +25,11 @@ health, readiness и metrics исключены из проверки верси
 
 | Версия | Дата | Тип | Основные изменения |
 |--------|------|-----|--------------------|
+| 0.15.0 | 2026-08-17 | Minor | Scheduler trigger-now endpoint, propagation failed status, E2E рефакторинг с shared settings, CI hardening |
+| 0.14.0 | 2026-08-17 | Minor | HMAC-SHA-256 для хеширования API ключей, ENCRYPTION_SALT обязателен, ограничение CORS, валидация group_by, очистка WebSocket token auth |
+| 0.13.4 | 2026-08-17 | Patch | Исправления OpenAPI snapshot и tag_manager bindparams |
+| 0.13.3 | 2026-08-17 | Patch | Исправление unit test failures после DTO refactor |
+| 0.13.2 | 2026-08-17 | Patch | Typed result DTOs, подавление bandit B608 warnings |
 | 0.13.1 | 2026-08-17 | Patch | Исправления E2E тестов Stage F, проблемы кэширования SQLAlchemy |
 | 0.13.0 | 2026-08-15 | Minor | Избранное, заметки, управление тегами, клонирование, метрики дашборда, глобальный поиск, статистика выполнения, SSE поток, экспорт аудита |
 | 0.11.0 | 2026-08-13 | Minor | Dry-run режим импорта конфигурации, endpoint валидации учётных данных |
