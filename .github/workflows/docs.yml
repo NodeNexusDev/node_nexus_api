@@ -27,7 +27,6 @@ jobs:
       DATABASE_URL: "sqlite+aiosqlite:///:memory:"
       SECRET_KEY: docs-ci-only
       MASTER_API_KEY: docs-ci-only
-      ENCRYPTION_SALT: docs-ci-only
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 

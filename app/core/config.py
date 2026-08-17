@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     MASTER_API_KEY: str = ""
 
     # Encryption
-    ENCRYPTION_SALT: str  # Required — set via .env
+    ENCRYPTION_SALT: str = ""  # Required in production — set via .env
 
     # SSH host verification
     SSH_STRICT_HOST_KEY_CHECKING: bool = True
