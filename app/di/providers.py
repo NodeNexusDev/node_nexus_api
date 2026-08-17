@@ -1154,7 +1154,9 @@ class SchedulerProvider(Provider):
         self, engine: AsyncEngine, settings: Settings
     ) -> AsyncIterable[ApschedulerRuntime]:
         """Start and finalize the application-scoped script scheduler."""
-        scheduler = ApschedulerRuntime()
+        scheduler = ApschedulerRuntime(
+            ownership_poll_seconds=settings.SCHEDULER_OWNERSHIP_POLL_SECONDS,
+        )
         if settings.SCHEDULER_ENABLED:
             await scheduler.acquire_ownership(engine)
             scheduler.start_ownership_monitor(engine)

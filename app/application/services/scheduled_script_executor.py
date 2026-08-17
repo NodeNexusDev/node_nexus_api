@@ -7,6 +7,7 @@ from app.application.dto.script_execution import ScriptExecutionRequestDTO
 from app.application.ports.schedule import ScheduleWriter
 from app.application.services.script_execution_service import ScriptExecutionService
 from app.application.types import JsonValue
+from app.core.exceptions import ScheduledScriptExecutionError
 
 
 class ScheduledScriptExecutor:
@@ -29,7 +30,7 @@ class ScheduledScriptExecutor:
     ) -> None:
         await self._schedule_writer.mark_started(script_id, datetime.now(UTC))
         try:
-            await self._script_execution.execute_script(
+            result = await self._script_execution.execute_script(
                 script_id,
                 ScriptExecutionRequestDTO(
                     node_ids=tuple(node_ids),
@@ -45,4 +46,16 @@ class ScheduledScriptExecutor:
                 type(exc).__name__,
             )
             raise
+
+        if any(node_result.status == "failed" for node_result in result.results):
+            error_type = ScheduledScriptExecutionError.__name__
+            await self._schedule_writer.mark_failed(
+                script_id,
+                datetime.now(UTC),
+                error_type,
+            )
+            raise ScheduledScriptExecutionError(
+                f"Scheduled script {script_id} reported a failed execution"
+            )
+
         await self._schedule_writer.mark_succeeded(script_id, datetime.now(UTC))

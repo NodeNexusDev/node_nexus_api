@@ -39,13 +39,18 @@ logger = structlog.get_logger()
 ScheduledScriptExecutor = Callable[["UUID", list["UUID"], dict], Awaitable[None]]
 ScheduleReconciler = Callable[[], Awaitable[tuple[int, int]]]
 _SCHEDULER_LOCK_ID = 5_642_395_847_322_111
-_OWNERSHIP_POLL_SECONDS = 5
+_DEFAULT_OWNERSHIP_POLL_SECONDS = 5.0
 
 
 class ApschedulerRuntime:
     """Application-scoped APScheduler engine and ownership manager."""
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        *,
+        ownership_poll_seconds: float = _DEFAULT_OWNERSHIP_POLL_SECONDS,
+    ) -> None:
+        self._ownership_poll_seconds = ownership_poll_seconds
         self._scheduler = AsyncIOScheduler()
         self._scheduler.add_listener(
             self._record_scheduler_event,
@@ -195,7 +200,7 @@ class ApschedulerRuntime:
                 if self._owner_connection is not None:
                     await self._owner_connection.close()
                     self._owner_connection = None
-            await asyncio.sleep(_OWNERSHIP_POLL_SECONDS)
+            await asyncio.sleep(self._ownership_poll_seconds)
 
     async def stop(self) -> None:
         """Stop the scheduler."""

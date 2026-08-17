@@ -12,6 +12,10 @@ from app.application.dto.schedule import (
     ScheduleRequestDTO,
     ScheduleViewDTO,
 )
+from app.application.dto.script_execution import (
+    ScriptExecutionBatchResultDTO,
+    ScriptNodeResultDTO,
+)
 from app.application.services.schedule_management import (
     ScheduleManagementService,
 )
@@ -23,6 +27,7 @@ from app.application.services.scheduled_script_executor import (
 )
 from app.core.exceptions import (
     NodeNotFoundError,
+    ScheduledScriptExecutionError,
     ScheduleNotFoundError,
     SchedulePersistenceError,
     ScheduleValidationError,
@@ -186,6 +191,18 @@ async def test_reconciliation_removes_orphans_and_records_each_outcome() -> None
 
 async def test_scheduled_executor_records_success_metadata() -> None:
     execution = AsyncMock()
+    execution.execute_script.return_value = ScriptExecutionBatchResultDTO(
+        script_id=uuid4(),
+        results=(
+            ScriptNodeResultDTO(
+                execution_id=uuid4(),
+                node_id=uuid4(),
+                node_name="node-1",
+                status="completed",
+                steps=(),
+            ),
+        ),
+    )
     writer = AsyncMock()
     executor = ScheduledScriptExecutor(execution, writer)
     script_id = uuid4()
@@ -204,6 +221,30 @@ async def test_scheduled_executor_records_and_propagates_failure() -> None:
     executor = ScheduledScriptExecutor(execution, writer)
 
     with pytest.raises(TimeoutError):
+        await executor.execute(uuid4(), [uuid4()], {})
+
+    writer.mark_failed.assert_awaited_once()
+    writer.mark_succeeded.assert_not_awaited()
+
+
+async def test_scheduled_executor_records_failure_on_bad_exit_code() -> None:
+    execution = AsyncMock()
+    execution.execute_script.return_value = ScriptExecutionBatchResultDTO(
+        script_id=uuid4(),
+        results=(
+            ScriptNodeResultDTO(
+                execution_id=uuid4(),
+                node_id=uuid4(),
+                node_name="node-1",
+                status="failed",
+                steps=(),
+            ),
+        ),
+    )
+    writer = AsyncMock()
+    executor = ScheduledScriptExecutor(execution, writer)
+
+    with pytest.raises(ScheduledScriptExecutionError):
         await executor.execute(uuid4(), [uuid4()], {})
 
     writer.mark_failed.assert_awaited_once()
