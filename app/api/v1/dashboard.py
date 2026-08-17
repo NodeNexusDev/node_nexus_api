@@ -2,6 +2,7 @@
 
 from dataclasses import asdict
 from datetime import datetime
+from typing import Literal
 
 import structlog
 from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
@@ -76,7 +77,7 @@ async def get_dashboard_metrics(
     metrics_service: FromDishka[DashboardMetricsService],
     date_from: datetime | None = Query(None),
     date_to: datetime | None = Query(None),
-    group_by: str = Query("day", pattern="^(hour|day|week|month)$"),
+    group_by: Literal["day", "hour", "week", "month"] = Query("day"),
     _key: str = Security(get_current_api_key),
 ) -> DashboardMetricsResponse:
     """Get time-series execution metrics for charts."""
