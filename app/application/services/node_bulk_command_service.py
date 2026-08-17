@@ -26,6 +26,7 @@ from app.application.dto.command_execution import (
 )
 from app.application.dto.command_history import CommandHistoryCreateDTO
 from app.application.policies.output import bound_output
+from app.application.services._target_resolver import resolve_targets
 from app.application.types import JsonObject
 from app.core.exceptions import ConnectionFailedError, NodeNotFoundError
 
@@ -115,24 +116,11 @@ class NodeBulkCommandService:
         self, data: BulkCommandRequestDTO
     ) -> list[NodeConnectionDTO]:
         """Resolve target nodes from IDs and tags before concurrent work."""
-        nodes_by_ids = None
-        if data.node_ids:
-            nodes_by_ids = await self._node_reader.get_connections_by_ids(
-                list(data.node_ids)
-            )
-
-        nodes_by_tags = None
-        if data.tags:
-            nodes_by_tags = await self._node_reader.get_connections_by_tags(
-                list(data.tags)
-            )
-
-        if nodes_by_ids is not None and nodes_by_tags is not None:
-            tag_ids = {node.id for node in nodes_by_tags}
-            return [node for node in nodes_by_ids if node.id in tag_ids]
-        if nodes_by_ids is not None:
-            return nodes_by_ids
-        return nodes_by_tags or []
+        return await resolve_targets(
+            self._node_reader,
+            node_ids=data.node_ids,
+            tags=data.tags,
+        )
 
     async def _execute_on_single_node(
         self,
