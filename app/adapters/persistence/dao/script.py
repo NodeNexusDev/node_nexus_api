@@ -6,6 +6,7 @@ from uuid import UUID
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.adapters.persistence.dao.base import escape_ilike
 from app.models.script import ScriptModel
 
 
@@ -31,11 +32,12 @@ class ScriptRepository:
             for tag in tags:
                 query = query.where(ScriptModel.tags.op("@>")([tag]))
         if search:
-            pattern = f"%{search}%"
+            escaped = escape_ilike(search)
+            pattern = f"%{escaped}%"
             query = query.where(
                 or_(
-                    ScriptModel.name.ilike(pattern),
-                    ScriptModel.description.ilike(pattern),
+                    ScriptModel.name.ilike(pattern, escape="\\"),
+                    ScriptModel.description.ilike(pattern, escape="\\"),
                 )
             )
         return query
@@ -93,5 +95,4 @@ class ScriptRepository:
             return False
         await self._session.delete(script)
         await self._session.flush()
-        await self._session.commit()
         return True

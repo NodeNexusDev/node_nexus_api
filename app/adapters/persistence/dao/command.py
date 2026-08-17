@@ -6,6 +6,7 @@ from uuid import UUID
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.adapters.persistence.dao.base import escape_ilike
 from app.models.command import CommandModel
 
 
@@ -31,11 +32,12 @@ class CommandRepository:
             for tag in tags:
                 query = query.where(CommandModel.tags.op("@>")([tag]))
         if search:
-            pattern = f"%{search}%"
+            escaped = escape_ilike(search)
+            pattern = f"%{escaped}%"
             query = query.where(
                 or_(
-                    CommandModel.name.ilike(pattern),
-                    CommandModel.description.ilike(pattern),
+                    CommandModel.name.ilike(pattern, escape="\\"),
+                    CommandModel.description.ilike(pattern, escape="\\"),
                 )
             )
         return query
@@ -93,5 +95,4 @@ class CommandRepository:
             return False
         await self._session.delete(command)
         await self._session.flush()
-        await self._session.commit()
         return True

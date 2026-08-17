@@ -6,6 +6,16 @@ from datetime import datetime
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+_DEFAULT_STATS: dict = {
+    "total": 0,
+    "successful": 0,
+    "failed": 0,
+    "avg_duration_ms": None,
+    "min_duration_ms": None,
+    "max_duration_ms": None,
+    "last_executed_at": None,
+}
+
 
 class ExecutionStatsRepository:
     def __init__(self, session: AsyncSession) -> None:
@@ -47,8 +57,8 @@ class ExecutionStatsRepository:
             "FROM command_executions ce "
             f"WHERE {where_sql}"  # nosec B608
         )
-        row = (await self._session.execute(sql, params)).one()
-        return dict(row._mapping)
+        row = (await self._session.execute(sql, params)).one_or_none()
+        return dict(row._mapping) if row else dict(_DEFAULT_STATS)
 
     async def script_stats(
         self,
@@ -86,5 +96,5 @@ class ExecutionStatsRepository:
             "FROM script_executions se "
             f"WHERE {where_sql}"  # nosec B608
         )
-        row = (await self._session.execute(sql, params)).one()
-        return dict(row._mapping)
+        row = (await self._session.execute(sql, params)).one_or_none()
+        return dict(row._mapping) if row else dict(_DEFAULT_STATS)
