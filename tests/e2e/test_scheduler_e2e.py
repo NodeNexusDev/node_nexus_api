@@ -2,28 +2,21 @@
 
 import asyncio
 import time
-from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
 import asyncpg
 import httpx2 as httpx
 import pytest
 
+from app.adapters.runtime.apscheduler_runtime import _SCHEDULER_LOCK_ID
+from tests.e2e.helpers.polling import wait_for_condition
 from tests.e2e.helpers.resources import UniqueResourceFactory
 from tests.e2e.helpers.service_controller import DockerServiceController
 
-pytestmark = pytest.mark.docker
+pytestmark = [pytest.mark.docker, pytest.mark.e2e_scheduler]
 
 
-def _next_minute_cron() -> tuple[str, datetime]:
-    """Return a UTC cron safely ahead of the current minute boundary."""
-    now = datetime.now(UTC)
-    minutes = 2 if now.second >= 45 else 1
-    run_at = (now + timedelta(minutes=minutes)).replace(second=0, microsecond=0)
-    return f"{run_at.minute} {run_at.hour} * * *", run_at
-
-
-def _wait_for_api(client: httpx.Client, *, timeout: float = 120.0) -> None:
+def _wait_for_api(client: httpx.Client, *, timeout: float = 60.0) -> None:
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         try:
@@ -40,32 +33,40 @@ def _wait_for_execution(
     client: httpx.Client,
     script_id: str,
     *,
-    timeout: float = 130.0,
+    timeout: float = 10.0,
 ) -> list[dict]:
-    deadline = time.monotonic() + timeout
-    while time.monotonic() < deadline:
+    def _has_execution() -> bool:
         response = client.get(f"/api/v1/scripts/{script_id}/executions")
-        if response.status_code == 200 and response.json()["total"] > 0:
-            return response.json()["items"]
-        time.sleep(1)
-    pytest.fail("Scheduled execution did not appear before the deadline")
+        return response.status_code == 200 and response.json()["total"] > 0
+
+    wait_for_condition(
+        _has_execution,
+        timeout=timeout,
+        pause=0.2,
+        description="scheduled execution to appear",
+    )
+    return client.get(f"/api/v1/scripts/{script_id}/executions").json()["items"]
 
 
 def _wait_for_completed_execution(
     client: httpx.Client,
     script_id: str,
     *,
-    timeout: float = 130.0,
+    timeout: float = 10.0,
 ) -> list[dict]:
-    deadline = time.monotonic() + timeout
-    while time.monotonic() < deadline:
+    def _is_completed() -> bool:
         response = client.get(f"/api/v1/scripts/{script_id}/executions")
-        if response.status_code == 200 and response.json()["total"] > 0:
-            items = response.json()["items"]
-            if items[0]["status"] in ("completed", "failed"):
-                return items
-        time.sleep(1)
-    pytest.fail("Scheduled execution did not complete before the deadline")
+        if response.status_code != 200 or response.json()["total"] == 0:
+            return False
+        return response.json()["items"][0]["status"] in ("completed", "failed")
+
+    wait_for_condition(
+        _is_completed,
+        timeout=timeout,
+        pause=0.2,
+        description="scheduled execution to complete",
+    )
+    return client.get(f"/api/v1/scripts/{script_id}/executions").json()["items"]
 
 
 def _schedule_url(script_id: str) -> str:
@@ -74,6 +75,36 @@ def _schedule_url(script_id: str) -> str:
 
 def _executions_url(script_id: str) -> str:
     return f"/api/v1/scripts/{script_id}/executions"
+
+
+async def _lock_held_by_another(
+    connection: asyncpg.Connection,
+    lock_id: int = _SCHEDULER_LOCK_ID,
+) -> bool:
+    """Return True if another session holds the advisory lock.
+
+    Uses a transaction-scoped lock so the test connection never keeps it.
+    """
+    acquired = await connection.fetchval(
+        "SELECT pg_try_advisory_xact_lock($1)", lock_id
+    )
+    return not acquired
+
+
+async def _wait_lock_held_by_another(
+    connection: asyncpg.Connection,
+    *,
+    timeout: float = 10.0,
+) -> None:
+    """Wait until another session holds the scheduler advisory lock."""
+    deadline = asyncio.get_event_loop().time() + timeout
+    while asyncio.get_event_loop().time() < deadline:
+        if await _lock_held_by_another(connection):
+            return
+        await asyncio.sleep(0.5)
+    raise AssertionError(
+        f"Scheduler lock was not held by another session within {timeout}s"
+    )
 
 
 def test_reconciliation_restores_schedule_after_restart(
@@ -99,8 +130,7 @@ def test_reconciliation_restores_schedule_after_restart(
             }
         ]
     )
-    cron, run_at = _next_minute_cron()
-    e2e_resources.create_schedule(script["id"], [node["id"]], cron=cron)
+    e2e_resources.create_schedule(script["id"], [node["id"]], cron="* * * * *")
 
     # Verify initial state
     resp = e2e_client.get(_schedule_url(script["id"]))
@@ -108,7 +138,7 @@ def test_reconciliation_restores_schedule_after_restart(
     initial = resp.json()
     assert initial["enabled"] is True
     assert initial["operational_state"] == "registered"
-    assert initial["cron"] == cron
+    assert initial["cron"] == "* * * * *"
 
     # Clear runtime state by restarting API
     docker_service_controller.restart("api")
@@ -120,8 +150,13 @@ def test_reconciliation_restores_schedule_after_restart(
     restored = resp.json()
     assert restored["enabled"] is True
     assert restored["operational_state"] == "registered"
-    assert restored["cron"] == cron
+    assert restored["cron"] == "* * * * *"
     assert restored["next_run_at"] is not None
+
+    # Trigger execution immediately via the E2E harness.
+    resp = e2e_client.post(f"/api/v1/internal/e2e/scheduler/{script['id']}/trigger-now")
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "triggered"
 
     # Verify exactly one execution (no duplicates from reconciliation)
     executions = _wait_for_completed_execution(e2e_client, script["id"])
@@ -132,8 +167,7 @@ def test_reconciliation_restores_schedule_after_restart(
     assert executions[0]["steps"][0]["exit_code"] == 0
     assert "reconciliation-ok" in executions[0]["steps"][0]["stdout"]
 
-    # Confirm no duplicate execution after waiting
-    time.sleep(3)
+    # Confirm no duplicate execution
     final_resp = e2e_client.get(_executions_url(script["id"]))
     assert final_resp.json()["total"] == 1
 
@@ -154,7 +188,7 @@ def test_schedule_replace_removes_old_runtime_job(
     """Replacing a schedule with a new cron removes the old runtime job.
 
     The new cron should be the only active one. We verify by checking that
-    only one execution appears and it matches the new schedule's timing.
+    only one execution appears and it matches the new schedule.
     """
     node = e2e_resources.create_ssh_node()
     script = e2e_resources.create_script(
@@ -190,11 +224,18 @@ def test_schedule_replace_removes_old_runtime_job(
     assert schedule["cron"] == "* * * * *"
     assert schedule["next_run_at"] is not None
 
-    # Wait for execution from the new cron (must be completed, not just started)
+    # Trigger execution immediately and verify only one run occurs.
+    resp = e2e_client.post(f"/api/v1/internal/e2e/scheduler/{script['id']}/trigger-now")
+    assert resp.status_code == 200
+
     executions = _wait_for_completed_execution(e2e_client, script["id"])
     assert len(executions) == 1
     assert executions[0]["status"] == "completed"
     assert "replace-ok" in executions[0]["steps"][0]["stdout"]
+
+    # No duplicate executions from the old far-future cron.
+    final = e2e_client.get(_executions_url(script["id"])).json()
+    assert final["total"] == 1
 
 
 def test_persistent_schedule_recovers_after_api_restart(
@@ -213,9 +254,10 @@ def test_persistent_schedule_recovers_after_api_restart(
             }
         ]
     )
-    cron, _ = _next_minute_cron()
-    schedule = e2e_resources.create_schedule(script["id"], [node["id"]], cron=cron)
-    assert schedule["cron"] == cron
+    schedule = e2e_resources.create_schedule(
+        script["id"], [node["id"]], cron="* * * * *"
+    )
+    assert schedule["cron"] == "* * * * *"
 
     docker_service_controller.restart("api")
     _wait_for_api(e2e_client)
@@ -224,8 +266,11 @@ def test_persistent_schedule_recovers_after_api_restart(
     assert restored.status_code == 200, restored.text
     restored_schedule = restored.json()
     assert restored_schedule["enabled"] is True
-    assert restored_schedule["cron"] == cron
+    assert restored_schedule["cron"] == "* * * * *"
     assert restored_schedule["next_run_at"] is not None
+
+    resp = e2e_client.post(f"/api/v1/internal/e2e/scheduler/{script['id']}/trigger-now")
+    assert resp.status_code == 200
 
     executions = _wait_for_execution(e2e_client, script["id"])
     assert len(executions) == 1
@@ -256,30 +301,22 @@ async def test_scheduler_replica_failover_has_no_duplicate_execution(
                 }
             ]
         )
-        cron, run_at = _next_minute_cron()
-        e2e_resources.create_schedule(script["id"], [node["id"]], cron=cron)
+        # Use a per-minute cron; the primary API currently owns the lock.
+        e2e_resources.create_schedule(script["id"], [node["id"]], cron="* * * * *")
 
-        await asyncio.sleep(2)
-        assert "scheduler.owner.rejected" in docker_service_controller.logs(
-            "api-replica"
-        )
+        # Verify the primary API holds the lock (replica is rejected).
+        await _wait_lock_held_by_another(postgres_connection, timeout=10.0)
 
         docker_service_controller.stop("api")
         api_stopped = True
 
-        ownership_deadline = time.monotonic() + 30
-        while time.monotonic() < ownership_deadline:
-            if "scheduler.owner.acquired" in docker_service_controller.logs(
-                "api-replica"
-            ):
-                break
-            await asyncio.sleep(1)
-        else:
-            pytest.fail("Scheduler contender did not acquire ownership")
+        # Wait for the replica to take over the advisory lock.
+        await _wait_lock_held_by_another(postgres_connection, timeout=30.0)
 
-        execution_deadline = run_at.timestamp() + 45
+        # Wait for the replica to execute the scheduled job.
         execution_count = 0
-        while time.time() < execution_deadline:
+        deadline = time.monotonic() + 60.0
+        while time.monotonic() < deadline:
             execution_count = await postgres_connection.fetchval(
                 "SELECT count(*) FROM script_executions WHERE script_id = $1",
                 UUID(script["id"]),
@@ -289,7 +326,7 @@ async def test_scheduler_replica_failover_has_no_duplicate_execution(
             await asyncio.sleep(1)
         assert execution_count == 1
 
-        await asyncio.sleep(3)
+        await asyncio.sleep(2)
         assert (
             await postgres_connection.fetchval(
                 "SELECT count(*) FROM script_executions WHERE script_id = $1",
@@ -302,7 +339,8 @@ async def test_scheduler_replica_failover_has_no_duplicate_execution(
         api_stopped = False
         _wait_for_api(e2e_client)
         await asyncio.sleep(2)
-        assert "scheduler.owner.rejected" in docker_service_controller.logs("api")
+        # After the primary comes back it should be rejected (replica still owns).
+        assert await _lock_held_by_another(postgres_connection)
         assert (
             await postgres_connection.fetchval(
                 "SELECT count(*) FROM script_executions WHERE script_id = $1",

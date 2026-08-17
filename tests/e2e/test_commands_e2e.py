@@ -5,8 +5,7 @@ from uuid import uuid4
 import httpx2 as httpx
 import pytest
 
-from tests.e2e.helpers.nodes import create_node as _create_node
-from tests.e2e.helpers.nodes import create_ssh_node as _create_ssh_node
+from tests.e2e.helpers.resources import UniqueResourceFactory
 
 pytestmark = pytest.mark.docker
 
@@ -98,8 +97,11 @@ def test_command_not_found(e2e_client: httpx.Client) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_command_execute_on_node(e2e_client: httpx.Client) -> None:
-    node = _create_ssh_node(e2e_client, name="cmd-exec-node")
+def test_command_execute_on_node(
+    e2e_client: httpx.Client,
+    e2e_resources: UniqueResourceFactory,
+) -> None:
+    node = e2e_resources.create_ssh_node(name="cmd-exec-node")
     cmd = _create_command(e2e_client, name="cmd-exec", command="echo hello-cmd")
 
     resp = e2e_client.post(
@@ -112,8 +114,11 @@ def test_command_execute_on_node(e2e_client: httpx.Client) -> None:
     assert result["exit_code"] == 0
 
 
-def test_command_execute_not_found(e2e_client: httpx.Client) -> None:
-    node = _create_ssh_node(e2e_client, name="cmd-nf-node")
+def test_command_execute_not_found(
+    e2e_client: httpx.Client,
+    e2e_resources: UniqueResourceFactory,
+) -> None:
+    node = e2e_resources.create_ssh_node(name="cmd-nf-node")
     resp = e2e_client.post(
         f"/api/v1/commands/{uuid4()}/execute",
         json={"node_id": node["id"], "params": {}},
@@ -130,8 +135,11 @@ def test_command_execute_node_not_found(e2e_client: httpx.Client) -> None:
     assert resp.status_code == 404
 
 
-def test_command_execute_missing_required_param(e2e_client: httpx.Client) -> None:
-    node = _create_ssh_node(e2e_client, name="cmd-param-node")
+def test_command_execute_missing_required_param(
+    e2e_client: httpx.Client,
+    e2e_resources: UniqueResourceFactory,
+) -> None:
+    node = e2e_resources.create_ssh_node(name="cmd-param-node")
     cmd = _create_command(
         e2e_client,
         name="cmd-param",
@@ -146,8 +154,11 @@ def test_command_execute_missing_required_param(e2e_client: httpx.Client) -> Non
     assert resp.status_code == 422
 
 
-def test_command_execute_with_params(e2e_client: httpx.Client) -> None:
-    node = _create_ssh_node(e2e_client, name="cmd-params-node")
+def test_command_execute_with_params(
+    e2e_client: httpx.Client,
+    e2e_resources: UniqueResourceFactory,
+) -> None:
+    node = e2e_resources.create_ssh_node(name="cmd-params-node")
     cmd = _create_command(
         e2e_client,
         name="cmd-with-params",
@@ -201,9 +212,12 @@ def test_command_partial_update(e2e_client: httpx.Client) -> None:
     assert updated["command"] == "echo test"  # unchanged
 
 
-def test_bulk_execute_by_ids(e2e_client: httpx.Client) -> None:
-    node1 = _create_ssh_node(e2e_client, name="bulk-1")
-    node2 = _create_ssh_node(e2e_client, name="bulk-2")
+def test_bulk_execute_by_ids(
+    e2e_client: httpx.Client,
+    e2e_resources: UniqueResourceFactory,
+) -> None:
+    node1 = e2e_resources.create_ssh_node(name="bulk-1")
+    node2 = e2e_resources.create_ssh_node(name="bulk-2")
 
     resp = e2e_client.post(
         "/api/v1/nodes/bulk/execute",
@@ -228,10 +242,13 @@ def test_bulk_execute_by_ids(e2e_client: httpx.Client) -> None:
         assert r["exit_code"] == 0
 
 
-def test_bulk_execute_by_tags(e2e_client: httpx.Client) -> None:
-    node1 = _create_ssh_node(e2e_client, name="bulk-tag-1", tags=["bulk-test"])
-    node2 = _create_ssh_node(e2e_client, name="bulk-tag-2", tags=["bulk-test"])
-    _create_ssh_node(e2e_client, name="bulk-tag-other", tags=["other"])
+def test_bulk_execute_by_tags(
+    e2e_client: httpx.Client,
+    e2e_resources: UniqueResourceFactory,
+) -> None:
+    node1 = e2e_resources.create_ssh_node(name="bulk-tag-1", tags=["bulk-test"])
+    node2 = e2e_resources.create_ssh_node(name="bulk-tag-2", tags=["bulk-test"])
+    e2e_resources.create_ssh_node(name="bulk-tag-other", tags=["other"])
 
     resp = e2e_client.post(
         "/api/v1/nodes/bulk/execute",
@@ -253,14 +270,16 @@ def test_bulk_execute_no_nodes(e2e_client: httpx.Client) -> None:
     assert resp.status_code == 404
 
 
-def test_bulk_execute_partial_failure(e2e_client: httpx.Client) -> None:
+def test_bulk_execute_partial_failure(
+    e2e_client: httpx.Client,
+    e2e_resources: UniqueResourceFactory,
+) -> None:
     """One good node + one unreachable node = partial success."""
-    good_node = _create_ssh_node(e2e_client, name="bulk-good")
-    bad_node = _create_node(
-        e2e_client,
+    good_node = e2e_resources.create_ssh_node(name="bulk-good")
+    bad_node = e2e_resources.create_node(
         name="bulk-bad",
-        host="192.0.2.1",  # TEST-NET — unreachable
-        port=22,
+        host="127.0.0.1",  # closed port — fast connection refused
+        port=1,
     )
 
     resp = e2e_client.post(

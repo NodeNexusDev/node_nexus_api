@@ -8,8 +8,7 @@ import pytest
 
 from app.schemas.common import encode_cursor
 from tests.e2e.conftest import ServicePorts
-from tests.e2e.helpers.nodes import create_node as _create_node
-from tests.e2e.helpers.nodes import create_ssh_node as _create_ssh_node
+from tests.e2e.helpers.resources import UniqueResourceFactory
 
 pytestmark = pytest.mark.docker
 
@@ -112,15 +111,21 @@ def test_not_found_errors(e2e_client: httpx.Client) -> None:
     assert resp.status_code == 404
 
 
-def test_ssh_check_connectivity(e2e_client: httpx.Client) -> None:
-    node = _create_ssh_node(e2e_client, name="ssh-test")
+def test_ssh_check_connectivity(
+    e2e_client: httpx.Client,
+    e2e_resources: UniqueResourceFactory,
+) -> None:
+    node = e2e_resources.create_ssh_node(name="ssh-test")
     resp = e2e_client.post(f"/api/v1/nodes/{node['id']}/check")
     assert resp.status_code == 200
     assert resp.json()["status"] == "active"
 
 
-def test_ssh_execute_command(e2e_client: httpx.Client) -> None:
-    node = _create_ssh_node(e2e_client, name="ssh-exec")
+def test_ssh_execute_command(
+    e2e_client: httpx.Client,
+    e2e_resources: UniqueResourceFactory,
+) -> None:
+    node = e2e_resources.create_ssh_node(name="ssh-exec")
     resp = e2e_client.post(
         f"/api/v1/nodes/{node['id']}/execute",
         json={"command": "echo e2e-works"},
@@ -132,8 +137,11 @@ def test_ssh_execute_command(e2e_client: httpx.Client) -> None:
     assert result["exit_code"] == 0
 
 
-def test_ssh_execute_command_non_zero_exit(e2e_client: httpx.Client) -> None:
-    node = _create_ssh_node(e2e_client, name="ssh-fail")
+def test_ssh_execute_command_non_zero_exit(
+    e2e_client: httpx.Client,
+    e2e_resources: UniqueResourceFactory,
+) -> None:
+    node = e2e_resources.create_ssh_node(name="ssh-fail")
     resp = e2e_client.post(
         f"/api/v1/nodes/{node['id']}/execute",
         json={"command": "exit 42"},
@@ -143,8 +151,11 @@ def test_ssh_execute_command_non_zero_exit(e2e_client: httpx.Client) -> None:
     assert result["exit_code"] == 42
 
 
-def test_ssh_execute_command_stderr(e2e_client: httpx.Client) -> None:
-    node = _create_ssh_node(e2e_client, name="ssh-stderr")
+def test_ssh_execute_command_stderr(
+    e2e_client: httpx.Client,
+    e2e_resources: UniqueResourceFactory,
+) -> None:
+    node = e2e_resources.create_ssh_node(name="ssh-stderr")
     resp = e2e_client.post(
         f"/api/v1/nodes/{node['id']}/execute",
         json={"command": "echo error-output >&2"},
@@ -199,20 +210,21 @@ def test_pagination_page2(e2e_client: httpx.Client) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_ssh_check_wrong_credentials(e2e_client: httpx.Client) -> None:
+def test_ssh_check_wrong_credentials(
+    e2e_client: httpx.Client,
+    e2e_resources: UniqueResourceFactory,
+) -> None:
     """Wrong credentials return 200 with status="unreachable".
 
     The /check endpoint always returns 200 — it reports connectivity
     status via the response body, not HTTP status codes.
     """
-    node = _create_ssh_node(
-        e2e_client, name="ssh-bad", username="testuser", password="wrongpass"
+    node = e2e_resources.create_ssh_node(
+        name="ssh-bad", username="testuser", password="wrongpass"
     )
     resp = e2e_client.post(f"/api/v1/nodes/{node['id']}/check")
     assert resp.status_code == 200
     assert resp.json()["status"] == "unreachable"
-
-    e2e_client.delete(f"/api/v1/nodes/{node['id']}")
 
 
 # ---------------------------------------------------------------------------
@@ -312,9 +324,12 @@ def test_create_node_port_zero(e2e_client: httpx.Client) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_create_node_duplicate_name(e2e_client: httpx.Client) -> None:
+def test_create_node_duplicate_name(
+    e2e_client: httpx.Client,
+    e2e_resources: UniqueResourceFactory,
+) -> None:
     """Node names are unique and duplicate creation is a conflict."""
-    n1 = _create_node(e2e_client, name="dup-name")
+    e2e_resources.create_node(name="dup-name")
     resp = e2e_client.post(
         "/api/v1/nodes/",
         json={
@@ -325,7 +340,6 @@ def test_create_node_duplicate_name(e2e_client: httpx.Client) -> None:
         },
     )
     assert resp.status_code == 409
-    e2e_client.delete(f"/api/v1/nodes/{n1['id']}")
 
 
 # ---------------------------------------------------------------------------
@@ -356,9 +370,12 @@ def test_node_create_with_tags(e2e_client: httpx.Client) -> None:
     e2e_client.delete(f"/api/v1/nodes/{node['id']}")
 
 
-def test_node_get_all_tags(e2e_client: httpx.Client) -> None:
-    n1 = _create_node(e2e_client, name="tag-a", tags=["alpha", "beta"])
-    n2 = _create_node(e2e_client, name="tag-b", tags=["beta", "gamma"])
+def test_node_get_all_tags(
+    e2e_client: httpx.Client,
+    e2e_resources: UniqueResourceFactory,
+) -> None:
+    e2e_resources.create_node(name="tag-a", tags=["alpha", "beta"])
+    e2e_resources.create_node(name="tag-b", tags=["beta", "gamma"])
 
     resp = e2e_client.get("/api/v1/nodes/tags")
     assert resp.status_code == 200
@@ -367,12 +384,12 @@ def test_node_get_all_tags(e2e_client: httpx.Client) -> None:
     assert "beta" in tags
     assert "gamma" in tags
 
-    for n in (n1, n2):
-        e2e_client.delete(f"/api/v1/nodes/{n['id']}")
 
-
-def test_node_add_tag(e2e_client: httpx.Client) -> None:
-    node = _create_node(e2e_client, name="add-tag-node", tags=["existing"])
+def test_node_add_tag(
+    e2e_client: httpx.Client,
+    e2e_resources: UniqueResourceFactory,
+) -> None:
+    node = e2e_resources.create_node(name="add-tag-node", tags=["existing"])
 
     resp = e2e_client.post(
         f"/api/v1/nodes/{node['id']}/tags",
@@ -381,8 +398,6 @@ def test_node_add_tag(e2e_client: httpx.Client) -> None:
     assert resp.status_code == 200
     assert "new-tag" in resp.json()["tags"]
     assert "existing" in resp.json()["tags"]
-
-    e2e_client.delete(f"/api/v1/nodes/{node['id']}")
 
 
 def test_node_add_tag_not_found(e2e_client: httpx.Client) -> None:
@@ -393,8 +408,11 @@ def test_node_add_tag_not_found(e2e_client: httpx.Client) -> None:
     assert resp.status_code == 404
 
 
-def test_node_remove_tag(e2e_client: httpx.Client) -> None:
-    node = _create_node(e2e_client, name="rm-tag-node", tags=["keep", "remove"])
+def test_node_remove_tag(
+    e2e_client: httpx.Client,
+    e2e_resources: UniqueResourceFactory,
+) -> None:
+    node = e2e_resources.create_node(name="rm-tag-node", tags=["keep", "remove"])
 
     resp = e2e_client.request(
         "DELETE",
@@ -404,8 +422,6 @@ def test_node_remove_tag(e2e_client: httpx.Client) -> None:
     assert resp.status_code == 200
     assert "keep" in resp.json()["tags"]
     assert "remove" not in resp.json()["tags"]
-
-    e2e_client.delete(f"/api/v1/nodes/{node['id']}")
 
 
 def test_node_remove_tag_not_found(e2e_client: httpx.Client) -> None:
@@ -422,10 +438,13 @@ def test_node_remove_tag_not_found(e2e_client: httpx.Client) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_node_filter_by_tags(e2e_client: httpx.Client) -> None:
-    n1 = _create_node(e2e_client, name="filter-prod-web", tags=["prod", "web"])
-    n2 = _create_node(e2e_client, name="filter-prod-db", tags=["prod", "db"])
-    n3 = _create_node(e2e_client, name="filter-staging", tags=["staging"])
+def test_node_filter_by_tags(
+    e2e_client: httpx.Client,
+    e2e_resources: UniqueResourceFactory,
+) -> None:
+    e2e_resources.create_node(name="filter-prod-web", tags=["prod", "web"])
+    e2e_resources.create_node(name="filter-prod-db", tags=["prod", "db"])
+    e2e_resources.create_node(name="filter-staging", tags=["staging"])
 
     resp = e2e_client.get("/api/v1/nodes/?tags=prod")
     assert resp.status_code == 200
@@ -435,14 +454,14 @@ def test_node_filter_by_tags(e2e_client: httpx.Client) -> None:
     assert "filter-prod-db" in names
     assert "filter-staging" not in names
 
-    for n in (n1, n2, n3):
-        e2e_client.delete(f"/api/v1/nodes/{n['id']}")
 
-
-def test_node_filter_by_multiple_tags(e2e_client: httpx.Client) -> None:
-    n1 = _create_node(e2e_client, name="multi-tag-1", tags=["prod", "web"])
-    n2 = _create_node(e2e_client, name="multi-tag-2", tags=["prod", "db"])
-    n3 = _create_node(e2e_client, name="multi-tag-3", tags=["prod"])
+def test_node_filter_by_multiple_tags(
+    e2e_client: httpx.Client,
+    e2e_resources: UniqueResourceFactory,
+) -> None:
+    e2e_resources.create_node(name="multi-tag-1", tags=["prod", "web"])
+    e2e_resources.create_node(name="multi-tag-2", tags=["prod", "db"])
+    e2e_resources.create_node(name="multi-tag-3", tags=["prod"])
 
     resp = e2e_client.get("/api/v1/nodes/?tags=prod,web")
     assert resp.status_code == 200
@@ -451,13 +470,13 @@ def test_node_filter_by_multiple_tags(e2e_client: httpx.Client) -> None:
     assert "multi-tag-1" in names
     assert "multi-tag-2" not in names  # has prod but not web
 
-    for n in (n1, n2, n3):
-        e2e_client.delete(f"/api/v1/nodes/{n['id']}")
 
-
-def test_node_search_by_name(e2e_client: httpx.Client) -> None:
-    n1 = _create_node(e2e_client, name="search-web-1", host="10.0.0.1")
-    n2 = _create_node(e2e_client, name="search-db-1", host="10.0.0.2")
+def test_node_search_by_name(
+    e2e_client: httpx.Client,
+    e2e_resources: UniqueResourceFactory,
+) -> None:
+    e2e_resources.create_node(name="search-web-1", host="10.0.0.1")
+    e2e_resources.create_node(name="search-db-1", host="10.0.0.2")
 
     resp = e2e_client.get("/api/v1/nodes/?search=web")
     assert resp.status_code == 200
@@ -466,13 +485,13 @@ def test_node_search_by_name(e2e_client: httpx.Client) -> None:
     assert "search-web-1" in names
     assert "search-db-1" not in names
 
-    for n in (n1, n2):
-        e2e_client.delete(f"/api/v1/nodes/{n['id']}")
 
-
-def test_node_search_by_host(e2e_client: httpx.Client) -> None:
-    n1 = _create_node(e2e_client, name="host-alpha", host="prod.example.com")
-    n2 = _create_node(e2e_client, name="host-beta", host="staging.example.com")
+def test_node_search_by_host(
+    e2e_client: httpx.Client,
+    e2e_resources: UniqueResourceFactory,
+) -> None:
+    e2e_resources.create_node(name="host-alpha", host="prod.example.com")
+    e2e_resources.create_node(name="host-beta", host="staging.example.com")
 
     resp = e2e_client.get("/api/v1/nodes/?search=prod")
     assert resp.status_code == 200
@@ -481,19 +500,18 @@ def test_node_search_by_host(e2e_client: httpx.Client) -> None:
     assert "host-alpha" in names
     assert "host-beta" not in names
 
-    for n in (n1, n2):
-        e2e_client.delete(f"/api/v1/nodes/{n['id']}")
 
-
-def test_node_filter_by_tags_and_search(e2e_client: httpx.Client) -> None:
-    n1 = _create_node(
-        e2e_client, name="combo-web-prod", host="10.0.0.1", tags=["prod", "web"]
+def test_node_filter_by_tags_and_search(
+    e2e_client: httpx.Client,
+    e2e_resources: UniqueResourceFactory,
+) -> None:
+    e2e_resources.create_node(
+        name="combo-web-prod", host="10.0.0.1", tags=["prod", "web"]
     )
-    n2 = _create_node(
-        e2e_client, name="combo-db-prod", host="10.0.0.2", tags=["prod", "db"]
+    e2e_resources.create_node(
+        name="combo-db-prod", host="10.0.0.2", tags=["prod", "db"]
     )
-    n3 = _create_node(
-        e2e_client,
+    e2e_resources.create_node(
         name="combo-web-staging",
         host="10.0.0.3",
         tags=["staging", "web"],
@@ -507,18 +525,16 @@ def test_node_filter_by_tags_and_search(e2e_client: httpx.Client) -> None:
     assert "combo-db-prod" not in names  # has prod but not web in name
     assert "combo-web-staging" not in names  # has web but not prod tag
 
-    for n in (n1, n2, n3):
-        e2e_client.delete(f"/api/v1/nodes/{n['id']}")
 
-
-def test_node_filter_empty_result(e2e_client: httpx.Client) -> None:
-    node = _create_node(e2e_client, name="no-match", tags=["dev"])
+def test_node_filter_empty_result(
+    e2e_client: httpx.Client,
+    e2e_resources: UniqueResourceFactory,
+) -> None:
+    e2e_resources.create_node(name="no-match", tags=["dev"])
 
     resp = e2e_client.get("/api/v1/nodes/?search=nonexistent")
     assert resp.status_code == 200
     assert resp.json()["total"] == 0
-
-    e2e_client.delete(f"/api/v1/nodes/{node['id']}")
 
 
 # ---------------------------------------------------------------------------
@@ -526,9 +542,12 @@ def test_node_filter_empty_result(e2e_client: httpx.Client) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_node_metrics(e2e_client: httpx.Client) -> None:
+def test_node_metrics(
+    e2e_client: httpx.Client,
+    e2e_resources: UniqueResourceFactory,
+) -> None:
     """GET /nodes/{id}/metrics returns system metrics."""
-    node = _create_ssh_node(e2e_client, name="metrics-node")
+    node = e2e_resources.create_ssh_node(name="metrics-node")
     resp = e2e_client.get(f"/api/v1/nodes/{node['id']}/metrics")
     assert resp.status_code == 200
     data = resp.json()

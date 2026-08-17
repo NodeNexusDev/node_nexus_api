@@ -73,9 +73,10 @@ addopts = '-m "not docker"'
 markers = [
     "docker: tests requiring running Docker infrastructure (PostgreSQL, SSH)",
     "e2e_smoke: fast E2E tests covering core happy paths",
+    "e2e_scheduler: E2E tests for script scheduler execution and failover",
     "e2e_resilience: E2E tests for restart, network failure, and failover scenarios",
     "e2e_migration: E2E tests verifying Alembic migration upgrade paths",
-    "e2e_slow: slow E2E tests (cron, timeout, retention, large payloads)",
+    "e2e_slow: slow E2E tests (timeout, retention, large payloads)",
 ]
 filterwarnings = [
     "ignore::DeprecationWarning:starlette",

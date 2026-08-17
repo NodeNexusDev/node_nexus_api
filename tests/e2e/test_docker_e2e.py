@@ -10,14 +10,15 @@ import httpx2 as httpx
 import pytest
 
 from tests.e2e.conftest import ServicePorts
+from tests.e2e.settings import DEFAULT_TIMEOUT, MASTER_API_KEY
 
 
 @pytest.fixture
 async def client(service_ports: ServicePorts) -> httpx.AsyncClient:
     async with httpx.AsyncClient(
         base_url=f"http://{service_ports.api_host}:{service_ports.api_port}",
-        headers={"X-API-Key": "e2e-master-key-12345"},
-        timeout=30.0,
+        headers={"X-API-Key": MASTER_API_KEY},
+        timeout=DEFAULT_TIMEOUT,
     ) as c:
         yield c
 
@@ -501,24 +502,26 @@ class TestDockerBulkByTags:
         """Create a tagged Docker node → bulk start by tag."""
         node_data = self._make_docker_node_data(["zone-a", "env-e2e"])
         node = (await client.post("/api/v1/nodes/", json=node_data)).json()
+        container_name = f"bulk-tag-ctr-{uuid.uuid4().hex[:8]}"
         try:
-            self._pull_alpine(client, node["id"])
+            await self._pull_alpine(client, node["id"])
             # Run a container via SSH exec so we can bulk-start it
+            run_cmd = f"docker run -d --name {container_name} alpine sleep 300"
             resp = await client.post(
                 f"/api/v1/nodes/{node['id']}/execute",
-                json={"command": "docker run -d --name bulk-tag-ctr alpine sleep 300"},
+                json={"command": run_cmd},
             )
             assert resp.status_code == 200
             # Stop it first
             await client.post(
-                f"/api/v1/nodes/{node['id']}/docker/containers/bulk-tag-ctr/stop"
+                f"/api/v1/nodes/{node['id']}/docker/containers/{container_name}/stop"
             )
 
             resp = await client.post(
                 "/api/v1/docker/bulk/start",
                 json={
                     "node_tags": ["env-e2e"],
-                    "container_id": "bulk-tag-ctr",
+                    "container_id": container_name,
                 },
             )
             assert resp.status_code == 200
@@ -528,7 +531,7 @@ class TestDockerBulkByTags:
             assert data["succeeded"] == 1
         finally:
             await client.delete(
-                f"/api/v1/nodes/{node['id']}/docker/containers/bulk-tag-ctr?force=true"
+                f"/api/v1/nodes/{node['id']}/docker/containers/{container_name}?force=true"
             )
             await client.delete(f"/api/v1/nodes/{node['id']}")
 
@@ -538,16 +541,17 @@ class TestDockerBulkByTags:
         """Both node_ids and node_tags provided → deduplicate."""
         node_data = self._make_docker_node_data(["zone-a", "env-e2e"])
         node = (await client.post("/api/v1/nodes/", json=node_data)).json()
+        container_name = f"bulk-mixed-ctr-{uuid.uuid4().hex[:8]}"
         try:
-            self._pull_alpine(client, node["id"])
+            await self._pull_alpine(client, node["id"])
             await client.post(
                 f"/api/v1/nodes/{node['id']}/execute",
                 json={
-                    "command": "docker run -d --name bulk-mixed-ctr alpine sleep 300"
+                    "command": f"docker run -d --name {container_name} alpine sleep 300"
                 },
             )
             await client.post(
-                f"/api/v1/nodes/{node['id']}/docker/containers/bulk-mixed-ctr/stop"
+                f"/api/v1/nodes/{node['id']}/docker/containers/{container_name}/stop"
             )
 
             resp = await client.post(
@@ -555,7 +559,7 @@ class TestDockerBulkByTags:
                 json={
                     "node_ids": [node["id"]],
                     "node_tags": ["env-e2e"],
-                    "container_id": "bulk-mixed-ctr",
+                    "container_id": container_name,
                 },
             )
             assert resp.status_code == 200
@@ -565,7 +569,7 @@ class TestDockerBulkByTags:
             assert data["succeeded"] == 1
         finally:
             await client.delete(
-                f"/api/v1/nodes/{node['id']}/docker/containers/bulk-mixed-ctr?force=true"
+                f"/api/v1/nodes/{node['id']}/docker/containers/{container_name}?force=true"
             )
             await client.delete(f"/api/v1/nodes/{node['id']}")
 

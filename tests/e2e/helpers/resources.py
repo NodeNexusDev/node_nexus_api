@@ -7,6 +7,15 @@ from uuid import uuid4
 
 import httpx2 as httpx
 
+from tests.e2e.settings import (
+    DEFAULT_DOCKER_IMAGE,
+    DOCKER_HOST,
+    SSH_HOST,
+    SSH_PASSWORD,
+    SSH_PORT,
+    SSH_USERNAME,
+)
+
 
 @dataclass
 class CleanupRegistry:
@@ -49,15 +58,30 @@ class UniqueResourceFactory:
         )
         return response.json()
 
+    def create_node(self, **overrides: object) -> dict:
+        """Create a generic SSH node (legacy shape) with deterministic cleanup."""
+        payload: dict[str, object] = {
+            "name": self.unique_name("e2e-node"),
+            "host": SSH_HOST,
+            "port": SSH_PORT,
+            "connection_type": "ssh",
+            "username": SSH_USERNAME,
+            "password": SSH_PASSWORD,
+        }
+        payload.update(overrides)
+        node = self._assert_created(self._client.post("/api/v1/nodes/", json=payload))
+        self._cleanup.add(lambda: self._client.delete(f"/api/v1/nodes/{node['id']}"))
+        return node
+
     def create_ssh_node(self, **overrides: object) -> dict:
         """Create an SSH node connected to the E2E SSH service."""
         payload: dict[str, object] = {
             "name": self.unique_name("e2e-ssh"),
-            "host": "ssh-server",
-            "port": 2222,
+            "host": SSH_HOST,
+            "port": SSH_PORT,
             "connection_type": "ssh",
-            "username": "testuser",
-            "password": "testpass",
+            "username": SSH_USERNAME,
+            "password": SSH_PASSWORD,
         }
         payload.update(overrides)
         node = self._assert_created(self._client.post("/api/v1/nodes/", json=payload))
@@ -68,17 +92,51 @@ class UniqueResourceFactory:
         """Create a Docker-capable SSH node connected to DinD."""
         payload: dict[str, object] = {
             "name": self.unique_name("e2e-docker"),
-            "host": "ssh-server",
-            "port": 2222,
+            "host": SSH_HOST,
+            "port": SSH_PORT,
             "connection_type": "docker",
-            "username": "testuser",
-            "password": "testpass",
-            "docker_host": "tcp://dind:2375",
+            "username": SSH_USERNAME,
+            "password": SSH_PASSWORD,
+            "docker_host": DOCKER_HOST,
         }
         payload.update(overrides)
         node = self._assert_created(self._client.post("/api/v1/nodes/", json=payload))
         self._cleanup.add(lambda: self._client.delete(f"/api/v1/nodes/{node['id']}"))
         return node
+
+    def create_container(
+        self,
+        node_id: str,
+        image: str = DEFAULT_DOCKER_IMAGE,
+        command: str = "sleep 300",
+        **overrides: object,
+    ) -> dict:
+        """Create a Docker container via the API and register its cleanup.
+
+        The container is created but not started; callers can start/stop/remove
+        it as needed. Cleanup is best-effort and ignores 404 (already removed).
+        """
+        payload: dict[str, object] = {
+            "image": image,
+            "name": self.unique_name("e2e-ctr"),
+            "command": command,
+        }
+        payload.update(overrides)
+        response = self._client.post(
+            f"/api/v1/nodes/{node_id}/docker/containers",
+            json=payload,
+        )
+        assert response.status_code == 201, (
+            f"Expected 201, got {response.status_code}: {response.text}"
+        )
+        container = response.json()
+        container_id = container["id"]
+        self._cleanup.add(
+            lambda: self._client.delete(
+                f"/api/v1/nodes/{node_id}/docker/containers/{container_id}?force=true"
+            )
+        )
+        return container
 
     def create_command(self, command: str = "echo e2e", **overrides: object) -> dict:
         """Create a reusable command."""
@@ -141,6 +199,15 @@ class UniqueResourceFactory:
             lambda: self._client.delete(f"/api/v1/scripts/{script_id}/schedule")
         )
         return response.json()
+
+    def trigger_schedule_now(self, script_id: str) -> None:
+        """Immediately trigger a scheduled script via the E2E harness endpoint."""
+        response = self._client.post(
+            f"/api/v1/internal/e2e/scheduler/{script_id}/trigger-now"
+        )
+        assert response.status_code == 200, (
+            f"Expected 200, got {response.status_code}: {response.text}"
+        )
 
 
 @contextmanager
