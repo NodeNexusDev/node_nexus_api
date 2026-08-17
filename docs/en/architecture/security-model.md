@@ -2,7 +2,7 @@
 title: Security model
 status: stable
 translation_key: architecture.security-model
-source_revision: "2026-07-30"
+source_revision: "2026-08-17"
 ---
 
 # Security model
@@ -10,9 +10,10 @@ source_revision: "2026-07-30"
 API keys authenticate clients through `X-API-Key`; scopes authorize read and
 write operations. Managed keys are stored as SHA-256 hashes. SSH passwords and
 private keys are encrypted at rest using a key derived from `SECRET_KEY` and
-`ENCRYPTION_SALT`. New ciphertext uses the `enc:v1:` envelope and decryption
-fails closed; a prefixed or legacy-shaped ciphertext is never reused as a
-password after a cryptographic error.
+`ENCRYPTION_SALT`. The salt defaults to empty (acceptable for dev/test);
+production deployments must set it via `.env`. New ciphertext uses the
+`enc:v1:` envelope and decryption fails closed; a prefixed or legacy-shaped
+ciphertext is never reused as a password after a cryptographic error.
 
 SSH host-key verification is strict by default. Generate `known_hosts` through
 a trusted channel, mount it read-only, and set `SSH_KNOWN_HOSTS_PATH`.

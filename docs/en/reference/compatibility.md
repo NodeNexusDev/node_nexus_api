@@ -26,6 +26,11 @@ and metrics endpoints are excluded from version enforcement.
 
 | Version | Date | Type | Highlights |
 |---------|------|------|------------|
+| 0.15.0 | 2026-08-17 | Minor | Scheduler trigger-now endpoint, failed status propagation, E2E refactoring with shared settings, CI hardening |
+| 0.14.0 | 2026-08-17 | Minor | HMAC-SHA-256 API key hashing, ENCRYPTION_SALT required, CORS restriction, dashboard group_by validation, WebSocket token auth cleanup |
+| 0.13.4 | 2026-08-17 | Patch | OpenAPI snapshot and tag_manager bindparam fixes |
+| 0.13.3 | 2026-08-17 | Patch | Resolve unit test failures from DTO refactor |
+| 0.13.2 | 2026-08-17 | Patch | Typed result DTOs, suppress bandit B608 warnings |
 | 0.13.1 | 2026-08-17 | Patch | Fix Stage F E2E test failures, SQLAlchemy cache key issues |
 | 0.13.0 | 2026-08-15 | Minor | Favorites, notes, tag management, clone, dashboard metrics, global search, execution statistics, SSE stream, audit export |
 | 0.11.0 | 2026-08-13 | Minor | Dry-run config import, validate-credentials endpoint |
