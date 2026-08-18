@@ -2,7 +2,7 @@
 title: Журнал аудита
 status: stable
 translation_key: guides.audit-log
-source_revision: "2026-08-16"
+source_revision: "2026-08-18"
 ---
 
 # Журнал аудита
@@ -53,6 +53,19 @@ curl --get --fail-with-body \
 | `date_to` | Конец диапазона (ISO 8601) | `date_to=2026-08-31T23:59:59` |
 
 Фильтры можно комбинировать с существующими `node_id` и `action`.
+
+## Экспорт
+
+Экспортируйте события аудита для внешнего анализа в формате JSON или CSV:
+
+```bash
+curl --fail-with-body \
+  -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
+  "${NODE_NEXUS_URL}/api/v1/audit/export?fmt=csv"
+```
+
+См. [Дашборд, поиск и метрики](dashboard-search-metrics.md) для live SSE-потока
+и статистики выполнения.
 
 ## Срок хранения и удаление
 

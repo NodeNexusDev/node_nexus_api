@@ -2,7 +2,7 @@
 title: Transaction model
 status: stable
 translation_key: architecture.transaction-model
-source_revision: "2026-07-30"
+source_revision: "2026-08-18"
 ---
 
 # Transaction model
@@ -19,6 +19,18 @@ distributed rollback.
 Multi-aggregate operations use dedicated boundaries only when atomicity is a
 business requirement. Configuration import owns one transaction for the whole
 payload; there is no universal application Unit of Work.
+
+## Commit before response
+
+For HTTP requests, `CommitOnResponseMiddleware` commits the request-scoped
+transaction immediately before the application emits `http.response.start`.
+This eliminates read-after-write races: a client cannot receive a successful
+response and then observe stale state on the next request.
+
+The middleware skips `/health`, `/ready`, and `/metrics`, and only commits when
+the session has pending changes (`new`, `dirty`, or `deleted`). If commit fails,
+the middleware rolls back and raises, so the client receives a 500 instead of a
+false success.
 
 ## Request lifecycle
 

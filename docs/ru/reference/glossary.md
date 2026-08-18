@@ -2,7 +2,7 @@
 title: Глоссарий
 status: stable
 translation_key: reference.glossary
-source_revision: "2026-07-30"
+source_revision: "2026-08-18"
 ---
 
 # Глоссарий
@@ -12,6 +12,12 @@ source_revision: "2026-07-30"
   ресурсом без блокировки чтения. В Node Nexus гарантирует, что только одна
   реплика выполняет scheduled jobs.
   См. [runtime lifecycle](../architecture/runtime-lifecycle.md).
+
+**Commit-on-response middleware**
+: `CommitOnResponseMiddleware` фиксирует request-scoped транзакцию БД
+  непосредственно перед отправкой HTTP-заголовков ответа. Это не даёт
+  клиентам видеть устаревшее состояние после записи.
+  См. [модель транзакций](../architecture/transaction-model.md).
 
 **Application core**
 : Слой `app/application`: DTO, ports (Protocols), use cases и policies.
@@ -82,10 +88,17 @@ source_revision: "2026-07-30"
   восстановления расхождений: добавление отсутствующих, замена изменённых,
   удаление лишних. Запускается при старте и периодически.
 
+**OpenAPI contract hash**
+: SHA-256 отпечаток сгенерированной OpenAPI-схемы, хранящийся в
+  `tests/unit/test_openapi_contract.py`. Меняется при изменении endpoint'ов,
+  схем или версии API. Pre-commit hook поддерживает его в актуальном состоянии.
+  См. [workflow разработки](../development/workflow.md).
+
 **Session (база данных)**
 : SQLAlchemy `AsyncSession`. В Node Nexus сессии бывают request-scoped (одна
-  на HTTP-запрос, provider владеет commit) или открываются по требованию
-  APP gateways через `async_sessionmaker` для коротких операций.
+  на HTTP-запрос, commit выполняется `CommitOnResponseMiddleware` перед
+  отправкой ответа) или открываются по требованию APP gateways через
+  `async_sessionmaker` для коротких операций.
 
 **Unit of Work (UoW)**
 : Паттерн группировки операций нескольких repository в одну транзакцию.
