@@ -2,7 +2,7 @@
 title: Glossary
 status: stable
 translation_key: reference.glossary
-source_revision: "2026-07-30"
+source_revision: "2026-08-18"
 ---
 
 # Glossary
@@ -12,6 +12,12 @@ source_revision: "2026-07-30"
   resource ownership without blocking reads. In Node Nexus, it ensures only
   one replica executes scheduled jobs at a time.
   See [runtime lifecycle](../architecture/runtime-lifecycle.md).
+
+**Commit-on-response middleware**
+: `CommitOnResponseMiddleware` commits the request-scoped database
+  transaction immediately before the HTTP response headers are sent. This
+  prevents clients from observing stale state after a write.
+  See [transaction model](../architecture/transaction-model.md).
 
 **Application core**
 : The `app/application` layer: DTOs, ports (Protocols), use cases, and
@@ -83,9 +89,16 @@ source_revision: "2026-07-30"
   jobs and repairs differences: adds missing, replaces changed, removes
   orphans. Runs on startup and periodically.
 
+**OpenAPI contract hash**
+: A SHA-256 fingerprint of the generated OpenAPI schema, stored in
+  `tests/unit/test_openapi_contract.py`. It changes whenever endpoints,
+  schemas, or the API version change. A pre-commit hook keeps it in sync.
+  See [development workflow](../development/workflow.md).
+
 **Session (database)**
 : A SQLAlchemy `AsyncSession`. In Node Nexus, sessions are either
-  request-scoped (one per HTTP request, provider owns commit) or opened
+  request-scoped (one per HTTP request, committed by
+  `CommitOnResponseMiddleware` before the response is sent) or opened
   on-demand by APP gateways via `async_sessionmaker` for short operations.
 
 **Unit of Work (UoW)**

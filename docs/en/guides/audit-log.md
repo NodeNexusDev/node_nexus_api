@@ -2,7 +2,7 @@
 title: Audit log
 status: stable
 translation_key: guides.audit-log
-source_revision: "2026-08-16"
+source_revision: "2026-08-18"
 ---
 
 # Audit log
@@ -51,6 +51,19 @@ Parameters:
 | `date_to` | End of date range (ISO 8601) | `date_to=2026-08-31T23:59:59` |
 
 Filters can be combined with existing `node_id` and `action` parameters.
+
+## Export
+
+Export audit events for external analysis in JSON or CSV format:
+
+```bash
+curl --fail-with-body \
+  -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
+  "${NODE_NEXUS_URL}/api/v1/audit/export?fmt=csv"
+```
+
+See [Dashboard, search, and metrics](dashboard-search-metrics.md) for the live
+SSE event stream and execution statistics.
 
 ## Retention and deletion
 

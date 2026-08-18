@@ -2,7 +2,7 @@
 title: Каталог ошибок
 status: stable
 translation_key: reference.error-catalog
-source_revision: "2026-07-30"
+source_revision: "2026-08-18"
 ---
 
 # Каталог ошибок
@@ -38,3 +38,34 @@ Domain failures используют стабильный JSON-конверт:
 
 Клиентская логика должна опираться на HTTP status и `code`, а не на текст
 `message` или `detail`.
+
+## Коды domain-ошибок
+
+| Код | HTTP status | Значение |
+|-----|-------------|----------|
+| `AuthenticationError` | `401` | API key отсутствует, невалиден или не имеет нужного scope |
+| `APIKeyExpiredError` | `401` | API key истёк |
+| `APIKeyNotFoundError` | `404` | API key не существует |
+| `APIKeyRevokedError` | `401` | API key отозван |
+| `AuditWriteError` | `503` | Не удалось записать audit-запись |
+| `CommandNotFoundError` | `404` | Шаблон команды не существует |
+| `ConnectionFailedError` | `503` | SSH-подключение не удалось |
+| `ContainerNotFoundError` | `404` | Docker-контейнер не найден |
+| `CredentialDecryptionError` | `503` | Не удалось расшифровать сохранённые учётные данные |
+| `DockerDaemonError` | `503` | Docker daemon недоступен |
+| `DockerError` | `502` | Общая ошибка удалённой Docker-операции |
+| `DockerValidationError` | `422` | Ошибка валидации Docker-запроса |
+| `ImageNotFoundError` | `404` | Docker-образ не найден |
+| `NodeNameConflictError` | `409` | Нода с таким именем уже существует |
+| `NodeNotFoundError` | `404` | Нода не найдена |
+| `RequestTimeoutError` | `504` | Запрос превысил глобальный timeout |
+| `ScheduleNotFoundError` | `404` | Расписание не найдено |
+| `SchedulePersistenceError` | `503` | Не удалось обновить runtime-состояние расписания |
+| `ScheduleValidationError` | `422` | Невалидное cron-выражение или список нод |
+| `SchedulerOwnershipError` | `503` | Планировщик не смог получить advisory lock |
+| `ScriptNotFoundError` | `404` | Скрипт не найден |
+| `TagNotFoundError` | `404` | Тег не найден |
+| `TemplateRenderError` | `422` | Ошибка рендеринга шаблона команды |
+| `UnsupportedConfigFormatError` | `422` | Формат импорта конфигурации не поддерживается |
+
+Любой подкласс `DomainError`, не перечисленный выше, по умолчанию маппится на `422`.

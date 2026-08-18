@@ -26,6 +26,7 @@ and metrics endpoints are excluded from version enforcement.
 
 | Version | Date | Type | Highlights |
 |---------|------|------|------------|
+| 0.15.1 | 2026-08-18 | Patch | Commit request transaction before sending response, scheduler minute-boundary race fix, OpenAPI contract hash pre-commit hook |
 | 0.15.0 | 2026-08-17 | Minor | Scheduler trigger-now endpoint, failed status propagation, E2E refactoring with shared settings, CI hardening |
 | 0.14.0 | 2026-08-17 | Minor | HMAC-SHA-256 API key hashing, ENCRYPTION_SALT required, CORS restriction, dashboard group_by validation, WebSocket token auth cleanup |
 | 0.13.4 | 2026-08-17 | Patch | OpenAPI snapshot and tag_manager bindparam fixes |

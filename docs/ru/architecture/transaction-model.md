@@ -2,7 +2,7 @@
 title: Модель транзакций
 status: stable
 translation_key: architecture.transaction-model
-source_revision: "2026-07-30"
+source_revision: "2026-08-18"
 ---
 
 # Модель транзакций
@@ -18,6 +18,18 @@ operations возвращают частичные результаты без d
 Multi-aggregate operation получает отдельную boundary только при бизнес-требовании
 atomicity. Config import владеет одной transaction для всего payload;
 универсального application Unit of Work нет.
+
+## Коммит перед ответом
+
+Для HTTP-запросов `CommitOnResponseMiddleware` фиксирует request-scoped
+транзакцию непосредственно перед тем, как приложение отправит `http.response.start`.
+Это устраняет гонки read-after-write: клиент не может получить успешный ответ,
+а затем увидеть устаревшее состояние в следующем запросе.
+
+Middleware пропускает `/health`, `/ready` и `/metrics`, и коммитит только при
+наличии pending-изменений (`new`, `dirty` или `deleted`). Если commit падает,
+middleware делает rollback и пробрасывает исключение — клиент получит 500 вместо
+ложного успеха.
 
 ## Жизненный цикл запроса
 

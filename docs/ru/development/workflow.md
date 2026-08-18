@@ -2,7 +2,7 @@
 title: Workflow разработки
 status: stable
 translation_key: development.workflow
-source_revision: "2026-07-30"
+source_revision: "2026-08-18"
 ---
 
 # Workflow разработки
@@ -36,6 +36,25 @@ feat(api): add node connectivity check endpoint
 fix(connectors): handle SSH timeout gracefully
 docs(reference): update error catalog with schedule errors
 refactor(di): extract repository bindings to RepositoryProvider
+```
+
+## Pre-commit hooks
+
+Установите и запустите hooks перед коммитом:
+
+```bash
+uv run pre-commit install
+uv run pre-commit run --all-files
+```
+
+Hook `update-openapi-hash` автоматически обновляет снапшот OpenAPI contract
+в `tests/unit/test_openapi_contract.py`, когда сгенерированная схема меняется
+(например, после добавления endpoint'а или bump'а версии).
+
+Обновить hash вручную:
+
+```bash
+UPDATE_OPENAPI_HASH=1 uv run pytest tests/unit/test_openapi_contract.py::test_openapi_schema_matches_reviewed_snapshot -q
 ```
 
 ## Перед мержем
