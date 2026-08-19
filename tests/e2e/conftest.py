@@ -122,6 +122,7 @@ def _generate_ssh_keys() -> None:
             check=True,
             capture_output=True,
         )
+        key.chmod(0o644)
     if not enc.exists():
         subprocess.run(
             [
@@ -138,6 +139,7 @@ def _generate_ssh_keys() -> None:
             check=True,
             capture_output=True,
         )
+        enc.chmod(0o644)
 
 
 @pytest.fixture(scope="session")

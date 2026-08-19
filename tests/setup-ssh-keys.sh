@@ -13,5 +13,5 @@ if [ ! -f "$KEYS_DIR/test-key-enc" ]; then
     ssh-keygen -t ed25519 -f "$KEYS_DIR/test-key-enc" -N "keypass123" -C "e2e-encrypted"
 fi
 
-chmod 600 "$KEYS_DIR"/test-key "$KEYS_DIR"/test-key-enc
+chmod 644 "$KEYS_DIR"/test-key "$KEYS_DIR"/test-key-enc
 chmod 644 "$KEYS_DIR"/test-key.pub "$KEYS_DIR"/test-key-enc.pub
