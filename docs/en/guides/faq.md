@@ -51,6 +51,26 @@ The SSH connection to the node failed. Check:
 
 See [troubleshooting](troubleshooting.md).
 
+## How do I use an encrypted SSH key?
+
+Provide the private key in `ssh_key` and the passphrase in `passphrase`
+when creating or updating a node. The passphrase is stored encrypted and
+passed to the SSH server transparently. Example:
+
+```json
+{
+  "name": "srv",
+  "host": "192.0.2.10",
+  "port": 22,
+  "connection_type": "ssh",
+  "username": "ops",
+  "ssh_key": "<private-key>",
+  "passphrase": "key-passphrase"
+}
+```
+
+If the key is not encrypted, omit `passphrase`.
+
 ## Why do I get 429?
 
 You exceeded the per-IP rate limit. Wait for the window to reset. The

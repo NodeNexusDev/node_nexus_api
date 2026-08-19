@@ -3,6 +3,21 @@
 All notable changes to this project are documented here. For a full
 compatibility and support matrix, see [Compatibility](docs/en/reference/compatibility.md).
 
+## 0.16.0 — 2026-08-20
+
+### Added
+
+- SSH key passphrase support. Nodes now accept an optional `passphrase`
+  field for encrypted private keys. Passphrase is encrypted at rest with
+  AES-256-GCM (same as `password` and `ssh_key`) and passed to
+  `asyncssh.connect()` transparently.
+
+### Fixed
+
+- Made SSH test key files world-readable (`chmod 644`) to prevent
+  `PermissionError` in CI where Docker container volume mounts change
+  file ownership.
+
 ## 0.15.1 — 2026-08-18
 
 ### Fixed
