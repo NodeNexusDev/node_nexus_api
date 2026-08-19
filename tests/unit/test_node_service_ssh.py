@@ -102,6 +102,7 @@ class TestCheckConnectivity:
             username=node_response.username,
             password=None,
             ssh_key=None,
+            passphrase=None,
         )
 
     async def test_sets_unreachable_on_failure(

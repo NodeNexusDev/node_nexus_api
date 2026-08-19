@@ -255,6 +255,7 @@ class TestNodeMetricsService:
             username="root",
             password=None,
             ssh_key=None,
+            passphrase=None,
         )
 
         async def read_node(_node_id):  # noqa: ANN001
@@ -305,6 +306,7 @@ class TestNodeMetricsService:
         mock_node.username = "root"
         mock_node.password = None
         mock_node.ssh_key = None
+        mock_node.passphrase = None
 
         mock_repo.get_connection.return_value = mock_node
 
@@ -360,6 +362,7 @@ class TestNodeMetricsService:
         mock_node.username = "root"
         mock_node.password = None
         mock_node.ssh_key = None
+        mock_node.passphrase = None
 
         mock_repo.get_connection.return_value = mock_node
 

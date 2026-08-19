@@ -137,6 +137,23 @@ class TestCreateNode:
         assert call_data.ssh_key is not None
         assert "BEGIN" not in call_data.ssh_key
 
+    async def test_encrypts_passphrase(
+        self, service: NodeManagementService, repo: AsyncMock
+    ) -> None:
+        repo.create_node.return_value = make_node_view()
+        data = NodeCreateDTO(
+            name="test",
+            host="1.2.3.4",
+            port=22,
+            connection_type="ssh",
+            ssh_key="fake-key",
+            passphrase="my-passphrase",
+        )
+        await service.create_node(data)
+        call_data = repo.create_node.call_args.args[0]
+        assert call_data.passphrase is not None
+        assert decrypt(call_data.passphrase) == "my-passphrase"
+
 
 class TestUpdateNode:
     async def test_found(self, service: NodeManagementService, repo: AsyncMock) -> None:

@@ -39,12 +39,14 @@ def test_node_connection_dto_hides_secrets_from_repr() -> None:
         username="root",
         password="plain-password",
         ssh_key="private-key",
+        passphrase="key-passphrase",
     )
 
     representation = repr(dto)
 
     assert "plain-password" not in representation
     assert "private-key" not in representation
+    assert "key-passphrase" not in representation
 
 
 def test_node_create_dto_is_immutable_and_hides_secrets() -> None:
@@ -55,10 +57,12 @@ def test_node_create_dto_is_immutable_and_hides_secrets() -> None:
         connection_type="ssh",
         password="plain-password",
         ssh_key="private-key",
+        passphrase="key-passphrase",
     )
 
     assert "plain-password" not in repr(dto)
     assert "private-key" not in repr(dto)
+    assert "key-passphrase" not in repr(dto)
     with pytest.raises(AttributeError):
         dto.name = "changed"  # type: ignore[misc]
 
@@ -165,6 +169,7 @@ def test_node_repository_maps_connection_dto() -> None:
         username="operator",
         password="encrypted-password",
         ssh_key="encrypted-key",
+        passphrase="encrypted-passphrase",
         docker_host="tcp://docker:2375",
         tags=[],
     )
@@ -179,6 +184,7 @@ def test_node_repository_maps_connection_dto() -> None:
     assert dto.username == "operator"
     assert dto.password == "encrypted-password"
     assert dto.ssh_key == "encrypted-key"
+    assert dto.passphrase == "encrypted-passphrase"
     assert dto.docker_host == "tcp://docker:2375"
 
 

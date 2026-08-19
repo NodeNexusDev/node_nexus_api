@@ -367,6 +367,7 @@ class TestDockerServiceBulk:
         mock_node.username = "root"
         mock_node.password = None
         mock_node.ssh_key = None
+        mock_node.passphrase = None
         mock_node.docker_host = None
 
         mock_repo.get_by_id.return_value = mock_node
@@ -442,6 +443,7 @@ class TestDockerServiceBulk:
         mock_node.username = "root"
         mock_node.password = None
         mock_node.ssh_key = None
+        mock_node.passphrase = None
         mock_node.docker_host = None
 
         mock_repo.get_by_id.return_value = mock_node
@@ -484,6 +486,7 @@ def _make_node(node_id: str = "00000000-0000-0000-0000-000000000001") -> MagicMo
     mock_node.username = "root"
     mock_node.password = None
     mock_node.ssh_key = None
+    mock_node.passphrase = None
     mock_node.docker_host = None
     return mock_node
 
