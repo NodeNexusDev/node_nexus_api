@@ -42,6 +42,7 @@ def test_config_export_excludes_secrets(e2e_client: httpx.Client) -> None:
         assert exported is not None
         assert "password" not in exported
         assert "ssh_key" not in exported
+        assert "passphrase" not in exported
     finally:
         e2e_client.delete(f"/api/v1/nodes/{node_id}")
 

@@ -3,6 +3,7 @@
 from collections.abc import Callable, Generator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
+from pathlib import Path
 from uuid import uuid4
 
 import httpx2 as httpx
@@ -11,6 +12,7 @@ from tests.e2e.settings import (
     DEFAULT_DOCKER_IMAGE,
     DOCKER_HOST,
     SSH_HOST,
+    SSH_KEY_PASSPHRASE,
     SSH_PASSWORD,
     SSH_PORT,
     SSH_USERNAME,
@@ -83,6 +85,35 @@ class UniqueResourceFactory:
             "username": SSH_USERNAME,
             "password": SSH_PASSWORD,
         }
+        payload.update(overrides)
+        node = self._assert_created(self._client.post("/api/v1/nodes/", json=payload))
+        self._cleanup.add(lambda: self._client.delete(f"/api/v1/nodes/{node['id']}"))
+        return node
+
+    def create_ssh_key_node(
+        self,
+        *,
+        encrypted: bool = False,
+        **overrides: object,
+    ) -> dict:
+        """Create an SSH node with key-based authentication.
+
+        Args:
+            encrypted: If True, use the encrypted key + passphrase.
+        """
+        key_file = "test-key-enc" if encrypted else "test-key"
+        host_key_path = Path(f"tests/ssh-keys/{key_file}")
+        private_key = host_key_path.read_text()
+        payload: dict[str, object] = {
+            "name": self.unique_name("e2e-ssh-key"),
+            "host": SSH_HOST,
+            "port": SSH_PORT,
+            "connection_type": "ssh",
+            "username": SSH_USERNAME,
+            "ssh_key": private_key,
+        }
+        if encrypted:
+            payload["passphrase"] = SSH_KEY_PASSPHRASE
         payload.update(overrides)
         node = self._assert_created(self._client.post("/api/v1/nodes/", json=payload))
         self._cleanup.add(lambda: self._client.delete(f"/api/v1/nodes/{node['id']}"))

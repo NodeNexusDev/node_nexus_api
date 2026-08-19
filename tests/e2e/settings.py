@@ -15,6 +15,11 @@ SSH_PORT = 2222
 SSH_USERNAME = "testuser"
 SSH_PASSWORD = "testpass"
 
+# SSH key paths inside the containers (volume-mounted from tests/ssh-keys/)
+SSH_KEY_PATH = "/config/ssh/test-keys/test-key"
+SSH_KEY_ENCRYPTED_PATH = "/config/ssh/test-keys/test-key-enc"
+SSH_KEY_PASSPHRASE = "keypass123"
+
 # Docker-in-Docker endpoint exposed to Docker-capable nodes
 DOCKER_HOST = "tcp://dind:2375"
 DEFAULT_DOCKER_IMAGE = "alpine:latest"

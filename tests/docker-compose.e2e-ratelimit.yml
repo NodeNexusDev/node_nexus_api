@@ -48,6 +48,8 @@ services:
       - DOCKER_HOST=tcp://dind:2375
     ports:
       - "2224:2222"
+    volumes:
+      - ../tests/ssh-keys:/config/ssh/test-keys
     depends_on:
       dind:
         condition: service_healthy
@@ -67,6 +69,8 @@ services:
     ports:
       - "${HOST_PORT_E2E:-8002}:${PORT:-8000}"
     env_file: ../.env.e2e-ratelimit
+    volumes:
+      - ../tests/ssh-keys:/config/ssh/test-keys:ro
     depends_on:
       db:
         condition: service_healthy
