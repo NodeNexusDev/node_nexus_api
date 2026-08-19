@@ -29,6 +29,30 @@ curl --fail-with-body -X POST "${NODE_NEXUS_URL}/api/v1/nodes/" \
 
 Save the returned UUID for metrics, command execution, and connectivity checks.
 
+### SSH key authentication
+
+Instead of a password, pass the private key content in `ssh_key`. If the key
+is encrypted, supply the passphrase:
+
+```bash
+curl --fail-with-body -X POST "${NODE_NEXUS_URL}/api/v1/nodes/" \
+  -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "name": "web-02",
+    "host": "192.0.2.11",
+    "port": 22,
+    "connection_type": "ssh",
+    "username": "ops",
+    "ssh_key": "<private-key-content>",
+    "passphrase": "key-passphrase"
+  }'
+```
+
+`passphrase` is optional and only required when the SSH private key is
+encrypted. Both `password`, `ssh_key`, and `passphrase` are encrypted at
+rest and never returned in API responses.
+
 ## Validate credentials
 
 Check SSH connectivity with provided credentials without saving a node to the
@@ -45,6 +69,9 @@ curl --fail-with-body -X POST "${NODE_NEXUS_URL}/api/v1/nodes/validate-credentia
     "password": "change-me"
   }'
 ```
+
+SSH key validation also works — replace `password` with `ssh_key`
+(and optionally `passphrase`):
 
 Response on success:
 

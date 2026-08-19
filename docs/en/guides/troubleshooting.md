@@ -18,6 +18,7 @@ logs. Never add API keys, passwords, or private keys to diagnostic output.
 | `422 Unprocessable Entity` | Invalid schema, cursor, parameter, or identifier | Read `detail` and compare the request with the API reference |
 | `429 Too Many Requests` | The process exceeded its rate-limit window | Back off; inspect the rate-limit settings |
 | `503` during a node operation | SSH or the remote Docker daemon failed | Check routing, port, credentials, host-key policy, and daemon access |
+| `503` with encrypted SSH key | Wrong passphrase or missing `passphrase` field | Verify the passphrase; ensure `passphrase` is set for encrypted keys |
 | `504 Gateway Timeout` | The operation exceeded `REQUEST_TIMEOUT` | Find the slow remote operation before increasing the timeout |
 
 ## Application is not ready

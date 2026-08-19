@@ -31,6 +31,30 @@ curl --fail-with-body -X POST "${NODE_NEXUS_URL}/api/v1/nodes/" \
 Сохраните возвращённый UUID для метрик, выполнения команд и проверок
 подключения.
 
+### Аутентификация по SSH-ключу
+
+Вместо пароля передайте содержимое приватного ключа в поле `ssh_key`. Если
+ключ зашифрован, укажите passphrase:
+
+```bash
+curl --fail-with-body -X POST "${NODE_NEXUS_URL}/api/v1/nodes/" \
+  -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "name": "web-02",
+    "host": "192.0.2.11",
+    "port": 22,
+    "connection_type": "ssh",
+    "username": "ops",
+    "ssh_key": "<содержимое-приватного-ключа>",
+    "passphrase": "passphrase-ключа"
+  }'
+```
+
+`passphrase` — необязательное поле, требуется только для зашифрованных
+приватных ключей. Поля `password`, `ssh_key` и `passphrase` шифруются
+при сохранении и никогда не возвращаются в ответах API.
+
 ## Валидация учётных данных
 
 Проверьте SSH-подключение по предоставленным учётным данным без сохранения
@@ -47,6 +71,9 @@ curl --fail-with-body -X POST "${NODE_NEXUS_URL}/api/v1/nodes/validate-credentia
     "password": "change-me"
   }'
 ```
+
+Валидация также работает с SSH-ключом — замените `password` на `ssh_key`
+(и опционально `passphrase`):
 
 Ответ:
 

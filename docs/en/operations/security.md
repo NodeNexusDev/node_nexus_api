@@ -16,3 +16,15 @@ source_revision: "2026-07-30"
 - Review audit events and dependency scans.
 
 Changing `SECRET_KEY` requires a credential re-encryption plan.
+
+## Encrypted fields
+
+Node credentials are encrypted at rest with AES-256-GCM using
+`SECRET_KEY` + `ENCRYPTION_SALT`:
+
+- `password` — SSH password
+- `ssh_key` — SSH private key
+- `passphrase` — passphrase for encrypted private keys
+
+These fields are write-only: they are never returned in API responses and
+are excluded from configuration exports.

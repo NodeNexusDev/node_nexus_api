@@ -18,3 +18,8 @@ curl -X POST http://localhost:8000/api/v1/nodes/ \
 
 Keep credentials out of shell history in real environments. Use the returned
 `id` with the node connectivity endpoint shown in Swagger UI at `/docs`.
+
+!!! tip "SSH key authentication"
+    Instead of a password you can pass `"ssh_key": "<private-key>"` and
+    optionally `"passphrase": "<passphrase>"` for encrypted keys. See the
+    [nodes guide](../guides/nodes.md#ssh-key-authentication) for details.
