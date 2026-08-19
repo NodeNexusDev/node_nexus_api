@@ -11,3 +11,29 @@ RUN mv /usr/bin/docker /usr/bin/docker-cli \
     && printf '#!/bin/sh\nDOCKER_HOST="${DOCKER_HOST:-tcp://dind:2375}" exec /usr/bin/docker-cli "$@"\n' \
         > /usr/bin/docker \
     && chmod +x /usr/bin/docker
+
+# Generate test SSH key pairs for e2e tests (to a subdirectory so the
+# volume mount at /config/ssh/keys does not overwrite them).
+# Unencrypted key: auth without passphrase.
+# Encrypted key: auth requires passphrase "keypass123".
+RUN mkdir -p /config/ssh/test-keys \
+    && ssh-keygen -t ed25519 -f /config/ssh/test-keys/test-key -N "" -C "e2e-unencrypted" \
+    && ssh-keygen -t ed25519 -f /config/ssh/test-keys/test-key-enc -N "keypass123" -C "e2e-encrypted" \
+    && chown -R 1000:1000 /config/ssh/test-keys
+
+# s6-overlay init script: inject test public keys into authorized_keys
+# after the base image creates the user.
+# NOTE: testuser home is /config, so authorized_keys goes to /config/.ssh/
+RUN mkdir -p /etc/cont-init.d \
+    && printf '#!/bin/sh\nset -e\n\
+PUBKEYS=/config/ssh/test-keys\n\
+AUTH_DIR=/config/.ssh\n\
+mkdir -p "$AUTH_DIR"\n\
+for f in "$PUBKEYS"/*.pub; do\n\
+  [ -f "$f" ] || continue\n\
+  cat "$f" >> "$AUTH_DIR/authorized_keys"\n\
+done\n\
+chmod 700 "$AUTH_DIR"\n\
+chmod 600 "$AUTH_DIR/authorized_keys"\n\
+chown -R 1000:1000 "$AUTH_DIR"\n' > /etc/cont-init.d/99-test-keys \
+    && chmod +x /etc/cont-init.d/99-test-keys

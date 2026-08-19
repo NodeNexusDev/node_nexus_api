@@ -18,6 +18,8 @@ from tests.helpers import is_port_open
 
 _MASTER_API_KEY = MASTER_API_KEY
 
+_SSH_KEYS_DIR = Path("tests/ssh-keys")
+
 
 def pytest_addoption(parser: pytest.Parser) -> None:
     """Add E2E-specific CLI options."""
@@ -91,6 +93,51 @@ class ServicePorts:
     db_port: int
     dind_host: str
     dind_port: int
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _generate_ssh_keys() -> None:
+    """Generate test SSH key pairs before Docker stack starts.
+
+    Keys are written to tests/ssh-keys/ and mounted into containers via
+    docker-compose. The Makefile targets run this automatically; this
+    fixture handles direct ``pytest`` invocations.
+    """
+    _SSH_KEYS_DIR.mkdir(parents=True, exist_ok=True)
+    key = _SSH_KEYS_DIR / "test-key"
+    enc = _SSH_KEYS_DIR / "test-key-enc"
+    if not key.exists():
+        subprocess.run(
+            [
+                "ssh-keygen",
+                "-t",
+                "ed25519",
+                "-f",
+                str(key),
+                "-N",
+                "",
+                "-C",
+                "e2e-unencrypted",
+            ],
+            check=True,
+            capture_output=True,
+        )
+    if not enc.exists():
+        subprocess.run(
+            [
+                "ssh-keygen",
+                "-t",
+                "ed25519",
+                "-f",
+                str(enc),
+                "-N",
+                "keypass123",
+                "-C",
+                "e2e-encrypted",
+            ],
+            check=True,
+            capture_output=True,
+        )
 
 
 @pytest.fixture(scope="session")

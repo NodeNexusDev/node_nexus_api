@@ -85,6 +85,108 @@ def test_create_with_credentials(
     # Secrets must NOT be in response
     assert "password" not in node
     assert "ssh_key" not in node
+    assert "passphrase" not in node
+
+
+def test_create_with_passphrase(
+    e2e_client: httpx.Client, service_ports: ServicePorts
+) -> None:
+    resp = e2e_client.post(
+        "/api/v1/nodes/",
+        json={
+            "name": "ssh-passphrase-node",
+            "host": service_ports.ssh_host,
+            "port": service_ports.ssh_port,
+            "connection_type": "ssh",
+            "username": "testuser",
+            "ssh_key": (
+                "-----BEGIN OPENSSH PRIVATE KEY-----\n"
+                "fake\n"
+                "-----END OPENSSH PRIVATE KEY-----"
+            ),
+            "passphrase": "my-secret-passphrase",
+        },
+    )
+    assert resp.status_code == 201
+    node = resp.json()
+    assert node["name"] == "ssh-passphrase-node"
+    # Secrets must NOT be in response
+    assert "password" not in node
+    assert "ssh_key" not in node
+    assert "passphrase" not in node
+
+
+# ---------------------------------------------------------------------------
+# SSH key-based authentication
+# ---------------------------------------------------------------------------
+
+
+def test_ssh_key_auth_check(
+    e2e_client: httpx.Client,
+    e2e_resources: UniqueResourceFactory,
+) -> None:
+    """Connect via unencrypted SSH key — /check returns active."""
+    node = e2e_resources.create_ssh_key_node(encrypted=False)
+    resp = e2e_client.post(f"/api/v1/nodes/{node['id']}/check")
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "active"
+
+
+def test_ssh_key_auth_execute(
+    e2e_client: httpx.Client,
+    e2e_resources: UniqueResourceFactory,
+) -> None:
+    """Execute a command via unencrypted SSH key."""
+    node = e2e_resources.create_ssh_key_node(encrypted=False)
+    resp = e2e_client.post(
+        f"/api/v1/nodes/{node['id']}/execute",
+        json={"command": "echo e2e-key-works"},
+    )
+    assert resp.status_code == 200
+    result = resp.json()
+    assert result["stdout"].strip() == "e2e-key-works"
+    assert result["exit_code"] == 0
+
+
+def test_ssh_encrypted_key_auth_check(
+    e2e_client: httpx.Client,
+    e2e_resources: UniqueResourceFactory,
+) -> None:
+    """Connect via encrypted SSH key + passphrase — /check returns active."""
+    node = e2e_resources.create_ssh_key_node(encrypted=True)
+    resp = e2e_client.post(f"/api/v1/nodes/{node['id']}/check")
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "active"
+
+
+def test_ssh_encrypted_key_auth_execute(
+    e2e_client: httpx.Client,
+    e2e_resources: UniqueResourceFactory,
+) -> None:
+    """Execute a command via encrypted SSH key + passphrase."""
+    node = e2e_resources.create_ssh_key_node(encrypted=True)
+    resp = e2e_client.post(
+        f"/api/v1/nodes/{node['id']}/execute",
+        json={"command": "echo e2e-enc-key-works"},
+    )
+    assert resp.status_code == 200
+    result = resp.json()
+    assert result["stdout"].strip() == "e2e-enc-key-works"
+    assert result["exit_code"] == 0
+
+
+def test_ssh_encrypted_key_wrong_passphrase(
+    e2e_client: httpx.Client,
+    e2e_resources: UniqueResourceFactory,
+) -> None:
+    """Encrypted key with wrong passphrase — /check returns unreachable."""
+    node = e2e_resources.create_ssh_key_node(
+        encrypted=True,
+        passphrase="wrong-passphrase",
+    )
+    resp = e2e_client.post(f"/api/v1/nodes/{node['id']}/check")
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "unreachable"
 
 
 def test_validation_error(e2e_client: httpx.Client) -> None:
