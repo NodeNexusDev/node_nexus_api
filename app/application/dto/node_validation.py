@@ -14,6 +14,7 @@ class NodeValidationRequestDTO:
     username: str | None = None
     password: str | None = None
     ssh_key: str | None = None
+    passphrase: str | None = None
 
 
 @dataclass(frozen=True, slots=True)

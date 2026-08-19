@@ -80,6 +80,7 @@ class CommandExecutionService:
             username=node.username,
             password=self._credential_cipher.decrypt(node.password),
             ssh_key=self._credential_cipher.decrypt(node.ssh_key),
+            passphrase=self._credential_cipher.decrypt(node.passphrase),
         )
 
         try:

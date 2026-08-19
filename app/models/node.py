@@ -37,6 +37,7 @@ class NodeModel(Base):
     username: Mapped[str | None] = mapped_column(String(255), nullable=True)
     password: Mapped[str | None] = mapped_column(Text, nullable=True)
     ssh_key: Mapped[str | None] = mapped_column(Text, nullable=True)
+    passphrase: Mapped[str | None] = mapped_column(Text, nullable=True)
     docker_host: Mapped[str | None] = mapped_column(String(255), nullable=True)
     tags: Mapped[list[str] | None] = mapped_column(
         ARRAY(String(100)).with_variant(JSON(), "sqlite"), nullable=True, default=list

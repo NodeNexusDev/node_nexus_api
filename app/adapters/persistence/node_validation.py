@@ -34,6 +34,7 @@ class SshCredentialValidator:
             username=request.username,
             password=request.password,
             ssh_key=request.ssh_key,
+            passphrase=request.passphrase,
         )
 
         try:

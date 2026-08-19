@@ -33,6 +33,7 @@ class SSHConnector:
         username: str | None = None,
         password: str | None = None,
         ssh_key: str | None = None,
+        passphrase: str | None = None,
         timeout: int = 30,
         known_hosts: str | None = None,
         strict_host_key_checking: bool = True,
@@ -42,6 +43,7 @@ class SSHConnector:
         self._username = username
         self._password = password
         self._ssh_key = ssh_key
+        self._passphrase = passphrase
         self._timeout = timeout
         self._known_hosts = known_hosts
         self._strict_host_key_checking = strict_host_key_checking
@@ -75,6 +77,8 @@ class SSHConnector:
 
         if self._ssh_key:
             kwargs["client_keys"] = [self._ssh_key.encode()]
+            if self._passphrase:
+                kwargs["passphrase"] = self._passphrase
         elif self._password:
             kwargs["password"] = self._password
 
@@ -304,6 +308,7 @@ class SSHConnectorFactory:
         username: str | None,
         password: str | None,
         ssh_key: str | None,
+        passphrase: str | None = None,
     ) -> SSHConnector:
         return SSHConnector(
             host=host,
@@ -311,6 +316,7 @@ class SSHConnectorFactory:
             username=username,
             password=password,
             ssh_key=ssh_key,
+            passphrase=passphrase,
             known_hosts=(
                 self._known_hosts_path if self._strict_host_key_checking else None
             ),
