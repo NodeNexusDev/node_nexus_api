@@ -20,6 +20,7 @@ class NodeCreateDTO:
     username: str | None = None
     password: str | None = field(default=None, repr=False)
     ssh_key: str | None = field(default=None, repr=False)
+    passphrase: str | None = field(default=None, repr=False)
     docker_host: str | None = None
     tags: tuple[str, ...] = ()
 

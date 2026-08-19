@@ -195,6 +195,7 @@ async def create_node(
                 username=data.username,
                 password=data.password,
                 ssh_key=data.ssh_key,
+                passphrase=data.passphrase,
                 docker_host=data.docker_host,
                 tags=tuple(data.tags),
             )
@@ -338,6 +339,7 @@ async def validate_credentials(
             username=data.username,
             password=data.password,
             ssh_key=data.ssh_key,
+            passphrase=data.passphrase,
         )
     )
     return NodeValidateResponse(

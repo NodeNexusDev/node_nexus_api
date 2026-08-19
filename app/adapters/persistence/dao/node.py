@@ -33,6 +33,7 @@ class NodeRepository:
             username=node.username,
             password=node.password,
             ssh_key=node.ssh_key,
+            passphrase=node.passphrase,
             docker_host=node.docker_host,
         )
 

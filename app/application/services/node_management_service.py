@@ -32,7 +32,7 @@ from app.core.exceptions import NodeNotFoundError
 
 audit = structlog.get_logger("audit")
 
-_SENSITIVE_FIELDS = ("password", "ssh_key")
+_SENSITIVE_FIELDS = ("password", "ssh_key", "passphrase")
 
 
 class NodeManagementService:
@@ -113,6 +113,7 @@ class NodeManagementService:
             data,
             password=self._encrypt_value(data.password),
             ssh_key=self._encrypt_value(data.ssh_key),
+            passphrase=self._encrypt_value(data.passphrase),
         )
         node = await self._writer.create_node(secured)
         audit.info("node.create.ok", node_id=str(node.id), name=data.name)

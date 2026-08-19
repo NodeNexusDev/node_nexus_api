@@ -96,6 +96,7 @@ class SqlAlchemyNodeManagementGateway:
                         "username": data.username,
                         "password": data.password,
                         "ssh_key": data.ssh_key,
+                        "passphrase": data.passphrase,
                         "docker_host": data.docker_host,
                         "tags": list(data.tags),
                     }

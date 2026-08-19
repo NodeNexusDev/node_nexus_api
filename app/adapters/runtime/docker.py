@@ -37,6 +37,7 @@ class SshDockerRuntime:
             username=target.username,
             password=self._credential_cipher.decrypt(target.password),
             ssh_key=self._credential_cipher.decrypt(target.ssh_key),
+            passphrase=self._credential_cipher.decrypt(target.passphrase),
         )
         try:
             async with connector:

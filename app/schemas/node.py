@@ -32,6 +32,7 @@ class NodeCreate(BaseModel):
     username: str | None = None
     password: str | None = None
     ssh_key: str | None = None
+    passphrase: str | None = None
     docker_host: str | None = None
     tags: list[str] = Field(default_factory=list)
 
@@ -57,6 +58,7 @@ class NodeUpdate(BaseModel):
     username: str | None = None
     password: str | None = None
     ssh_key: str | None = None
+    passphrase: str | None = None
     docker_host: str | None = None
     tags: list[str] | None = None
 
@@ -225,6 +227,7 @@ class NodeValidateRequest(BaseModel):
     username: str | None = None
     password: str | None = None
     ssh_key: str | None = None
+    passphrase: str | None = None
 
 
 class NodeValidateResponse(BaseModel):
