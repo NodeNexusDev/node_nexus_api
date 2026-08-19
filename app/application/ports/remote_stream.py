@@ -46,6 +46,7 @@ class RemoteStreamingConnectorFactory(Protocol):
         username: str | None,
         password: str | None,
         ssh_key: str | None,
+        passphrase: str | None = None,
     ) -> RemoteStreamingConnector:
         """Create one SSH-backed streaming connector."""
         ...
