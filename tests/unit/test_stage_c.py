@@ -262,6 +262,7 @@ async def test_ssh_credential_validator_success() -> None:
         username="root",
         password="secret",
         ssh_key=None,
+        passphrase=None,
     )
 
 

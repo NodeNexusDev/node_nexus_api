@@ -65,6 +65,27 @@ class TestSSHConnector:
             assert "client_keys" in call_kwargs[1]
             assert connector._connection is mock_conn
 
+    async def test_key_auth_with_passphrase(self) -> None:
+        key = (
+            "-----BEGIN OPENSSH PRIVATE KEY-----\nfake\n"
+            "-----END OPENSSH PRIVATE KEY-----"
+        )
+        connector = SSHConnector(
+            host="127.0.0.1",
+            ssh_key=key,
+            passphrase="secret-passphrase",
+            known_hosts=None,
+            strict_host_key_checking=False,
+        )
+        mock_conn = AsyncMock()
+        connect_path = "app.adapters.runtime.ssh.asyncssh.connect"
+        with patch(connect_path, new_callable=AsyncMock) as mock_connect:
+            mock_connect.return_value = mock_conn
+            await connector.connect()
+            call_kwargs = mock_connect.call_args
+            assert "client_keys" in call_kwargs[1]
+            assert call_kwargs[1]["passphrase"] == "secret-passphrase"
+
     async def test_password_auth_branch(self) -> None:
         connector = SSHConnector(
             host="127.0.0.1",
@@ -312,8 +333,22 @@ class TestSSHConnectorFactory:
         assert connector._username == "user"
         assert connector._password == "pass"
         assert connector._ssh_key is None
+        assert connector._passphrase is None
         assert connector._known_hosts == "/app/.ssh/known_hosts"
         assert connector._strict_host_key_checking is True
+
+    def test_create_ssh_with_passphrase(self) -> None:
+        factory = SSHConnectorFactory()
+        connector = factory.create_ssh(
+            host="127.0.0.1",
+            port=22,
+            username="user",
+            password=None,
+            ssh_key="fake-key",
+            passphrase="my-passphrase",
+        )
+        assert connector._ssh_key == "fake-key"
+        assert connector._passphrase == "my-passphrase"
 
     def test_explicitly_disabled_host_key_checking(self) -> None:
         factory = SSHConnectorFactory(strict_host_key_checking=False)

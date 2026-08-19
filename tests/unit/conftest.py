@@ -49,6 +49,7 @@ def make_orm_node(**overrides: Any) -> Any:
         "username": "root",
         "password": None,
         "ssh_key": None,
+        "passphrase": None,
         "docker_host": None,
         "tags": [],
         "created_at": datetime.now(UTC),
