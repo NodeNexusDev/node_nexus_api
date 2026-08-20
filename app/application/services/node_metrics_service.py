@@ -112,7 +112,7 @@ class NodeMetricsService:
             )
             if exit_code == 0 and stdout.strip():
                 cpu_usage = float(stdout.strip())
-        except Exception:
+        except Exception:  # nosec B110 — intentional fallback if vmstat unavailable
             pass
         if cpu_usage == 0.0:
             try:
@@ -121,7 +121,7 @@ class NodeMetricsService:
                 )
                 if exit_code == 0 and stdout.strip():
                     cpu_usage = float(stdout.strip())
-            except Exception:
+            except Exception:  # nosec B110 — intentional fallback if top format differs
                 pass
         cores_stdout, _, _ = await connector.execute_command("nproc")
         cores = int(cores_stdout.strip()) if cores_stdout.strip() else 1
