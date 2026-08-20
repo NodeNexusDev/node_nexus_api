@@ -7,6 +7,12 @@ from fastapi import APIRouter, HTTPException, Security
 from app.api.deps import require_write_scope
 from app.application.services.docker.bulk_service import DockerBulkService
 from app.schemas.docker import (
+    BulkDockerImageBuildRequest,
+    BulkDockerImageBuildResponse,
+    BulkDockerImageBuildResult,
+    BulkDockerImageRemoveRequest,
+    BulkDockerImageRemoveResponse,
+    BulkDockerImageRemoveResult,
     BulkDockerPullRequest,
     BulkDockerPullResponse,
     BulkDockerPullResult,
@@ -161,6 +167,82 @@ async def bulk_pull_images(
     return BulkDockerPullResponse(
         results=[
             BulkDockerPullResult(
+                node_id=r.node_id,
+                node_name=r.node_name,
+                status=r.status,
+                output=r.output,
+                error=r.error,
+            )
+            for r in dto.results
+        ],
+        total=dto.total,
+        succeeded=dto.succeeded,
+        failed=dto.failed,
+    )
+
+
+@router.post("/bulk/images/remove", response_model=BulkDockerImageRemoveResponse)
+@inject
+async def bulk_remove_images(
+    data: BulkDockerImageRemoveRequest,
+    service: FromDishka[DockerBulkService],
+    _key: str = Security(require_write_scope),
+) -> BulkDockerImageRemoveResponse:
+    """Remove Docker images on multiple nodes."""
+    audit.info(
+        "api.docker.bulk.images.remove",
+        node_count=len(data.node_ids),
+        node_tag_count=len(data.node_tags),
+        image_id=data.image_id,
+    )
+    dto = await service.bulk_image_remove(
+        node_ids=data.node_ids,
+        image_id=data.image_id,
+        node_tags=data.node_tags,
+    )
+    return BulkDockerImageRemoveResponse(
+        results=[
+            BulkDockerImageRemoveResult(
+                node_id=r.node_id,
+                node_name=r.node_name,
+                status=r.status,
+                output=r.output,
+                error=r.error,
+            )
+            for r in dto.results
+        ],
+        total=dto.total,
+        succeeded=dto.succeeded,
+        failed=dto.failed,
+    )
+
+
+@router.post("/bulk/images/build", response_model=BulkDockerImageBuildResponse)
+@inject
+async def bulk_build_images(
+    data: BulkDockerImageBuildRequest,
+    service: FromDishka[DockerBulkService],
+    _key: str = Security(require_write_scope),
+) -> BulkDockerImageBuildResponse:
+    """Build Docker images on multiple nodes."""
+    audit.info(
+        "api.docker.bulk.images.build",
+        node_count=len(data.node_ids),
+        node_tag_count=len(data.node_tags),
+        tag=data.tag,
+    )
+    dto = await service.bulk_image_build(
+        node_ids=data.node_ids,
+        dockerfile=data.dockerfile,
+        tag=data.tag,
+        build_args=data.build_args,
+        no_cache=data.no_cache,
+        timeout=data.timeout,
+        node_tags=data.node_tags,
+    )
+    return BulkDockerImageBuildResponse(
+        results=[
+            BulkDockerImageBuildResult(
                 node_id=r.node_id,
                 node_name=r.node_name,
                 status=r.status,

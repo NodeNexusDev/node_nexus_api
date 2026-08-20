@@ -356,3 +356,80 @@ class ExecutionRetryResponse(BaseModel):
     execution_id: str
     status: str
     message: str
+
+
+# --- Bulk validate credentials ---
+
+
+class BulkValidateCredentialsRequest(BaseModel):
+    """Request to validate SSH credentials for multiple existing nodes."""
+
+    node_ids: list[uuid.UUID] = Field(min_length=1)
+    tags: list[str] = Field(default_factory=list)
+
+
+class BulkValidateCredentialsResult(BaseModel):
+    """Credential validation result for a single node."""
+
+    node_id: uuid.UUID
+    node_name: str
+    status: str  # "success" or "error"
+    message: str = ""
+
+
+class BulkValidateCredentialsResponse(BaseModel):
+    """Response for bulk credential validation."""
+
+    results: list[BulkValidateCredentialsResult]
+    total: int
+    succeeded: int
+    failed: int
+
+
+# --- Bulk retry/cancel commands ---
+
+
+class BulkRetryCommandRequest(BaseModel):
+    """Request to retry multiple command executions."""
+
+    execution_ids: list[uuid.UUID] = Field(min_length=1)
+
+
+class BulkRetryCommandResult(BaseModel):
+    """Result of retrying a single command execution."""
+
+    execution_id: str
+    status: str  # "retry_scheduled" or "error"
+    message: str = ""
+
+
+class BulkRetryCommandResponse(BaseModel):
+    """Response for bulk command retry."""
+
+    results: list[BulkRetryCommandResult]
+    total: int
+    succeeded: int
+    failed: int
+
+
+class BulkCancelCommandRequest(BaseModel):
+    """Request to cancel multiple command executions."""
+
+    execution_ids: list[uuid.UUID] = Field(min_length=1)
+
+
+class BulkCancelCommandResult(BaseModel):
+    """Result of cancelling a single command execution."""
+
+    execution_id: str
+    status: str  # "cancelled" or "error"
+    message: str = ""
+
+
+class BulkCancelCommandResponse(BaseModel):
+    """Response for bulk command cancellation."""
+
+    results: list[BulkCancelCommandResult]
+    total: int
+    succeeded: int
+    failed: int
