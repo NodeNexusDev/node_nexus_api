@@ -89,9 +89,7 @@ class NodeBulkOperationService:
         )
         return result
 
-    async def bulk_check(
-        self, node_ids: tuple[str, ...]
-    ) -> BulkNodeCheckResultDTO:
+    async def bulk_check(self, node_ids: tuple[str, ...]) -> BulkNodeCheckResultDTO:
         """Check which nodes exist by IDs."""
         result = await self._operator.bulk_check(node_ids)
         if self._audit:

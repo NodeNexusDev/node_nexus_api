@@ -93,9 +93,7 @@ class SqlAlchemyNodeBulkOperator:
             node_ids=tuple(affected_ids),
         )
 
-    async def bulk_check(
-        self, node_ids: tuple[str, ...]
-    ) -> BulkNodeCheckResultDTO:
+    async def bulk_check(self, node_ids: tuple[str, ...]) -> BulkNodeCheckResultDTO:
         """Check which nodes exist by IDs."""
         if not node_ids:
             return BulkNodeCheckResultDTO(total=0, succeeded=0, failed=0, node_ids=())

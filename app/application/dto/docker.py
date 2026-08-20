@@ -219,3 +219,20 @@ class BulkDockerResultDTO:
     total: int
     succeeded: int
     failed: int
+
+
+@dataclass(frozen=True, slots=True)
+class BulkDockerPullResultDTO:
+    node_id: str
+    node_name: str
+    status: str
+    output: str = ""
+    error: str = ""
+
+
+@dataclass(frozen=True, slots=True)
+class BulkDockerPullResultsDTO:
+    results: tuple[BulkDockerPullResultDTO, ...]
+    total: int
+    succeeded: int
+    failed: int

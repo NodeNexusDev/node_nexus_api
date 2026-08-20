@@ -301,6 +301,55 @@ class BulkNodeOperationResult(BaseModel):
     errors: list[str] | None = None
 
 
+class BulkNodeMetricsRequest(BaseModel):
+    """Request to collect metrics from multiple nodes."""
+
+    node_ids: list[uuid.UUID] = Field(min_length=1)
+
+
+class BulkNodeMetricsResult(BaseModel):
+    """Metrics result for a single node."""
+
+    node_id: uuid.UUID
+    node_name: str
+    status: str  # "success" or "error"
+    metrics: NodeMetrics | None = None
+    error: str = ""
+
+
+class BulkNodeMetricsResponse(BaseModel):
+    """Response for bulk metrics collection."""
+
+    results: list[BulkNodeMetricsResult]
+    total: int
+    succeeded: int
+    failed: int
+
+
+class BulkNodeUpdateRequest(BaseModel):
+    """Request to update multiple nodes with the same changes."""
+
+    node_ids: list[uuid.UUID] = Field(min_length=1)
+    changes: NodeUpdate
+
+
+class BulkNodeUpdateResult(BaseModel):
+    """Result of updating a single node."""
+
+    node_id: uuid.UUID
+    status: str  # "success" or "error"
+    error: str = ""
+
+
+class BulkNodeUpdateResponse(BaseModel):
+    """Response for bulk node update."""
+
+    results: list[BulkNodeUpdateResult]
+    total: int
+    succeeded: int
+    failed: int
+
+
 class ExecutionRetryResponse(BaseModel):
     """Response for retry/cancel execution."""
 

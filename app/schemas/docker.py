@@ -259,3 +259,37 @@ class BulkDockerResponse(BaseModel):
     total: int
     succeeded: int
     failed: int
+
+
+class BulkDockerPullRequest(BaseModel):
+    """Request for bulk Docker image pull on multiple nodes."""
+
+    node_ids: list[uuid.UUID] = Field(default_factory=list)
+    node_tags: list[str] = Field(default_factory=list)
+    image: str = Field(min_length=1, max_length=255)
+    timeout: int | None = Field(default=None, ge=1, le=3600)
+
+    @model_validator(mode="after")
+    def _require_targets(self) -> "BulkDockerPullRequest":
+        if not self.node_ids and not self.node_tags:
+            raise ValueError("At least one of node_ids or node_tags must be provided")
+        return self
+
+
+class BulkDockerPullResult(BaseModel):
+    """Result of a Docker image pull on a single node."""
+
+    node_id: str
+    node_name: str
+    status: str  # "success" or "error"
+    output: str = ""
+    error: str = ""
+
+
+class BulkDockerPullResponse(BaseModel):
+    """Response for bulk Docker image pull."""
+
+    results: list[BulkDockerPullResult]
+    total: int
+    succeeded: int
+    failed: int

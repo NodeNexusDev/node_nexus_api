@@ -209,11 +209,11 @@
 
 | # | Задача | Приоритет | Сложность |
 |---|--------|-----------|-----------|
-| 3.1 | **Bulk Metrics** — `POST /nodes/bulk/metrics` | HIGH | Средняя |
-| 3.2 | **Bulk Execute Command Template** — `POST /commands/{id}/bulk-execute` | HIGH | Средняя |
-| 3.3 | **Bulk Update Node** — `PUT /nodes/bulk/update` | HIGH | Средняя |
-| 3.4 | **Docker bulk remove** — `POST /docker/bulk/remove` | HIGH | Низкая |
-| 3.5 | **Docker bulk pull** — `POST /docker/bulk/pull` | HIGH | Низкая |
+| 3.1 | **Bulk Metrics** — `POST /nodes/bulk/metrics` | HIGH | Средняя | ✅ |
+| 3.2 | **Bulk Execute Command Template** — `POST /commands/{id}/bulk-execute` | HIGH | Средняя | ✅ |
+| 3.3 | **Bulk Update Node** — `PUT /nodes/bulk/update` | HIGH | Средняя | ✅ |
+| 3.4 | **Docker bulk remove** — `POST /docker/bulk/remove` | HIGH | Низкая | ✅ |
+| 3.5 | **Docker bulk pull** — `POST /docker/bulk/pull` | HIGH | Низкая | ✅ |
 | 3.6 | **Bulk Validate Credentials** — `POST /nodes/bulk/validate-credentials` | MEDIUM | Средняя |
 | 3.7 | **Bulk Retry/Cancel Command** — `POST /nodes/bulk/retry` | MEDIUM | Средняя |
 | 3.8 | **Bulk Cancel/Retry Script** — `POST /scripts/bulk/cancel`, `/retry` | MEDIUM | Средняя |
@@ -247,5 +247,36 @@
 
 ---
 
-Версия плана: 1.0
+Версия плана: 1.1
 Дата: 2026-08-20
+
+## 7. Текущий статус
+
+### Завершено
+- **Фаза 1 (7 задач)** — 455f647
+  - ✅ Semaphore для SSH + batch SQL DELETE/UPDATE
+  - ✅ Exception logging, timeout fix, parallel `_save_history`
+  - ✅ Удалён `BulkNodeCheckDTO` (dead code)
+- **Фаза 2 (12 задач)** — 6ebbed0
+  - ✅ `response_model` для docker bulk, UUID node_ids
+  - ✅ Audit для NodeBulkOperationService, DockerBulkService, GET /bulk/history
+  - ✅ `bulk_check` вынесен в сервисный слой
+  - ✅ `BulkNodeOperationResult` расширен
+  - ✅ DTO naming, `node_tags→tags`, REQUEST scope
+- **Фаза 3 HIGH (5 задач)** — текущая сессия
+  - ✅ 3.1 Bulk Metrics — `POST /nodes/bulk/metrics`
+  - ✅ 3.2 Bulk Execute Command Template — `POST /commands/{id}/bulk-execute`
+  - ✅ 3.3 Bulk Update Node — `PUT /nodes/bulk/update`
+  - ✅ 3.4 Docker bulk remove — `POST /docker/bulk/remove`
+  - ✅ 3.5 Docker bulk pull — `POST /docker/bulk/pull`
+
+### Осталось (MEDIUM приоритет)
+- ❌ 3.6 Bulk Validate Credentials — `POST /nodes/bulk/validate-credentials`
+- ❌ 3.7 Bulk Retry/Cancel Command — `POST /nodes/bulk/retry`
+- ❌ 3.8 Bulk Cancel/Retry Script — `POST /scripts/bulk/cancel`, `/retry`
+- ❌ 3.9 Docker bulk remove/build image — `POST /docker/bulk/images/remove`, `/build`
+
+### Архитектурные решения (текущая сессия)
+- `DockerBulkService.bulk_pull_image()` возвращает `BulkDockerPullResultsDTO` (DTO), а не schema — для соблюдения границы application ↔ schemas
+- `bulk_container_action()` теперь поддерживает `remove` action (`docker rm -f`)
+- `BulkDockerPullResultDTO` добавлен в `app/application/dto/docker.py`
