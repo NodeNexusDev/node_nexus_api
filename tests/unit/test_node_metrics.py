@@ -20,6 +20,7 @@ from app.core.exceptions import ConnectionFailedError, DomainError, NodeNotFound
 from app.schemas.node import (
     CpuMetrics,
     DiskMetrics,
+    LoadAverage,
     MemoryMetrics,
     NodeMetrics,
     NodeResponse,
@@ -58,6 +59,7 @@ def _make_node_metrics(**overrides: Any) -> NodeMetrics:
             used_bytes=53687091200,
             percent=50.0,
         ),
+        "load_average": LoadAverage(one_min=0.5, five_min=0.3, fifteen_min=0.1),
         "uptime_since": "2026-01-15 10:30:00",
     }
     defaults.update(overrides)
@@ -116,6 +118,7 @@ class TestGetNodeMetrics:
         assert "cpu" in data
         assert "memory" in data
         assert "disk" in data
+        assert "load_average" in data
         assert "uptime_since" in data
 
     async def test_not_found(
@@ -188,6 +191,21 @@ class TestGetNodeMetrics:
         assert data["disk"]["used_bytes"] == 107374182400
         assert data["disk"]["percent"] == 50.0
 
+    async def test_load_average_structure(
+        self, client: AsyncClient, mock_service: AsyncMock
+    ) -> None:
+        node_id = uuid.uuid4()
+        metrics = _make_node_metrics(
+            load_average=LoadAverage(one_min=1.5, five_min=0.8, fifteen_min=0.3)
+        )
+        mock_service.get_node_metrics.return_value = metrics
+
+        resp = await client.get(f"/api/v1/nodes/{node_id}/metrics")
+        data = resp.json()
+        assert data["load_average"]["one_min"] == 1.5
+        assert data["load_average"]["five_min"] == 0.8
+        assert data["load_average"]["fifteen_min"] == 0.3
+
 
 # --- NodeMetrics schema tests ---
 
@@ -199,6 +217,9 @@ class TestNodeMetricsSchema:
         assert metrics.cpu.cores == 4
         assert metrics.memory.total_bytes == 8589934592
         assert metrics.disk.percent == 50.0
+        assert metrics.load_average.one_min == 0.5
+        assert metrics.load_average.five_min == 0.3
+        assert metrics.load_average.fifteen_min == 0.1
         assert metrics.uptime_since == "2026-01-15 10:30:00"
 
     def test_cpu_metrics_validation(self) -> None:
@@ -221,6 +242,13 @@ class TestNodeMetricsSchema:
     def test_disk_metrics_validation(self) -> None:
         disk = DiskMetrics(total_bytes=1000, used_bytes=500, percent=50.0)
         assert disk.total_bytes == 1000
+
+    def test_load_average_validation(self) -> None:
+        la = LoadAverage(one_min=0.5, five_min=0.3, fifteen_min=0.1)
+        assert la.one_min == 0.5
+
+        with pytest.raises(Exception):
+            LoadAverage(one_min=-1, five_min=0.3, fifteen_min=0.1)
 
 
 # --- NodeMetricsService tests ---
@@ -269,12 +297,16 @@ class TestNodeMetricsService:
             return connector
 
         async def execute(command: str) -> tuple[str, str, int]:
+            if "vmstat" in command:
+                return ("1.0", "", 0)
             if "top" in command:
                 return ("1.0", "", 0)
             if "nproc" in command:
                 return ("1", "", 0)
             if "free" in command or "df" in command:
                 return ("100 50 50", "", 0)
+            if "loadavg" in command:
+                return ("0.50 0.30 0.10", "", 0)
             return ("2026-07-29 10:00:00", "", 0)
 
         reader.get_connection.side_effect = read_node
@@ -315,7 +347,9 @@ class TestNodeMetricsService:
 
         # Mock SSH commands
         async def mock_execute(cmd):
-            if "top" in cmd:
+            if "vmstat" in cmd:
+                return ("25.0", "", 0)
+            elif "top" in cmd:
                 return ("25.0", "", 0)
             elif "nproc" in cmd:
                 return ("4", "", 0)
@@ -323,6 +357,8 @@ class TestNodeMetricsService:
                 return ("8589934592 4294967296 4294967296", "", 0)
             elif "df" in cmd:
                 return ("107374182400 53687091200 53687091200", "", 0)
+            elif "loadavg" in cmd:
+                return ("0.50 0.30 0.10", "", 0)
             elif "uptime" in cmd:
                 return ("2026-01-15 10:30:00", "", 0)
             return ("", "", 0)
@@ -345,6 +381,9 @@ class TestNodeMetricsService:
         assert metrics.memory.used_bytes == 4294967296
         assert metrics.disk.total_bytes == 107374182400
         assert metrics.disk.used_bytes == 53687091200
+        assert metrics.load_average.one_min == 0.5
+        assert metrics.load_average.five_min == 0.3
+        assert metrics.load_average.fifteen_min == 0.1
         assert metrics.uptime_since == "2026-01-15 10:30:00"
 
     @pytest.mark.asyncio

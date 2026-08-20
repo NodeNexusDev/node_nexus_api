@@ -21,10 +21,20 @@ class UsageMetricsDTO:
 
 
 @dataclass(frozen=True, slots=True)
+class LoadAverageDTO:
+    """System load average over 1, 5, and 15 minutes."""
+
+    one_min: float
+    five_min: float
+    fifteen_min: float
+
+
+@dataclass(frozen=True, slots=True)
 class NodeMetricsDTO:
     """Transport-independent system metrics for one node."""
 
     cpu: CpuMetricsDTO
     memory: UsageMetricsDTO
     disk: UsageMetricsDTO
+    load_average: LoadAverageDTO
     uptime_since: str

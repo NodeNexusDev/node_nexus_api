@@ -65,6 +65,7 @@ from app.schemas.node import (
     CpuMetrics,
     DiskMetrics,
     ExecutionRetryResponse,
+    LoadAverage,
     MemoryMetrics,
     NodeCreate,
     NodeMetrics,
@@ -434,6 +435,11 @@ async def get_node_metrics(
             total_bytes=result.disk.total_bytes,
             used_bytes=result.disk.used_bytes,
             percent=result.disk.percent,
+        ),
+        load_average=LoadAverage(
+            one_min=result.load_average.one_min,
+            five_min=result.load_average.five_min,
+            fifteen_min=result.load_average.fifteen_min,
         ),
         uptime_since=result.uptime_since,
     )
