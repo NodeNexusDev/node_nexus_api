@@ -345,7 +345,7 @@ class RepositoryProvider(Provider):
         self, reader: ScopedNodeConnectionReader
     ) -> NodeConnectionReader:
         """Bind the node connection reader port."""
-        return reader  # ty: ignore[invalid-return-type]
+        return reader
 
     @provide(scope=Scope.APP)
     def get_node_management_gateway(
@@ -673,7 +673,7 @@ class ServiceProvider(Provider):
         """Get the node metrics service."""
         return NodeMetricsService(
             connector_factory=connector_factory,
-            node_reader=node_reader,  # ty: ignore[invalid-argument-type]
+            node_reader=node_reader,
             credential_cipher=credential_cipher,
         )
 
