@@ -1,5 +1,6 @@
 """Immutable application DTOs for Docker use cases."""
 
+import uuid
 from dataclasses import dataclass
 from uuid import UUID
 
@@ -194,7 +195,7 @@ class DockerImageBuildResultDTO:
 
 @dataclass(frozen=True, slots=True)
 class BulkDockerRequestDTO:
-    node_ids: tuple[str, ...]
+    node_ids: tuple[uuid.UUID, ...]
     container_id: str
     action: str
     timeout: int | None = None

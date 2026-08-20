@@ -17,7 +17,7 @@ def _bulk_response(result: object) -> BulkDockerResponse:
     return BulkDockerResponse.model_validate(result, from_attributes=True)
 
 
-@router.post("/bulk/start")
+@router.post("/bulk/start", response_model=BulkDockerResponse)
 @inject
 async def bulk_start_containers(
     data: BulkDockerRequest,
@@ -39,7 +39,7 @@ async def bulk_start_containers(
     return _bulk_response(result)
 
 
-@router.post("/bulk/stop")
+@router.post("/bulk/stop", response_model=BulkDockerResponse)
 @inject
 async def bulk_stop_containers(
     data: BulkDockerRequest,
@@ -62,7 +62,7 @@ async def bulk_stop_containers(
     return _bulk_response(result)
 
 
-@router.post("/bulk/restart")
+@router.post("/bulk/restart", response_model=BulkDockerResponse)
 @inject
 async def bulk_restart_containers(
     data: BulkDockerRequest,
@@ -85,7 +85,7 @@ async def bulk_restart_containers(
     return _bulk_response(result)
 
 
-@router.post("/bulk/exec")
+@router.post("/bulk/exec", response_model=BulkDockerResponse)
 @inject
 async def bulk_exec_in_containers(
     data: BulkDockerRequest,

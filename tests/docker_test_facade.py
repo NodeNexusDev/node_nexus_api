@@ -169,7 +169,7 @@ class DockerService:
 
     async def bulk_container_action(
         self,
-        node_ids: list[str],
+        node_ids: list[UUID],
         container_id: str,
         action: str,
         timeout: int | None = None,
@@ -179,7 +179,7 @@ class DockerService:
         )
 
     async def bulk_exec(
-        self, node_ids: list[str], container_id: str, command: str, timeout: int = 30
+        self, node_ids: list[UUID], container_id: str, command: str, timeout: int = 30
     ) -> BulkDockerResultDTO:
         return await self._bulk.bulk_exec(node_ids, container_id, command, timeout)
 

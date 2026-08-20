@@ -1,5 +1,7 @@
 """Docker schemas for API."""
 
+import uuid
+
 from pydantic import BaseModel, Field, model_validator
 
 
@@ -226,7 +228,7 @@ class DockerVolume(BaseModel):
 class BulkDockerRequest(BaseModel):
     """Request for bulk Docker operations on multiple nodes."""
 
-    node_ids: list[str] = Field(default_factory=list)
+    node_ids: list[uuid.UUID] = Field(default_factory=list)
     node_tags: list[str] = Field(default_factory=list)
     container_id: str = Field(min_length=1, max_length=255)
     timeout: int | None = Field(default=None, ge=1, le=300)

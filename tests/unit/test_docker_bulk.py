@@ -54,7 +54,7 @@ class TestBulkStartContainers:
             action="start",
             results=[
                 BulkDockerNodeResult(
-                    node_id="node-1",
+                    node_id="00000000-0000-0000-0000-000000000001",
                     node_name="server1",
                     status="success",
                     output="",
@@ -67,7 +67,7 @@ class TestBulkStartContainers:
 
         resp = await client.post(
             "/api/v1/docker/bulk/start",
-            json={"node_ids": ["node-1"], "container_id": "nginx"},
+            json={"node_ids": ["00000000-0000-0000-0000-000000000001"], "container_id": "nginx"},
         )
         assert resp.status_code == 200
         data = resp.json()
@@ -82,12 +82,12 @@ class TestBulkStartContainers:
             action="start",
             results=[
                 BulkDockerNodeResult(
-                    node_id="node-1",
+                    node_id="00000000-0000-0000-0000-000000000001",
                     node_name="server1",
                     status="success",
                 ),
                 BulkDockerNodeResult(
-                    node_id="node-2",
+                    node_id="00000000-0000-0000-0000-000000000002",
                     node_name="server2",
                     status="error",
                     error="Node not found",
@@ -100,7 +100,7 @@ class TestBulkStartContainers:
 
         resp = await client.post(
             "/api/v1/docker/bulk/start",
-            json={"node_ids": ["node-1", "node-2"], "container_id": "nginx"},
+            json={"node_ids": ["00000000-0000-0000-0000-000000000001", "00000000-0000-0000-0000-000000000002"], "container_id": "nginx"},
         )
         assert resp.status_code == 200
         data = resp.json()
@@ -115,7 +115,7 @@ class TestBulkStopContainers:
             action="stop",
             results=[
                 BulkDockerNodeResult(
-                    node_id="node-1",
+                    node_id="00000000-0000-0000-0000-000000000001",
                     node_name="server1",
                     status="success",
                 )
@@ -127,7 +127,7 @@ class TestBulkStopContainers:
 
         resp = await client.post(
             "/api/v1/docker/bulk/stop",
-            json={"node_ids": ["node-1"], "container_id": "nginx", "timeout": 5},
+            json={"node_ids": ["00000000-0000-0000-0000-000000000001"], "container_id": "nginx", "timeout": 5},
         )
         assert resp.status_code == 200
         data = resp.json()
@@ -141,7 +141,7 @@ class TestBulkRestartContainers:
             action="restart",
             results=[
                 BulkDockerNodeResult(
-                    node_id="node-1",
+                    node_id="00000000-0000-0000-0000-000000000001",
                     node_name="server1",
                     status="success",
                 )
@@ -153,7 +153,7 @@ class TestBulkRestartContainers:
 
         resp = await client.post(
             "/api/v1/docker/bulk/restart",
-            json={"node_ids": ["node-1"], "container_id": "nginx"},
+            json={"node_ids": ["00000000-0000-0000-0000-000000000001"], "container_id": "nginx"},
         )
         assert resp.status_code == 200
         data = resp.json()
@@ -166,7 +166,7 @@ class TestBulkExecInContainers:
             action="exec",
             results=[
                 BulkDockerNodeResult(
-                    node_id="node-1",
+                    node_id="00000000-0000-0000-0000-000000000001",
                     node_name="server1",
                     status="success",
                     output="hello",
@@ -180,7 +180,7 @@ class TestBulkExecInContainers:
         resp = await client.post(
             "/api/v1/docker/bulk/exec",
             json={
-                "node_ids": ["node-1"],
+                "node_ids": ["00000000-0000-0000-0000-000000000001"],
                 "container_id": "nginx",
                 "command": "echo hello",
             },
@@ -195,7 +195,7 @@ class TestBulkExecInContainers:
     ) -> None:
         resp = await client.post(
             "/api/v1/docker/bulk/exec",
-            json={"node_ids": ["node-1"], "container_id": "nginx"},
+            json={"node_ids": ["00000000-0000-0000-0000-000000000001"], "container_id": "nginx"},
         )
         assert resp.status_code == 422
 
@@ -208,7 +208,7 @@ class TestBulkByTags:
             action="start",
             results=[
                 BulkDockerNodeResult(
-                    node_id="node-1", node_name="server1", status="success"
+                    node_id="00000000-0000-0000-0000-000000000001", node_name="server1", status="success"
                 )
             ],
             total=1,
@@ -236,7 +236,7 @@ class TestBulkByTags:
         resp = await client.post(
             "/api/v1/docker/bulk/stop",
             json={
-                "node_ids": ["node-1"],
+                "node_ids": ["00000000-0000-0000-0000-000000000001"],
                 "node_tags": ["zone-a"],
                 "container_id": "nginx",
                 "timeout": 5,
@@ -244,7 +244,7 @@ class TestBulkByTags:
         )
         assert resp.status_code == 200
         mock_service.bulk_container_action.assert_called_once_with(
-            node_ids=["node-1"],
+            node_ids=[uuid.UUID("00000000-0000-0000-0000-000000000001")],
             container_id="nginx",
             action="stop",
             timeout=5,
@@ -289,7 +289,7 @@ class TestBulkDockerSchemas:
         from app.schemas.docker import BulkDockerRequest
 
         req = BulkDockerRequest(
-            node_ids=["node-1", "node-2"],
+            node_ids=[uuid.UUID("00000000-0000-0000-0000-000000000001"), uuid.UUID("00000000-0000-0000-0000-000000000002")],
             container_id="abc123def456",
         )
         assert len(req.node_ids) == 2
@@ -384,7 +384,7 @@ class TestDockerServiceBulk:
         )
 
         result = await service.bulk_container_action(
-            node_ids=["00000000-0000-0000-0000-000000000001"],
+            node_ids=[uuid.UUID("00000000-0000-0000-0000-000000000001")],
             container_id="abc123def456",
             action="start",
         )
@@ -417,7 +417,7 @@ class TestDockerServiceBulk:
         )
 
         result = await service.bulk_container_action(
-            node_ids=["00000000-0000-0000-0000-000000000001"],
+            node_ids=[uuid.UUID("00000000-0000-0000-0000-000000000001")],
             container_id="abc123def456",
             action="unknown",
         )
@@ -459,7 +459,7 @@ class TestDockerServiceBulk:
         )
 
         result = await service.bulk_exec(
-            node_ids=["00000000-0000-0000-0000-000000000001"],
+            node_ids=[uuid.UUID("00000000-0000-0000-0000-000000000001")],
             container_id="abc123def456",
             command="echo hello",
         )
@@ -513,7 +513,7 @@ class TestBulkServicePrepareErrors:
         service = DockerBulkService(runner)
 
         result = await service.bulk_container_action(
-            node_ids=["00000000-0000-0000-0000-000000000001"],
+            node_ids=[uuid.UUID("00000000-0000-0000-0000-000000000001")],
             container_id="abc123def456",
             action="start",
         )
@@ -523,18 +523,15 @@ class TestBulkServicePrepareErrors:
     @pytest.mark.asyncio
     async def test_prepare_invalid_uuid(self) -> None:
         """A malformed UUID produces a ValueError error result."""
+        from pydantic import ValidationError
 
-        runner = _make_runner()
-        runner.get_target = AsyncMock(side_effect=ValueError("bad uuid"))
-        service = DockerBulkService(runner)
+        from app.schemas.docker import BulkDockerRequest
 
-        result = await service.bulk_container_action(
-            node_ids=["not-a-uuid"],
-            container_id="abc123def456",
-            action="start",
-        )
-        assert result.failed == 1
-        assert "badly formed" in result.results[0].error
+        with pytest.raises(ValidationError):
+            BulkDockerRequest(
+                node_ids=["not-a-uuid"],
+                container_id="abc123def456",
+            )
 
 
 class TestBulkServiceContainerActionBranches:
@@ -547,7 +544,7 @@ class TestBulkServiceContainerActionBranches:
         service = DockerBulkService(runner)
 
         result = await service.bulk_container_action(
-            node_ids=["00000000-0000-0000-0000-000000000001"],
+            node_ids=[uuid.UUID("00000000-0000-0000-0000-000000000001")],
             container_id="abc123def456",
             action="stop",
             timeout=15,
@@ -565,7 +562,7 @@ class TestBulkServiceContainerActionBranches:
         service = DockerBulkService(runner)
 
         result = await service.bulk_container_action(
-            node_ids=["00000000-0000-0000-0000-000000000001"],
+            node_ids=[uuid.UUID("00000000-0000-0000-0000-000000000001")],
             container_id="abc123def456",
             action="restart",
             timeout=20,
@@ -580,7 +577,7 @@ class TestBulkServiceContainerActionBranches:
         service = DockerBulkService(runner)
 
         result = await service.bulk_container_action(
-            node_ids=["00000000-0000-0000-0000-000000000001"],
+            node_ids=[uuid.UUID("00000000-0000-0000-0000-000000000001")],
             container_id="abc123def456",
             action="start",
         )
@@ -599,7 +596,7 @@ class TestBulkServiceExecErrors:
         service = DockerBulkService(runner)
 
         result = await service.bulk_exec(
-            node_ids=["00000000-0000-0000-0000-000000000001"],
+            node_ids=[uuid.UUID("00000000-0000-0000-0000-000000000001")],
             container_id="abc123def456",
             command="echo hello",
         )

@@ -482,21 +482,26 @@ class TestBulkByTags:
         )
         service = DockerBulkService(runner)
         resolved = await service._resolve_node_ids(
-            [str(NODE), "00000000-0000-0000-0000-000000000003"],
+            [NODE, uuid.UUID("00000000-0000-0000-0000-000000000003")],
             ["zone-a"],
         )
         assert resolved == [
-            "00000000-0000-0000-0000-000000000001",
-            "00000000-0000-0000-0000-000000000003",
-            "00000000-0000-0000-0000-000000000002",
+            uuid.UUID("00000000-0000-0000-0000-000000000001"),
+            uuid.UUID("00000000-0000-0000-0000-000000000003"),
+            uuid.UUID("00000000-0000-0000-0000-000000000002"),
         ]
 
     async def test_resolve_without_tags_returns_node_ids_only(self) -> None:
         runner = _make_runner()
         runner.get_targets_by_tags = AsyncMock(return_value=[])
         service = DockerBulkService(runner)
-        resolved = await service._resolve_node_ids(["a", "b"], [])
-        assert resolved == ["a", "b"]
+        resolved = await service._resolve_node_ids(
+            [uuid.UUID("00000000-0000-0000-0000-000000000001"), uuid.UUID("00000000-0000-0000-0000-000000000002")], []
+        )
+        assert resolved == [
+            uuid.UUID("00000000-0000-0000-0000-000000000001"),
+            uuid.UUID("00000000-0000-0000-0000-000000000002"),
+        ]
         runner.get_targets_by_tags.assert_not_called()
 
     async def test_bulk_action_uses_tags(self) -> None:
