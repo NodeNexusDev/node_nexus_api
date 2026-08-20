@@ -293,3 +293,79 @@ class BulkDockerPullResponse(BaseModel):
     total: int
     succeeded: int
     failed: int
+
+
+# --- Bulk Docker image remove ---
+
+
+class BulkDockerImageRemoveRequest(BaseModel):
+    """Request to remove Docker images on multiple nodes."""
+
+    node_ids: list[uuid.UUID] = Field(default_factory=list)
+    node_tags: list[str] = Field(default_factory=list)
+    image_id: str = Field(min_length=1, max_length=255)
+
+    @model_validator(mode="after")
+    def _require_targets(self) -> "BulkDockerImageRemoveRequest":
+        if not self.node_ids and not self.node_tags:
+            raise ValueError("At least one of node_ids or node_tags must be provided")
+        return self
+
+
+class BulkDockerImageRemoveResult(BaseModel):
+    """Result of removing a Docker image on a single node."""
+
+    node_id: str
+    node_name: str
+    status: str  # "success" or "error"
+    output: str = ""
+    error: str = ""
+
+
+class BulkDockerImageRemoveResponse(BaseModel):
+    """Response for bulk Docker image remove."""
+
+    results: list[BulkDockerImageRemoveResult]
+    total: int
+    succeeded: int
+    failed: int
+
+
+# --- Bulk Docker image build ---
+
+
+class BulkDockerImageBuildRequest(BaseModel):
+    """Request to build Docker images on multiple nodes."""
+
+    node_ids: list[uuid.UUID] = Field(default_factory=list)
+    node_tags: list[str] = Field(default_factory=list)
+    dockerfile: str = Field(min_length=1, max_length=4096)
+    tag: str = Field(min_length=1, max_length=255)
+    build_args: dict[str, str] = Field(default_factory=dict)
+    no_cache: bool = False
+    timeout: int | None = Field(default=None, ge=1, le=3600)
+
+    @model_validator(mode="after")
+    def _require_targets(self) -> "BulkDockerImageBuildRequest":
+        if not self.node_ids and not self.node_tags:
+            raise ValueError("At least one of node_ids or node_tags must be provided")
+        return self
+
+
+class BulkDockerImageBuildResult(BaseModel):
+    """Result of building a Docker image on a single node."""
+
+    node_id: str
+    node_name: str
+    status: str  # "success" or "error"
+    output: str = ""
+    error: str = ""
+
+
+class BulkDockerImageBuildResponse(BaseModel):
+    """Response for bulk Docker image build."""
+
+    results: list[BulkDockerImageBuildResult]
+    total: int
+    succeeded: int
+    failed: int

@@ -17,7 +17,7 @@ from app.application.dto.command_execution import (
     BulkCommandRequestDTO,
     CommandRequestDTO,
 )
-from app.application.dto.execution_lifecycle import RetryCommandDTO
+from app.application.dto.execution_lifecycle import CancelExecutionDTO, RetryCommandDTO
 from app.application.dto.node_management import (
     NodeCreateDTO,
     NodeTagDTO,
@@ -50,6 +50,9 @@ from app.application.services.node_validation_service import NodeValidationServi
 from app.schemas.common import CursorPage, decode_cursor, encode_cursor
 from app.schemas.execution_stats import ExecutionStatsResponse
 from app.schemas.node import (
+    BulkCancelCommandRequest,
+    BulkCancelCommandResponse,
+    BulkCancelCommandResult,
     BulkCommandHistoryItem,
     BulkCommandHistoryResponse,
     BulkCommandRequest,
@@ -65,6 +68,12 @@ from app.schemas.node import (
     BulkNodeUpdateRequest,
     BulkNodeUpdateResponse,
     BulkNodeUpdateResult,
+    BulkRetryCommandRequest,
+    BulkRetryCommandResponse,
+    BulkRetryCommandResult,
+    BulkValidateCredentialsRequest,
+    BulkValidateCredentialsResponse,
+    BulkValidateCredentialsResult,
     CommandHistoryResponse,
     CommandRequest,
     CommandResult,
@@ -721,6 +730,69 @@ async def bulk_check_nodes(
 
 
 @router.post(
+    "/bulk/validate-credentials",
+    response_model=BulkValidateCredentialsResponse,
+)
+@inject
+async def bulk_validate_credentials(
+    data: BulkValidateCredentialsRequest,
+    service: FromDishka[NodeBulkCommandService],
+    _key: str = Security(require_write_scope),
+) -> BulkValidateCredentialsResponse:
+    """Validate SSH connectivity for multiple existing nodes."""
+    import asyncio
+
+    from app.application.dto.node_connection import NodeConnectionDTO
+    from app.application.services._target_resolver import resolve_targets
+
+    audit.info(
+        "api.nodes.bulk_validate_credentials",
+        node_ids=[str(n) for n in data.node_ids],
+        tags=data.tags,
+    )
+    nodes = await resolve_targets(
+        service._node_reader,
+        node_ids=data.node_ids,
+        tags=data.tags,
+    )
+
+    async def _validate_one(node: NodeConnectionDTO) -> BulkValidateCredentialsResult:
+        try:
+            connector = service._connector_factory.create_ssh(
+                host=node.host,
+                port=node.port,
+                username=node.username,
+                password=service._credential_cipher.decrypt(node.password),
+                ssh_key=service._credential_cipher.decrypt(node.ssh_key),
+                passphrase=service._credential_cipher.decrypt(node.passphrase),
+            )
+            async with connector:
+                await connector.execute_command("echo ok")
+            return BulkValidateCredentialsResult(
+                node_id=node.id,
+                node_name=node.name,
+                status="success",
+                message="Credentials valid",
+            )
+        except Exception as exc:
+            return BulkValidateCredentialsResult(
+                node_id=node.id,
+                node_name=node.name,
+                status="error",
+                message=str(exc),
+            )
+
+    results = list(await asyncio.gather(*(_validate_one(node) for node in nodes)))
+    succeeded = sum(1 for r in results if r.status == "success")
+    return BulkValidateCredentialsResponse(
+        results=results,
+        total=len(results),
+        succeeded=succeeded,
+        failed=len(results) - succeeded,
+    )
+
+
+@router.post(
     "/{node_id}/commands/{execution_id}/retry",
     response_model=ExecutionRetryResponse,
 )
@@ -744,6 +816,122 @@ async def retry_command(
         execution_id=result.execution_id,
         status=result.status,
         message="Command retry scheduled",
+    )
+
+
+@router.post(
+    "/bulk/retry",
+    response_model=BulkRetryCommandResponse,
+)
+@inject
+async def bulk_retry_commands(
+    data: BulkRetryCommandRequest,
+    service: FromDishka[ExecutionLifecycleService],
+    _key: str = Security(require_write_scope),
+) -> BulkRetryCommandResponse:
+    """Retry multiple command executions."""
+    import asyncio
+
+    audit.info(
+        "api.nodes.bulk_retry_commands",
+        execution_ids=[str(e) for e in data.execution_ids],
+    )
+
+    async def _retry_one(execution_id: uuid.UUID) -> BulkRetryCommandResult:
+        try:
+            # For bulk retry, we need to look up the execution and get node_id
+            reader = service._command_history_reader
+            if reader is None:
+                return BulkRetryCommandResult(
+                    execution_id=str(execution_id),
+                    status="error",
+                    message="Command history reader not available",
+                )
+            execution = await reader.get_by_id(execution_id)
+            if execution is None:
+                return BulkRetryCommandResult(
+                    execution_id=str(execution_id),
+                    status="error",
+                    message="Execution not found",
+                )
+            if execution.node_id is None:
+                return BulkRetryCommandResult(
+                    execution_id=str(execution_id),
+                    status="error",
+                    message="No node_id associated with execution",
+                )
+            await service.retry_command(
+                RetryCommandDTO(
+                    execution_id=execution_id,
+                    node_id=execution.node_id,
+                )
+            )
+            return BulkRetryCommandResult(
+                execution_id=str(execution_id),
+                status="retry_scheduled",
+            )
+        except Exception as exc:
+            return BulkRetryCommandResult(
+                execution_id=str(execution_id),
+                status="error",
+                message=str(exc),
+            )
+
+    results = list(
+        await asyncio.gather(*(_retry_one(eid) for eid in data.execution_ids))
+    )
+    succeeded = sum(1 for r in results if r.status == "retry_scheduled")
+    return BulkRetryCommandResponse(
+        results=results,
+        total=len(results),
+        succeeded=succeeded,
+        failed=len(results) - succeeded,
+    )
+
+
+@router.post(
+    "/bulk/cancel",
+    response_model=BulkCancelCommandResponse,
+)
+@inject
+async def bulk_cancel_commands(
+    data: BulkCancelCommandRequest,
+    service: FromDishka[ExecutionLifecycleService],
+    _key: str = Security(require_write_scope),
+) -> BulkCancelCommandResponse:
+    """Cancel multiple running command executions."""
+    import asyncio
+
+    audit.info(
+        "api.nodes.bulk_cancel_commands",
+        execution_ids=[str(e) for e in data.execution_ids],
+    )
+
+    async def _cancel_one(execution_id: uuid.UUID) -> BulkCancelCommandResult:
+        try:
+            await service.cancel_execution(
+                CancelExecutionDTO(execution_id=execution_id)
+            )
+            return BulkCancelCommandResult(
+                execution_id=str(execution_id),
+                status="cancelled",
+            )
+        except Exception as exc:
+            return BulkCancelCommandResult(
+                execution_id=str(execution_id),
+                status="error",
+                message=str(exc),
+            )
+
+    results = list(
+        await asyncio.gather(*(_cancel_one(eid) for eid in data.execution_ids))
+    )
+    succeeded = sum(1 for r in results if r.status == "cancelled")
+    return BulkCancelCommandResponse(
+        results=results,
+        total=len(results),
+        succeeded=succeeded,
+        failed=len(results) - succeeded,
     )
 
 
