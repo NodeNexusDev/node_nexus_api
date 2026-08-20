@@ -9,7 +9,12 @@ from typing import TYPE_CHECKING
 
 import structlog
 
-from app.application.dto.docker import BulkDockerNodeResultDTO, BulkDockerResultDTO
+from app.application.dto.docker import (
+    BulkDockerNodeResultDTO,
+    BulkDockerPullResultDTO,
+    BulkDockerPullResultsDTO,
+    BulkDockerResultDTO,
+)
 from app.application.services.docker.command_runner import DockerCommandRunner
 from app.core.docker_validation import validate_container_id
 from app.core.exceptions import DockerError, NodeNotFoundError
@@ -118,6 +123,8 @@ class DockerBulkService:
                 elif action in {"stop", "restart"}:
                     timeout_val = timeout if timeout is not None else 10
                     args = f"{action} -t {timeout_val} {validated_id}"
+                elif action == "remove":
+                    args = f"rm -f {validated_id}"
                 else:
                     raise DockerError(f"Unknown action: {action}")
                 cmd = self._runner.build_command(node, args)
@@ -214,6 +221,86 @@ class DockerBulkService:
             action=action,
             results=tuple(results),
             total=len(results),
+            succeeded=succeeded,
+            failed=failed,
+        )
+
+    async def bulk_pull_image(
+        self,
+        node_ids: list[uuid.UUID],
+        image: str,
+        timeout: int | None = None,
+        node_tags: list[str] | None = None,
+    ) -> BulkDockerPullResultsDTO:
+        resolved_ids = await self._resolve_node_ids(node_ids, list(node_tags or []))
+        prepared, slots = await self._prepare(resolved_ids)
+
+        async def worker(
+            node_id_str: str, node: NodeConnectionDTO
+        ) -> BulkDockerPullResultDTO:
+            try:
+                args = f"pull {image}"
+                cmd = self._runner.build_command(node, args)
+                exec_timeout = timeout if timeout is not None else 300
+                stdout, stderr, exit_code = await self._runner.execute(
+                    node, cmd, exec_timeout
+                )
+                if exit_code != 0 and stderr:
+                    return BulkDockerPullResultDTO(
+                        node_id=node_id_str,
+                        node_name=node.name,
+                        status="error",
+                        error=stderr.strip(),
+                    )
+                return BulkDockerPullResultDTO(
+                    node_id=node_id_str,
+                    node_name=node.name,
+                    status="success",
+                    output=stdout.strip(),
+                )
+            except Exception as exc:
+                return BulkDockerPullResultDTO(
+                    node_id=node_id_str,
+                    node_name="unknown",
+                    status="error",
+                    error=str(exc),
+                )
+
+        remote = list(
+            await asyncio.gather(
+                *(worker(node_id_str, node) for _, node_id_str, node in prepared)
+            )
+        )
+
+        for (index, _, _), result in zip(prepared, remote, strict=True):
+            slots[index] = result
+
+        all_results = [r for r in slots if r is not None]
+        pull_results = [
+            BulkDockerPullResultDTO(
+                node_id=r.node_id,
+                node_name=r.node_name,
+                status=r.status,
+                output=r.output,
+                error=r.error,
+            )
+            for r in all_results
+        ]
+
+        succeeded = sum(1 for r in pull_results if r.status == "success")
+        failed = len(pull_results) - succeeded
+
+        audit.info(
+            "docker.bulk.pull",
+            image=image,
+            total=len(pull_results),
+            succeeded=succeeded,
+            failed=failed,
+        )
+
+        return BulkDockerPullResultsDTO(
+            results=tuple(pull_results),
+            total=len(pull_results),
             succeeded=succeeded,
             failed=failed,
         )

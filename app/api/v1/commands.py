@@ -8,7 +8,10 @@ from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
 from fastapi import APIRouter, Query, Security
 
 from app.api.deps import get_current_api_key, require_write_scope
-from app.application.dto.command_execution import CommandResultDTO
+from app.application.dto.command_execution import (
+    BulkCommandRequestDTO,
+    CommandResultDTO,
+)
 from app.application.dto.command_management import (
     CommandCreateDTO,
     CommandExecuteRequestDTO,
@@ -19,6 +22,8 @@ from app.application.dto.command_management import (
 from app.application.services.command_execution_service import CommandExecutionService
 from app.application.services.command_management_service import CommandManagementService
 from app.application.services.execution_stats_service import ExecutionStatsService
+from app.application.services.node_bulk_command_service import NodeBulkCommandService
+from app.core.template import render_command
 from app.schemas.command import (
     CommandCreate,
     CommandExecuteRequest,
@@ -28,7 +33,12 @@ from app.schemas.command import (
     CommandUpdate,
 )
 from app.schemas.execution_stats import ExecutionStatsResponse
-from app.schemas.node import PaginatedResponse
+from app.schemas.node import (
+    BulkCommandRequest,
+    BulkCommandResult,
+    BulkNodeResult,
+    PaginatedResponse,
+)
 
 audit = structlog.get_logger("audit")
 
@@ -235,3 +245,52 @@ async def clone_command(
     audit.info("api.commands.clone", command_id=str(command_id))
     cloned = await service.clone_command(command_id, new_name=new_name)
     return _command_response(cloned)
+
+
+@router.post("/{command_id}/bulk-execute", response_model=BulkCommandResult)
+@inject
+async def bulk_execute_command(
+    command_id: uuid.UUID,
+    data: BulkCommandRequest,
+    service: FromDishka[CommandManagementService],
+    bulk_service: FromDishka[NodeBulkCommandService],
+    _key: str = Security(require_write_scope),
+) -> BulkCommandResult:
+    """Execute a command template on multiple nodes in parallel."""
+    audit.info(
+        "api.commands.bulk_execute",
+        command_id=str(command_id),
+        node_count=len(data.node_ids),
+        tag_count=len(data.tags),
+    )
+
+    command = await service.get_command(command_id)
+    rendered = render_command(
+        command.command,
+        list(command.parameters or ()),
+        dict(data.params) if data.params else {},
+    )
+
+    result = await bulk_service.execute(
+        BulkCommandRequestDTO(
+            command=rendered,
+            node_ids=tuple(data.node_ids),
+            tags=tuple(data.tags),
+        )
+    )
+    return BulkCommandResult(
+        command=result.command,
+        results=[
+            BulkNodeResult(
+                node_id=item.node_id,
+                node_name=item.node_name,
+                stdout=item.stdout,
+                stderr=item.stderr,
+                exit_code=item.exit_code,
+            )
+            for item in result.results
+        ],
+        total=result.total,
+        succeeded=result.succeeded,
+        failed=result.failed,
+    )

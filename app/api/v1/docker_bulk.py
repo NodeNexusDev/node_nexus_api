@@ -6,7 +6,13 @@ from fastapi import APIRouter, HTTPException, Security
 
 from app.api.deps import require_write_scope
 from app.application.services.docker.bulk_service import DockerBulkService
-from app.schemas.docker import BulkDockerRequest, BulkDockerResponse
+from app.schemas.docker import (
+    BulkDockerPullRequest,
+    BulkDockerPullResponse,
+    BulkDockerPullResult,
+    BulkDockerRequest,
+    BulkDockerResponse,
+)
 
 audit = structlog.get_logger("audit")
 
@@ -85,6 +91,28 @@ async def bulk_restart_containers(
     return _bulk_response(result)
 
 
+@router.post("/bulk/remove", response_model=BulkDockerResponse)
+@inject
+async def bulk_remove_containers(
+    data: BulkDockerRequest,
+    service: FromDishka[DockerBulkService],
+    _key: str = Security(require_write_scope),
+) -> BulkDockerResponse:
+    """Remove containers on multiple nodes."""
+    audit.info(
+        "api.docker.bulk.remove",
+        node_count=len(data.node_ids),
+        node_tag_count=len(data.node_tags),
+    )
+    result = await service.bulk_container_action(
+        node_ids=data.node_ids,
+        container_id=data.container_id,
+        action="remove",
+        node_tags=data.node_tags,
+    )
+    return _bulk_response(result)
+
+
 @router.post("/bulk/exec", response_model=BulkDockerResponse)
 @inject
 async def bulk_exec_in_containers(
@@ -108,3 +136,40 @@ async def bulk_exec_in_containers(
         node_tags=data.node_tags,
     )
     return _bulk_response(result)
+
+
+@router.post("/bulk/pull", response_model=BulkDockerPullResponse)
+@inject
+async def bulk_pull_images(
+    data: BulkDockerPullRequest,
+    service: FromDishka[DockerBulkService],
+    _key: str = Security(require_write_scope),
+) -> BulkDockerPullResponse:
+    """Pull Docker images on multiple nodes."""
+    audit.info(
+        "api.docker.bulk.pull",
+        node_count=len(data.node_ids),
+        node_tag_count=len(data.node_tags),
+        image=data.image,
+    )
+    dto = await service.bulk_pull_image(
+        node_ids=data.node_ids,
+        image=data.image,
+        timeout=data.timeout,
+        node_tags=data.node_tags,
+    )
+    return BulkDockerPullResponse(
+        results=[
+            BulkDockerPullResult(
+                node_id=r.node_id,
+                node_name=r.node_name,
+                status=r.status,
+                output=r.output,
+                error=r.error,
+            )
+            for r in dto.results
+        ],
+        total=dto.total,
+        succeeded=dto.succeeded,
+        failed=dto.failed,
+    )

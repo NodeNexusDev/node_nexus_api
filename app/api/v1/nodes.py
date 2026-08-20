@@ -56,9 +56,15 @@ from app.schemas.node import (
     BulkCommandResult,
     BulkNodeCheckRequest,
     BulkNodeDeleteRequest,
+    BulkNodeMetricsRequest,
+    BulkNodeMetricsResponse,
+    BulkNodeMetricsResult,
     BulkNodeOperationResult,
     BulkNodeResult,
     BulkNodeTagRequest,
+    BulkNodeUpdateRequest,
+    BulkNodeUpdateResponse,
+    BulkNodeUpdateResult,
     CommandHistoryResponse,
     CommandRequest,
     CommandResult,
@@ -448,6 +454,112 @@ async def get_node_metrics(
             fifteen_min=result.load_average.fifteen_min,
         ),
         uptime_since=result.uptime_since,
+    )
+
+
+@router.post("/bulk/metrics", response_model=BulkNodeMetricsResponse)
+@inject
+async def bulk_get_node_metrics(
+    data: BulkNodeMetricsRequest,
+    service: FromDishka[NodeMetricsService],
+    _key: str = Security(get_current_api_key),
+) -> BulkNodeMetricsResponse:
+    """Collect system metrics from multiple nodes in parallel."""
+    import asyncio
+
+    audit.info(
+        "api.nodes.bulk.metrics",
+        node_ids=[str(n) for n in data.node_ids],
+    )
+
+    async def _collect_one(node_id: uuid.UUID) -> BulkNodeMetricsResult:
+        try:
+            result = await service.get_node_metrics(node_id)
+            return BulkNodeMetricsResult(
+                node_id=node_id,
+                node_name="unknown",
+                status="success",
+                metrics=NodeMetrics(
+                    cpu=CpuMetrics(
+                        usage_percent=result.cpu.usage_percent,
+                        cores=result.cpu.cores,
+                    ),
+                    memory=MemoryMetrics(
+                        total_bytes=result.memory.total_bytes,
+                        used_bytes=result.memory.used_bytes,
+                        percent=result.memory.percent,
+                    ),
+                    disk=DiskMetrics(
+                        total_bytes=result.disk.total_bytes,
+                        used_bytes=result.disk.used_bytes,
+                        percent=result.disk.percent,
+                    ),
+                    load_average=LoadAverage(
+                        one_min=result.load_average.one_min,
+                        five_min=result.load_average.five_min,
+                        fifteen_min=result.load_average.fifteen_min,
+                    ),
+                    uptime_since=result.uptime_since,
+                ),
+            )
+        except Exception as exc:
+            return BulkNodeMetricsResult(
+                node_id=node_id,
+                node_name="unknown",
+                status="error",
+                error=str(exc),
+            )
+
+    results = await asyncio.gather(
+        *(_collect_one(node_id) for node_id in data.node_ids),
+    )
+    succeeded = sum(1 for r in results if r.status == "success")
+    return BulkNodeMetricsResponse(
+        results=list(results),
+        total=len(results),
+        succeeded=succeeded,
+        failed=len(results) - succeeded,
+    )
+
+
+@router.put("/bulk/update", response_model=BulkNodeUpdateResponse)
+@inject
+async def bulk_update_nodes(
+    data: BulkNodeUpdateRequest,
+    service: FromDishka[NodeManagementService],
+    _key: str = Security(require_write_scope),
+) -> BulkNodeUpdateResponse:
+    """Update multiple nodes with the same changes."""
+    import asyncio
+
+    audit.info(
+        "api.nodes.bulk_update",
+        node_ids=[str(n) for n in data.node_ids],
+    )
+
+    changes = data.changes.model_dump(exclude_unset=True)
+    if isinstance(changes.get("tags"), list):
+        changes["tags"] = tuple(changes["tags"])
+
+    async def _update_one(node_id: uuid.UUID) -> BulkNodeUpdateResult:
+        try:
+            await service.update_node(
+                node_id,
+                NodeUpdateDTO(changes=tuple(changes.items())),
+            )
+            return BulkNodeUpdateResult(node_id=node_id, status="success")
+        except Exception as exc:
+            return BulkNodeUpdateResult(node_id=node_id, status="error", error=str(exc))
+
+    results = await asyncio.gather(
+        *(_update_one(node_id) for node_id in data.node_ids),
+    )
+    succeeded = sum(1 for r in results if r.status == "success")
+    return BulkNodeUpdateResponse(
+        results=list(results),
+        total=len(results),
+        succeeded=succeeded,
+        failed=len(results) - succeeded,
     )
 
 
