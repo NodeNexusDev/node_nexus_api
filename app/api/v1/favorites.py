@@ -38,6 +38,7 @@ async def list_favorites(
                 id=str(f.id),
                 target_type=f.target_type,
                 target_id=str(f.target_id),
+                name=f.name,
                 note=f.note,
                 created_at=f.created_at,
             )
@@ -61,6 +62,7 @@ async def add_favorite(
         FavoriteCreateDTO(
             target_type=data.target_type,
             target_id=uuid.UUID(data.target_id),
+            name=data.name,
             note=data.note,
         )
     )
@@ -68,6 +70,7 @@ async def add_favorite(
         id=str(result.id),
         target_type=result.target_type,
         target_id=str(result.target_id),
+        name=result.name,
         note=result.note,
         created_at=result.created_at,
     )

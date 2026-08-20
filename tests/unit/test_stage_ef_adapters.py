@@ -77,6 +77,7 @@ class TestFavoriteGateway:
             id=uuid.uuid4(),
             target_type="script",
             target_id=uuid.uuid4(),
+            name=None,
             note=None,
             created_at=datetime.now(UTC),
         )

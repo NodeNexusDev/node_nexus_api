@@ -16,6 +16,7 @@ def _dto(m: FavoriteModel) -> FavoriteDTO:
         id=uuid.UUID(str(m.id)),
         target_type=m.target_type,
         target_id=uuid.UUID(str(m.target_id)),
+        name=m.name,
         note=m.note,
         created_at=m.created_at,
     )
@@ -62,6 +63,7 @@ class SqlAlchemyFavoriteGateway:
             id=uuid.uuid4(),
             target_type=data.target_type,
             target_id=data.target_id,
+            name=data.name,
             note=data.note,
         )
         self._session.add(model)
