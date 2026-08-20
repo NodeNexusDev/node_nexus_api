@@ -4,6 +4,7 @@ from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.application.dto.bulk_node_operation import (
+    BulkNodeCheckResultDTO,
     BulkNodeDeleteDTO,
     BulkNodeOperationResultDTO,
     BulkNodeTagOperationDTO,
@@ -90,4 +91,21 @@ class SqlAlchemyNodeBulkOperator:
         return BulkNodeOperationResultDTO(
             affected=len(affected_ids),
             node_ids=tuple(affected_ids),
+        )
+
+    async def bulk_check(
+        self, node_ids: tuple[str, ...]
+    ) -> BulkNodeCheckResultDTO:
+        """Check which nodes exist by IDs."""
+        if not node_ids:
+            return BulkNodeCheckResultDTO(total=0, succeeded=0, failed=0, node_ids=())
+        async with self._sessionmaker.begin() as session:
+            stmt = select(NodeModel.id).where(NodeModel.id.in_(node_ids))
+            result = await session.execute(stmt)
+            existing_ids = [row[0] for row in result.all()]
+        return BulkNodeCheckResultDTO(
+            total=len(node_ids),
+            succeeded=len(existing_ids),
+            failed=len(node_ids) - len(existing_ids),
+            node_ids=tuple(existing_ids),
         )

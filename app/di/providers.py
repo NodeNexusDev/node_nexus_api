@@ -786,7 +786,7 @@ class ServiceProvider(Provider):
         """Get command execution history query use cases."""
         return CommandHistoryService(reader)
 
-    @provide(scope=Scope.APP)
+    @provide(scope=Scope.REQUEST)
     def get_bulk_command_history_service(
         self,
         reader: CommandHistoryReader,
@@ -825,9 +825,10 @@ class ServiceProvider(Provider):
     def get_node_bulk_operation_service(
         self,
         operator: NodeBulkOperator,
+        audit_service: AuditEventSink,
     ) -> NodeBulkOperationService:
         """Get the bulk node operation service."""
-        return NodeBulkOperationService(operator=operator)
+        return NodeBulkOperationService(operator=operator, audit_service=audit_service)
 
     @provide(scope=Scope.REQUEST)
     def get_execution_lifecycle_service(

@@ -21,3 +21,11 @@ class BulkNodeTagOperationDTO:
 class BulkNodeOperationResultDTO:
     affected: int
     node_ids: tuple[uuid.UUID, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class BulkNodeCheckResultDTO:
+    total: int
+    succeeded: int
+    failed: int
+    node_ids: tuple[uuid.UUID, ...]

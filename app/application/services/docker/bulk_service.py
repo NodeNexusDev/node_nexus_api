@@ -57,7 +57,14 @@ class DockerBulkService:
     async def _resolve_node_ids(
         self, node_ids: list[uuid.UUID], node_tags: list[str]
     ) -> list[uuid.UUID]:
-        """Merge explicit node_ids with tag-resolved ids, deduplicated."""
+        """Merge explicit node_ids with tag-resolved ids, deduplicated.
+
+        Uses union (OR) logic: nodes matching either node_ids OR tags are
+        included. This expands the target set for docker bulk operations.
+
+        For node bulk operations with intersection (AND) logic, see
+        _target_resolver.resolve_targets().
+        """
         if not node_tags:
             return list(node_ids)
         try:
