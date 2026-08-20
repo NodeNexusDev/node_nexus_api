@@ -209,12 +209,21 @@ class DiskMetrics(BaseModel):
     percent: float = Field(ge=0, le=100)
 
 
+class LoadAverage(BaseModel):
+    """System load average over 1, 5, and 15 minutes."""
+
+    one_min: float = Field(ge=0)
+    five_min: float = Field(ge=0)
+    fifteen_min: float = Field(ge=0)
+
+
 class NodeMetrics(BaseModel):
     """System metrics from a node."""
 
     cpu: CpuMetrics
     memory: MemoryMetrics
     disk: DiskMetrics
+    load_average: LoadAverage
     uptime_since: str
 
 

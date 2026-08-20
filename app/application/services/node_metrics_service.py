@@ -17,6 +17,7 @@ if TYPE_CHECKING:
 
 from app.application.dto.node_metrics import (
     CpuMetricsDTO,
+    LoadAverageDTO,
     NodeMetricsDTO,
     UsageMetricsDTO,
 )
@@ -64,6 +65,7 @@ class NodeMetricsService:
                     connector,
                     "df -B1 / | awk 'NR==2 {print $2, $3, $4}'",
                 )
+                load_average = await self._collect_load_average(connector)
                 uptime_stdout, _, _ = await connector.execute_command("uptime -s")
 
             audit.info("node.metrics.collected", node_id=str(node_id))
@@ -79,6 +81,7 @@ class NodeMetricsService:
                     used_bytes=disk_used,
                     percent=round(disk_percent, 2),
                 ),
+                load_average=load_average,
                 uptime_since=uptime_stdout.strip() or "unknown",
             )
         except ConnectionFailedError as exc:
@@ -101,13 +104,46 @@ class NodeMetricsService:
 
     @staticmethod
     async def _collect_cpu(connector: RemoteCommandSession) -> tuple[float, int]:
-        cpu_stdout, _, _ = await connector.execute_command(
-            "top -bn1 | grep 'Cpu(s)' | awk '{print $2}'"
-        )
+        """Collect CPU usage via vmstat (1s average) with top fallback."""
+        cpu_usage = 0.0
+        try:
+            stdout, _, exit_code = await connector.execute_command(
+                "vmstat 1 2 | tail -1 | awk '{print 100 - $NF}'"
+            )
+            if exit_code == 0 and stdout.strip():
+                cpu_usage = float(stdout.strip())
+        except Exception:
+            pass
+        if cpu_usage == 0.0:
+            try:
+                stdout, _, exit_code = await connector.execute_command(
+                    "top -bn2 -d1 | grep 'Cpu(s)' | tail -1 | awk '{print $2}'"
+                )
+                if exit_code == 0 and stdout.strip():
+                    cpu_usage = float(stdout.strip())
+            except Exception:
+                pass
         cores_stdout, _, _ = await connector.execute_command("nproc")
-        cpu_usage = float(cpu_stdout.strip()) if cpu_stdout.strip() else 0.0
         cores = int(cores_stdout.strip()) if cores_stdout.strip() else 1
         return cpu_usage, cores
+
+    @staticmethod
+    async def _collect_load_average(
+        connector: RemoteCommandSession,
+    ) -> LoadAverageDTO:
+        """Collect 1/5/15 min load averages from /proc/loadavg."""
+        stdout, _, exit_code = await connector.execute_command(
+            "cat /proc/loadavg | awk '{print $1, $2, $3}'"
+        )
+        if exit_code == 0:
+            parts = stdout.strip().split()
+            if len(parts) >= 3:
+                return LoadAverageDTO(
+                    one_min=float(parts[0]),
+                    five_min=float(parts[1]),
+                    fifteen_min=float(parts[2]),
+                )
+        return LoadAverageDTO(one_min=0.0, five_min=0.0, fifteen_min=0.0)
 
     @staticmethod
     async def _collect_usage(

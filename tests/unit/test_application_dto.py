@@ -21,6 +21,7 @@ from app.application.dto.node_connection import NodeConnectionDTO
 from app.application.dto.node_management import NodeCreateDTO, NodeUpdateDTO
 from app.application.dto.node_metrics import (
     CpuMetricsDTO,
+    LoadAverageDTO,
     NodeMetricsDTO,
     UsageMetricsDTO,
 )
@@ -131,10 +132,12 @@ def test_node_metrics_dto_is_immutable() -> None:
         cpu=CpuMetricsDTO(usage_percent=25.0, cores=4),
         memory=UsageMetricsDTO(total_bytes=100, used_bytes=50, percent=50.0),
         disk=UsageMetricsDTO(total_bytes=200, used_bytes=100, percent=50.0),
+        load_average=LoadAverageDTO(one_min=0.5, five_min=0.3, fifteen_min=0.1),
         uptime_since="2026-07-29 10:00:00",
     )
 
     assert metrics.cpu.cores == 4
+    assert metrics.load_average.one_min == 0.5
     with pytest.raises(AttributeError):
         metrics.uptime_since = "changed"  # type: ignore[misc]
 

@@ -27,3 +27,10 @@ class ScopedNodeConnectionReader:
     async def get_connections_by_tags(self, tags: list[str]) -> list[NodeConnectionDTO]:
         async with self._sessionmaker() as session:
             return await NodeRepository(session).get_connections_by_tags(tags)
+
+    async def get_connections_by_type(
+        self, connection_type: str
+    ) -> list[NodeConnectionDTO]:
+        async with self._sessionmaker() as session:
+            repo = NodeRepository(session)
+            return await repo.get_connections_by_type(connection_type)
