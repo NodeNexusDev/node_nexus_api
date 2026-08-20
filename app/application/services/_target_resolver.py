@@ -14,7 +14,15 @@ async def resolve_targets(
     node_ids: frozenset | tuple | list | None = None,
     tags: frozenset | tuple | list | None = None,
 ) -> list[NodeConnectionDTO]:
-    """Resolve target nodes from IDs and tags with intersection logic."""
+    """Resolve target nodes from IDs and tags with intersection logic.
+
+    When both node_ids and tags are provided, only nodes matching BOTH
+    criteria are returned (AND/intersection). This ensures precise targeting
+    for node bulk operations.
+
+    For docker bulk operations, see DockerBulkService._resolve_node_ids()
+    which uses union (OR) logic to expand the target set.
+    """
     nodes_by_ids = None
     if node_ids:
         nodes_by_ids = await node_reader.get_connections_by_ids(list(node_ids))

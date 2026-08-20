@@ -295,6 +295,10 @@ class BulkNodeOperationResult(BaseModel):
 
     affected: int
     node_ids: list[uuid.UUID]
+    total: int | None = None
+    succeeded: int | None = None
+    failed: int | None = None
+    errors: list[str] | None = None
 
 
 class ExecutionRetryResponse(BaseModel):

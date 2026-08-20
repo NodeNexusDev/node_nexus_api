@@ -200,7 +200,7 @@ class BulkDockerRequestDTO:
     action: str
     timeout: int | None = None
     command: str | None = None
-    node_tags: tuple[str, ...] = ()
+    tags: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)

@@ -286,6 +286,12 @@ async def get_bulk_command_history(
     size: Annotated[int, Query(ge=1, le=100)] = 20,
 ) -> BulkCommandHistoryResponse:
     """Return paginated command execution history for one bulk batch."""
+    audit.info(
+        "api.nodes.bulk.history",
+        batch_id=str(batch_id),
+        page=page,
+        size=size,
+    )
     result = await service.get_batch_history(batch_id, page=page, size=size)
     return BulkCommandHistoryResponse(
         items=[BulkCommandHistoryItem.model_validate(item) for item in result.items],
@@ -585,27 +591,19 @@ async def bulk_remove_tags(
 @inject
 async def bulk_check_nodes(
     data: BulkNodeCheckRequest,
-    service: FromDishka[NodeCommandService],
+    service: FromDishka[NodeBulkOperationService],
     _key: str = Security(require_write_scope),
 ) -> BulkNodeOperationResult:
     """Check SSH connectivity for multiple nodes."""
-    import asyncio
-
     audit.info(
         "api.nodes.bulk_check",
         node_ids=[str(n) for n in data.node_ids],
     )
-    results = await asyncio.gather(
-        *(service.check_connectivity(node_id) for node_id in data.node_ids),
-        return_exceptions=True,
+    result = await service.bulk_check(
+        node_ids=tuple(str(n) for n in data.node_ids),
     )
-    succeeded_ids = [
-        str(data.node_ids[i])
-        for i, r in enumerate(results)
-        if not isinstance(r, Exception)
-    ]
     return BulkNodeOperationResult(
-        affected=len(succeeded_ids),
+        affected=result.succeeded,
         node_ids=data.node_ids,
     )
 
