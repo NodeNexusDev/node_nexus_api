@@ -11,6 +11,7 @@ from datetime import datetime
 class FavoriteCreateDTO:
     target_type: str
     target_id: uuid.UUID
+    name: str | None = None
     note: str | None = None
 
 
@@ -19,5 +20,6 @@ class FavoriteDTO:
     id: uuid.UUID
     target_type: str
     target_id: uuid.UUID
+    name: str | None
     note: str | None
     created_at: datetime

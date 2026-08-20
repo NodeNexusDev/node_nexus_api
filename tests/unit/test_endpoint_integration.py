@@ -214,6 +214,7 @@ class TestFavoriteEndpoints:
             id=uuid.uuid4(),
             target_type="command",
             target_id=uuid.uuid4(),
+            name=None,
             note=None,
             created_at=datetime.now(UTC),
         )
