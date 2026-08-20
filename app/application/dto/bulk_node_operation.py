@@ -18,11 +18,6 @@ class BulkNodeTagOperationDTO:
 
 
 @dataclass(frozen=True, slots=True)
-class BulkNodeCheckDTO:
-    node_ids: tuple[uuid.UUID, ...]
-
-
-@dataclass(frozen=True, slots=True)
 class BulkNodeOperationResultDTO:
     affected: int
     node_ids: tuple[uuid.UUID, ...]

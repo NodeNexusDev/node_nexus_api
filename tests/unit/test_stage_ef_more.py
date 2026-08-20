@@ -160,15 +160,13 @@ class TestNodeBulkOperator:
 
         from app.application.dto.bulk_node_operation import BulkNodeDeleteDTO
 
-        with patch(
-            "app.adapters.persistence.node_bulk_operator.NodeRepository"
-        ) as mock_repo:
-            repo = mock_repo.return_value
-            repo.delete = AsyncMock(return_value=True)
-            result = await gw.bulk_delete(
-                BulkNodeDeleteDTO(node_ids=(uuid.uuid4(), uuid.uuid4()))
-            )
-            assert result.affected == 2
+        node_id1, node_id2 = uuid.uuid4(), uuid.uuid4()
+        mock_result = MagicMock()
+        mock_result.rowcount = 2
+        session.execute = AsyncMock(return_value=mock_result)
+
+        result = await gw.bulk_delete(BulkNodeDeleteDTO(node_ids=(node_id1, node_id2)))
+        assert result.affected == 2
 
     @pytest.mark.asyncio
     async def test_bulk_add_tags(self) -> None:
@@ -184,18 +182,21 @@ class TestNodeBulkOperator:
         from app.application.dto.bulk_node_operation import BulkNodeTagOperationDTO
 
         node_id = uuid.uuid4()
-        with patch(
-            "app.adapters.persistence.node_bulk_operator.NodeRepository"
-        ) as mock_repo:
-            repo = mock_repo.return_value
-            node = MagicMock()
-            node.tags = ("existing",)
-            repo.get_by_id = AsyncMock(return_value=node)
-            repo.update = AsyncMock()
-            result = await gw.bulk_add_tags(
-                BulkNodeTagOperationDTO(node_ids=(node_id,), tags=("new",))
-            )
-            assert result.affected == 1
+        node = MagicMock()
+        node.tags = ("existing",)
+        node.id = node_id
+
+        mock_select_result = MagicMock()
+        mock_select_result.scalars.return_value.all.return_value = [node]
+        mock_update_result = MagicMock()
+        session.execute = AsyncMock(
+            side_effect=[mock_select_result, mock_update_result]
+        )
+
+        result = await gw.bulk_add_tags(
+            BulkNodeTagOperationDTO(node_ids=(node_id,), tags=("new",))
+        )
+        assert result.affected == 1
 
     @pytest.mark.asyncio
     async def test_bulk_add_tags_already_has(self) -> None:
@@ -211,17 +212,18 @@ class TestNodeBulkOperator:
         from app.application.dto.bulk_node_operation import BulkNodeTagOperationDTO
 
         node_id = uuid.uuid4()
-        with patch(
-            "app.adapters.persistence.node_bulk_operator.NodeRepository"
-        ) as mock_repo:
-            repo = mock_repo.return_value
-            node = MagicMock()
-            node.tags = ("tag1",)
-            repo.get_by_id = AsyncMock(return_value=node)
-            result = await gw.bulk_add_tags(
-                BulkNodeTagOperationDTO(node_ids=(node_id,), tags=("tag1",))
-            )
-            assert result.affected == 0
+        node = MagicMock()
+        node.tags = ("tag1",)
+        node.id = node_id
+
+        mock_select_result = MagicMock()
+        mock_select_result.scalars.return_value.all.return_value = [node]
+        session.execute = AsyncMock(return_value=mock_select_result)
+
+        result = await gw.bulk_add_tags(
+            BulkNodeTagOperationDTO(node_ids=(node_id,), tags=("tag1",))
+        )
+        assert result.affected == 0
 
     @pytest.mark.asyncio
     async def test_bulk_remove_tags(self) -> None:
@@ -237,18 +239,21 @@ class TestNodeBulkOperator:
         from app.application.dto.bulk_node_operation import BulkNodeTagOperationDTO
 
         node_id = uuid.uuid4()
-        with patch(
-            "app.adapters.persistence.node_bulk_operator.NodeRepository"
-        ) as mock_repo:
-            repo = mock_repo.return_value
-            node = MagicMock()
-            node.tags = ("keep", "remove")
-            repo.get_by_id = AsyncMock(return_value=node)
-            repo.update = AsyncMock()
-            result = await gw.bulk_remove_tags(
-                BulkNodeTagOperationDTO(node_ids=(node_id,), tags=("remove",))
-            )
-            assert result.affected == 1
+        node = MagicMock()
+        node.tags = ("keep", "remove")
+        node.id = node_id
+
+        mock_select_result = MagicMock()
+        mock_select_result.scalars.return_value.all.return_value = [node]
+        mock_update_result = MagicMock()
+        session.execute = AsyncMock(
+            side_effect=[mock_select_result, mock_update_result]
+        )
+
+        result = await gw.bulk_remove_tags(
+            BulkNodeTagOperationDTO(node_ids=(node_id,), tags=("remove",))
+        )
+        assert result.affected == 1
 
     @pytest.mark.asyncio
     async def test_bulk_remove_tags_no_change(self) -> None:
@@ -264,17 +269,18 @@ class TestNodeBulkOperator:
         from app.application.dto.bulk_node_operation import BulkNodeTagOperationDTO
 
         node_id = uuid.uuid4()
-        with patch(
-            "app.adapters.persistence.node_bulk_operator.NodeRepository"
-        ) as mock_repo:
-            repo = mock_repo.return_value
-            node = MagicMock()
-            node.tags = ("keep",)
-            repo.get_by_id = AsyncMock(return_value=node)
-            result = await gw.bulk_remove_tags(
-                BulkNodeTagOperationDTO(node_ids=(node_id,), tags=("other",))
-            )
-            assert result.affected == 0
+        node = MagicMock()
+        node.tags = ("keep",)
+        node.id = node_id
+
+        mock_select_result = MagicMock()
+        mock_select_result.scalars.return_value.all.return_value = [node]
+        session.execute = AsyncMock(return_value=mock_select_result)
+
+        result = await gw.bulk_remove_tags(
+            BulkNodeTagOperationDTO(node_ids=(node_id,), tags=("other",))
+        )
+        assert result.affected == 0
 
     @pytest.mark.asyncio
     async def test_bulk_delete_nonexistent(self) -> None:
@@ -289,13 +295,12 @@ class TestNodeBulkOperator:
 
         from app.application.dto.bulk_node_operation import BulkNodeDeleteDTO
 
-        with patch(
-            "app.adapters.persistence.node_bulk_operator.NodeRepository"
-        ) as mock_repo:
-            repo = mock_repo.return_value
-            repo.delete = AsyncMock(return_value=False)
-            result = await gw.bulk_delete(BulkNodeDeleteDTO(node_ids=(uuid.uuid4(),)))
-            assert result.affected == 0
+        mock_result = MagicMock()
+        mock_result.rowcount = 0
+        session.execute = AsyncMock(return_value=mock_result)
+
+        result = await gw.bulk_delete(BulkNodeDeleteDTO(node_ids=(uuid.uuid4(),)))
+        assert result.affected == 0
 
 
 # ─── Dashboard adapter ───

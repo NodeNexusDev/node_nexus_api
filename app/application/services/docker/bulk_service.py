@@ -27,27 +27,27 @@ class DockerBulkService:
         self._runner = runner
 
     async def _prepare(
-        self, node_ids: list[str]
+        self, node_ids: list[uuid.UUID]
     ) -> tuple[
         list[tuple[int, str, NodeConnectionDTO]],
         list[BulkDockerNodeResultDTO | None],
     ]:
         prepared: list[tuple[int, str, NodeConnectionDTO]] = []
         results: list[BulkDockerNodeResultDTO | None] = [None] * len(node_ids)
-        for index, node_id_str in enumerate(node_ids):
+        for index, node_id in enumerate(node_ids):
             try:
-                node = await self._runner.get_target(uuid.UUID(node_id_str))
-                prepared.append((index, node_id_str, node))
+                node = await self._runner.get_target(node_id)
+                prepared.append((index, str(node_id), node))
             except NodeNotFoundError:
                 results[index] = BulkDockerNodeResultDTO(
-                    node_id=node_id_str,
+                    node_id=str(node_id),
                     node_name="unknown",
                     status="error",
                     error="Node not found",
                 )
             except (ValueError, DockerError) as exc:
                 results[index] = BulkDockerNodeResultDTO(
-                    node_id=node_id_str,
+                    node_id=str(node_id),
                     node_name="unknown",
                     status="error",
                     error=str(exc),
@@ -55,25 +55,29 @@ class DockerBulkService:
         return prepared, results
 
     async def _resolve_node_ids(
-        self, node_ids: list[str], node_tags: list[str]
-    ) -> list[str]:
+        self, node_ids: list[uuid.UUID], node_tags: list[str]
+    ) -> list[uuid.UUID]:
         """Merge explicit node_ids with tag-resolved ids, deduplicated."""
         if not node_tags:
             return list(node_ids)
         try:
             tag_nodes = await self._runner.get_targets_by_tags(list(node_tags))
-        except Exception:
+        except Exception as exc:
+            audit.warning(
+                "docker.bulk.resolve_tags.failed",
+                tags=node_tags,
+                error=str(exc),
+                error_type=type(exc).__name__,
+            )
             tag_nodes = []
-        tag_ids = [
-            str(node.id) for node in tag_nodes if node.connection_type == "docker"
-        ]
+        tag_ids = [node.id for node in tag_nodes if node.connection_type == "docker"]
         merged = [*node_ids, *tag_ids]
-        seen: set[str] = set()
-        deduped: list[str] = []
-        for node_id_str in merged:
-            if node_id_str not in seen:
-                seen.add(node_id_str)
-                deduped.append(node_id_str)
+        seen: set[uuid.UUID] = set()
+        deduped: list[uuid.UUID] = []
+        for node_id in merged:
+            if node_id not in seen:
+                seen.add(node_id)
+                deduped.append(node_id)
         return deduped
 
     @staticmethod
@@ -88,7 +92,7 @@ class DockerBulkService:
 
     async def bulk_container_action(
         self,
-        node_ids: list[str],
+        node_ids: list[uuid.UUID],
         container_id: str,
         action: str,
         timeout: int | None = None,
@@ -105,7 +109,8 @@ class DockerBulkService:
                 if action == "start":
                     args = f"start {validated_id}"
                 elif action in {"stop", "restart"}:
-                    args = f"{action} -t {timeout or 10} {validated_id}"
+                    timeout_val = timeout if timeout is not None else 10
+                    args = f"{action} -t {timeout_val} {validated_id}"
                 else:
                     raise DockerError(f"Unknown action: {action}")
                 cmd = self._runner.build_command(node, args)
@@ -141,7 +146,7 @@ class DockerBulkService:
 
     async def bulk_exec(
         self,
-        node_ids: list[str],
+        node_ids: list[uuid.UUID],
         container_id: str,
         command: str,
         timeout: int = 30,

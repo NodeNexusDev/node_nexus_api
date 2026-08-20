@@ -1,6 +1,7 @@
 AGENTS.md
 *.db
 coverage.json
+openapi.json
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

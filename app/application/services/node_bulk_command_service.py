@@ -36,6 +36,8 @@ audit = structlog.get_logger("audit")
 class NodeBulkCommandService:
     """Resolve targets and execute one command concurrently."""
 
+    _DEFAULT_MAX_CONCURRENCY = 50
+
     def __init__(
         self,
         node_reader: NodeConnectionReader,
@@ -43,12 +45,14 @@ class NodeBulkCommandService:
         connector_factory: RemoteConnectorFactory,
         audit_service: AuditEventSink | None = None,
         history_writer: CommandHistoryWriter | None = None,
+        max_concurrency: int = _DEFAULT_MAX_CONCURRENCY,
     ) -> None:
         self._node_reader = node_reader
         self._credential_cipher = credential_cipher
         self._audit = audit_service
         self._connector_factory = connector_factory
         self._history_writer = history_writer
+        self._semaphore = asyncio.Semaphore(max_concurrency)
 
     async def execute(self, data: BulkCommandRequestDTO) -> BulkCommandResultDTO:
         """Execute a command on all matching nodes in parallel."""
@@ -128,43 +132,44 @@ class NodeBulkCommandService:
         command: str,
     ) -> CommandExecutionDTO:
         """Execute on one node and always return a result."""
-        connector = self._connector_factory.create_ssh(
-            host=node.host,
-            port=node.port,
-            username=node.username,
-            password=self._credential_cipher.decrypt(node.password),
-            ssh_key=self._credential_cipher.decrypt(node.ssh_key),
-            passphrase=self._credential_cipher.decrypt(node.passphrase),
-        )
+        async with self._semaphore:
+            connector = self._connector_factory.create_ssh(
+                host=node.host,
+                port=node.port,
+                username=node.username,
+                password=self._credential_cipher.decrypt(node.password),
+                ssh_key=self._credential_cipher.decrypt(node.ssh_key),
+                passphrase=self._credential_cipher.decrypt(node.passphrase),
+            )
 
-        try:
-            async with connector:
-                stdout, stderr, exit_code = await connector.execute_command(command)
-            audit.info("node.bulk.executed", node_id=str(node.id), command=command)
-            return CommandExecutionDTO(
-                node_id=node.id,
-                node_name=node.name,
-                stdout=stdout,
-                stderr=stderr,
-                exit_code=exit_code,
-            )
-        except ConnectionFailedError as exc:
-            audit.error(
-                "node.bulk.execute.failed",
-                node_id=str(node.id),
-                command=command,
-                error=str(exc),
-            )
-            return self._error_result(node, exc)
-        except Exception as exc:
-            audit.error(
-                "node.bulk.execute.unexpected_error",
-                node_id=str(node.id),
-                command=command,
-                error_type=type(exc).__name__,
-                error=str(exc),
-            )
-            return self._error_result(node, exc)
+            try:
+                async with connector:
+                    stdout, stderr, exit_code = await connector.execute_command(command)
+                audit.info("node.bulk.executed", node_id=str(node.id), command=command)
+                return CommandExecutionDTO(
+                    node_id=node.id,
+                    node_name=node.name,
+                    stdout=stdout,
+                    stderr=stderr,
+                    exit_code=exit_code,
+                )
+            except ConnectionFailedError as exc:
+                audit.error(
+                    "node.bulk.execute.failed",
+                    node_id=str(node.id),
+                    command=command,
+                    error=str(exc),
+                )
+                return self._error_result(node, exc)
+            except Exception as exc:
+                audit.error(
+                    "node.bulk.execute.unexpected_error",
+                    node_id=str(node.id),
+                    command=command,
+                    error_type=type(exc).__name__,
+                    error=str(exc),
+                )
+                return self._error_result(node, exc)
 
     @staticmethod
     def _error_result(node: NodeConnectionDTO, exc: Exception) -> CommandExecutionDTO:
@@ -188,7 +193,8 @@ class NodeBulkCommandService:
         if self._history_writer is None:
             return
         fingerprint = command_fingerprint(command)
-        for result in results:
+
+        async def _save_single(result: CommandExecutionDTO) -> None:
             bounded = bound_output(result.stdout)
             stderr_bounded = bound_output(result.stderr)
             await self._history_writer.save(
@@ -206,3 +212,5 @@ class NodeBulkCommandService:
                     finished_at=finished_at,
                 )
             )
+
+        await asyncio.gather(*(_save_single(result) for result in results))
