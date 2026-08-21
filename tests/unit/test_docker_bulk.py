@@ -10,10 +10,21 @@ from fastapi import FastAPI
 from httpx2 import ASGITransport, AsyncClient
 
 from app.api.v1.docker_bulk import router as docker_bulk_router
+from app.application.dto.docker import (
+    BulkDockerNodeResultDTO,
+    BulkDockerPullResultDTO,
+    BulkDockerPullResultsDTO,
+    BulkDockerResultDTO,
+)
 from app.application.services.docker.bulk_service import DockerBulkService
 from app.schemas.docker import BulkDockerNodeResult, BulkDockerResponse
 from tests.docker_test_facade import DockerService
 from tests.unit.conftest import MockAuthServiceProvider, _mock_settings
+
+_settings_patcher = patch(
+    "app.api.deps.get_settings",
+    return_value=_mock_settings("test-master"),
+)
 
 
 def _create_test_app(service: DockerService | AsyncMock) -> FastAPI:
@@ -626,3 +637,135 @@ class TestBulkServiceExecErrors:
         )
         assert result.failed == 1
         assert "connection lost" in result.results[0].error
+
+
+# ── Docker Bulk API endpoints ──
+
+NODE_ID = "00000000-0000-0000-0000-000000000001"
+
+
+class TestBulkRemoveContainers:
+    @pytest.mark.asyncio
+    async def test_bulk_remove_success(self, client: AsyncClient) -> None:
+        mock_service = AsyncMock(spec=DockerService)
+        mock_service.bulk_container_action.return_value = BulkDockerResultDTO(
+            action="remove",
+            results=(
+                BulkDockerNodeResultDTO(
+                    node_id=NODE_ID, node_name="s1", status="success"
+                ),
+            ),
+            total=1,
+            succeeded=1,
+            failed=0,
+        )
+        app = _create_test_app(mock_service)
+        with _settings_patcher:
+            async with AsyncClient(
+                transport=ASGITransport(app=app),
+                base_url="http://test",
+                headers={"X-API-Key": "test-master"},
+            ) as ac:
+                resp = await ac.post(
+                    "/api/v1/docker/bulk/remove",
+                    json={"node_ids": [NODE_ID], "container_id": "nginx"},
+                )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["action"] == "remove"
+        assert data["succeeded"] == 1
+
+
+class TestBulkPullImages:
+    @pytest.mark.asyncio
+    async def test_bulk_pull_success(self) -> None:
+        mock_service = AsyncMock()
+        mock_service.bulk_pull_image.return_value = BulkDockerPullResultsDTO(
+            results=(
+                BulkDockerPullResultDTO(
+                    node_id=NODE_ID, node_name="s1", status="success", output="ok"
+                ),
+            ),
+            total=1,
+            succeeded=1,
+            failed=0,
+        )
+        app = _create_test_app(mock_service)
+        with _settings_patcher:
+            async with AsyncClient(
+                transport=ASGITransport(app=app),
+                base_url="http://test",
+                headers={"X-API-Key": "test-master"},
+            ) as ac:
+                resp = await ac.post(
+                    "/api/v1/docker/bulk/pull",
+                    json={"node_ids": [NODE_ID], "image": "nginx:latest"},
+                )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["total"] == 1
+        assert data["succeeded"] == 1
+
+
+class TestBulkRemoveImages:
+    @pytest.mark.asyncio
+    async def test_bulk_remove_image_success(self) -> None:
+        mock_service = AsyncMock()
+        mock_service.bulk_image_remove.return_value = BulkDockerPullResultsDTO(
+            results=(
+                BulkDockerPullResultDTO(
+                    node_id=NODE_ID, node_name="s1", status="success"
+                ),
+            ),
+            total=1,
+            succeeded=1,
+            failed=0,
+        )
+        app = _create_test_app(mock_service)
+        with _settings_patcher:
+            async with AsyncClient(
+                transport=ASGITransport(app=app),
+                base_url="http://test",
+                headers={"X-API-Key": "test-master"},
+            ) as ac:
+                resp = await ac.post(
+                    "/api/v1/docker/bulk/images/remove",
+                    json={"node_ids": [NODE_ID], "image_id": "nginx:latest"},
+                )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["succeeded"] == 1
+
+
+class TestBulkBuildImages:
+    @pytest.mark.asyncio
+    async def test_bulk_build_image_success(self) -> None:
+        mock_service = AsyncMock()
+        mock_service.bulk_image_build.return_value = BulkDockerPullResultsDTO(
+            results=(
+                BulkDockerPullResultDTO(
+                    node_id=NODE_ID, node_name="s1", status="success"
+                ),
+            ),
+            total=1,
+            succeeded=1,
+            failed=0,
+        )
+        app = _create_test_app(mock_service)
+        with _settings_patcher:
+            async with AsyncClient(
+                transport=ASGITransport(app=app),
+                base_url="http://test",
+                headers={"X-API-Key": "test-master"},
+            ) as ac:
+                resp = await ac.post(
+                    "/api/v1/docker/bulk/images/build",
+                    json={
+                        "node_ids": [NODE_ID],
+                        "dockerfile": "FROM ubuntu",
+                        "tag": "myapp:latest",
+                    },
+                )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["succeeded"] == 1
