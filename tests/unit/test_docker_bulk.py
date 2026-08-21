@@ -67,7 +67,10 @@ class TestBulkStartContainers:
 
         resp = await client.post(
             "/api/v1/docker/bulk/start",
-            json={"node_ids": ["00000000-0000-0000-0000-000000000001"], "container_id": "nginx"},
+            json={
+                "node_ids": ["00000000-0000-0000-0000-000000000001"],
+                "container_id": "nginx",
+            },
         )
         assert resp.status_code == 200
         data = resp.json()
@@ -100,7 +103,13 @@ class TestBulkStartContainers:
 
         resp = await client.post(
             "/api/v1/docker/bulk/start",
-            json={"node_ids": ["00000000-0000-0000-0000-000000000001", "00000000-0000-0000-0000-000000000002"], "container_id": "nginx"},
+            json={
+                "node_ids": [
+                    "00000000-0000-0000-0000-000000000001",
+                    "00000000-0000-0000-0000-000000000002",
+                ],
+                "container_id": "nginx",
+            },
         )
         assert resp.status_code == 200
         data = resp.json()
@@ -127,7 +136,11 @@ class TestBulkStopContainers:
 
         resp = await client.post(
             "/api/v1/docker/bulk/stop",
-            json={"node_ids": ["00000000-0000-0000-0000-000000000001"], "container_id": "nginx", "timeout": 5},
+            json={
+                "node_ids": ["00000000-0000-0000-0000-000000000001"],
+                "container_id": "nginx",
+                "timeout": 5,
+            },
         )
         assert resp.status_code == 200
         data = resp.json()
@@ -153,7 +166,10 @@ class TestBulkRestartContainers:
 
         resp = await client.post(
             "/api/v1/docker/bulk/restart",
-            json={"node_ids": ["00000000-0000-0000-0000-000000000001"], "container_id": "nginx"},
+            json={
+                "node_ids": ["00000000-0000-0000-0000-000000000001"],
+                "container_id": "nginx",
+            },
         )
         assert resp.status_code == 200
         data = resp.json()
@@ -195,7 +211,10 @@ class TestBulkExecInContainers:
     ) -> None:
         resp = await client.post(
             "/api/v1/docker/bulk/exec",
-            json={"node_ids": ["00000000-0000-0000-0000-000000000001"], "container_id": "nginx"},
+            json={
+                "node_ids": ["00000000-0000-0000-0000-000000000001"],
+                "container_id": "nginx",
+            },
         )
         assert resp.status_code == 422
 
@@ -208,7 +227,9 @@ class TestBulkByTags:
             action="start",
             results=[
                 BulkDockerNodeResult(
-                    node_id="00000000-0000-0000-0000-000000000001", node_name="server1", status="success"
+                    node_id="00000000-0000-0000-0000-000000000001",
+                    node_name="server1",
+                    status="success",
                 )
             ],
             total=1,
@@ -289,7 +310,10 @@ class TestBulkDockerSchemas:
         from app.schemas.docker import BulkDockerRequest
 
         req = BulkDockerRequest(
-            node_ids=[uuid.UUID("00000000-0000-0000-0000-000000000001"), uuid.UUID("00000000-0000-0000-0000-000000000002")],
+            node_ids=[
+                uuid.UUID("00000000-0000-0000-0000-000000000001"),
+                uuid.UUID("00000000-0000-0000-0000-000000000002"),
+            ],
             container_id="abc123def456",
         )
         assert len(req.node_ids) == 2
