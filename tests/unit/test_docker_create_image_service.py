@@ -496,7 +496,11 @@ class TestBulkByTags:
         runner.get_targets_by_tags = AsyncMock(return_value=[])
         service = DockerBulkService(runner)
         resolved = await service._resolve_node_ids(
-            [uuid.UUID("00000000-0000-0000-0000-000000000001"), uuid.UUID("00000000-0000-0000-0000-000000000002")], []
+            [
+                uuid.UUID("00000000-0000-0000-0000-000000000001"),
+                uuid.UUID("00000000-0000-0000-0000-000000000002"),
+            ],
+            [],
         )
         assert resolved == [
             uuid.UUID("00000000-0000-0000-0000-000000000001"),
