@@ -190,14 +190,15 @@ class NodeBulkCommandService:
         finished_at: datetime,
     ) -> None:
         """Persist each node execution result as a history record."""
-        if self._history_writer is None:
+        writer = self._history_writer
+        if writer is None:
             return
         fingerprint = command_fingerprint(command)
 
         async def _save_single(result: CommandExecutionDTO) -> None:
             bounded = bound_output(result.stdout)
             stderr_bounded = bound_output(result.stderr)
-            await self._history_writer.save(
+            await writer.save(
                 CommandHistoryCreateDTO(
                     node_id=result.node_id,
                     command_fingerprint=fingerprint,

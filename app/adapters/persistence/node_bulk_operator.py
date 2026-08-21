@@ -23,7 +23,7 @@ class SqlAlchemyNodeBulkOperator:
         async with self._sessionmaker.begin() as session:
             stmt = delete(NodeModel).where(NodeModel.id.in_(data.node_ids))
             result = await session.execute(stmt)
-            deleted_ids = list(data.node_ids[: result.rowcount])
+            deleted_ids = list(data.node_ids[: result.rowcount or 0])  # ty: ignore[unresolved-attribute]
         return BulkNodeOperationResultDTO(
             affected=len(deleted_ids),
             node_ids=tuple(deleted_ids),
@@ -47,7 +47,7 @@ class SqlAlchemyNodeBulkOperator:
                         existing.append(tag)
                         changed = True
                 if changed:
-                    node.tags = tuple(existing)
+                    node.tags = list(existing)
                     affected_ids.append(node.id)
 
             if affected_ids:
@@ -77,7 +77,7 @@ class SqlAlchemyNodeBulkOperator:
                 existing = list(node.tags) if node.tags else []
                 new_tags = [t for t in existing if t not in data.tags]
                 if len(new_tags) != len(existing):
-                    node.tags = tuple(new_tags)
+                    node.tags = list(new_tags)
                     affected_ids.append(node.id)
 
             if affected_ids:
