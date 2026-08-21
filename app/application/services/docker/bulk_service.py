@@ -409,7 +409,9 @@ class DockerBulkService:
 
                 cache_flag = " --no-cache" if no_cache else ""
                 args = f"build{cache_flag}{build_args_str} -t {tag} -"
-                cmd = self._runner.build_command(node, args)
+                base_cmd = self._runner.build_command(node, args)
+                quoted_stdin = shlex.quote(dockerfile)
+                cmd = f"printf %s {quoted_stdin} | {base_cmd}"
                 exec_timeout = timeout if timeout is not None else 300
                 stdout, stderr, exit_code = await self._runner.execute(
                     node, cmd, exec_timeout

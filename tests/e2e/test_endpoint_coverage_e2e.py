@@ -51,6 +51,11 @@ COVERED_ENDPOINTS: set[str] = {
     "POST /api/v1/nodes/bulk/tags/remove",
     "POST /api/v1/nodes/bulk/check",
     "POST /api/v1/nodes/{node_id}/commands/{execution_id}/retry",
+    "POST /api/v1/nodes/bulk/metrics",
+    "PUT /api/v1/nodes/bulk/update",
+    "POST /api/v1/nodes/bulk/validate-credentials",
+    "POST /api/v1/nodes/bulk/retry",
+    "POST /api/v1/nodes/bulk/cancel",
     # Commands
     "GET /api/v1/commands/",
     "GET /api/v1/commands/tags",
@@ -59,6 +64,7 @@ COVERED_ENDPOINTS: set[str] = {
     "PUT /api/v1/commands/{command_id}",
     "DELETE /api/v1/commands/{command_id}",
     "POST /api/v1/commands/{command_id}/execute",
+    "POST /api/v1/commands/{command_id}/bulk-execute",
     # Scripts
     "GET /api/v1/scripts/",
     "GET /api/v1/scripts/tags",
@@ -73,6 +79,8 @@ COVERED_ENDPOINTS: set[str] = {
     "DELETE /api/v1/scripts/{script_id}/schedule",
     "POST /api/v1/scripts/executions/{execution_id}/retry",
     "POST /api/v1/scripts/executions/{execution_id}/cancel",
+    "POST /api/v1/scripts/bulk/retry",
+    "POST /api/v1/scripts/bulk/cancel",
     "GET /api/v1/scripts/{script_id}/schedule/history",
     # API Keys
     "GET /api/v1/api-keys/",
@@ -113,6 +121,10 @@ COVERED_ENDPOINTS: set[str] = {
     "POST /api/v1/docker/bulk/stop",
     "POST /api/v1/docker/bulk/restart",
     "POST /api/v1/docker/bulk/exec",
+    "POST /api/v1/docker/bulk/remove",
+    "POST /api/v1/docker/bulk/pull",
+    "POST /api/v1/docker/bulk/images/remove",
+    "POST /api/v1/docker/bulk/images/build",
     # Favorites (Stage F)
     "GET /api/v1/favorites",
     "POST /api/v1/favorites",
@@ -146,42 +158,6 @@ EXCLUDED_ENDPOINTS: dict[str, str] = {
     "GET /api/v1/events/stream": (
         "SSE streaming endpoint — TestClient blocks indefinitely on "
         "streaming responses; covered by unit test for _event_generator."
-    ),
-    "POST /api/v1/nodes/bulk/metrics": (
-        "Bulk metrics requires live SSH nodes; covered by unit tests."
-    ),
-    "PUT /api/v1/nodes/bulk/update": (
-        "Bulk update requires live SSH nodes; covered by unit tests."
-    ),
-    "POST /api/v1/nodes/bulk/validate-credentials": (
-        "Bulk validate requires live SSH nodes; covered by unit tests."
-    ),
-    "POST /api/v1/nodes/bulk/retry": (
-        "Bulk retry requires prior command executions; covered by unit tests."
-    ),
-    "POST /api/v1/nodes/bulk/cancel": (
-        "Bulk cancel requires running executions; covered by unit tests."
-    ),
-    "POST /api/v1/commands/{command_id}/bulk-execute": (
-        "Bulk execute requires command + live nodes; covered by unit tests."
-    ),
-    "POST /api/v1/scripts/bulk/retry": (
-        "Bulk retry requires prior script executions; covered by unit tests."
-    ),
-    "POST /api/v1/scripts/bulk/cancel": (
-        "Bulk cancel requires running script executions; covered by unit tests."
-    ),
-    "POST /api/v1/docker/bulk/remove": (
-        "Bulk remove requires running containers; covered by unit tests."
-    ),
-    "POST /api/v1/docker/bulk/pull": (
-        "Bulk pull requires Docker nodes; covered by unit tests."
-    ),
-    "POST /api/v1/docker/bulk/images/remove": (
-        "Bulk image remove requires Docker nodes; covered by unit tests."
-    ),
-    "POST /api/v1/docker/bulk/images/build": (
-        "Bulk image build requires Docker nodes; covered by unit tests."
     ),
 }
 
