@@ -24,6 +24,7 @@ from app.adapters.security import HmacSha256APIKeyHasher
 from app.api.error_mapping import domain_error_handler
 from app.api.v1.health import router as health_router
 from app.api.v1.nodes import router as nodes_router
+from app.api.v1.nodes_bulk import router as nodes_bulk_router
 from app.application.services.api_key_authentication import APIKeyAuthenticationService
 from app.application.services.bulk_command_history_service import (
     BulkCommandHistoryService,
@@ -126,6 +127,7 @@ async def integration_client(
     app = FastAPI()
     app.add_exception_handler(DomainError, domain_error_handler)
     app.include_router(health_router)
+    app.include_router(nodes_bulk_router, prefix="/api/v1")
     app.include_router(nodes_router, prefix="/api/v1")
     setup_dishka(container, app)
 
