@@ -13,6 +13,7 @@ from fastapi import FastAPI
 from httpx2 import ASGITransport, AsyncClient
 
 from app.api.v1.nodes import router as nodes_router
+from app.api.v1.nodes_bulk import router as nodes_bulk_router
 from app.application.dto.command_history import (
     CommandHistoryDTO,
     CommandHistoryPageDTO,
@@ -51,6 +52,7 @@ def _create_test_app(
     service: AsyncMock, bulk_service: AsyncMock | None = None
 ) -> FastAPI:
     app = FastAPI()
+    app.include_router(nodes_bulk_router, prefix="/api/v1")
     app.include_router(nodes_router, prefix="/api/v1")
 
     class MockServiceProvider(Provider):

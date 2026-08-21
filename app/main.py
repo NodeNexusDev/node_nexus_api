@@ -37,6 +37,7 @@ from app.api.v1.favorites import router as favorites_router
 from app.api.v1.health import router as health_router
 from app.api.v1.internal import router as internal_router
 from app.api.v1.nodes import router as nodes_router
+from app.api.v1.nodes_bulk import router as nodes_bulk_router
 from app.api.v1.notes import router as notes_router
 from app.api.v1.scripts import router as scripts_router
 from app.api.v1.search import router as search_router
@@ -190,6 +191,7 @@ def create_app() -> FastAPI:
 
     setup_dishka(container, app)
     app.include_router(health_router)
+    app.include_router(nodes_bulk_router, prefix="/api/v1")
     app.include_router(nodes_router, prefix="/api/v1")
     app.include_router(commands_router, prefix="/api/v1")
     app.include_router(scripts_router, prefix="/api/v1")

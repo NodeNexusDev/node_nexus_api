@@ -10,6 +10,7 @@ from fastapi import FastAPI
 from httpx2 import ASGITransport, AsyncClient
 
 from app.api.v1.nodes import router as nodes_router
+from app.api.v1.nodes_bulk import router as nodes_bulk_router
 from app.application.dto.bulk_node_operation import (
     BulkNodeCheckResultDTO,
     BulkNodeOperationResultDTO,
@@ -44,6 +45,7 @@ from tests.unit.conftest import MockAuthServiceProvider, _mock_settings
 
 def _create_nodes_app(**services: AsyncMock) -> FastAPI:
     app = FastAPI()
+    app.include_router(nodes_bulk_router, prefix="/api/v1")
     app.include_router(nodes_router, prefix="/api/v1")
 
     class MockServiceProvider(Provider):
