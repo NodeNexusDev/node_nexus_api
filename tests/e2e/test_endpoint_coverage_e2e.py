@@ -147,6 +147,42 @@ EXCLUDED_ENDPOINTS: dict[str, str] = {
         "SSE streaming endpoint — TestClient blocks indefinitely on "
         "streaming responses; covered by unit test for _event_generator."
     ),
+    "POST /api/v1/nodes/bulk/metrics": (
+        "Bulk metrics requires live SSH nodes; covered by unit tests."
+    ),
+    "PUT /api/v1/nodes/bulk/update": (
+        "Bulk update requires live SSH nodes; covered by unit tests."
+    ),
+    "POST /api/v1/nodes/bulk/validate-credentials": (
+        "Bulk validate requires live SSH nodes; covered by unit tests."
+    ),
+    "POST /api/v1/nodes/bulk/retry": (
+        "Bulk retry requires prior command executions; covered by unit tests."
+    ),
+    "POST /api/v1/nodes/bulk/cancel": (
+        "Bulk cancel requires running executions; covered by unit tests."
+    ),
+    "POST /api/v1/commands/{command_id}/bulk-execute": (
+        "Bulk execute requires command + live nodes; covered by unit tests."
+    ),
+    "POST /api/v1/scripts/bulk/retry": (
+        "Bulk retry requires prior script executions; covered by unit tests."
+    ),
+    "POST /api/v1/scripts/bulk/cancel": (
+        "Bulk cancel requires running script executions; covered by unit tests."
+    ),
+    "POST /api/v1/docker/bulk/remove": (
+        "Bulk remove requires running containers; covered by unit tests."
+    ),
+    "POST /api/v1/docker/bulk/pull": (
+        "Bulk pull requires Docker nodes; covered by unit tests."
+    ),
+    "POST /api/v1/docker/bulk/images/remove": (
+        "Bulk image remove requires Docker nodes; covered by unit tests."
+    ),
+    "POST /api/v1/docker/bulk/images/build": (
+        "Bulk image build requires Docker nodes; covered by unit tests."
+    ),
 }
 
 # WebSocket routes (not in OpenAPI, tracked separately).
