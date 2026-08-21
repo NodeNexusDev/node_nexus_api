@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import csv
 import io
-from typing import Protocol
+from typing import Any, Protocol
 
 from app.application.dto.export import AuditExportQueryDTO, AuditExportRowDTO
 
@@ -34,7 +34,7 @@ def rows_to_csv(rows: list[AuditExportRowDTO]) -> str:
     return buf.getvalue()
 
 
-def rows_to_json(rows: list[AuditExportRowDTO]) -> list[dict]:
+def rows_to_json(rows: list[AuditExportRowDTO]) -> list[dict[str, Any]]:
     return [
         {
             "id": r.id,

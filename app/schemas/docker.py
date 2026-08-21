@@ -1,6 +1,7 @@
 """Docker schemas for API."""
 
 import uuid
+from typing import Any
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -55,7 +56,9 @@ class DockerContainerInspect(BaseModel):
     name: str = Field(alias="Name")
     state: DockerContainerState = Field(alias="State")
     config: DockerContainerConfig = Field(alias="Config")
-    network_settings: dict | None = Field(default=None, alias="NetworkSettings")
+    network_settings: dict[str, Any] | None = Field(
+        default=None, alias="NetworkSettings"
+    )
 
     model_config = {"populate_by_name": True}
 

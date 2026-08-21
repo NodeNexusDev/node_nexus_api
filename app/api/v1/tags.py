@@ -1,5 +1,7 @@
 """Tag management endpoints."""
 
+from typing import Any
+
 import structlog
 from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
 from fastapi import APIRouter, Body, Security
@@ -19,7 +21,7 @@ async def rename_tag(
     new_name: str = Body(..., embed=True),
     service: FromDishka[TagManagementService] = None,  # ty: ignore[invalid-parameter-default]
     _key: str = Security(require_write_scope),
-) -> dict:
+) -> dict[str, Any]:
     audit.info("api.tags.rename", old=tag_name, new=new_name)
     affected = await service.rename_tag(tag_name, new_name)
     return {
@@ -35,7 +37,7 @@ async def delete_tag(
     tag_name: str,
     service: FromDishka[TagManagementService] = None,  # ty: ignore[invalid-parameter-default]
     _key: str = Security(require_write_scope),
-) -> dict:
+) -> dict[str, Any]:
     audit.info("api.tags.delete", tag=tag_name)
     affected = await service.delete_tag(tag_name)
     return {

@@ -135,12 +135,14 @@ async def exec_stream(
     if not await _validate_ws_token(websocket, token, api_key_service):
         return
 
+    active_task: asyncio.Task[None] | None = None
+    streaming_session = None
+
     try:
         try:
             connection = streaming_service.connect(node_id)
             async with connection as streaming_session:
                 audit.info("ws.exec.connected", node_id=str(node_id))
-                active_task: asyncio.Task[None] | None = None
                 while True:
                     try:
                         data = await websocket.receive_json()
@@ -234,15 +236,16 @@ async def exec_stream(
             )
             return
         finally:
-            if "active_task" in locals() and active_task is not None:
+            if active_task is not None:
                 if not active_task.done():
-                    try:
-                        await streaming_session.abort_active_process()
-                    except (OSError, RuntimeError):
-                        logger.debug(
-                            "ws.exec.disconnect_signal_failed",
-                            node_id=str(node_id),
-                        )
+                    if streaming_session is not None:
+                        try:
+                            await streaming_session.abort_active_process()
+                        except (OSError, RuntimeError):
+                            logger.debug(
+                                "ws.exec.disconnect_signal_failed",
+                                node_id=str(node_id),
+                            )
                 active_task.cancel()
                 await asyncio.gather(active_task, return_exceptions=True)
             audit.info("ws.exec.disconnected", node_id=str(node_id))

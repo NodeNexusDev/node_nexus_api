@@ -147,4 +147,4 @@ class SqlAlchemyDashboardGateway:
     @staticmethod
     async def _scalar(session: AsyncSession, stmt: Executable) -> int:
         result = await session.execute(stmt)
-        return result.scalar_one()
+        return int(result.scalar_one())

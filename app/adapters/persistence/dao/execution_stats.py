@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
+from typing import Any
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-_DEFAULT_STATS: dict = {
+_DEFAULT_STATS: dict[str, Any] = {
     "total": 0,
     "successful": 0,
     "failed": 0,
@@ -27,8 +28,8 @@ class ExecutionStatsRepository:
         node_id: uuid.UUID | None = None,
         date_from: datetime | None = None,
         date_to: datetime | None = None,
-    ) -> dict:
-        params: dict = {}
+    ) -> dict[str, Any]:
+        params: dict[str, Any] = {}
         where_clauses: list[str] = []
         if command_id is not None:
             where_clauses.append("ce.command_id = :command_id")
@@ -66,8 +67,8 @@ class ExecutionStatsRepository:
         node_id: uuid.UUID | None = None,
         date_from: datetime | None = None,
         date_to: datetime | None = None,
-    ) -> dict:
-        params: dict = {}
+    ) -> dict[str, Any]:
+        params: dict[str, Any] = {}
         where_clauses: list[str] = []
         if script_id is not None:
             where_clauses.append("se.script_id = :script_id")

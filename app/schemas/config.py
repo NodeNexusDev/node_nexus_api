@@ -2,6 +2,7 @@
 
 from datetime import datetime
 from importlib.metadata import PackageNotFoundError, version
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -33,7 +34,7 @@ class CommandExport(BaseModel):
     name: str
     description: str | None = None
     command: str
-    parameters: list[dict] | None = None
+    parameters: list[dict[str, Any]] | None = None
     tags: list[str] = Field(default_factory=list)
 
 
@@ -42,7 +43,7 @@ class ScriptExport(BaseModel):
 
     name: str
     description: str | None = None
-    steps: list[dict] = Field(default_factory=list)
+    steps: list[dict[str, Any]] = Field(default_factory=list)
     tags: list[str] = Field(default_factory=list)
 
 

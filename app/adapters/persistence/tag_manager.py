@@ -24,7 +24,7 @@ class SqlAlchemyTagManager:
                 )
             )
             result = await self._session.execute(stmt_rm, {"old_name": old_name})
-            total += result.rowcount  # ty: ignore[unresolved-attribute]
+            total += int(result.rowcount)  # ty: ignore[unresolved-attribute]
             stmt_add = (
                 update(model)
                 .where(text("NOT (:new_name = ANY(tags))"))
@@ -47,6 +47,6 @@ class SqlAlchemyTagManager:
                 )
             )
             result = await self._session.execute(stmt, {"del_tag": tag_name})
-            total += result.rowcount  # ty: ignore[unresolved-attribute]
+            total += int(result.rowcount)  # ty: ignore[unresolved-attribute]
         await self._session.flush()
         return total

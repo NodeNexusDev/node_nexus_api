@@ -2,6 +2,7 @@
 
 import uuid
 from datetime import datetime
+from typing import Any
 
 import structlog
 from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
@@ -392,7 +393,7 @@ async def unschedule_script(
     script_id: uuid.UUID,
     schedule_service: FromDishka[ScheduleManagementService],
     _key: str = Security(require_write_scope),
-) -> dict:
+) -> dict[str, Any]:
     """Remove a scheduled script."""
     audit.info("api.scripts.unschedule", script_id=str(script_id))
     await schedule_service.delete(script_id)
@@ -420,7 +421,7 @@ async def retry_script(
     execution_id: uuid.UUID,
     service: FromDishka[ExecutionLifecycleService],
     _key: str = Security(require_write_scope),
-) -> dict:
+) -> dict[str, Any]:
     """Retry a script execution."""
     audit.info("api.scripts.executions.retry", execution_id=str(execution_id))
     result = await service.retry_script(RetryScriptDTO(execution_id=execution_id))
@@ -437,7 +438,7 @@ async def cancel_script(
     execution_id: uuid.UUID,
     service: FromDishka[ExecutionLifecycleService],
     _key: str = Security(require_write_scope),
-) -> dict:
+) -> dict[str, Any]:
     """Cancel a running script execution."""
     audit.info("api.scripts.executions.cancel", execution_id=str(execution_id))
     await service.cancel_execution(CancelExecutionDTO(execution_id=execution_id))
@@ -451,10 +452,10 @@ async def cancel_script(
 @router.post("/bulk/retry")
 @inject
 async def bulk_retry_scripts(
-    data: dict,
+    data: dict[str, Any],
     service: FromDishka[ExecutionLifecycleService],
     _key: str = Security(require_write_scope),
-) -> dict:
+) -> dict[str, Any]:
     """Retry multiple script executions."""
     import asyncio
 
@@ -467,7 +468,7 @@ async def bulk_retry_scripts(
         execution_ids=[str(e) for e in execution_ids],
     )
 
-    async def _retry_one(execution_id: uuid.UUID) -> dict:
+    async def _retry_one(execution_id: uuid.UUID) -> dict[str, Any]:
         try:
             result = await service.retry_script(
                 RetryScriptDTO(execution_id=execution_id)
@@ -497,10 +498,10 @@ async def bulk_retry_scripts(
 @router.post("/bulk/cancel")
 @inject
 async def bulk_cancel_scripts(
-    data: dict,
+    data: dict[str, Any],
     service: FromDishka[ExecutionLifecycleService],
     _key: str = Security(require_write_scope),
-) -> dict:
+) -> dict[str, Any]:
     """Cancel multiple running script executions."""
     import asyncio
 
@@ -513,7 +514,7 @@ async def bulk_cancel_scripts(
         execution_ids=[str(e) for e in execution_ids],
     )
 
-    async def _cancel_one(execution_id: uuid.UUID) -> dict:
+    async def _cancel_one(execution_id: uuid.UUID) -> dict[str, Any]:
         try:
             await service.cancel_execution(
                 CancelExecutionDTO(execution_id=execution_id)

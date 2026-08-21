@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -27,7 +29,7 @@ class DashboardMetricsRepository:
         query: MetricsQueryDTO,
     ) -> list[MetricsBucketDTO]:
         grp = _GROUP_MAP[query.group_by]
-        params: dict = {"grp": grp}
+        params: dict[str, Any] = {"grp": grp}
         where_clauses: list[str] = []
         if query.date_from is not None:
             where_clauses.append("ce.started_at >= :date_from")
@@ -67,7 +69,7 @@ class DashboardMetricsRepository:
         query: MetricsQueryDTO,
     ) -> list[MetricsBucketDTO]:
         grp = _GROUP_MAP[query.group_by]
-        params: dict = {"grp": grp}
+        params: dict[str, Any] = {"grp": grp}
         where_clauses: list[str] = []
         if query.date_from is not None:
             where_clauses.append("se.started_at >= :date_from")

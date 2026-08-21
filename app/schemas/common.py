@@ -3,7 +3,7 @@
 import base64
 import json
 from datetime import UTC, datetime
-from typing import TypeVar
+from typing import Any, TypeVar
 from uuid import UUID
 
 from pydantic import BaseModel
@@ -14,7 +14,7 @@ T = TypeVar("T")
 class CursorPage(BaseModel):
     """Cursor-based paginated response."""
 
-    items: list
+    items: list[Any]
     next_cursor: str | None = None
     has_more: bool = False
     limit: int = 20

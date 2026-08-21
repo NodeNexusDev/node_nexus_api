@@ -1,5 +1,7 @@
 """Short-scope SQLAlchemy adapter for bulk node operations."""
 
+import uuid
+
 from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -38,7 +40,7 @@ class SqlAlchemyNodeBulkOperator:
             result = await session.execute(stmt)
             nodes = list(result.scalars().all())
 
-            affected_ids: list = []
+            affected_ids: list[uuid.UUID] = []
             for node in nodes:
                 existing = list(node.tags) if node.tags else []
                 changed = False
@@ -72,7 +74,7 @@ class SqlAlchemyNodeBulkOperator:
             result = await session.execute(stmt)
             nodes = list(result.scalars().all())
 
-            affected_ids: list = []
+            affected_ids: list[uuid.UUID] = []
             for node in nodes:
                 existing = list(node.tags) if node.tags else []
                 new_tags = [t for t in existing if t not in data.tags]
