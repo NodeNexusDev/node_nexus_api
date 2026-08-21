@@ -2,7 +2,7 @@
 
 import uuid
 from datetime import datetime
-from typing import Literal, TypeVar
+from typing import Any, Literal, TypeVar
 
 import structlog
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -114,6 +114,7 @@ class BulkCommandRequest(BaseModel):
     command: str = Field(min_length=1, max_length=4096)
     node_ids: list[uuid.UUID] | None = Field(default=None, min_length=1)
     tags: list[str] | None = Field(default=None, min_length=1)
+    params: dict[str, Any] | None = Field(default=None)
 
     @model_validator(mode="after")
     def check_targets(self) -> "BulkCommandRequest":

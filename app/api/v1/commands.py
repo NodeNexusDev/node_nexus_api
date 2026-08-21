@@ -260,22 +260,22 @@ async def bulk_execute_command(
     audit.info(
         "api.commands.bulk_execute",
         command_id=str(command_id),
-        node_count=len(data.node_ids),
-        tag_count=len(data.tags),
+        node_count=len(data.node_ids or []),
+        tag_count=len(data.tags or []),
     )
 
     command = await service.get_command(command_id)
     rendered = render_command(
         command.command,
-        list(command.parameters or ()),
-        dict(data.params) if data.params else {},
+        [p.__dict__ for p in command.parameters] if command.parameters else [],
+        data.params or {},
     )
 
     result = await bulk_service.execute(
         BulkCommandRequestDTO(
             command=rendered,
-            node_ids=tuple(data.node_ids),
-            tags=tuple(data.tags),
+            node_ids=tuple(data.node_ids or ()),
+            tags=tuple(data.tags or ()),
         )
     )
     return BulkCommandResult(

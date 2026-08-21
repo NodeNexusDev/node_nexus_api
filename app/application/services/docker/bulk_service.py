@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import shlex
 import uuid
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import structlog
 
@@ -35,10 +35,10 @@ class DockerBulkService:
         self, node_ids: list[uuid.UUID]
     ) -> tuple[
         list[tuple[int, str, NodeConnectionDTO]],
-        list[BulkDockerNodeResultDTO | None],
+        list[Any],
     ]:
         prepared: list[tuple[int, str, NodeConnectionDTO]] = []
-        results: list[BulkDockerNodeResultDTO | None] = [None] * len(node_ids)
+        results: list[Any] = [None] * len(node_ids)
         for index, node_id in enumerate(node_ids):
             try:
                 node = await self._runner.get_target(node_id)
