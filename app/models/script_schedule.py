@@ -2,6 +2,7 @@
 
 import uuid
 from datetime import datetime
+from typing import Any
 
 from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Index, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
@@ -25,7 +26,7 @@ class ScriptScheduleModel(Base):
     cron: Mapped[str] = mapped_column(String(60), nullable=False)
     timezone: Mapped[str] = mapped_column(String(100), default="UTC")
     node_ids: Mapped[list[str]] = mapped_column(JSON, default=list)
-    params: Mapped[dict] = mapped_column(JSON, default=dict)
+    params: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     misfire_grace_seconds: Mapped[int] = mapped_column(Integer, default=60)
     operational_state: Mapped[str] = mapped_column(String(50), default="registered")

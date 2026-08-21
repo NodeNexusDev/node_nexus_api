@@ -6,7 +6,7 @@ import asyncio
 import time
 from collections.abc import Awaitable, Callable
 from datetime import datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from zoneinfo import ZoneInfo
 
 import structlog
@@ -36,7 +36,9 @@ if TYPE_CHECKING:
 
 logger = structlog.get_logger()
 
-ScheduledScriptExecutor = Callable[["UUID", list["UUID"], dict], Awaitable[None]]
+ScheduledScriptExecutor = Callable[
+    ["UUID", list["UUID"], dict[str, Any]], Awaitable[None]
+]
 ScheduleReconciler = Callable[[], Awaitable[tuple[int, int]]]
 _SCHEDULER_LOCK_ID = 5_642_395_847_322_111
 _DEFAULT_OWNERSHIP_POLL_SECONDS = 5.0
@@ -235,7 +237,7 @@ class ApschedulerRuntime:
         node_ids: list[UUID],
         callback: object = None,
         *,
-        params: dict | None = None,
+        params: dict[str, Any] | None = None,
         timezone: str = "UTC",
         misfire_grace_seconds: int = 60,
         schedule_id: UUID | None = None,
@@ -277,7 +279,10 @@ class ApschedulerRuntime:
         return job_id
 
     async def _execute_scheduled_script(
-        self, script_id: UUID, node_ids: list[UUID], params: dict | None = None
+        self,
+        script_id: UUID,
+        node_ids: list[UUID],
+        params: dict[str, Any] | None = None,
     ) -> None:
         """Execute a job through the callback configured by the composition root."""
         if not self._owns_execution:
@@ -320,7 +325,7 @@ class ApschedulerRuntime:
             logger.info("scheduler.script.unscheduled", script_id=str(script_id))
         return found
 
-    def get_schedule(self, script_id: UUID) -> dict | None:
+    def get_schedule(self, script_id: UUID) -> dict[str, Any] | None:
         """Get schedule info for a script."""
         job_id = str(script_id)
         job = self._scheduler.get_job(job_id)
@@ -339,7 +344,7 @@ class ApschedulerRuntime:
         value = getattr(job, "next_run_time", None) if job else None
         return value if isinstance(value, datetime) else None
 
-    def list_schedules(self) -> list[dict]:
+    def list_schedules(self) -> list[dict[str, Any]]:
         """List all scheduled jobs."""
         jobs = []
         for job in self._scheduler.get_jobs():

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from app.application.dto.node_connection import NodeConnectionDTO
@@ -11,8 +11,8 @@ if TYPE_CHECKING:
 
 async def resolve_targets(
     node_reader: NodeConnectionReader,
-    node_ids: frozenset | tuple | list | None = None,
-    tags: frozenset | tuple | list | None = None,
+    node_ids: frozenset[Any] | tuple[Any, ...] | list[Any] | None = None,
+    tags: frozenset[Any] | tuple[Any, ...] | list[Any] | None = None,
 ) -> list[NodeConnectionDTO]:
     """Resolve target nodes from IDs and tags with intersection logic.
 

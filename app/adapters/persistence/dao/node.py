@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from sqlalchemy import Select
+    from sqlalchemy.sql import Select
 from uuid import UUID
 
 from sqlalchemy import and_, func, or_, select
@@ -83,7 +83,7 @@ class NodeRepository:
     async def count(self) -> int:
         """Count total nodes."""
         result = await self._session.execute(select(func.count(NodeModel.id)))
-        return result.scalar_one()
+        return int(result.scalar_one())
 
     async def get_by_tags(
         self, tags: list[str], skip: int = 0, limit: int = 100
@@ -121,10 +121,10 @@ class NodeRepository:
 
     def _apply_filters(
         self,
-        query: "Select",
+        query: "Select[Any]",
         tags: list[str] | None = None,
         search: str | None = None,
-    ) -> "Select":
+    ) -> "Select[Any]":
         """Apply tag and search filters to a query.
 
         Tag filtering uses PostgreSQL @> operator — not testable with SQLite.
@@ -174,7 +174,7 @@ class NodeRepository:
             select(func.count(NodeModel.id)), tags=tags, search=search
         )
         result = await self._session.execute(query)
-        return result.scalar_one()
+        return int(result.scalar_one())
 
     async def get_list_cursor(
         self,

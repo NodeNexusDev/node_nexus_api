@@ -5,6 +5,7 @@ from uuid import UUID
 
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.sql import Select
 
 from app.adapters.persistence.dao.base import escape_ilike
 from app.models.command import CommandModel
@@ -24,10 +25,10 @@ class CommandRepository:
 
     def _apply_filters(
         self,
-        query,
+        query: Select[Any],
         tags: list[str] | None = None,
         search: str | None = None,
-    ):
+    ) -> Select[Any]:
         if tags:
             for tag in tags:
                 query = query.where(CommandModel.tags.op("@>")([tag]))
@@ -61,7 +62,7 @@ class CommandRepository:
             select(func.count(CommandModel.id)), tags=tags, search=search
         )
         result = await self._session.execute(query)
-        return result.scalar_one()
+        return int(result.scalar_one())
 
     async def get_all_tags(self) -> list[str]:
         """Get all unique tags across all commands.

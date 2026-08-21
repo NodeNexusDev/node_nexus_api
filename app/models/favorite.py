@@ -1,5 +1,6 @@
 """Favorite entity model."""
 
+import uuid
 from datetime import datetime
 
 from sqlalchemy import DateTime, Index, String, Text, func
@@ -15,9 +16,9 @@ class FavoriteModel(Base):
     __tablename__ = "favorites"
     __table_args__ = (Index("ix_favorites_target", "target_type", "target_id"),)
 
-    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True)
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True)
     target_type: Mapped[str] = mapped_column(String(20), nullable=False)
-    target_id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    target_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(

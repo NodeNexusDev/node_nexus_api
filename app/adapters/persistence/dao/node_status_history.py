@@ -1,5 +1,6 @@
 """Internal SQLAlchemy DAO for node status history."""
 
+from typing import Any
 from uuid import UUID
 
 from sqlalchemy import func, select
@@ -14,7 +15,7 @@ class NodeStatusHistoryRepository:
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
 
-    async def create(self, data: dict) -> NodeStatusHistoryModel:
+    async def create(self, data: dict[str, Any]) -> NodeStatusHistoryModel:
         """Create a new status change record."""
         record = NodeStatusHistoryModel(**data)
         self._session.add(record)

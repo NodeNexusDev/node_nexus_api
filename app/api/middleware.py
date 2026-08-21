@@ -5,6 +5,7 @@ import json
 import time
 import uuid
 from collections import defaultdict
+from typing import override
 
 import structlog
 from fastapi import Request, Response
@@ -18,6 +19,7 @@ logger = structlog.get_logger()
 class RequestIdMiddleware(BaseHTTPMiddleware):
     """Assign or propagate a request id and expose it on the response."""
 
+    @override
     async def dispatch(
         self, request: Request, call_next: RequestResponseEndpoint
     ) -> Response:
@@ -41,6 +43,7 @@ class ApiVersionMiddleware(BaseHTTPMiddleware):
         super().__init__(app)
         self._supported_versions = set(supported_versions or ["1"])
 
+    @override
     async def dispatch(
         self, request: Request, call_next: RequestResponseEndpoint
     ) -> Response:
@@ -64,6 +67,7 @@ class ApiVersionMiddleware(BaseHTTPMiddleware):
 class RequestLoggingMiddleware(BaseHTTPMiddleware):
     """Log every HTTP request with request_id, method, path, status, duration."""
 
+    @override
     async def dispatch(
         self, request: Request, call_next: RequestResponseEndpoint
     ) -> Response:
@@ -111,6 +115,7 @@ class TimeoutMiddleware(BaseHTTPMiddleware):
         super().__init__(app)
         self._timeout = timeout
 
+    @override
     async def dispatch(
         self, request: Request, call_next: RequestResponseEndpoint
     ) -> Response:
@@ -163,6 +168,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         cutoff = now - self._window
         self._ip_counts[ip] = [ts for ts in self._ip_counts[ip] if ts > cutoff]
 
+    @override
     async def dispatch(
         self, request: Request, call_next: RequestResponseEndpoint
     ) -> Response:

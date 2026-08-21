@@ -177,7 +177,7 @@ class SSHConnector:
         try:
             async with self._connection.create_process(command) as process:
                 async for line in process.stdout:
-                    yield line
+                    yield str(line)
                 # Wait for process to finish
                 await process.wait()
                 exit_code = process.exit_status or 0
