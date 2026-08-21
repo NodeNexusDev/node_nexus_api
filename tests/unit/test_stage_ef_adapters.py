@@ -565,8 +565,26 @@ class TestAuditExportGateway:
         assert isinstance(result[0], AuditExportRowDTO)
         assert result[0].action == "node.create"
 
+    @pytest.mark.asyncio
+    async def test_export_audit_with_filters(self) -> None:
+        session = AsyncMock()
+        gw = SqlAlchemyAuditExporter(session)
+        mock_result = MagicMock()
+        mock_result.scalars.return_value.all.return_value = []
+        session.execute.return_value = mock_result
 
-# ─── Dashboard metrics DAO ───
+        from datetime import UTC, datetime
+
+        result = await gw.export_audit(
+            AuditExportQueryDTO(
+                date_from=datetime(2025, 1, 1, tzinfo=UTC),
+                date_to=datetime(2025, 12, 31, tzinfo=UTC),
+                action="node.create",
+                node_id=uuid.uuid4(),
+            )
+        )
+        assert isinstance(result, list)
+        assert session.execute.called
 
 
 class TestDashboardMetricsDAO:

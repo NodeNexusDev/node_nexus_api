@@ -111,7 +111,29 @@ async def test_lists_filtered_audit_logs() -> None:
     assert page.items[0].id == model.id
 
 
-async def test_lists_unfiltered_empty_audit_logs() -> None:
+async def test_lists_audit_logs_with_all_filters() -> None:
+    model = _log()
+    count_result = MagicMock()
+    count_result.scalar_one.return_value = 1
+    rows = MagicMock()
+    rows.scalars.return_value = [model]
+    session = AsyncMock()
+    session.execute.side_effect = [count_result, rows]
+    gateway = SqlAlchemyAuditLogGateway(_Sessionmaker(session))  # type: ignore[arg-type]
+
+    page = await gateway.list_logs(
+        AuditLogQueryDTO(
+            node_id=model.node_id,
+            action="execute",
+            user="admin",
+            date_from=datetime(2025, 1, 1, tzinfo=UTC),
+            date_to=datetime(2025, 12, 31, tzinfo=UTC),
+            offset=0,
+            limit=20,
+        )
+    )
+
+    assert page.total == 1
     count_result = MagicMock()
     count_result.scalar_one.return_value = 0
     rows = MagicMock()
