@@ -7,11 +7,13 @@ from uuid import UUID
 
 import structlog
 
-from app.application.command_policy import command_fingerprint
 from app.application.dto.command_execution import CommandResultDTO
-from app.application.dto.command_history import CommandHistoryCreateDTO
 from app.application.dto.command_management import CommandExecuteRequestDTO
-from app.application.policies.output import bound_output
+from app.application.services.ssh_executor import (
+    build_ssh_connector,
+    execute_ssh,
+    save_history,
+)
 from app.application.types import JsonObject
 from app.core.exceptions import (
     CommandNotFoundError,
@@ -74,55 +76,40 @@ class CommandExecutionService:
         node = await self._node_reader.get_connection(data.node_id)
         if node is None:
             raise NodeNotFoundError(f"Node {data.node_id} not found")
-        connector = self._connector_factory.create_ssh(
-            host=node.host,
-            port=node.port,
-            username=node.username,
-            password=self._credential_cipher.decrypt(node.password),
-            ssh_key=self._credential_cipher.decrypt(node.ssh_key),
-            passphrase=self._credential_cipher.decrypt(node.passphrase),
+
+        connector = build_ssh_connector(
+            node, self._credential_cipher, self._connector_factory
         )
 
         try:
-            from datetime import UTC, datetime
-
-            started_at = datetime.now(UTC)
-            async with connector:
-                stdout, stderr, exit_code = await connector.execute_command(rendered)
-            finished_at = datetime.now(UTC)
-            bounded_stdout = bound_output(stdout)
-            bounded_stderr = bound_output(stderr)
+            result = await execute_ssh(connector, rendered)
             audit.info(
                 "command.executed",
                 command_id=str(command_id),
                 node_id=str(data.node_id),
-                exit_code=exit_code,
+                exit_code=result.exit_code,
             )
             await self._log(
                 "execute",
                 data.node_id,
-                {"command_id": str(command_id), "exit_code": exit_code},
+                {"command_id": str(command_id), "exit_code": result.exit_code},
             )
             if self._history_writer is not None:
-                await self._history_writer.save(
-                    CommandHistoryCreateDTO(
-                        node_id=data.node_id,
-                        command_id=command_id,
-                        command_fingerprint=command_fingerprint(rendered),
-                        exit_code=exit_code,
-                        stdout=bounded_stdout.value,
-                        stderr=bounded_stderr.value,
-                        stdout_bytes=bounded_stdout.original_bytes,
-                        stderr_bytes=bounded_stderr.original_bytes,
-                        truncated=bounded_stdout.truncated or bounded_stderr.truncated,
-                        started_at=started_at,
-                        finished_at=finished_at,
-                    )
+                await save_history(
+                    self._history_writer,
+                    node_id=data.node_id,
+                    command=rendered,
+                    exit_code=result.exit_code,
+                    stdout=result.stdout,
+                    stderr=result.stderr,
+                    started_at=result.started_at,
+                    finished_at=result.finished_at,
+                    command_id=command_id,
                 )
             return CommandResultDTO(
-                stdout=stdout,
-                stderr=stderr,
-                exit_code=exit_code,
+                stdout=result.stdout,
+                stderr=result.stderr,
+                exit_code=result.exit_code,
             )
         except Exception as exc:
             audit.error(
