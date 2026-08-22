@@ -13,7 +13,7 @@ class NodeStats(BaseModel):
     unreachable: int
 
 
-class DockerStats(BaseModel):
+class DashboardDockerStats(BaseModel):
     """Aggregated Docker container statistics."""
 
     total: int
@@ -42,7 +42,7 @@ class DashboardResponse(BaseModel):
     """Full dashboard overview response."""
 
     nodes: NodeStats
-    docker: DockerStats
+    docker: DashboardDockerStats
     scripts: EntityStats
     commands: EntityStats
     recent_activity: list[RecentActivity]

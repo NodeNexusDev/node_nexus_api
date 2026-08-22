@@ -2,24 +2,14 @@
 
 import uuid
 from datetime import datetime
-from typing import Any, Literal, TypeVar
+from typing import Any, Literal, Self
 
-import structlog
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-T = TypeVar("T")
+from app.schemas.common import PaginatedResponse
 
 ConnectionType = Literal["ssh", "docker", "proxmox"]
 NodeStatus = Literal["active", "unreachable", "error"]
-
-
-class PaginatedResponse[T](BaseModel):
-    """Paginated response with total count."""
-
-    items: list[T]
-    total: int
-    page: int
-    size: int
 
 
 class NodeCreate(BaseModel):
@@ -37,13 +27,7 @@ class NodeCreate(BaseModel):
     tags: list[str] = Field(default_factory=list)
 
     @model_validator(mode="after")
-    def check_docker_host(self) -> "NodeCreate":
-        if self.connection_type == "docker" and not self.docker_host:
-            structlog.get_logger("validation").warning(
-                "docker_host_not_set",
-                connection_type=self.connection_type,
-                host=self.host,
-            )
+    def check_docker_host(self) -> Self:
         return self
 
 
@@ -96,26 +80,6 @@ class CommandExecuteRawRequest(BaseModel):
     timeout: int | None = Field(default=None, ge=1, le=600)
 
 
-class CommandResult(BaseModel):
-    """Schema for command execution result."""
-
-    stdout: str
-    stderr: str
-    exit_code: int
-
-
-class TagAdd(BaseModel):
-    """Schema for adding a tag to a node."""
-
-    tag: str = Field(min_length=1, max_length=100)
-
-
-class TagRemove(BaseModel):
-    """Schema for removing a tag from a node."""
-
-    tag: str = Field(min_length=1, max_length=100)
-
-
 class BulkCommandRequest(BaseModel):
     """Request to execute a command on multiple nodes."""
 
@@ -125,7 +89,7 @@ class BulkCommandRequest(BaseModel):
     params: dict[str, Any] | None = Field(default=None)
 
     @model_validator(mode="after")
-    def check_targets(self) -> "BulkCommandRequest":
+    def check_targets(self) -> Self:
         if not self.node_ids and not self.tags:
             raise ValueError("At least one of node_ids or tags must be provided")
         return self
@@ -321,7 +285,7 @@ class BulkNodeMetricsResult(BaseModel):
 
     node_id: uuid.UUID
     node_name: str
-    status: str  # "success" or "error"
+    status: Literal["success", "error"]
     metrics: NodeMetrics | None = None
     error: str = ""
 
@@ -346,7 +310,7 @@ class BulkNodeUpdateResult(BaseModel):
     """Result of updating a single node."""
 
     node_id: uuid.UUID
-    status: str  # "success" or "error"
+    status: Literal["success", "error"]
     error: str = ""
 
 
@@ -382,7 +346,7 @@ class BulkValidateCredentialsResult(BaseModel):
 
     node_id: uuid.UUID
     node_name: str
-    status: str  # "success" or "error"
+    status: Literal["success", "error"]
     message: str = ""
 
 
@@ -408,7 +372,7 @@ class BulkRetryCommandResult(BaseModel):
     """Result of retrying a single command execution."""
 
     execution_id: str
-    status: str  # "retry_scheduled" or "error"
+    status: Literal["retry_scheduled", "error"]
     message: str = ""
 
 
@@ -431,7 +395,7 @@ class BulkCancelCommandResult(BaseModel):
     """Result of cancelling a single command execution."""
 
     execution_id: str
-    status: str  # "cancelled" or "error"
+    status: Literal["cancelled", "error"]
     message: str = ""
 
 
