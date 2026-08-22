@@ -2,6 +2,7 @@
 
 import uuid
 from dataclasses import dataclass
+from typing import Literal
 from uuid import UUID
 
 
@@ -207,7 +208,7 @@ class BulkDockerRequestDTO:
 class BulkDockerNodeResultDTO:
     node_id: str
     node_name: str
-    status: str
+    status: Literal["success", "error"]
     output: str = ""
     error: str = ""
 
@@ -225,7 +226,7 @@ class BulkDockerResultDTO:
 class BulkDockerPullResultDTO:
     node_id: str
     node_name: str
-    status: str
+    status: Literal["success", "error"]
     output: str = ""
     error: str = ""
 

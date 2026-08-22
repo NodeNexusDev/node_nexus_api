@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
+from typing import Literal
 
 
 @dataclass(frozen=True, slots=True)
@@ -35,5 +36,5 @@ class BulkNodeCheckResultDTO:
 class BulkValidateCredentialsResultDTO:
     node_id: uuid.UUID
     node_name: str
-    status: str
+    status: Literal["success", "error"]
     message: str = ""
