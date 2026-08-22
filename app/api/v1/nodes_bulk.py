@@ -2,26 +2,17 @@
 
 import asyncio
 import uuid
-from typing import Annotated
 
 import structlog
 from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
-from fastapi import APIRouter, Query, Security
+from fastapi import APIRouter, Security
 
 from app.api.deps import get_current_api_key, require_write_scope
 from app.application.dto.bulk_node_operation import (
     BulkNodeDeleteDTO,
     BulkNodeTagOperationDTO,
 )
-from app.application.dto.command_execution import BulkCommandRequestDTO
-from app.application.dto.execution_lifecycle import CancelExecutionDTO, RetryCommandDTO
 from app.application.dto.node_management import NodeUpdateDTO
-from app.application.services.bulk_command_history_service import (
-    BulkCommandHistoryService,
-)
-from app.application.services.execution_lifecycle_service import (
-    ExecutionLifecycleService,
-)
 from app.application.services.node_bulk_command_service import NodeBulkCommandService
 from app.application.services.node_bulk_operation_service import (
     NodeBulkOperationService,
@@ -29,27 +20,16 @@ from app.application.services.node_bulk_operation_service import (
 from app.application.services.node_management_service import NodeManagementService
 from app.application.services.node_metrics_service import NodeMetricsService
 from app.schemas.node import (
-    BulkCancelCommandRequest,
-    BulkCancelCommandResponse,
-    BulkCancelCommandResult,
-    BulkCommandHistoryItem,
-    BulkCommandHistoryResponse,
-    BulkCommandRequest,
-    BulkCommandResult,
     BulkNodeCheckRequest,
     BulkNodeDeleteRequest,
     BulkNodeMetricsRequest,
     BulkNodeMetricsResponse,
     BulkNodeMetricsResult,
     BulkNodeOperationResult,
-    BulkNodeResult,
     BulkNodeTagRequest,
     BulkNodeUpdateRequest,
     BulkNodeUpdateResponse,
     BulkNodeUpdateResult,
-    BulkRetryCommandRequest,
-    BulkRetryCommandResponse,
-    BulkRetryCommandResult,
     BulkValidateCredentialsRequest,
     BulkValidateCredentialsResponse,
     BulkValidateCredentialsResult,
@@ -63,70 +43,6 @@ from app.schemas.node import (
 audit = structlog.get_logger("audit")
 
 router = APIRouter(prefix="/nodes", tags=["nodes", "bulk"], route_class=DishkaRoute)
-
-
-@router.post("/bulk/execute", response_model=BulkCommandResult)
-@inject
-async def bulk_execute_command(
-    data: BulkCommandRequest,
-    service: FromDishka[NodeBulkCommandService],
-    _key: str = Security(require_write_scope),
-) -> BulkCommandResult:
-    """Execute a command on multiple nodes by IDs and/or tags."""
-    audit.info(
-        "api.nodes.bulk_execute",
-        command=data.command,
-        node_ids=[str(n) for n in (data.node_ids or [])],
-        tags=data.tags,
-    )
-    result = await service.bulk_execute_command(
-        BulkCommandRequestDTO(
-            command=data.command,
-            node_ids=tuple(data.node_ids or ()),
-            tags=tuple(data.tags or ()),
-        )
-    )
-    return BulkCommandResult(
-        command=result.command,
-        results=[
-            BulkNodeResult(
-                node_id=item.node_id,
-                node_name=item.node_name,
-                stdout=item.stdout,
-                stderr=item.stderr,
-                exit_code=item.exit_code,
-            )
-            for item in result.results
-        ],
-        total=result.total,
-        succeeded=result.succeeded,
-        failed=result.failed,
-    )
-
-
-@router.get("/bulk/history", response_model=BulkCommandHistoryResponse)
-@inject
-async def get_bulk_command_history(
-    batch_id: Annotated[uuid.UUID, Query(description="Batch ID to retrieve")],
-    service: FromDishka[BulkCommandHistoryService],
-    _key: str = Security(get_current_api_key),
-    page: Annotated[int, Query(ge=1)] = 1,
-    size: Annotated[int, Query(ge=1, le=100)] = 20,
-) -> BulkCommandHistoryResponse:
-    """Return paginated command execution history for one bulk batch."""
-    audit.info(
-        "api.nodes.bulk.history",
-        batch_id=str(batch_id),
-        page=page,
-        size=size,
-    )
-    result = await service.get_batch_history(batch_id, page=page, size=size)
-    return BulkCommandHistoryResponse(
-        items=[BulkCommandHistoryItem.model_validate(item) for item in result.items],
-        total=result.total,
-        page=page,
-        size=size,
-    )
 
 
 @router.post("/bulk/metrics", response_model=BulkNodeMetricsResponse)
@@ -375,117 +291,6 @@ async def bulk_validate_credentials(
     results = list(await asyncio.gather(*(_validate_one(node) for node in nodes)))
     succeeded = sum(1 for r in results if r.status == "success")
     return BulkValidateCredentialsResponse(
-        results=results,
-        total=len(results),
-        succeeded=succeeded,
-        failed=len(results) - succeeded,
-    )
-
-
-@router.post(
-    "/bulk/retry",
-    response_model=BulkRetryCommandResponse,
-)
-@inject
-async def bulk_retry_commands(
-    data: BulkRetryCommandRequest,
-    service: FromDishka[ExecutionLifecycleService],
-    _key: str = Security(require_write_scope),
-) -> BulkRetryCommandResponse:
-    """Retry multiple command executions."""
-    audit.info(
-        "api.nodes.bulk_retry_commands",
-        execution_ids=[str(e) for e in data.execution_ids],
-    )
-
-    async def _retry_one(execution_id: uuid.UUID) -> BulkRetryCommandResult:
-        try:
-            reader = service._command_history_reader
-            if reader is None:
-                return BulkRetryCommandResult(
-                    execution_id=str(execution_id),
-                    status="error",
-                    message="Command history reader not available",
-                )
-            execution = await reader.get_by_id(execution_id)
-            if execution is None:
-                return BulkRetryCommandResult(
-                    execution_id=str(execution_id),
-                    status="error",
-                    message="Execution not found",
-                )
-            if execution.node_id is None:
-                return BulkRetryCommandResult(
-                    execution_id=str(execution_id),
-                    status="error",
-                    message="No node_id associated with execution",
-                )
-            await service.retry_command(
-                RetryCommandDTO(
-                    execution_id=execution_id,
-                    node_id=execution.node_id,
-                )
-            )
-            return BulkRetryCommandResult(
-                execution_id=str(execution_id),
-                status="retry_scheduled",
-            )
-        except Exception as exc:
-            return BulkRetryCommandResult(
-                execution_id=str(execution_id),
-                status="error",
-                message=str(exc),
-            )
-
-    results = list(
-        await asyncio.gather(*(_retry_one(eid) for eid in data.execution_ids))
-    )
-    succeeded = sum(1 for r in results if r.status == "retry_scheduled")
-    return BulkRetryCommandResponse(
-        results=results,
-        total=len(results),
-        succeeded=succeeded,
-        failed=len(results) - succeeded,
-    )
-
-
-@router.post(
-    "/bulk/cancel",
-    response_model=BulkCancelCommandResponse,
-)
-@inject
-async def bulk_cancel_commands(
-    data: BulkCancelCommandRequest,
-    service: FromDishka[ExecutionLifecycleService],
-    _key: str = Security(require_write_scope),
-) -> BulkCancelCommandResponse:
-    """Cancel multiple running command executions."""
-    audit.info(
-        "api.nodes.bulk_cancel_commands",
-        execution_ids=[str(e) for e in data.execution_ids],
-    )
-
-    async def _cancel_one(execution_id: uuid.UUID) -> BulkCancelCommandResult:
-        try:
-            await service.cancel_execution(
-                CancelExecutionDTO(execution_id=execution_id)
-            )
-            return BulkCancelCommandResult(
-                execution_id=str(execution_id),
-                status="cancelled",
-            )
-        except Exception as exc:
-            return BulkCancelCommandResult(
-                execution_id=str(execution_id),
-                status="error",
-                message=str(exc),
-            )
-
-    results = list(
-        await asyncio.gather(*(_cancel_one(eid) for eid in data.execution_ids))
-    )
-    succeeded = sum(1 for r in results if r.status == "cancelled")
-    return BulkCancelCommandResponse(
         results=results,
         total=len(results),
         succeeded=succeeded,

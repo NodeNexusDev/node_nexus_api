@@ -88,6 +88,14 @@ class CommandRequest(BaseModel):
     timeout: int | None = Field(default=None, ge=1, le=600)
 
 
+class CommandExecuteRawRequest(BaseModel):
+    """Schema for executing a raw command via the commands endpoint."""
+
+    node_id: uuid.UUID
+    command: str = Field(min_length=1, max_length=4096)
+    timeout: int | None = Field(default=None, ge=1, le=600)
+
+
 class CommandResult(BaseModel):
     """Schema for command execution result."""
 

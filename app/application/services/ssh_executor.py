@@ -10,7 +10,6 @@ from uuid import UUID
 import structlog
 
 if TYPE_CHECKING:
-    from app.application.dto.command_history import CommandHistoryCreateDTO
     from app.application.dto.node_connection import NodeConnectionDTO
     from app.application.ports.command_history import CommandHistoryWriter
     from app.application.ports.credential_cipher import CredentialCipher
@@ -20,6 +19,7 @@ if TYPE_CHECKING:
     )
 
 from app.application.command_policy import command_fingerprint
+from app.application.dto.command_history import CommandHistoryCreateDTO
 from app.application.policies.output import bound_output
 
 audit = structlog.get_logger("audit")

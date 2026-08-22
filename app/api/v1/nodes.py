@@ -1,15 +1,12 @@
 """Node API endpoints."""
 
 import uuid
-from datetime import datetime
 
 import structlog
 from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
 from fastapi import APIRouter, HTTPException, Query, Security
 
 from app.api.deps import get_current_api_key, require_write_scope
-from app.application.dto.command_execution import CommandRequestDTO
-from app.application.dto.execution_lifecycle import RetryCommandDTO
 from app.application.dto.node_management import (
     NodeCreateDTO,
     NodeTagDTO,
@@ -20,11 +17,6 @@ from app.application.dto.node_status_history import (
 )
 from app.application.dto.node_validation import NodeValidationRequestDTO
 from app.application.dto.node_view import NodeViewDTO
-from app.application.services.command_history_service import CommandHistoryService
-from app.application.services.execution_lifecycle_service import (
-    ExecutionLifecycleService,
-)
-from app.application.services.execution_stats_service import ExecutionStatsService
 from app.application.services.node_command_service import NodeCommandService
 from app.application.services.node_management_service import NodeManagementService
 from app.application.services.node_metrics_service import NodeMetricsService
@@ -33,14 +25,9 @@ from app.application.services.node_status_history_service import (
 )
 from app.application.services.node_validation_service import NodeValidationService
 from app.schemas.common import CursorPage, decode_cursor, encode_cursor
-from app.schemas.execution_stats import ExecutionStatsResponse
 from app.schemas.node import (
-    CommandHistoryResponse,
-    CommandRequest,
-    CommandResult,
     CpuMetrics,
     DiskMetrics,
-    ExecutionRetryResponse,
     LoadAverage,
     MemoryMetrics,
     NodeCreate,
@@ -267,68 +254,6 @@ async def validate_credentials(
     )
 
 
-@router.post(
-    "/{node_id}/execute",
-    response_model=CommandResult,
-)
-@inject
-async def execute_command(
-    node_id: uuid.UUID,
-    data: CommandRequest,
-    service: FromDishka[NodeCommandService],
-    _key: str = Security(require_write_scope),
-) -> CommandResult:
-    """Execute a command on a node via SSH."""
-    audit.info("api.nodes.execute", node_id=str(node_id), command=data.command)
-    result = await service.execute_command(
-        node_id,
-        CommandRequestDTO(command=data.command, timeout=data.timeout),
-    )
-    return CommandResult(
-        stdout=result.stdout,
-        stderr=result.stderr,
-        exit_code=result.exit_code,
-    )
-
-
-@router.get(
-    "/{node_id}/commands/history",
-    response_model=PaginatedResponse[CommandHistoryResponse],
-)
-@inject
-async def get_command_history(
-    node_id: uuid.UUID,
-    service: FromDishka[CommandHistoryService],
-    page: int = Query(1, ge=1),
-    size: int = Query(20, ge=1, le=100),
-    _key: str = Security(get_current_api_key),
-) -> PaginatedResponse[CommandHistoryResponse]:
-    """Get command execution history for a node."""
-    audit.info("api.nodes.commands.history", node_id=str(node_id), page=page, size=size)
-    page_dto = await service.get_node_history(node_id, page=page, size=size)
-    return PaginatedResponse(
-        items=[
-            CommandHistoryResponse(
-                id=item.id,
-                command_fingerprint=item.command_fingerprint,
-                exit_code=item.exit_code,
-                stdout=item.stdout,
-                stderr=item.stderr,
-                stdout_bytes=item.stdout_bytes,
-                stderr_bytes=item.stderr_bytes,
-                truncated=item.truncated,
-                started_at=item.started_at,
-                finished_at=item.finished_at,
-                created_at=item.created_at,
-            )
-            for item in page_dto.items
-        ],
-        total=page_dto.total,
-        page=page,
-        size=size,
-    )
-
-
 @router.get("/{node_id}/metrics", response_model=NodeMetrics)
 @inject
 async def get_node_metrics(
@@ -425,46 +350,3 @@ async def get_node_status_history(
         page=page,
         size=size,
     )
-
-
-@router.post(
-    "/{node_id}/commands/{execution_id}/retry",
-    response_model=ExecutionRetryResponse,
-)
-@inject
-async def retry_command(
-    node_id: uuid.UUID,
-    execution_id: uuid.UUID,
-    service: FromDishka[ExecutionLifecycleService],
-    _key: str = Security(require_write_scope),
-) -> ExecutionRetryResponse:
-    """Retry a command execution."""
-    audit.info(
-        "api.nodes.commands.retry",
-        node_id=str(node_id),
-        execution_id=str(execution_id),
-    )
-    result = await service.retry_command(
-        RetryCommandDTO(execution_id=execution_id, node_id=node_id)
-    )
-    return ExecutionRetryResponse(
-        execution_id=result.execution_id,
-        status=result.status,
-        message="Command retry scheduled",
-    )
-
-
-@router.get("/{node_id}/stats", response_model=ExecutionStatsResponse)
-@inject
-async def get_node_stats(
-    node_id: uuid.UUID,
-    stats_service: FromDishka[ExecutionStatsService],
-    date_from: datetime | None = Query(None),
-    date_to: datetime | None = Query(None),
-    _key: str = Security(get_current_api_key),
-) -> ExecutionStatsResponse:
-    audit.info("api.nodes.stats", node_id=str(node_id))
-    stats = await stats_service.get_node_command_stats(
-        node_id=node_id, date_from=date_from, date_to=date_to
-    )
-    return ExecutionStatsResponse.model_validate(stats)

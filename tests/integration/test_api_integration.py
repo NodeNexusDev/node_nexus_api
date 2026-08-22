@@ -23,6 +23,7 @@ from app.adapters.persistence.node_management import SqlAlchemyNodeManagementGat
 from app.adapters.persistence.node_reader import ScopedNodeConnectionReader
 from app.adapters.security import AesGcmCredentialCipher, HmacSha256APIKeyHasher
 from app.api.error_mapping import domain_error_handler
+from app.api.v1.commands import router as commands_router
 from app.api.v1.health import router as health_router
 from app.api.v1.nodes import router as nodes_router
 from app.application.services.api_key_authentication import APIKeyAuthenticationService
@@ -129,6 +130,7 @@ async def integration_client(
     app = FastAPI()
     app.add_exception_handler(DomainError, domain_error_handler)
     app.include_router(health_router)
+    app.include_router(commands_router, prefix="/api/v1")
     app.include_router(nodes_router, prefix="/api/v1")
     setup_dishka(container, app)
 
@@ -348,8 +350,8 @@ async def test_check_node_not_found(integration_client: AsyncClient) -> None:
 
 async def test_execute_command_not_found(integration_client: AsyncClient) -> None:
     resp = await integration_client.post(
-        f"/api/v1/nodes/{uuid.uuid4()}/execute",
-        json={"command": "ls"},
+        "/api/v1/commands/execute",
+        json={"node_id": str(uuid.uuid4()), "command": "ls"},
     )
     assert resp.status_code == 404
 
@@ -359,8 +361,8 @@ async def test_execute_command_validation_error(
 ) -> None:
     node = await _create_node(integration_client)
     resp = await integration_client.post(
-        f"/api/v1/nodes/{node['id']}/execute",
-        json={},
+        "/api/v1/commands/execute",
+        json={"node_id": node["id"]},
     )
     assert resp.status_code == 422
 

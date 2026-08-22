@@ -13,6 +13,7 @@ from fastapi import FastAPI
 from httpx2 import ASGITransport, AsyncClient
 
 from app.api.error_mapping import domain_error_handler
+from app.api.v1.commands import router as commands_router
 from app.api.v1.health import router as health_router
 from app.api.v1.nodes import router as nodes_router
 from app.api.v1.nodes_bulk import router as nodes_bulk_router
@@ -52,6 +53,7 @@ def _create_test_app(service: NodeManagementService | AsyncMock) -> FastAPI:
     app = FastAPI()
     app.add_exception_handler(DomainError, domain_error_handler)
     app.include_router(health_router)
+    app.include_router(commands_router, prefix="/api/v1")
     app.include_router(nodes_bulk_router, prefix="/api/v1")
     app.include_router(nodes_router, prefix="/api/v1")
 
@@ -278,11 +280,12 @@ class TestCheckNode:
 
 class TestExecuteCommand:
     async def test_success(self, client: AsyncClient, mock_service: AsyncMock) -> None:
+        nid = uuid.uuid4()
         result = CommandResult(stdout="ok", stderr="", exit_code=0)
         mock_service.execute_command.return_value = result
         response = await client.post(
-            f"/api/v1/nodes/{uuid.uuid4()}/execute",
-            json={"command": "uptime"},
+            "/api/v1/commands/execute",
+            json={"node_id": str(nid), "command": "uptime"},
         )
         assert response.status_code == 200
         assert response.json()["stdout"] == "ok"
@@ -293,8 +296,8 @@ class TestExecuteCommand:
     ) -> None:
         mock_service.execute_command.side_effect = NodeNotFoundError("not found")
         response = await client.post(
-            f"/api/v1/nodes/{uuid.uuid4()}/execute",
-            json={"command": "ls"},
+            "/api/v1/commands/execute",
+            json={"node_id": str(uuid.uuid4()), "command": "ls"},
         )
         assert response.status_code == 404
 
@@ -303,8 +306,8 @@ class TestExecuteCommand:
     ) -> None:
         mock_service.execute_command.side_effect = ConnectionFailedError("refused")
         response = await client.post(
-            f"/api/v1/nodes/{uuid.uuid4()}/execute",
-            json={"command": "ls"},
+            "/api/v1/commands/execute",
+            json={"node_id": str(uuid.uuid4()), "command": "ls"},
         )
         assert response.status_code == 503
 
@@ -312,7 +315,7 @@ class TestExecuteCommand:
         self, client: AsyncClient, mock_service: AsyncMock
     ) -> None:
         response = await client.post(
-            f"/api/v1/nodes/{uuid.uuid4()}/execute",
+            "/api/v1/commands/execute",
             json={},
         )
         assert response.status_code == 422
@@ -341,7 +344,7 @@ class TestBulkExecuteCommand:
         )
         mock_service.bulk_execute_command.return_value = result
         response = await client.post(
-            "/api/v1/nodes/bulk/execute",
+            "/api/v1/commands/bulk/execute",
             json={"command": "uptime", "node_ids": [str(nid)]},
         )
         assert response.status_code == 200
@@ -355,7 +358,7 @@ class TestBulkExecuteCommand:
             "No nodes matched"
         )
         response = await client.post(
-            "/api/v1/nodes/bulk/execute",
+            "/api/v1/commands/bulk/execute",
             json={"command": "ls", "node_ids": [str(uuid.uuid4())]},
         )
         assert response.status_code == 404
@@ -364,7 +367,7 @@ class TestBulkExecuteCommand:
         self, client: AsyncClient, mock_service: AsyncMock
     ) -> None:
         response = await client.post(
-            "/api/v1/nodes/bulk/execute",
+            "/api/v1/commands/bulk/execute",
             json={"command": "ls"},
         )
         assert response.status_code == 422
@@ -373,7 +376,7 @@ class TestBulkExecuteCommand:
         self, client: AsyncClient, mock_service: AsyncMock
     ) -> None:
         response = await client.post(
-            "/api/v1/nodes/bulk/execute",
+            "/api/v1/commands/bulk/execute",
             json={"command": "", "node_ids": [str(uuid.uuid4())]},
         )
         assert response.status_code == 422
@@ -390,7 +393,7 @@ class TestBulkExecuteCommand:
         )
         mock_service.bulk_execute_command.return_value = result
         response = await client.post(
-            "/api/v1/nodes/bulk/execute",
+            "/api/v1/commands/bulk/execute",
             json={"command": "uptime", "tags": ["prod"]},
         )
         assert response.status_code == 200
