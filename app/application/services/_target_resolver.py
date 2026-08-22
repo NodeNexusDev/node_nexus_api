@@ -2,17 +2,22 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+import uuid
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from app.application.dto.node_connection import NodeConnectionDTO
     from app.application.ports.node_reader import NodeConnectionReader
 
 
+UUIDCollection = frozenset[uuid.UUID] | tuple[uuid.UUID, ...] | list[uuid.UUID]
+TagCollection = frozenset[str] | tuple[str, ...] | list[str]
+
+
 async def resolve_targets(
     node_reader: NodeConnectionReader,
-    node_ids: frozenset[Any] | tuple[Any, ...] | list[Any] | None = None,
-    tags: frozenset[Any] | tuple[Any, ...] | list[Any] | None = None,
+    node_ids: UUIDCollection | None = None,
+    tags: TagCollection | None = None,
 ) -> list[NodeConnectionDTO]:
     """Resolve target nodes from IDs and tags with intersection logic.
 

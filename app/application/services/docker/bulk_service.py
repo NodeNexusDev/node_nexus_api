@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import shlex
 import uuid
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 import structlog
 
@@ -35,29 +35,29 @@ class DockerBulkService:
         self, node_ids: list[uuid.UUID]
     ) -> tuple[
         list[tuple[int, str, NodeConnectionDTO]],
-        list[Any],
+        dict[int, BulkDockerNodeResultDTO],
     ]:
         prepared: list[tuple[int, str, NodeConnectionDTO]] = []
-        results: list[Any] = [None] * len(node_ids)
+        errors: dict[int, BulkDockerNodeResultDTO] = {}
         for index, node_id in enumerate(node_ids):
             try:
                 node = await self._runner.get_target(node_id)
                 prepared.append((index, str(node_id), node))
             except NodeNotFoundError:
-                results[index] = BulkDockerNodeResultDTO(
+                errors[index] = BulkDockerNodeResultDTO(
                     node_id=str(node_id),
                     node_name="unknown",
                     status="error",
                     error="Node not found",
                 )
             except (ValueError, DockerError) as exc:
-                results[index] = BulkDockerNodeResultDTO(
+                errors[index] = BulkDockerNodeResultDTO(
                     node_id=str(node_id),
                     node_name="unknown",
                     status="error",
                     error=str(exc),
                 )
-        return prepared, results
+        return prepared, errors
 
     async def _resolve_node_ids(
         self, node_ids: list[uuid.UUID], node_tags: list[str]
@@ -95,12 +95,12 @@ class DockerBulkService:
     @staticmethod
     def _finalize(
         prepared: list[tuple[int, str, NodeConnectionDTO]],
-        slots: list[BulkDockerNodeResultDTO | None],
+        errors: dict[int, BulkDockerNodeResultDTO],
         remote_results: list[BulkDockerNodeResultDTO],
     ) -> list[BulkDockerNodeResultDTO]:
         for (index, _, _), result in zip(prepared, remote_results, strict=True):
-            slots[index] = result
-        return [result for result in slots if result is not None]
+            errors[index] = result
+        return [errors[i] for i in sorted(errors)]
 
     async def bulk_container_action(
         self,
@@ -112,7 +112,7 @@ class DockerBulkService:
     ) -> BulkDockerResultDTO:
         validated_id = validate_container_id(container_id)
         resolved_ids = await self._resolve_node_ids(node_ids, list(node_tags or []))
-        prepared, slots = await self._prepare(resolved_ids)
+        prepared, errors = await self._prepare(resolved_ids)
 
         async def worker(
             node_id_str: str, node: NodeConnectionDTO
@@ -155,7 +155,7 @@ class DockerBulkService:
                 *(worker(node_id_str, node) for _, node_id_str, node in prepared)
             )
         )
-        results = self._finalize(prepared, slots, remote)
+        results = self._finalize(prepared, errors, remote)
         return self._response(action, validated_id, results)
 
     async def bulk_exec(
@@ -168,7 +168,7 @@ class DockerBulkService:
     ) -> BulkDockerResultDTO:
         validated_id = validate_container_id(container_id)
         resolved_ids = await self._resolve_node_ids(node_ids, list(node_tags or []))
-        prepared, slots = await self._prepare(resolved_ids)
+        prepared, errors = await self._prepare(resolved_ids)
 
         async def worker(
             node_id_str: str, node: NodeConnectionDTO
@@ -199,7 +199,7 @@ class DockerBulkService:
                 *(worker(node_id_str, node) for _, node_id_str, node in prepared)
             )
         )
-        results = self._finalize(prepared, slots, remote)
+        results = self._finalize(prepared, errors, remote)
         return self._response("exec", validated_id, results)
 
     @staticmethod
@@ -233,7 +233,7 @@ class DockerBulkService:
         node_tags: list[str] | None = None,
     ) -> BulkDockerPullResultsDTO:
         resolved_ids = await self._resolve_node_ids(node_ids, list(node_tags or []))
-        prepared, slots = await self._prepare(resolved_ids)
+        prepared, errors = await self._prepare(resolved_ids)
 
         async def worker(
             node_id_str: str, node: NodeConnectionDTO
@@ -272,10 +272,16 @@ class DockerBulkService:
             )
         )
 
+        merged: dict[int, BulkDockerPullResultDTO] = {}
+        for idx, err in errors.items():
+            merged[idx] = BulkDockerPullResultDTO(
+                node_id=err.node_id, node_name=err.node_name,
+                status=err.status, output=err.output, error=err.error,
+            )
         for (index, _, _), result in zip(prepared, remote, strict=True):
-            slots[index] = result
+            merged[index] = result
 
-        all_results = [r for r in slots if r is not None]
+        all_results = [merged[i] for i in sorted(merged)]
         pull_results = [
             BulkDockerPullResultDTO(
                 node_id=r.node_id,
@@ -314,7 +320,7 @@ class DockerBulkService:
         """Remove Docker image on multiple nodes."""
 
         resolved_ids = await self._resolve_node_ids(node_ids, list(node_tags or []))
-        prepared, slots = await self._prepare(resolved_ids)
+        prepared, errors = await self._prepare(resolved_ids)
 
         async def worker(
             node_id_str: str, node: NodeConnectionDTO
@@ -350,10 +356,16 @@ class DockerBulkService:
             )
         )
 
+        merged: dict[int, BulkDockerPullResultDTO] = {}
+        for idx, err in errors.items():
+            merged[idx] = BulkDockerPullResultDTO(
+                node_id=err.node_id, node_name=err.node_name,
+                status=err.status, output=err.output, error=err.error,
+            )
         for (index, _, _), result in zip(prepared, remote, strict=True):
-            slots[index] = result
+            merged[index] = result
 
-        all_results = [r for r in slots if r is not None]
+        all_results = [merged[i] for i in sorted(merged)]
         pull_results = [
             BulkDockerPullResultDTO(
                 node_id=r.node_id,
@@ -396,7 +408,7 @@ class DockerBulkService:
         """Build Docker image on multiple nodes."""
 
         resolved_ids = await self._resolve_node_ids(node_ids, list(node_tags or []))
-        prepared, slots = await self._prepare(resolved_ids)
+        prepared, errors = await self._prepare(resolved_ids)
 
         async def worker(
             node_id_str: str, node: NodeConnectionDTO
@@ -443,10 +455,16 @@ class DockerBulkService:
             )
         )
 
+        merged: dict[int, BulkDockerPullResultDTO] = {}
+        for idx, err in errors.items():
+            merged[idx] = BulkDockerPullResultDTO(
+                node_id=err.node_id, node_name=err.node_name,
+                status=err.status, output=err.output, error=err.error,
+            )
         for (index, _, _), result in zip(prepared, remote, strict=True):
-            slots[index] = result
+            merged[index] = result
 
-        all_results = [r for r in slots if r is not None]
+        all_results = [merged[i] for i in sorted(merged)]
         pull_results = [
             BulkDockerPullResultDTO(
                 node_id=r.node_id,
