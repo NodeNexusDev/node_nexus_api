@@ -13,6 +13,7 @@ from tests.e2e.helpers.middleware_stack import (
     MiddlewareStackManager,
     MiddlewareStackPorts,
 )
+from tests.e2e.helpers.polling import wait_for_condition
 from tests.e2e.helpers.resources import UniqueResourceFactory
 from tests.e2e.helpers.service_controller import DockerServiceController
 from tests.e2e.settings import MASTER_API_KEY
@@ -154,8 +155,14 @@ class TestRateLimit:
         resp = rate_limit_client.get("/api/v1/nodes/")
         assert resp.status_code == 429
 
-        # Wait for window to expire (3s window + 1s buffer)
-        time.sleep(4)
+        # Wait for window to expire by polling until request succeeds
+        def _rate_limit_reset() -> bool:
+            resp = rate_limit_client.get("/api/v1/nodes/")
+            return resp.status_code == 200
+
+        wait_for_condition(
+            _rate_limit_reset, timeout=10.0, description="rate limit window reset"
+        )
 
         # Should succeed again
         resp = rate_limit_client.get("/api/v1/nodes/")
@@ -329,8 +336,14 @@ class TestNetworkFailures:
         docker_service_controller.stop("ssh-server")
         docker_service_controller.start("ssh-server")
 
-        # Wait for SSH to be healthy
-        time.sleep(3)
+        # Wait for SSH to be healthy by polling the check endpoint
+        def _ssh_healthy() -> bool:
+            resp = e2e_client.post(f"/api/v1/nodes/{node['id']}/check")
+            return resp.status_code == 200
+
+        wait_for_condition(
+            _ssh_healthy, timeout=10.0, description="SSH healthy after restart"
+        )
 
         # Connectivity check should work again
         resp = e2e_client.post(
@@ -356,32 +369,27 @@ class TestNetworkFailures:
             time.sleep(1)
 
         docker_service_controller.pause("db")
-        try:
-            # Wait for the API to notice the DB is down
-            # API may return 503 or may crash — both are acceptable
-            deadline = time.monotonic() + 15.0
-            got_503 = False
-            while time.monotonic() < deadline:
-                try:
-                    resp = e2e_client.get("/ready")
-                    if resp.status_code == 503:
-                        got_503 = True
-                        data = resp.json()
-                        assert data["status"] == "not_ready"
-                        assert data["checks"]["database"]["status"] == "error"
-                        break
-                except httpx.HTTPError:
-                    pass
-                time.sleep(1)
 
-            # If API is down entirely, that's also acceptable behavior
-            if not got_503:
-                try:
-                    resp = e2e_client.get("/ready")
-                    # API is still up but didn't return 503 — acceptable
-                    assert resp.status_code in (200, 503)
-                except httpx.HTTPError:
-                    pass  # API is down — acceptable
+        # Wait for the API to notice the DB is down by polling /ready
+        def _db_down() -> bool:
+            try:
+                resp = e2e_client.get("/ready")
+                return resp.status_code == 503
+            except httpx.HTTPError:
+                return True  # API is down — acceptable
+
+        wait_for_condition(
+            _db_down, timeout=15.0, description="API reports DB unavailable"
+        )
+
+        try:
+            resp = e2e_client.get("/ready")
+            if resp.status_code == 503:
+                data = resp.json()
+                assert data["status"] == "not_ready"
+                assert data["checks"]["database"]["status"] == "error"
+        except httpx.HTTPError:
+            pass  # API is down — acceptable
         finally:
             docker_service_controller.unpause("db")
 
@@ -392,7 +400,18 @@ class TestNetworkFailures:
     ) -> None:
         """Readiness probe returns to 200 after DB recovery."""
         docker_service_controller.pause("db")
-        time.sleep(2)
+
+        # Wait for DB pause to take effect
+        def _db_paused() -> bool:
+            try:
+                resp = e2e_client.get("/ready")
+                return resp.status_code == 503
+            except httpx.HTTPError:
+                return True  # API is down — acceptable
+
+        wait_for_condition(
+            _db_paused, timeout=10.0, description="DB pause detected"
+        )
 
         docker_service_controller.unpause("db")
 
@@ -481,12 +500,17 @@ class TestNetworkFailures:
 
         docker_service_controller.disconnect_network("api")
         try:
-            time.sleep(2)
-            try:
-                resp = e2e_client.get("/api/v1/nodes/")
-                assert resp.status_code in (500, 503)
-            except httpx.HTTPError:
-                pass
+            # Wait for network disconnect to take effect by polling
+            def _network_down() -> bool:
+                try:
+                    resp = e2e_client.get("/api/v1/nodes/")
+                    return resp.status_code in (500, 503)
+                except httpx.HTTPError:
+                    return True  # Connection error — also acceptable
+
+            wait_for_condition(
+                _network_down, timeout=10.0, description="network disconnect detected"
+            )
         finally:
             docker_service_controller.reconnect_network("api")
 

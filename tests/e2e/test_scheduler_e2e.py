@@ -333,20 +333,27 @@ async def test_scheduler_replica_failover_has_no_duplicate_execution(
             await asyncio.sleep(1)
         assert execution_count == 1
 
-        await asyncio.sleep(2)
-        assert (
-            await postgres_connection.fetchval(
+        # Wait for execution count to remain at 1 (no duplicates)
+        deadline = time.monotonic() + 5.0
+        while time.monotonic() < deadline:
+            count = await postgres_connection.fetchval(
                 "SELECT count(*) FROM script_executions WHERE script_id = $1",
                 UUID(script["id"]),
             )
-            == 1
-        )
+            assert count == 1
+            time.sleep(0.5)
 
         docker_service_controller.start("api")
         api_stopped = False
         _wait_for_api(e2e_client)
-        await asyncio.sleep(2)
-        # After the primary comes back it should be rejected (replica still owns).
+
+        # Wait for primary to come back and be rejected by replica
+        deadline = time.monotonic() + 15.0
+        while time.monotonic() < deadline:
+            if await _lock_held_by_another(postgres_connection):
+                break
+            time.sleep(1)
+
         assert await _lock_held_by_another(postgres_connection)
         assert (
             await postgres_connection.fetchval(

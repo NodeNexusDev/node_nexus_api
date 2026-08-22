@@ -7,12 +7,12 @@ Covers:
 - Script bulk: retry, cancel
 """
 
-import time
 import uuid
 
 import httpx2 as httpx
 import pytest
 
+from tests.e2e.helpers.polling import wait_for_condition
 from tests.e2e.helpers.resources import UniqueResourceFactory
 
 pytestmark = pytest.mark.docker
@@ -65,7 +65,20 @@ def test_docker_bulk_remove(
         f"/api/v1/nodes/{node['id']}/execute",
         json={"command": "docker run -d --name bulk-rm-test alpine sleep 300"},
     )
-    time.sleep(1)
+
+    # Wait for container to be running
+    def _container_running() -> bool:
+        resp = e2e_client.get(
+            f"/api/v1/nodes/{node['id']}/docker/containers/bulk-rm-test"
+        )
+        if resp.status_code != 200:
+            return False
+        state = resp.json().get("State", {})
+        return state.get("status", "").lower() == "running"
+
+    wait_for_condition(
+        _container_running, timeout=10.0, description="container running"
+    )
 
     resp = e2e_client.post(
         "/api/v1/docker/bulk/remove",
