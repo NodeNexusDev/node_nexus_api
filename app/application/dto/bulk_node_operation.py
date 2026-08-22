@@ -29,3 +29,11 @@ class BulkNodeCheckResultDTO:
     succeeded: int
     failed: int
     node_ids: tuple[uuid.UUID, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class BulkValidateCredentialsResultDTO:
+    node_id: uuid.UUID
+    node_name: str
+    status: str
+    message: str = ""

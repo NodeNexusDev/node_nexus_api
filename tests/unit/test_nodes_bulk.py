@@ -164,10 +164,7 @@ class TestBulkValidateCredentials:
     @pytest.mark.asyncio
     async def test_bulk_validate_credentials(self) -> None:
         svc = AsyncMock()
-        svc._node_reader = AsyncMock()
-        svc._node_reader.get_connections_by_ids = AsyncMock(return_value=[])
-        svc._connector_factory = AsyncMock()
-        svc._credential_cipher = AsyncMock()
+        svc.validate_credentials_bulk = AsyncMock(return_value=[])
         app = _create_nodes_app(node_bulk_cmd=svc)
         with _settings_patcher:
             async with AsyncClient(
@@ -190,8 +187,10 @@ class TestBulkValidateCredentials:
 class TestBulkRetry:
     @pytest.mark.asyncio
     async def test_bulk_retry_commands(self) -> None:
+        from app.core.exceptions import ExecutionNotFoundError
+
         svc = AsyncMock()
-        svc._command_history_reader = None
+        svc.retry_command = AsyncMock(side_effect=ExecutionNotFoundError("not found"))
         app = _create_nodes_app(execution_lifecycle=svc)
         with _settings_patcher:
             async with AsyncClient(

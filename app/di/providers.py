@@ -47,7 +47,6 @@ from app.adapters.persistence.node_reader import ScopedNodeConnectionReader
 from app.adapters.persistence.node_status_history import (
     SqlAlchemyNodeStatusHistoryGateway,
 )
-from app.adapters.persistence.node_validation import SshCredentialValidator
 from app.adapters.persistence.note import SqlAlchemyNoteGateway
 from app.adapters.persistence.schedule import SqlAlchemyScheduleGateway
 from app.adapters.persistence.script_gateway import (
@@ -57,6 +56,7 @@ from app.adapters.persistence.script_gateway import (
 )
 from app.adapters.runtime.apscheduler_runtime import ApschedulerRuntime
 from app.adapters.runtime.docker import SshDockerRuntime
+from app.adapters.runtime.node_validation import SshCredentialValidator
 from app.adapters.runtime.scheduler import ApschedulerJobScheduler
 from app.adapters.runtime.ssh import SSHConnectorFactory
 from app.adapters.security import AesGcmCredentialCipher, HmacSha256APIKeyHasher

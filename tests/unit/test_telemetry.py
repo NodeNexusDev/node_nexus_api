@@ -2,7 +2,7 @@
 
 from unittest.mock import MagicMock, patch
 
-from app.core.telemetry import init_telemetry
+from app.adapters.telemetry import init_telemetry
 
 
 class TestTelemetryConfig:
@@ -39,7 +39,7 @@ class TestTelemetryInit:
         settings = MagicMock()
         settings.OTEL_ENABLED = False
 
-        with patch("app.core.telemetry.logger") as mock_logger:
+        with patch("app.adapters.telemetry.logger") as mock_logger:
             init_telemetry(app, settings)
             mock_logger.debug.assert_called_once_with("telemetry.disabled")
 
@@ -51,7 +51,7 @@ class TestTelemetryInit:
         settings.OTEL_ENDPOINT = "http://localhost:4317"
         settings.OTEL_SERVICE_NAME = "test-service"
 
-        with patch("app.core.telemetry.logger") as mock_logger:
+        with patch("app.adapters.telemetry.logger") as mock_logger:
             # The actual import will fail if opentelemetry is not fully configured
             # but we can verify the flow
             try:
@@ -73,7 +73,7 @@ class TestTelemetryInit:
         settings.OTEL_ENABLED = True
 
         with patch.dict("sys.modules", {"opentelemetry": None}):
-            with patch("app.core.telemetry.logger") as mock_logger:
+            with patch("app.adapters.telemetry.logger") as mock_logger:
                 init_telemetry(app, settings)
                 # Should log a warning, not crash
                 assert mock_logger.warning.called

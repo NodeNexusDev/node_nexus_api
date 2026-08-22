@@ -10,7 +10,8 @@ from fastapi.responses import PlainTextResponse, Response
 
 from app.api.deps import get_current_api_key, require_write_scope
 from app.application.dto.audit import AuditLogDTO
-from app.application.ports.export import AuditExporter, rows_to_csv, rows_to_json
+from app.application.export_utils import rows_to_csv, rows_to_json
+from app.application.ports.export import AuditExporter
 from app.application.services.audit_log_service import AuditLogService
 from app.schemas.audit_log import AuditLogResponse
 from app.schemas.common import PaginatedResponse

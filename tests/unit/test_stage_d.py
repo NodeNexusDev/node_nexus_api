@@ -223,7 +223,7 @@ def lifecycle_service(
 
 
 def test_retry_command_dto_is_frozen() -> None:
-    dto = RetryCommandDTO(execution_id=uuid.uuid4(), node_id=uuid.uuid4())
+    dto = RetryCommandDTO(execution_id=uuid.uuid4())
     with pytest.raises(AttributeError):
         dto.execution_id = uuid.uuid4()  # type: ignore[misc]
 
@@ -254,7 +254,7 @@ async def test_retry_command(
     mock_execution.command_fingerprint = "abc123"
     command_history_reader.get_by_id.return_value = mock_execution
     result = await lifecycle_service.retry_command(
-        RetryCommandDTO(execution_id=exec_id, node_id=node_id)
+        RetryCommandDTO(execution_id=exec_id)
     )
     command_history_reader.get_by_id.assert_awaited_once_with(exec_id)
     assert result.status == "retry_scheduled"
@@ -272,7 +272,7 @@ async def test_retry_command_not_found(
 
     with pytest.raises(ExecutionNotFoundError):
         await lifecycle_service.retry_command(
-            RetryCommandDTO(execution_id=uuid.uuid4(), node_id=uuid.uuid4())
+            RetryCommandDTO(execution_id=uuid.uuid4())
         )
 
 
