@@ -41,6 +41,7 @@ from app.schemas.command import (
     CommandResult,
     CommandUpdate,
 )
+from app.schemas.common import PaginatedResponse
 from app.schemas.execution_stats import ExecutionStatsResponse
 from app.schemas.node import (
     BulkCancelCommandRequest,
@@ -57,7 +58,6 @@ from app.schemas.node import (
     CommandExecuteRawRequest,
     CommandHistoryResponse,
     ExecutionRetryResponse,
-    PaginatedResponse,
 )
 
 audit = structlog.get_logger("audit")
@@ -461,7 +461,7 @@ async def create_command(
     return _command_response(result)
 
 
-@router.put("/{command_id}", response_model=CommandResponse)
+@router.patch("/{command_id}", response_model=CommandResponse)
 @inject
 async def update_command(
     command_id: uuid.UUID,

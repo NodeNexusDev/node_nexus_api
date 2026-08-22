@@ -9,8 +9,8 @@ from fastapi import APIRouter, Query, Security
 from app.api.deps import get_current_api_key, require_write_scope
 from app.application.dto.favorite import FavoriteCreateDTO
 from app.application.services.favorite_service import FavoriteService
+from app.schemas.common import PaginatedResponse
 from app.schemas.favorite import FavoriteCreate, FavoriteResponse
-from app.schemas.node import PaginatedResponse
 
 audit = structlog.get_logger("audit")
 
@@ -50,7 +50,7 @@ async def list_favorites(
     )
 
 
-@router.post("/favorites", response_model=FavoriteResponse)
+@router.post("/favorites", response_model=FavoriteResponse, status_code=201)
 @inject
 async def add_favorite(
     data: FavoriteCreate,

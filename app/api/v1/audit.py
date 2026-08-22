@@ -13,7 +13,7 @@ from app.application.dto.audit import AuditLogDTO
 from app.application.ports.export import AuditExporter, rows_to_csv, rows_to_json
 from app.application.services.audit_log_service import AuditLogService
 from app.schemas.audit_log import AuditLogResponse
-from app.schemas.node import PaginatedResponse
+from app.schemas.common import PaginatedResponse
 
 audit = structlog.get_logger("audit")
 
@@ -59,13 +59,13 @@ async def get_audit_logs(
     )
 
 
-@router.delete("/", status_code=200)
+@router.delete("/", status_code=204)
 @inject
 async def delete_audit_logs(
     service: FromDishka[AuditLogService],
     confirm: str | None = Query(None),
     _key: str = Security(require_write_scope),
-) -> dict[str, int]:
+) -> None:
     """Delete all audit log entries.
 
     Requires ?confirm=yes parameter to prevent accidental deletion.
@@ -81,8 +81,7 @@ async def delete_audit_logs(
             detail="Add ?confirm=yes to confirm deletion of all audit logs",
         )
     audit.info("api.audit.delete_all")
-    deleted = await service.delete_all_logs()
-    return {"deleted_count": deleted}
+    await service.delete_all_logs()
 
 
 def _to_response(log: AuditLogDTO) -> AuditLogResponse:

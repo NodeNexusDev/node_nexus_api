@@ -225,14 +225,14 @@ class TestCreateScript:
         assert response.status_code == 422
 
 
-# --- PUT /scripts/{id} ---
+# --- PATCH /scripts/{id} ---
 
 
 class TestUpdateScript:
     async def test_found(self, client: AsyncClient, mock_service: AsyncMock) -> None:
         script = _make_script(name="updated")
         mock_service.update_script.return_value = script
-        response = await client.put(
+        response = await client.patch(
             f"/api/v1/scripts/{script.id}",
             json={"name": "updated"},
         )
@@ -243,7 +243,7 @@ class TestUpdateScript:
         self, client: AsyncClient, mock_service: AsyncMock
     ) -> None:
         mock_service.update_script.side_effect = ScriptNotFoundError("not found")
-        response = await client.put(
+        response = await client.patch(
             f"/api/v1/scripts/{uuid.uuid4()}",
             json={"name": "x"},
         )
