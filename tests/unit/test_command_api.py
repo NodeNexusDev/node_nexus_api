@@ -111,7 +111,9 @@ class TestGetCommands:
         self, client: AsyncClient, mock_service: AsyncMock
     ) -> None:
         mock_service.get_all_commands.return_value = ([], 0)
-        await client.get("/api/v1/commands?page=2&size=10")
+        response = await client.get("/api/v1/commands?page=2&size=10")
+        assert response.status_code == 200
+        assert response.json()["items"] == []
         mock_service.get_all_commands.assert_called_once_with(
             page=2, size=10, tags=None, search=None
         )
@@ -120,7 +122,8 @@ class TestGetCommands:
         self, client: AsyncClient, mock_service: AsyncMock
     ) -> None:
         mock_service.get_all_commands.return_value = ([], 0)
-        await client.get("/api/v1/commands?search=disk")
+        response = await client.get("/api/v1/commands?search=disk")
+        assert response.status_code == 200
         mock_service.get_all_commands.assert_called_once_with(
             page=1, size=20, tags=None, search="disk"
         )
@@ -129,7 +132,8 @@ class TestGetCommands:
         self, client: AsyncClient, mock_service: AsyncMock
     ) -> None:
         mock_service.get_all_commands.return_value = ([], 0)
-        await client.get("/api/v1/commands?tag=ops")
+        response = await client.get("/api/v1/commands?tag=ops")
+        assert response.status_code == 200
         mock_service.get_all_commands.assert_called_once_with(
             page=1, size=20, tags=["ops"], search=None
         )

@@ -90,3 +90,6 @@ class TestConfigImportAPI:
             json={},
         )
         assert resp.status_code == 200
+        data = resp.json()
+        assert "nodes_created" in data
+        assert "commands_created" in data
