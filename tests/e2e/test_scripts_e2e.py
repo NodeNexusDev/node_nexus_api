@@ -497,6 +497,38 @@ def test_script_schedule_nonexistent(e2e_client: httpx.Client) -> None:
     assert resp.status_code == 404
 
 
+def test_script_schedule_invalid_cron(e2e_client: httpx.Client) -> None:
+    """POST /scripts/{id}/schedule returns 422 for invalid cron expression."""
+    resp = e2e_client.post(
+        "/api/v1/scripts/",
+        json={"name": "invalid-cron-script", "steps": _INLINE_STEP},
+    )
+    assert resp.status_code == 201
+    script = resp.json()
+
+    resp = e2e_client.post(
+        "/api/v1/nodes/",
+        json={
+            "name": "invalid-cron-node",
+            "host": "10.0.0.1",
+            "port": 22,
+            "connection_type": "ssh",
+        },
+    )
+    assert resp.status_code == 201
+    node = resp.json()
+
+    try:
+        resp = e2e_client.post(
+            f"/api/v1/scripts/{script['id']}/schedule",
+            json={"cron": "not-a-valid-cron", "node_ids": [node["id"]]},
+        )
+        assert resp.status_code == 422
+    finally:
+        e2e_client.delete(f"/api/v1/scripts/{script['id']}")
+        e2e_client.delete(f"/api/v1/nodes/{node['id']}")
+
+
 @pytest.mark.e2e_scheduler
 async def test_second_scheduler_replica_cannot_acquire_ownership(
     docker_ip: str,

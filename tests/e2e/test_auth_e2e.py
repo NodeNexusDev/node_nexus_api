@@ -1,5 +1,6 @@
 """E2E tests for API key CRUD, scopes, master key, revoked/read-only keys."""
 
+from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
 import httpx2 as httpx
@@ -425,6 +426,48 @@ def test_read_only_key_can_read(e2e_client):
             headers={"X-API-Key": ro_key},
         )
         assert resp.status_code == 200
+    finally:
+        e2e_client.delete(
+            f"/api/v1/api-keys/{key_id}",
+            headers={"X-API-Key": master_key},
+        )
+
+
+# ---------------------------------------------------------------------------
+# Expired API key
+# ---------------------------------------------------------------------------
+
+
+def test_expired_api_key_returns_401(e2e_client: httpx.Client) -> None:
+    """API key with expires_at in the past is rejected with 401."""
+    master_key = _get_master_key()
+    resp = e2e_client.post(
+        "/api/v1/api-keys/",
+        json={"name": "expired-key-test"},
+        headers={"X-API-Key": master_key},
+    )
+    assert resp.status_code == 201
+    key_id = resp.json()["id"]
+    generated_key = resp.json()["key"]
+
+    try:
+        # Set expires_at to the past
+        past_time = (datetime.now(UTC) - timedelta(hours=1)).strftime(
+            "%Y-%m-%dT%H:%M:%SZ"
+        )
+        resp = e2e_client.patch(
+            f"/api/v1/api-keys/{key_id}",
+            json={"expires_at": past_time},
+            headers={"X-API-Key": master_key},
+        )
+        assert resp.status_code == 200
+
+        # Expired key should be rejected
+        resp = e2e_client.get(
+            "/api/v1/nodes/",
+            headers={"X-API-Key": generated_key},
+        )
+        assert resp.status_code == 401
     finally:
         e2e_client.delete(
             f"/api/v1/api-keys/{key_id}",
