@@ -303,7 +303,7 @@ async def test_create_node_validation_error(
 
 async def test_update_node_found(integration_client: AsyncClient) -> None:
     node = await _create_node(integration_client)
-    resp = await integration_client.put(
+    resp = await integration_client.patch(
         f"/api/v1/nodes/{node['id']}",
         json={"name": "updated"},
     )
@@ -313,7 +313,7 @@ async def test_update_node_found(integration_client: AsyncClient) -> None:
 
 
 async def test_update_node_not_found(integration_client: AsyncClient) -> None:
-    resp = await integration_client.put(
+    resp = await integration_client.patch(
         f"/api/v1/nodes/{uuid.uuid4()}",
         json={"name": "x"},
     )
