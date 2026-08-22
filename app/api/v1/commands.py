@@ -23,12 +23,9 @@ from app.application.dto.command_management import (
     CommandViewDTO,
 )
 from app.application.dto.execution_lifecycle import CancelExecutionDTO, RetryCommandDTO
-from app.application.services.bulk_command_history_service import (
-    BulkCommandHistoryService,
-)
 from app.application.services.command_execution_service import CommandExecutionService
-from app.application.services.command_history_service import CommandHistoryService
 from app.application.services.command_management_service import CommandManagementService
+from app.application.services.execution_history_service import ExecutionHistoryService
 from app.application.services.execution_lifecycle_service import (
     ExecutionLifecycleService,
 )
@@ -171,7 +168,7 @@ async def execute_raw_command(
 @inject
 async def get_command_history(
     node_id: Annotated[uuid.UUID, Query(description="Node ID to filter by")],
-    service: FromDishka[CommandHistoryService],
+    service: FromDishka[ExecutionHistoryService],
     page: int = Query(1, ge=1),
     size: int = Query(20, ge=1, le=100),
     _key: str = Security(get_current_api_key),
@@ -302,7 +299,7 @@ async def bulk_execute_raw_command(
 @inject
 async def get_bulk_command_history(
     batch_id: Annotated[uuid.UUID, Query(description="Batch ID to retrieve")],
-    service: FromDishka[BulkCommandHistoryService],
+    service: FromDishka[ExecutionHistoryService],
     _key: str = Security(get_current_api_key),
     page: Annotated[int, Query(ge=1)] = 1,
     size: Annotated[int, Query(ge=1, le=100)] = 20,

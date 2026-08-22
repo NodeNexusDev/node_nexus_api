@@ -27,10 +27,7 @@ from app.api.v1.health import router as health_router
 from app.api.v1.nodes import router as nodes_router
 from app.api.v1.nodes_bulk import router as nodes_bulk_router
 from app.application.services.api_key_authentication import APIKeyAuthenticationService
-from app.application.services.bulk_command_history_service import (
-    BulkCommandHistoryService,
-)
-from app.application.services.command_history_service import CommandHistoryService
+from app.application.services.execution_history_service import ExecutionHistoryService
 from app.application.services.node_management_service import NodeManagementService
 from app.core.exceptions import DomainError
 from app.models.base import Base
@@ -92,18 +89,11 @@ class IntegrationDbProvider(Provider):
         )
 
     @provide(scope=Scope.APP)
-    def get_command_history_service(
+    def get_execution_history_service(
         self,
         gateway: SqlAlchemyCommandHistoryGateway,
-    ) -> CommandHistoryService:
-        return CommandHistoryService(gateway)
-
-    @provide(scope=Scope.APP)
-    def get_bulk_command_history_service(
-        self,
-        gateway: SqlAlchemyCommandHistoryGateway,
-    ) -> BulkCommandHistoryService:
-        return BulkCommandHistoryService(gateway)
+    ) -> ExecutionHistoryService:
+        return ExecutionHistoryService(gateway)
 
     @provide(scope=Scope.REQUEST)
     def get_api_key_service(

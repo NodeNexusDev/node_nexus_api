@@ -120,11 +120,7 @@ from app.application.services.api_key_management import APIKeyManagementService
 from app.application.services.audit_cleanup_job import AuditCleanupJob
 from app.application.services.audit_event_service import AuditEventService
 from app.application.services.audit_log_service import AuditLogService
-from app.application.services.bulk_command_history_service import (
-    BulkCommandHistoryService,
-)
 from app.application.services.command_execution_service import CommandExecutionService
-from app.application.services.command_history_service import CommandHistoryService
 from app.application.services.command_management_service import CommandManagementService
 from app.application.services.config_service import ConfigService
 from app.application.services.dashboard_metrics_service import (
@@ -136,6 +132,7 @@ from app.application.services.docker.command_runner import DockerCommandRunner
 from app.application.services.docker.container_service import DockerContainerService
 from app.application.services.docker.image_service import DockerImageService
 from app.application.services.docker.resource_service import DockerResourceService
+from app.application.services.execution_history_service import ExecutionHistoryService
 from app.application.services.execution_lifecycle_service import (
     ExecutionLifecycleService,
 )
@@ -779,20 +776,12 @@ class ServiceProvider(Provider):
         return AuditLogService(reader, writer)
 
     @provide(scope=Scope.APP)
-    def get_command_history_service(
+    def get_execution_history_service(
         self,
         reader: CommandHistoryReader,
-    ) -> CommandHistoryService:
-        """Get command execution history query use cases."""
-        return CommandHistoryService(reader)
-
-    @provide(scope=Scope.REQUEST)
-    def get_bulk_command_history_service(
-        self,
-        reader: CommandHistoryReader,
-    ) -> BulkCommandHistoryService:
-        """Get bulk command batch history query use cases."""
-        return BulkCommandHistoryService(reader)
+    ) -> ExecutionHistoryService:
+        """Get unified command execution history query service."""
+        return ExecutionHistoryService(reader)
 
     @provide(scope=Scope.APP)
     def get_audit_cleanup_job(
