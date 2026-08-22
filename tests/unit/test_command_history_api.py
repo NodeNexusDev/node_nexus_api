@@ -19,10 +19,7 @@ from app.application.dto.command_history import (
     CommandHistoryDTO,
     CommandHistoryPageDTO,
 )
-from app.application.services.bulk_command_history_service import (
-    BulkCommandHistoryService,
-)
-from app.application.services.command_history_service import CommandHistoryService
+from app.application.services.execution_history_service import ExecutionHistoryService
 from tests.unit.conftest import MockAuthServiceProvider, _mock_settings
 
 
@@ -49,9 +46,7 @@ def _make_history(**overrides: Any) -> CommandHistoryDTO:
     return CommandHistoryDTO(**defaults)
 
 
-def _create_test_app(
-    service: AsyncMock, bulk_service: AsyncMock | None = None
-) -> FastAPI:
+def _create_test_app(service: AsyncMock) -> FastAPI:
     app = FastAPI()
     app.include_router(commands_router, prefix="/api/v1")
     app.include_router(nodes_bulk_router, prefix="/api/v1")
@@ -59,12 +54,8 @@ def _create_test_app(
 
     class MockServiceProvider(Provider):
         @provide(scope=Scope.APP)
-        def get_history_service(self) -> CommandHistoryService:
+        def get_history_service(self) -> ExecutionHistoryService:
             return service
-
-        @provide(scope=Scope.APP)
-        def get_bulk_history_service(self) -> BulkCommandHistoryService:
-            return bulk_service
 
     container = make_async_container(MockServiceProvider(), MockAuthServiceProvider())
     setup_dishka(container, app)
@@ -73,19 +64,12 @@ def _create_test_app(
 
 @pytest.fixture
 def mock_service() -> AsyncMock:
-    return AsyncMock(spec=CommandHistoryService)
+    return AsyncMock(spec=ExecutionHistoryService)
 
 
 @pytest.fixture
-def mock_bulk_service() -> AsyncMock:
-    return AsyncMock(spec=BulkCommandHistoryService)
-
-
-@pytest.fixture
-async def client(
-    mock_service: AsyncMock, mock_bulk_service: AsyncMock
-) -> AsyncGenerator[AsyncClient]:
-    app = _create_test_app(mock_service, mock_bulk_service)
+async def client(mock_service: AsyncMock) -> AsyncGenerator[AsyncClient]:
+    app = _create_test_app(mock_service)
     with patch("app.api.deps.get_settings", return_value=_mock_settings("test-master")):
         async with AsyncClient(
             transport=ASGITransport(app=app),
@@ -153,10 +137,10 @@ class TestGetCommandHistory:
 
 class TestGetBulkCommandHistory:
     async def test_empty_bulk_history(
-        self, client: AsyncClient, mock_bulk_service: AsyncMock
+        self, client: AsyncClient, mock_service: AsyncMock
     ) -> None:
         batch_id = uuid.uuid4()
-        mock_bulk_service.get_batch_history.return_value = CommandHistoryPageDTO(
+        mock_service.get_batch_history.return_value = CommandHistoryPageDTO(
             items=(), total=0
         )
         response = await client.get(
@@ -169,14 +153,14 @@ class TestGetBulkCommandHistory:
         assert data["total"] == 0
 
     async def test_returns_bulk_history(
-        self, client: AsyncClient, mock_bulk_service: AsyncMock
+        self, client: AsyncClient, mock_service: AsyncMock
     ) -> None:
         batch_id = uuid.uuid4()
         records = [
             _make_history(batch_id=batch_id, exit_code=0),
             _make_history(batch_id=batch_id, exit_code=1),
         ]
-        mock_bulk_service.get_batch_history.return_value = CommandHistoryPageDTO(
+        mock_service.get_batch_history.return_value = CommandHistoryPageDTO(
             items=tuple(records), total=2
         )
         response = await client.get(
@@ -190,16 +174,16 @@ class TestGetBulkCommandHistory:
         assert data["items"][0]["exit_code"] == 0
 
     async def test_pagination_params(
-        self, client: AsyncClient, mock_bulk_service: AsyncMock
+        self, client: AsyncClient, mock_service: AsyncMock
     ) -> None:
         batch_id = uuid.uuid4()
-        mock_bulk_service.get_batch_history.return_value = CommandHistoryPageDTO(
+        mock_service.get_batch_history.return_value = CommandHistoryPageDTO(
             items=(), total=0
         )
         await client.get(
             "/api/v1/commands/bulk/history",
             params={"batch_id": str(batch_id), "page": "2", "size": "10"},
         )
-        mock_bulk_service.get_batch_history.assert_called_once_with(
+        mock_service.get_batch_history.assert_called_once_with(
             batch_id, page=2, size=10
         )

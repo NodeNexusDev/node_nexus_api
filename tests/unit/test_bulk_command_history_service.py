@@ -1,4 +1,4 @@
-"""Unit tests for BulkCommandHistoryService."""
+"""Unit tests for ExecutionHistoryService.get_batch_history."""
 
 import uuid
 from datetime import UTC, datetime
@@ -11,9 +11,7 @@ from app.application.dto.command_history import (
     CommandHistoryPageDTO,
 )
 from app.application.ports.command_history import CommandHistoryReader
-from app.application.services.bulk_command_history_service import (
-    BulkCommandHistoryService,
-)
+from app.application.services.execution_history_service import ExecutionHistoryService
 
 
 class FakeReader(CommandHistoryReader):
@@ -62,7 +60,7 @@ async def test_get_batch_history_filters_by_batch_id() -> None:
     other = uuid.uuid4()
     items = [_make_dto(batch_id), _make_dto(other)]
     reader = FakeReader(items)
-    service = BulkCommandHistoryService(reader)
+    service = ExecutionHistoryService(reader)
 
     result = await service.get_batch_history(batch_id, page=1, size=10)
 
@@ -76,7 +74,7 @@ async def test_get_batch_history_pagination_offset() -> None:
     batch_id = uuid.uuid4()
     items = [_make_dto(batch_id) for _ in range(5)]
     reader = FakeReader(items)
-    service = BulkCommandHistoryService(reader)
+    service = ExecutionHistoryService(reader)
 
     result = await service.get_batch_history(batch_id, page=2, size=2)
 

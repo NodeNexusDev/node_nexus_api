@@ -23,10 +23,7 @@ from app.application.dto.node_metrics import (
     UsageMetricsDTO,
 )
 from app.application.dto.node_status_history import NodeStatusHistoryPageDTO
-from app.application.services.bulk_command_history_service import (
-    BulkCommandHistoryService,
-)
-from app.application.services.command_history_service import CommandHistoryService
+from app.application.services.execution_history_service import ExecutionHistoryService
 from app.application.services.execution_lifecycle_service import (
     ExecutionLifecycleService,
 )
@@ -80,12 +77,8 @@ def _create_nodes_app(**services: AsyncMock) -> FastAPI:
             return services.get("execution_stats", AsyncMock())
 
         @provide(scope=Scope.REQUEST)
-        def get_bulk_history(self) -> BulkCommandHistoryService:
-            return services.get("bulk_history", AsyncMock())
-
-        @provide(scope=Scope.REQUEST)
-        def get_command_history(self) -> CommandHistoryService:
-            return services.get("command_history", AsyncMock())
+        def get_execution_history(self) -> ExecutionHistoryService:
+            return services.get("execution_history", AsyncMock())
 
         @provide(scope=Scope.REQUEST)
         def get_node_status_history(self) -> NodeStatusHistoryService:
