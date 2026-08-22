@@ -40,6 +40,12 @@ async def test_get_node_maps_orm_to_public_dto() -> None:
 
     assert result is not None
     assert result.id == node.id
+    assert result.name == "server-1"
+    assert result.host == "10.0.0.1"
+    assert result.port == 22
+    assert result.connection_type == "ssh"
+    assert result.status == "active"
+    assert result.username == "root"
     assert result.tags == ()
     assert not hasattr(result, "password")
 
