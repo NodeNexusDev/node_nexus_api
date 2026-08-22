@@ -1,7 +1,7 @@
 """Docker schemas for API."""
 
 import uuid
-from typing import Any
+from typing import Any, Literal, Self
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -238,7 +238,7 @@ class BulkDockerRequest(BaseModel):
     command: str | None = Field(default=None, min_length=1, max_length=4096)
 
     @model_validator(mode="after")
-    def _require_targets(self) -> "BulkDockerRequest":
+    def _require_targets(self) -> Self:
         if not self.node_ids and not self.node_tags:
             raise ValueError("At least one of node_ids or node_tags must be provided")
         return self
@@ -247,9 +247,9 @@ class BulkDockerRequest(BaseModel):
 class BulkDockerNodeResult(BaseModel):
     """Result of a Docker operation on a single node."""
 
-    node_id: str
+    node_id: uuid.UUID
     node_name: str
-    status: str  # "success" or "error"
+    status: Literal["success", "error"]
     output: str = ""
     error: str = ""
 
@@ -273,7 +273,7 @@ class BulkDockerPullRequest(BaseModel):
     timeout: int | None = Field(default=None, ge=1, le=3600)
 
     @model_validator(mode="after")
-    def _require_targets(self) -> "BulkDockerPullRequest":
+    def _require_targets(self) -> Self:
         if not self.node_ids and not self.node_tags:
             raise ValueError("At least one of node_ids or node_tags must be provided")
         return self
@@ -282,9 +282,9 @@ class BulkDockerPullRequest(BaseModel):
 class BulkDockerPullResult(BaseModel):
     """Result of a Docker image pull on a single node."""
 
-    node_id: str
+    node_id: uuid.UUID
     node_name: str
-    status: str  # "success" or "error"
+    status: Literal["success", "error"]
     output: str = ""
     error: str = ""
 
@@ -309,7 +309,7 @@ class BulkDockerImageRemoveRequest(BaseModel):
     image_id: str = Field(min_length=1, max_length=255)
 
     @model_validator(mode="after")
-    def _require_targets(self) -> "BulkDockerImageRemoveRequest":
+    def _require_targets(self) -> Self:
         if not self.node_ids and not self.node_tags:
             raise ValueError("At least one of node_ids or node_tags must be provided")
         return self
@@ -318,9 +318,9 @@ class BulkDockerImageRemoveRequest(BaseModel):
 class BulkDockerImageRemoveResult(BaseModel):
     """Result of removing a Docker image on a single node."""
 
-    node_id: str
+    node_id: uuid.UUID
     node_name: str
-    status: str  # "success" or "error"
+    status: Literal["success", "error"]
     output: str = ""
     error: str = ""
 
@@ -349,7 +349,7 @@ class BulkDockerImageBuildRequest(BaseModel):
     timeout: int | None = Field(default=None, ge=1, le=3600)
 
     @model_validator(mode="after")
-    def _require_targets(self) -> "BulkDockerImageBuildRequest":
+    def _require_targets(self) -> Self:
         if not self.node_ids and not self.node_tags:
             raise ValueError("At least one of node_ids or node_tags must be provided")
         return self
@@ -358,9 +358,9 @@ class BulkDockerImageBuildRequest(BaseModel):
 class BulkDockerImageBuildResult(BaseModel):
     """Result of building a Docker image on a single node."""
 
-    node_id: str
+    node_id: uuid.UUID
     node_name: str
-    status: str  # "success" or "error"
+    status: Literal["success", "error"]
     output: str = ""
     error: str = ""
 

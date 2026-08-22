@@ -17,9 +17,9 @@ from app.application.services.dashboard_metrics_service import (
 )
 from app.application.services.dashboard_service import DashboardService
 from app.schemas.dashboard import (
+    DashboardDockerStats,
     DashboardMetricsResponse,
     DashboardResponse,
-    DockerStats,
     EntityStats,
     MetricsBucket,
     NodeStats,
@@ -38,7 +38,7 @@ def _to_response(dto: DashboardDTO) -> DashboardResponse:
             active=dto.nodes.active,
             unreachable=dto.nodes.unreachable,
         ),
-        docker=DockerStats(
+        docker=DashboardDockerStats(
             total=dto.docker.total,
             running=dto.docker.running,
             stopped=dto.docker.stopped,

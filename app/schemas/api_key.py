@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class APIKeyCreate(BaseModel):
@@ -40,12 +40,12 @@ class APIKeyResponse(BaseModel):
     name: str
     key_prefix: str
     is_active: bool
-    scope: str
+    scope: Literal["read-only", "read-write"]
     created_at: datetime
     last_used_at: datetime | None
     expires_at: datetime | None
 
-    model_config = {"from_attributes": True}
+    model_config = ConfigDict(from_attributes=True)
 
 
 class APIKeyList(BaseModel):
