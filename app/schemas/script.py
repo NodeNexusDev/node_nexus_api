@@ -93,3 +93,35 @@ class ScriptExecutionBatchResult(BaseModel):
 
     script_id: uuid.UUID
     results: list[ScriptNodeResult]
+
+
+# --- Bulk operation schemas ---
+
+
+class ScriptBulkRetryRequest(BaseModel):
+    """Request to retry multiple script executions."""
+
+    execution_ids: list[uuid.UUID] = Field(..., min_length=1)
+
+
+class ScriptBulkCancelRequest(BaseModel):
+    """Request to cancel multiple running script executions."""
+
+    execution_ids: list[uuid.UUID] = Field(..., min_length=1)
+
+
+class ScriptBulkResult(BaseModel):
+    """Result of a single bulk operation item."""
+
+    execution_id: str
+    status: str
+    message: str
+
+
+class ScriptBulkOperationResponse(BaseModel):
+    """Response for bulk script retry/cancel operations."""
+
+    results: list[ScriptBulkResult]
+    total: int
+    succeeded: int
+    failed: int
