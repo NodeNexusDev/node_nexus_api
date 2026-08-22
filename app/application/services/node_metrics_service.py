@@ -104,28 +104,58 @@ class NodeMetricsService:
 
     @staticmethod
     async def _collect_cpu(connector: RemoteCommandSession) -> tuple[float, int]:
-        """Collect CPU usage via vmstat (1s average) with top fallback."""
+        """Collect CPU usage percentage and core count via SSH.
+
+        Primary: vmstat sums us+sy+wa+st columns (total non-idle CPU).
+        Fallback: /proc/stat 1-second delta when vmstat is unavailable.
+        """
         cpu_usage = 0.0
+        vmstat_ok = False
         try:
             stdout, _, exit_code = await connector.execute_command(
-                "vmstat 1 2 | tail -1 | awk '{print 100 - $NF}'"
+                "vmstat 1 2 | tail -1 | awk '{print $13+$14+$16+$17}'"
             )
             if exit_code == 0 and stdout.strip():
                 cpu_usage = float(stdout.strip())
-        except Exception:  # nosec B110 — intentional fallback if vmstat unavailable
+                vmstat_ok = True
+        except Exception:  # nosec B110 — intentional fallback
             pass
-        if cpu_usage == 0.0:
-            try:
-                stdout, _, exit_code = await connector.execute_command(
-                    "top -bn2 -d1 | grep 'Cpu(s)' | tail -1 | awk '{print $2}'"
-                )
-                if exit_code == 0 and stdout.strip():
-                    cpu_usage = float(stdout.strip())
-            except Exception:  # nosec B110 — intentional fallback if top format differs
-                pass
+
+        if not vmstat_ok:
+            audit.info("node.metrics.cpu.fallback_proc_stat")
+            cpu_usage = await NodeMetricsService._cpu_from_proc_stat(connector)
+
+        cpu_usage = max(0.0, min(100.0, cpu_usage))
+
         cores_stdout, _, _ = await connector.execute_command("nproc")
         cores = int(cores_stdout.strip()) if cores_stdout.strip() else 1
         return cpu_usage, cores
+
+    @staticmethod
+    async def _cpu_from_proc_stat(connector: RemoteCommandSession) -> float:
+        """Derive CPU usage from a 1-second /proc/stat delta."""
+        try:
+            s1, _, ec1 = await connector.execute_command("head -1 /proc/stat")
+            if ec1 != 0 or not s1.strip():
+                return 0.0
+            await connector.execute_command("sleep 1")
+            s2, _, ec2 = await connector.execute_command("head -1 /proc/stat")
+            if ec2 != 0 or not s2.strip():
+                return 0.0
+
+            vals1 = [int(v) for v in s1.strip().split()[1:]]
+            vals2 = [int(v) for v in s2.strip().split()[1:]]
+
+            idle1, idle2 = vals1[3], vals2[3]
+            total1, total2 = sum(vals1), sum(vals2)
+
+            d_idle = idle2 - idle1
+            d_total = total2 - total1
+            if d_total == 0:
+                return 0.0
+            return (d_total - d_idle) / d_total * 100
+        except Exception:  # nosec B110 — intentional fallback if /proc/stat unavailable
+            return 0.0
 
     @staticmethod
     async def _collect_load_average(
