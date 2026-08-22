@@ -40,6 +40,7 @@ from app.api.v1.nodes import router as nodes_router
 from app.api.v1.nodes_bulk import router as nodes_bulk_router
 from app.api.v1.notes import router as notes_router
 from app.api.v1.scripts import router as scripts_router
+from app.api.v1.scripts_bulk import router as scripts_bulk_router
 from app.api.v1.search import router as search_router
 from app.api.v1.tags import router as tags_router
 from app.api.v1.websocket import router as ws_router
@@ -202,6 +203,7 @@ def create_app() -> FastAPI:
     app.include_router(nodes_router, prefix="/api/v1")
     app.include_router(commands_router, prefix="/api/v1")
     app.include_router(scripts_router, prefix="/api/v1")
+    app.include_router(scripts_bulk_router, prefix="/api/v1")
     app.include_router(audit_router, prefix="/api/v1")
     app.include_router(dashboard_router, prefix="/api/v1")
     app.include_router(api_keys_router, prefix="/api/v1")
