@@ -12,6 +12,7 @@ from dishka.integrations.fastapi import setup_dishka
 from fastapi import FastAPI
 from httpx2 import ASGITransport, AsyncClient
 
+from app.api.v1.commands import router as commands_router
 from app.api.v1.nodes import router as nodes_router
 from app.api.v1.nodes_bulk import router as nodes_bulk_router
 from app.application.dto.command_history import (
@@ -52,6 +53,7 @@ def _create_test_app(
     service: AsyncMock, bulk_service: AsyncMock | None = None
 ) -> FastAPI:
     app = FastAPI()
+    app.include_router(commands_router, prefix="/api/v1")
     app.include_router(nodes_bulk_router, prefix="/api/v1")
     app.include_router(nodes_router, prefix="/api/v1")
 
@@ -102,7 +104,10 @@ class TestGetCommandHistory:
         mock_service.get_node_history.return_value = CommandHistoryPageDTO(
             items=(), total=0
         )
-        response = await client.get(f"/api/v1/nodes/{node_id}/commands/history")
+        response = await client.get(
+            "/api/v1/commands/history",
+            params={"node_id": str(node_id)},
+        )
         assert response.status_code == 200
         data = response.json()
         assert data["items"] == []
@@ -121,7 +126,10 @@ class TestGetCommandHistory:
         mock_service.get_node_history.return_value = CommandHistoryPageDTO(
             items=tuple(records), total=2
         )
-        response = await client.get(f"/api/v1/nodes/{node_id}/commands/history")
+        response = await client.get(
+            "/api/v1/commands/history",
+            params={"node_id": str(node_id)},
+        )
         assert response.status_code == 200
         data = response.json()
         assert len(data["items"]) == 2
@@ -136,7 +144,10 @@ class TestGetCommandHistory:
         mock_service.get_node_history.return_value = CommandHistoryPageDTO(
             items=(), total=0
         )
-        await client.get(f"/api/v1/nodes/{node_id}/commands/history?page=2&size=10")
+        await client.get(
+            "/api/v1/commands/history",
+            params={"node_id": str(node_id), "page": "2", "size": "10"},
+        )
         mock_service.get_node_history.assert_called_once_with(node_id, page=2, size=10)
 
 
@@ -149,7 +160,7 @@ class TestGetBulkCommandHistory:
             items=(), total=0
         )
         response = await client.get(
-            "/api/v1/nodes/bulk/history",
+            "/api/v1/commands/bulk/history",
             params={"batch_id": str(batch_id)},
         )
         assert response.status_code == 200
@@ -169,7 +180,7 @@ class TestGetBulkCommandHistory:
             items=tuple(records), total=2
         )
         response = await client.get(
-            "/api/v1/nodes/bulk/history",
+            "/api/v1/commands/bulk/history",
             params={"batch_id": str(batch_id)},
         )
         assert response.status_code == 200
@@ -186,7 +197,7 @@ class TestGetBulkCommandHistory:
             items=(), total=0
         )
         await client.get(
-            "/api/v1/nodes/bulk/history",
+            "/api/v1/commands/bulk/history",
             params={"batch_id": str(batch_id), "page": "2", "size": "10"},
         )
         mock_bulk_service.get_batch_history.assert_called_once_with(

@@ -143,9 +143,7 @@ class NodeBulkCommandService:
 
             try:
                 result = await execute_ssh(connector, command)
-                audit.info(
-                    "node.bulk.executed", node_id=str(node.id), command=command
-                )
+                audit.info("node.bulk.executed", node_id=str(node.id), command=command)
                 return CommandExecutionDTO(
                     node_id=node.id,
                     node_name=node.name,

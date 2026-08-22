@@ -9,6 +9,7 @@ from dishka.integrations.fastapi import setup_dishka
 from fastapi import FastAPI
 from httpx2 import ASGITransport, AsyncClient
 
+from app.api.v1.commands import router as commands_router
 from app.api.v1.nodes import router as nodes_router
 from app.api.v1.nodes_bulk import router as nodes_bulk_router
 from app.application.dto.bulk_node_operation import (
@@ -45,6 +46,7 @@ from tests.unit.conftest import MockAuthServiceProvider, _mock_settings
 
 def _create_nodes_app(**services: AsyncMock) -> FastAPI:
     app = FastAPI()
+    app.include_router(commands_router, prefix="/api/v1")
     app.include_router(nodes_bulk_router, prefix="/api/v1")
     app.include_router(nodes_router, prefix="/api/v1")
 
@@ -205,7 +207,7 @@ class TestBulkRetry:
                 headers={"X-API-Key": "test-master"},
             ) as ac:
                 resp = await ac.post(
-                    "/api/v1/nodes/bulk/retry",
+                    "/api/v1/commands/bulk/retry",
                     json={"execution_ids": [NODE_ID]},
                 )
         assert resp.status_code == 200
@@ -230,7 +232,7 @@ class TestBulkCancel:
                 headers={"X-API-Key": "test-master"},
             ) as ac:
                 resp = await ac.post(
-                    "/api/v1/nodes/bulk/cancel",
+                    "/api/v1/commands/bulk/cancel",
                     json={"execution_ids": [NODE_ID]},
                 )
         assert resp.status_code == 200
@@ -353,7 +355,7 @@ class TestRetryCommand:
                 headers={"X-API-Key": "test-master"},
             ) as ac:
                 resp = await ac.post(
-                    f"/api/v1/nodes/{NODE_ID}/commands/{NODE_ID2}/retry",
+                    f"/api/v1/commands/executions/{NODE_ID2}/retry",
                 )
         assert resp.status_code == 200
         data = resp.json()
