@@ -19,6 +19,7 @@ if TYPE_CHECKING:
     from app.application.ports.remote_command import RemoteConnectorFactory
 
 from app.application.command_policy import command_fingerprint
+from app.application.dto.bulk_node_operation import BulkValidateCredentialsResultDTO
 from app.application.dto.command_execution import (
     BulkCommandRequestDTO,
     BulkCommandResultDTO,
@@ -119,6 +120,39 @@ class NodeBulkCommandService:
     ) -> BulkCommandResultDTO:
         """Expose the stable node API use-case name."""
         return await self.execute(data)
+
+    async def validate_credentials_bulk(
+        self,
+        node_ids: list[uuid.UUID] | None = None,
+        tags: list[str] | None = None,
+    ) -> list[BulkValidateCredentialsResultDTO]:
+        """Validate SSH credentials for multiple existing nodes."""
+        nodes = await resolve_targets(self._node_reader, node_ids=node_ids, tags=tags)
+
+        async def _validate_one(
+            node: NodeConnectionDTO,
+        ) -> BulkValidateCredentialsResultDTO:
+            try:
+                connector = build_ssh_connector(
+                    node, self._credential_cipher, self._connector_factory
+                )
+                async with connector:
+                    await connector.execute_command("echo ok")
+                return BulkValidateCredentialsResultDTO(
+                    node_id=node.id,
+                    node_name=node.name,
+                    status="success",
+                    message="Credentials valid",
+                )
+            except Exception as exc:
+                return BulkValidateCredentialsResultDTO(
+                    node_id=node.id,
+                    node_name=node.name,
+                    status="error",
+                    message=str(exc),
+                )
+
+        return list(await asyncio.gather(*(_validate_one(node) for node in nodes)))
 
     async def _resolve_targets(
         self, data: BulkCommandRequestDTO

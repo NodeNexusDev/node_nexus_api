@@ -228,24 +228,7 @@ async def retry_command(
 ) -> ExecutionRetryResponse:
     """Retry a command execution."""
     audit.info("api.commands.executions.retry", execution_id=str(execution_id))
-    # Look up execution to get node_id
-    reader = service._command_history_reader
-    if reader is None:
-        from app.core.exceptions import ExecutionNotFoundError
-
-        raise ExecutionNotFoundError("Command history reader not available")
-    execution = await reader.get_by_id(execution_id)
-    if execution is None:
-        from app.core.exceptions import ExecutionNotFoundError
-
-        raise ExecutionNotFoundError(f"Execution {execution_id} not found")
-    if execution.node_id is None:
-        from app.core.exceptions import ExecutionNotFoundError
-
-        raise ExecutionNotFoundError("No node_id associated with execution")
-    result = await service.retry_command(
-        RetryCommandDTO(execution_id=execution_id, node_id=execution.node_id)
-    )
+    result = await service.retry_command(RetryCommandDTO(execution_id=execution_id))
     return ExecutionRetryResponse(
         execution_id=result.execution_id,
         status=result.status,
@@ -335,41 +318,13 @@ async def bulk_retry_commands(
 
     async def _retry_one(execution_id: uuid.UUID) -> BulkRetryCommandResult:
         try:
-            reader = service._command_history_reader
-            if reader is None:
-                return BulkRetryCommandResult(
-                    execution_id=str(execution_id),
-                    status="error",
-                    message="Command history reader not available",
-                )
-            execution = await reader.get_by_id(execution_id)
-            if execution is None:
-                return BulkRetryCommandResult(
-                    execution_id=str(execution_id),
-                    status="error",
-                    message="Execution not found",
-                )
-            if execution.node_id is None:
-                return BulkRetryCommandResult(
-                    execution_id=str(execution_id),
-                    status="error",
-                    message="No node_id associated with execution",
-                )
-            await service.retry_command(
-                RetryCommandDTO(
-                    execution_id=execution_id,
-                    node_id=execution.node_id,
-                )
-            )
+            await service.retry_command(RetryCommandDTO(execution_id=execution_id))
             return BulkRetryCommandResult(
-                execution_id=str(execution_id),
-                status="retry_scheduled",
+                execution_id=str(execution_id), status="retry_scheduled"
             )
         except Exception as exc:
             return BulkRetryCommandResult(
-                execution_id=str(execution_id),
-                status="error",
-                message=str(exc),
+                execution_id=str(execution_id), status="error", message=str(exc)
             )
 
     results = list(

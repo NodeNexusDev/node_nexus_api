@@ -3,12 +3,11 @@
 from __future__ import annotations
 
 import uuid
-from typing import Protocol, runtime_checkable
+from typing import Protocol
 
 from app.application.dto.favorite import FavoriteCreateDTO, FavoriteDTO
 
 
-@runtime_checkable
 class FavoriteReader(Protocol):
     async def list_favorites(
         self,
@@ -24,7 +23,6 @@ class FavoriteReader(Protocol):
     ) -> FavoriteDTO | None: ...
 
 
-@runtime_checkable
 class FavoriteWriter(Protocol):
     async def add_favorite(self, data: FavoriteCreateDTO) -> FavoriteDTO: ...
     async def remove_favorite(

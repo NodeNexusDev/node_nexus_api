@@ -1,4 +1,4 @@
-"""OpenTelemetry telemetry configuration."""
+"""OpenTelemetry telemetry configuration — infrastructure adapter."""
 
 from __future__ import annotations
 

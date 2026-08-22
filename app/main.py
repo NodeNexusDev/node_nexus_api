@@ -16,6 +16,7 @@ from prometheus_fastapi_instrumentator import Instrumentator
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.adapters.lifecycle.application_startup import ApplicationStartup
+from app.adapters.telemetry import init_telemetry
 from app.api.error_mapping import domain_error_handler
 from app.api.middleware import (
     ApiVersionMiddleware,
@@ -45,7 +46,6 @@ from app.api.v1.search import router as search_router
 from app.api.v1.websocket import router as ws_router
 from app.core.config import get_settings
 from app.core.exceptions import DomainError
-from app.core.telemetry import init_telemetry
 from app.di.container import container
 
 

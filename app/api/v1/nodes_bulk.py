@@ -196,47 +196,24 @@ async def bulk_validate_credentials(
     _key: str = Security(require_write_scope),
 ) -> BulkValidateCredentialsResponse:
     """Validate SSH connectivity for multiple existing nodes."""
-    from app.application.dto.node_connection import NodeConnectionDTO
-    from app.application.services._target_resolver import resolve_targets
-
     audit.info(
         "api.nodes.bulk_validate_credentials",
         node_ids=[str(n) for n in data.node_ids],
         tags=data.tags,
     )
-    nodes = await resolve_targets(
-        service._node_reader,
+    results_dto = await service.validate_credentials_bulk(
         node_ids=data.node_ids,
         tags=data.tags,
     )
-
-    async def _validate_one(node: NodeConnectionDTO) -> BulkValidateCredentialsResult:
-        try:
-            connector = service._connector_factory.create_ssh(
-                host=node.host,
-                port=node.port,
-                username=node.username,
-                password=service._credential_cipher.decrypt(node.password),
-                ssh_key=service._credential_cipher.decrypt(node.ssh_key),
-                passphrase=service._credential_cipher.decrypt(node.passphrase),
-            )
-            async with connector:
-                await connector.execute_command("echo ok")
-            return BulkValidateCredentialsResult(
-                node_id=node.id,
-                node_name=node.name,
-                status="success",
-                message="Credentials valid",
-            )
-        except Exception as exc:
-            return BulkValidateCredentialsResult(
-                node_id=node.id,
-                node_name=node.name,
-                status="error",
-                message=str(exc),
-            )
-
-    results = list(await asyncio.gather(*(_validate_one(node) for node in nodes)))
+    results = [
+        BulkValidateCredentialsResult(
+            node_id=r.node_id,
+            node_name=r.node_name,
+            status=r.status,
+            message=r.message,
+        )
+        for r in results_dto
+    ]
     succeeded = sum(1 for r in results if r.status == "success")
     return BulkValidateCredentialsResponse(
         results=results,
