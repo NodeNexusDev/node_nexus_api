@@ -27,6 +27,10 @@ from app.application.dto.command_execution import (
 from app.application.dto.command_history import CommandHistoryCreateDTO
 from app.application.policies.output import bound_output
 from app.application.services._target_resolver import resolve_targets
+from app.application.services.ssh_executor import (
+    build_ssh_connector,
+    execute_ssh,
+)
 from app.application.types import JsonObject
 from app.core.exceptions import ConnectionFailedError, NodeNotFoundError
 
@@ -133,25 +137,21 @@ class NodeBulkCommandService:
     ) -> CommandExecutionDTO:
         """Execute on one node and always return a result."""
         async with self._semaphore:
-            connector = self._connector_factory.create_ssh(
-                host=node.host,
-                port=node.port,
-                username=node.username,
-                password=self._credential_cipher.decrypt(node.password),
-                ssh_key=self._credential_cipher.decrypt(node.ssh_key),
-                passphrase=self._credential_cipher.decrypt(node.passphrase),
+            connector = build_ssh_connector(
+                node, self._credential_cipher, self._connector_factory
             )
 
             try:
-                async with connector:
-                    stdout, stderr, exit_code = await connector.execute_command(command)
-                audit.info("node.bulk.executed", node_id=str(node.id), command=command)
+                result = await execute_ssh(connector, command)
+                audit.info(
+                    "node.bulk.executed", node_id=str(node.id), command=command
+                )
                 return CommandExecutionDTO(
                     node_id=node.id,
                     node_name=node.name,
-                    stdout=stdout,
-                    stderr=stderr,
-                    exit_code=exit_code,
+                    stdout=result.stdout,
+                    stderr=result.stderr,
+                    exit_code=result.exit_code,
                 )
             except ConnectionFailedError as exc:
                 audit.error(

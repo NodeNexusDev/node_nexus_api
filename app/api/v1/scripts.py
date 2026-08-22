@@ -239,7 +239,7 @@ async def get_script(
 async def create_script(
     data: ScriptCreate,
     service: FromDishka[ScriptManagementService],
-    _key: str = Security(get_current_api_key),
+    _key: str = Security(require_write_scope),
 ) -> ScriptResponse:
     """Create a new script."""
     audit.info("api.scripts.create", name=data.name)
@@ -260,7 +260,7 @@ async def update_script(
     script_id: uuid.UUID,
     data: ScriptUpdate,
     service: FromDishka[ScriptManagementService],
-    _key: str = Security(get_current_api_key),
+    _key: str = Security(require_write_scope),
 ) -> ScriptResponse:
     """Update an existing script."""
     audit.info("api.scripts.update", script_id=str(script_id))
@@ -281,7 +281,7 @@ async def update_script(
 async def delete_script(
     script_id: uuid.UUID,
     service: FromDishka[ScriptManagementService],
-    _key: str = Security(get_current_api_key),
+    _key: str = Security(require_write_scope),
 ) -> None:
     """Delete a script."""
     audit.info("api.scripts.delete", script_id=str(script_id))
@@ -308,7 +308,7 @@ async def execute_script(
     script_id: uuid.UUID,
     data: ScriptExecuteRequest,
     service: FromDishka[ScriptExecutionService],
-    _key: str = Security(get_current_api_key),
+    _key: str = Security(require_write_scope),
 ) -> ScriptExecutionBatchResult:
     """Execute a script on multiple nodes by IDs and/or tags."""
     audit.info(
@@ -405,7 +405,7 @@ async def unschedule_script(
 async def get_schedule(
     script_id: uuid.UUID,
     schedule_service: FromDishka[ScheduleManagementService],
-    _key: str = Security(require_write_scope),
+    _key: str = Security(get_current_api_key),
 ) -> ScheduledJob | None:
     """Get the schedule for a script."""
     audit.info("api.scripts.get_schedule", script_id=str(script_id))
