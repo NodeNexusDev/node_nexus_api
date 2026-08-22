@@ -2,9 +2,12 @@ from __future__ import annotations
 
 import csv
 import io
-from typing import Any, Protocol
+from typing import Protocol
 
 from app.application.dto.export import AuditExportQueryDTO, AuditExportRowDTO
+
+# JSON-compatible value type
+JsonValue = str | int | float | bool | None
 
 
 class AuditExporter(Protocol):
@@ -34,7 +37,7 @@ def rows_to_csv(rows: list[AuditExportRowDTO]) -> str:
     return buf.getvalue()
 
 
-def rows_to_json(rows: list[AuditExportRowDTO]) -> list[dict[str, Any]]:
+def rows_to_json(rows: list[AuditExportRowDTO]) -> list[dict[str, JsonValue]]:
     return [
         {
             "id": r.id,

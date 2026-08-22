@@ -4,13 +4,15 @@ import asyncio
 import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import Any
+
+# JSON-compatible value type
+JsonValue = str | int | float | bool | None
 
 
 @dataclass
 class SseEvent:
     event: str
-    data: dict[str, Any]
+    data: dict[str, JsonValue]
     id: str = field(default_factory=lambda: uuid.uuid4().hex)
     timestamp: str = field(
         default_factory=lambda: datetime.now(UTC).isoformat(),
@@ -39,7 +41,7 @@ class SseBroadcaster:
     def unsubscribe(self, sub_id: str) -> None:
         self._queues.pop(sub_id, None)
 
-    def publish(self, event: str, data: dict[str, Any]) -> None:
+    def publish(self, event: str, data: dict[str, JsonValue]) -> None:
         sse_event = SseEvent(event=event, data=data)
         self._history.append(sse_event)
         if len(self._history) > self._max_history:
