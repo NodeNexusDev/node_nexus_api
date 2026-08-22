@@ -119,7 +119,7 @@ async def get_nodes(
 
 @router.get("/tags")
 @inject
-async def get_all_tags(
+async def get_node_tags(
     service: FromDishka[NodeManagementService],
     _key: str = Security(get_current_api_key),
 ) -> list[str]:

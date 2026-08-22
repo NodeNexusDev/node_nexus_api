@@ -31,7 +31,7 @@ async def rename_tag(
     }
 
 
-@router.delete("/tags/{tag_name}")
+@router.delete("/tags/{tag_name}", status_code=200)
 @inject
 async def delete_tag(
     tag_name: str,

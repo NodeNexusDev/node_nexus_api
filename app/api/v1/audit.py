@@ -59,7 +59,7 @@ async def get_audit_logs(
     )
 
 
-@router.delete("/")
+@router.delete("/", status_code=200)
 @inject
 async def delete_audit_logs(
     service: FromDishka[AuditLogService],
