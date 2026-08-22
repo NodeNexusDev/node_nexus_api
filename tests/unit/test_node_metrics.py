@@ -298,9 +298,7 @@ class TestNodeMetricsService:
 
         async def execute(command: str) -> tuple[str, str, int]:
             if "vmstat" in command:
-                return ("1.0", "", 0)
-            if "top" in command:
-                return ("1.0", "", 0)
+                return ("10", "", 0)
             if "nproc" in command:
                 return ("1", "", 0)
             if "free" in command or "df" in command:
@@ -348,9 +346,7 @@ class TestNodeMetricsService:
         # Mock SSH commands
         async def mock_execute(cmd):
             if "vmstat" in cmd:
-                return ("25.0", "", 0)
-            elif "top" in cmd:
-                return ("25.0", "", 0)
+                return ("25", "", 0)
             elif "nproc" in cmd:
                 return ("4", "", 0)
             elif "free" in cmd:
@@ -417,3 +413,107 @@ class TestNodeMetricsService:
 
         with pytest.raises(ConnectionFailedError):
             await service.collect(uuid.UUID("00000000-0000-0000-0000-000000000001"))
+
+    @pytest.mark.asyncio
+    async def test_cpu_fallback_to_proc_stat(self) -> None:
+        """When vmstat fails, falls back to /proc/stat delta."""
+        mock_repo = AsyncMock()
+        mock_factory = MagicMock()
+        mock_node = MagicMock(
+            id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
+            host="10.0.0.1",
+            port=22,
+            username="root",
+            password=None,
+            ssh_key=None,
+            passphrase=None,
+        )
+        mock_repo.get_connection.return_value = mock_node
+
+        proc_stat_1 = "cpu  1000 200 300 8000 100 50 30 10 0 0"
+        proc_stat_2 = "cpu  1200 250 350 8300 120 60 35 12 0 0"
+
+        async def mock_execute(cmd):
+            if "vmstat" in cmd:
+                return ("", "", 1)
+            if "head -1 /proc/stat" in cmd:
+                if not hasattr(mock_execute, "_call"):
+                    mock_execute._call = 0
+                mock_execute._call += 1
+                if mock_execute._call == 1:
+                    return (proc_stat_1, "", 0)
+                return (proc_stat_2, "", 0)
+            if "sleep" in cmd:
+                return ("", "", 0)
+            if "nproc" in cmd:
+                return ("2", "", 0)
+            if "free" in cmd:
+                return ("4000000000 2000000000 2000000000", "", 0)
+            if "df" in cmd:
+                return ("100000000000 50000000000 50000000000", "", 0)
+            if "loadavg" in cmd:
+                return ("0.10 0.20 0.30", "", 0)
+            if "uptime" in cmd:
+                return ("2026-01-01 00:00:00", "", 0)
+            return ("", "", 0)
+
+        mock_connector = AsyncMock()
+        mock_connector.execute_command = mock_execute
+        mock_factory.create_ssh.return_value = MockAsyncContextManager(mock_connector)
+
+        service = NodeMetricsService(
+            node_reader=mock_repo,
+            credential_cipher=AesGcmCredentialCipher(),
+            connector_factory=mock_factory,
+        )
+        metrics = await service.collect(
+            uuid.UUID("00000000-0000-0000-0000-000000000001")
+        )
+
+        assert 0.0 <= metrics.cpu.usage_percent <= 100.0
+
+    @pytest.mark.asyncio
+    async def test_cpu_clamped_to_100(self) -> None:
+        """CPU usage is clamped to [0, 100] even if parsing gives > 100."""
+        mock_repo = AsyncMock()
+        mock_factory = MagicMock()
+        mock_node = MagicMock(
+            id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
+            host="10.0.0.1",
+            port=22,
+            username="root",
+            password=None,
+            ssh_key=None,
+            passphrase=None,
+        )
+        mock_repo.get_connection.return_value = mock_node
+
+        async def mock_execute(cmd):
+            if "vmstat" in cmd:
+                return ("150", "", 0)
+            if "nproc" in cmd:
+                return ("1", "", 0)
+            if "free" in cmd:
+                return ("1000 500 500", "", 0)
+            if "df" in cmd:
+                return ("1000 500 500", "", 0)
+            if "loadavg" in cmd:
+                return ("0.5 0.3 0.1", "", 0)
+            if "uptime" in cmd:
+                return ("2026-01-01 00:00:00", "", 0)
+            return ("", "", 0)
+
+        mock_connector = AsyncMock()
+        mock_connector.execute_command = mock_execute
+        mock_factory.create_ssh.return_value = MockAsyncContextManager(mock_connector)
+
+        service = NodeMetricsService(
+            node_reader=mock_repo,
+            credential_cipher=AesGcmCredentialCipher(),
+            connector_factory=mock_factory,
+        )
+        metrics = await service.collect(
+            uuid.UUID("00000000-0000-0000-0000-000000000001")
+        )
+
+        assert metrics.cpu.usage_percent == 100.0

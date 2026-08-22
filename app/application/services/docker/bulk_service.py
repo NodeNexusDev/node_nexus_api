@@ -275,8 +275,11 @@ class DockerBulkService:
         merged: dict[int, BulkDockerPullResultDTO] = {}
         for idx, err in errors.items():
             merged[idx] = BulkDockerPullResultDTO(
-                node_id=err.node_id, node_name=err.node_name,
-                status=err.status, output=err.output, error=err.error,
+                node_id=err.node_id,
+                node_name=err.node_name,
+                status=err.status,
+                output=err.output,
+                error=err.error,
             )
         for (index, _, _), result in zip(prepared, remote, strict=True):
             merged[index] = result
@@ -359,8 +362,11 @@ class DockerBulkService:
         merged: dict[int, BulkDockerPullResultDTO] = {}
         for idx, err in errors.items():
             merged[idx] = BulkDockerPullResultDTO(
-                node_id=err.node_id, node_name=err.node_name,
-                status=err.status, output=err.output, error=err.error,
+                node_id=err.node_id,
+                node_name=err.node_name,
+                status=err.status,
+                output=err.output,
+                error=err.error,
             )
         for (index, _, _), result in zip(prepared, remote, strict=True):
             merged[index] = result
@@ -458,8 +464,11 @@ class DockerBulkService:
         merged: dict[int, BulkDockerPullResultDTO] = {}
         for idx, err in errors.items():
             merged[idx] = BulkDockerPullResultDTO(
-                node_id=err.node_id, node_name=err.node_name,
-                status=err.status, output=err.output, error=err.error,
+                node_id=err.node_id,
+                node_name=err.node_name,
+                status=err.status,
+                output=err.output,
+                error=err.error,
             )
         for (index, _, _), result in zip(prepared, remote, strict=True):
             merged[index] = result
