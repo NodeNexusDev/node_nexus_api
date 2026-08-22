@@ -19,9 +19,11 @@ from app.core.exceptions import (
     DockerValidationError,
     DomainError,
     ExecutionNotFoundError,
+    FavoriteNotFoundError,
     ImageNotFoundError,
     NodeNameConflictError,
     NodeNotFoundError,
+    NoteNotFoundError,
     RequestTimeoutError,
     ScheduledScriptExecutionError,
     ScheduleNotFoundError,
@@ -63,6 +65,8 @@ DOMAIN_ERROR_STATUS: dict[type[DomainError], int] = {
     AuditWriteError: 503,
     ExecutionNotFoundError: 404,
     ScheduledScriptExecutionError: 422,
+    FavoriteNotFoundError: 404,
+    NoteNotFoundError: 404,
     DomainError: 422,
 }
 
