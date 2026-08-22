@@ -10,7 +10,6 @@ from fastapi import APIRouter, Security
 from app.api.deps import get_current_api_key, require_write_scope
 from app.application.dto.bulk_node_operation import (
     BulkNodeDeleteDTO,
-    BulkNodeTagOperationDTO,
 )
 from app.application.dto.node_management import NodeUpdateDTO
 from app.application.services.node_bulk_command_service import NodeBulkCommandService
@@ -26,7 +25,6 @@ from app.schemas.node import (
     BulkNodeMetricsResponse,
     BulkNodeMetricsResult,
     BulkNodeOperationResult,
-    BulkNodeTagRequest,
     BulkNodeUpdateRequest,
     BulkNodeUpdateResponse,
     BulkNodeUpdateResult,
@@ -108,7 +106,7 @@ async def bulk_get_node_metrics(
     )
 
 
-@router.put("/bulk/update", response_model=BulkNodeUpdateResponse)
+@router.patch("/bulk/update", response_model=BulkNodeUpdateResponse)
 @inject
 async def bulk_update_nodes(
     data: BulkNodeUpdateRequest,
@@ -160,56 +158,6 @@ async def bulk_delete_nodes(
         node_ids=[str(n) for n in data.node_ids],
     )
     result = await service.bulk_delete(BulkNodeDeleteDTO(node_ids=tuple(data.node_ids)))
-    return BulkNodeOperationResult(
-        affected=result.affected,
-        node_ids=list(result.node_ids),
-    )
-
-
-@router.post("/bulk/tags/add", response_model=BulkNodeOperationResult)
-@inject
-async def bulk_add_tags(
-    data: BulkNodeTagRequest,
-    service: FromDishka[NodeBulkOperationService],
-    _key: str = Security(require_write_scope),
-) -> BulkNodeOperationResult:
-    """Add tags to multiple nodes."""
-    audit.info(
-        "api.nodes.bulk_tags_add",
-        node_ids=[str(n) for n in data.node_ids],
-        tags=data.tags,
-    )
-    result = await service.bulk_add_tags(
-        BulkNodeTagOperationDTO(
-            node_ids=tuple(data.node_ids),
-            tags=tuple(data.tags),
-        )
-    )
-    return BulkNodeOperationResult(
-        affected=result.affected,
-        node_ids=list(result.node_ids),
-    )
-
-
-@router.post("/bulk/tags/remove", response_model=BulkNodeOperationResult)
-@inject
-async def bulk_remove_tags(
-    data: BulkNodeTagRequest,
-    service: FromDishka[NodeBulkOperationService],
-    _key: str = Security(require_write_scope),
-) -> BulkNodeOperationResult:
-    """Remove tags from multiple nodes."""
-    audit.info(
-        "api.nodes.bulk_tags_remove",
-        node_ids=[str(n) for n in data.node_ids],
-        tags=data.tags,
-    )
-    result = await service.bulk_remove_tags(
-        BulkNodeTagOperationDTO(
-            node_ids=tuple(data.node_ids),
-            tags=tuple(data.tags),
-        )
-    )
     return BulkNodeOperationResult(
         affected=result.affected,
         node_ids=list(result.node_ids),

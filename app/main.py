@@ -42,7 +42,6 @@ from app.api.v1.notes import router as notes_router
 from app.api.v1.scripts import router as scripts_router
 from app.api.v1.scripts_bulk import router as scripts_bulk_router
 from app.api.v1.search import router as search_router
-from app.api.v1.tags import router as tags_router
 from app.api.v1.websocket import router as ws_router
 from app.core.config import get_settings
 from app.core.exceptions import DomainError
@@ -114,7 +113,6 @@ def create_app() -> FastAPI:
             {"name": "dashboard", "description": "Dashboard overview and metrics"},
             {"name": "favorites", "description": "Favorite nodes/scripts/commands"},
             {"name": "notes", "description": "Notes for nodes"},
-            {"name": "tags", "description": "Global tag management"},
             {"name": "search", "description": "Global search across entities"},
             {"name": "events", "description": "Real-time event streaming"},
         ],
@@ -213,7 +211,6 @@ def create_app() -> FastAPI:
     app.include_router(events_router, prefix="/api/v1")
     app.include_router(ws_router, prefix="/api/v1")
     app.include_router(search_router, prefix="/api/v1")
-    app.include_router(tags_router, prefix="/api/v1")
     app.include_router(favorites_router, prefix="/api/v1")
     app.include_router(notes_router, prefix="/api/v1")
     if settings.E2E_ENABLED:

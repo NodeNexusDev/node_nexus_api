@@ -24,7 +24,6 @@ from app.application.services.favorite_service import FavoriteService
 from app.application.services.global_search_service import GlobalSearchService
 from app.application.services.note_service import NoteService
 from app.application.services.sse_broadcaster import SseBroadcaster, SseEvent
-from app.application.services.tag_management_service import TagManagementService
 from app.core.exceptions import FavoriteNotFoundError, NoteNotFoundError
 
 # ─── FavoriteService ───
@@ -207,31 +206,6 @@ class TestNoteService:
 
         with pytest.raises(NoteNotFoundError):
             await svc.delete_note(str(uuid.uuid4()))
-
-
-# ─── TagManagementService ───
-
-
-class TestTagManagementService:
-    @pytest.mark.asyncio
-    async def test_rename_tag(self) -> None:
-        tag_manager = AsyncMock()
-        tag_manager.rename_tag.return_value = 5
-        svc = TagManagementService(tag_manager=tag_manager)
-
-        result = await svc.rename_tag("old", "new")
-        assert result == 5
-        tag_manager.rename_tag.assert_awaited_once_with("old", "new")
-
-    @pytest.mark.asyncio
-    async def test_delete_tag(self) -> None:
-        tag_manager = AsyncMock()
-        tag_manager.delete_tag.return_value = 3
-        svc = TagManagementService(tag_manager=tag_manager)
-
-        result = await svc.delete_tag("toremove")
-        assert result == 3
-        tag_manager.delete_tag.assert_awaited_once_with("toremove")
 
 
 # ─── ExecutionStatsService ───

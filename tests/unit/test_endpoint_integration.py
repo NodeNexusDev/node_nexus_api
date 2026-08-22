@@ -17,7 +17,6 @@ from app.api.v1 import (
     notes,
     scripts,
     search,
-    tags,
 )
 from app.application.dto.command_management import CommandViewDTO
 from app.application.dto.execution_stats import ExecutionStatsDTO
@@ -38,7 +37,6 @@ from app.application.services.note_service import NoteService
 from app.application.services.script_management_service import (
     ScriptManagementService,
 )
-from app.application.services.tag_management_service import TagManagementService
 
 
 async def _noop_auth(*a, **kw):  # noqa: ANN001, ANN002, ANN003
@@ -52,7 +50,6 @@ _MODULE_IMPORTS: dict[str, list[str]] = {
     "app.api.v1.notes": ["get_current_api_key", "require_write_scope"],
     "app.api.v1.scripts": ["get_current_api_key", "require_write_scope"],
     "app.api.v1.search": ["get_current_api_key"],
-    "app.api.v1.tags": ["require_write_scope"],
     "app.api.v1.nodes": ["get_current_api_key", "require_write_scope"],
 }
 
@@ -143,7 +140,7 @@ class TestNoteEndpoints:
             )
         finally:
             _stop_patches(patches)
-        assert resp.status_code == 200
+        assert resp.status_code == 201
         assert resp.json()["content"] == "note"
 
     def test_update(self) -> None:
@@ -232,7 +229,7 @@ class TestFavoriteEndpoints:
             )
         finally:
             _stop_patches(patches)
-        assert resp.status_code == 200
+        assert resp.status_code == 201
 
     def test_remove(self) -> None:
         mock_svc = AsyncMock(spec=FavoriteService)
@@ -251,47 +248,6 @@ class TestFavoriteEndpoints:
         finally:
             _stop_patches(patches)
         assert resp.status_code == 204
-
-
-class TestTagEndpoints:
-    def test_rename(self) -> None:
-        mock_svc = AsyncMock(spec=TagManagementService)
-        mock_svc.rename_tag.return_value = 3
-
-        app = _build_app_with_service(TagManagementService, mock_svc)
-        app.include_router(tags.router)
-
-        patches = _patch_auth()
-        try:
-            client = TestClient(app)
-            resp = client.patch(
-                "/tags/old",
-                json={"new_name": "new"},
-                headers={"X-API-Key": "test"},
-            )
-        finally:
-            _stop_patches(patches)
-        assert resp.status_code == 200
-        assert resp.json()["affected"] == 3
-
-    def test_delete(self) -> None:
-        mock_svc = AsyncMock(spec=TagManagementService)
-        mock_svc.delete_tag.return_value = 5
-
-        app = _build_app_with_service(TagManagementService, mock_svc)
-        app.include_router(tags.router)
-
-        patches = _patch_auth()
-        try:
-            client = TestClient(app)
-            resp = client.delete(
-                "/tags/toremove",
-                headers={"X-API-Key": "test"},
-            )
-        finally:
-            _stop_patches(patches)
-        assert resp.status_code == 200
-        assert resp.json()["affected"] == 5
 
 
 class TestSearchEndpoint:

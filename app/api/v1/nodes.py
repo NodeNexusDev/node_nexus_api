@@ -9,7 +9,6 @@ from fastapi import APIRouter, HTTPException, Query, Security
 from app.api.deps import get_current_api_key, require_write_scope
 from app.application.dto.node_management import (
     NodeCreateDTO,
-    NodeTagDTO,
     NodeUpdateDTO,
 )
 from app.application.dto.node_status_history import (
@@ -39,8 +38,6 @@ from app.schemas.node import (
     NodeValidateRequest,
     NodeValidateResponse,
     PaginatedResponse,
-    TagAdd,
-    TagRemove,
 )
 
 audit = structlog.get_logger("audit")
@@ -167,7 +164,7 @@ async def create_node(
     )
 
 
-@router.put("/{node_id}", response_model=NodeResponse)
+@router.patch("/{node_id}", response_model=NodeResponse)
 @inject
 async def update_node(
     node_id: uuid.UUID,
@@ -286,32 +283,6 @@ async def get_node_metrics(
         ),
         uptime_since=result.uptime_since,
     )
-
-
-@router.post("/{node_id}/tags", response_model=NodeResponse)
-@inject
-async def add_tag(
-    node_id: uuid.UUID,
-    data: TagAdd,
-    service: FromDishka[NodeManagementService],
-    _key: str = Security(require_write_scope),
-) -> NodeResponse:
-    """Add a tag to a node."""
-    audit.info("api.nodes.tags.add", node_id=str(node_id), tag=data.tag)
-    return _node_response(await service.add_tag(node_id, NodeTagDTO(tag=data.tag)))
-
-
-@router.delete("/{node_id}/tags", response_model=NodeResponse)
-@inject
-async def remove_tag(
-    node_id: uuid.UUID,
-    data: TagRemove,
-    service: FromDishka[NodeManagementService],
-    _key: str = Security(require_write_scope),
-) -> NodeResponse:
-    """Remove a tag from a node."""
-    audit.info("api.nodes.tags.remove", node_id=str(node_id), tag=data.tag)
-    return _node_response(await service.remove_tag(node_id, NodeTagDTO(tag=data.tag)))
 
 
 @router.get(

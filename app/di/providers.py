@@ -55,7 +55,6 @@ from app.adapters.persistence.script_gateway import (
     ScopedScriptExecutionWriter,
     SqlAlchemyScriptGateway,
 )
-from app.adapters.persistence.tag_manager import SqlAlchemyTagManager
 from app.adapters.runtime.apscheduler_runtime import ApschedulerRuntime
 from app.adapters.runtime.docker import SshDockerRuntime
 from app.adapters.runtime.scheduler import ApschedulerJobScheduler
@@ -112,7 +111,6 @@ from app.application.ports.script_persistence import (
     ScriptReader,
     ScriptWriter,
 )
-from app.application.ports.tag_manager import TagManager
 from app.application.services.api_key_authentication import (
     APIKeyAuthenticationService,
 )
@@ -166,7 +164,6 @@ from app.application.services.script_execution_service import ScriptExecutionSer
 from app.application.services.script_history_service import ScriptHistoryService
 from app.application.services.script_management_service import ScriptManagementService
 from app.application.services.streaming_command_service import StreamingCommandService
-from app.application.services.tag_management_service import TagManagementService
 from app.core.config import Settings, get_settings
 
 
@@ -501,11 +498,6 @@ class RepositoryProvider(Provider):
     def get_audit_exporter(self, session: AsyncSession) -> AuditExporter:
         """Bind audit export to the persistence adapter."""
         return SqlAlchemyAuditExporter(session)
-
-    @provide(scope=Scope.REQUEST, provides=TagManager)
-    def get_tag_manager(self, session: AsyncSession) -> TagManager:
-        """Bind tag management to the persistence adapter."""
-        return SqlAlchemyTagManager(session)
 
     @provide(scope=Scope.REQUEST, provides=FavoriteReader)
     def get_favorite_reader(self, session: AsyncSession) -> FavoriteReader:
@@ -1044,14 +1036,6 @@ class ServiceProvider(Provider):
     ) -> DashboardMetricsService:
         """Get dashboard metrics service."""
         return DashboardMetricsService(reader=reader)
-
-    @provide(scope=Scope.REQUEST)
-    def get_tag_management_service(
-        self,
-        tag_manager: TagManager,
-    ) -> TagManagementService:
-        """Get tag management service."""
-        return TagManagementService(tag_manager=tag_manager)
 
     @provide(scope=Scope.REQUEST)
     def get_favorite_service(
