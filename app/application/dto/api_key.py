@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass, field
 from datetime import datetime
+from typing import Literal
 from uuid import UUID
 
 
@@ -13,7 +14,7 @@ class APIKeyViewDTO:
     name: str
     key_prefix: str
     is_active: bool
-    scope: str
+    scope: Literal["read-only", "read-write"]
     created_at: datetime
     last_used_at: datetime | None
     expires_at: datetime | None
@@ -26,7 +27,7 @@ class APIKeyAuthDTO:
     id: UUID
     key_prefix: str
     is_active: bool
-    scope: str
+    scope: Literal["read-only", "read-write"]
     expires_at: datetime | None
     last_used_at: datetime | None
 
@@ -36,7 +37,7 @@ class APIKeyCreateDTO:
     """Requested API-key properties."""
 
     name: str
-    scope: str = "read-write"
+    scope: Literal["read-only", "read-write"] = "read-write"
 
 
 @dataclass(frozen=True, slots=True)
@@ -57,7 +58,7 @@ class APIKeyPersistenceDTO:
     name: str
     key_hash: str = field(repr=False)
     key_prefix: str
-    scope: str
+    scope: Literal["read-only", "read-write"]
 
 
 @dataclass(frozen=True, slots=True)
