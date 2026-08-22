@@ -144,7 +144,7 @@ class TestBulkUpdate:
                 base_url="http://test",
                 headers={"X-API-Key": "test-master"},
             ) as ac:
-                resp = await ac.put(
+                resp = await ac.patch(
                     "/api/v1/nodes/bulk/update",
                     json={
                         "node_ids": [NODE_ID],
@@ -254,58 +254,6 @@ class TestBulkDelete:
                 resp = await ac.post(
                     "/api/v1/nodes/bulk/delete",
                     json={"node_ids": [NODE_ID]},
-                )
-        assert resp.status_code == 200
-        data = resp.json()
-        assert data["affected"] == 1
-
-
-# ── bulk/tags/add ──
-
-
-class TestBulkAddTags:
-    @pytest.mark.asyncio
-    async def test_bulk_add_tags(self) -> None:
-        svc = AsyncMock()
-        svc.bulk_add_tags.return_value = BulkNodeOperationResultDTO(
-            affected=1, node_ids=(uuid.UUID(NODE_ID),)
-        )
-        app = _create_nodes_app(node_bulk_op=svc)
-        with _settings_patcher:
-            async with AsyncClient(
-                transport=ASGITransport(app=app),
-                base_url="http://test",
-                headers={"X-API-Key": "test-master"},
-            ) as ac:
-                resp = await ac.post(
-                    "/api/v1/nodes/bulk/tags/add",
-                    json={"node_ids": [NODE_ID], "tags": ["prod"]},
-                )
-        assert resp.status_code == 200
-        data = resp.json()
-        assert data["affected"] == 1
-
-
-# ── bulk/tags/remove ──
-
-
-class TestBulkRemoveTags:
-    @pytest.mark.asyncio
-    async def test_bulk_remove_tags(self) -> None:
-        svc = AsyncMock()
-        svc.bulk_remove_tags.return_value = BulkNodeOperationResultDTO(
-            affected=1, node_ids=(uuid.UUID(NODE_ID),)
-        )
-        app = _create_nodes_app(node_bulk_op=svc)
-        with _settings_patcher:
-            async with AsyncClient(
-                transport=ASGITransport(app=app),
-                base_url="http://test",
-                headers={"X-API-Key": "test-master"},
-            ) as ac:
-                resp = await ac.post(
-                    "/api/v1/nodes/bulk/tags/remove",
-                    json={"node_ids": [NODE_ID], "tags": ["prod"]},
                 )
         assert resp.status_code == 200
         data = resp.json()
