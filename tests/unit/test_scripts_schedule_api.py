@@ -132,8 +132,7 @@ class TestUnscheduleScriptAPI:
         resp = await client.delete(
             "/api/v1/scripts/00000000-0000-0000-0000-000000000001/schedule"
         )
-        assert resp.status_code == 200
-        assert "unscheduled" in resp.json()["message"]
+        assert resp.status_code == 204
 
     async def test_unschedule_not_found(
         self, client: AsyncClient, mock_schedule_service: AsyncMock

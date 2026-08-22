@@ -2,7 +2,6 @@
 
 import uuid
 from datetime import datetime
-from typing import Any
 
 import structlog
 from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
@@ -35,14 +34,16 @@ from app.application.services.schedule_management import (
 from app.application.services.script_execution_service import ScriptExecutionService
 from app.application.services.script_history_service import ScriptHistoryService
 from app.application.services.script_management_service import ScriptManagementService
+from app.schemas.common import PaginatedResponse
 from app.schemas.execution_stats import ExecutionStatsResponse
-from app.schemas.node import PaginatedResponse
 from app.schemas.scheduler import ScheduledJob, ScheduleRequest, ScheduleResponse
 from app.schemas.script import (
+    ScriptCancelResponse,
     ScriptCreate,
     ScriptExecuteRequest,
     ScriptExecutionBatchResult,
     ScriptResponse,
+    ScriptRetryResponse,
     ScriptStep,
     ScriptUpdate,
 )
@@ -254,7 +255,7 @@ async def create_script(
     return _script_response(result)
 
 
-@router.put("/{script_id}", response_model=ScriptResponse)
+@router.patch("/{script_id}", response_model=ScriptResponse)
 @inject
 async def update_script(
     script_id: uuid.UUID,
@@ -387,17 +388,16 @@ async def schedule_script(
     )
 
 
-@router.delete("/{script_id}/schedule", status_code=200)
+@router.delete("/{script_id}/schedule", status_code=204)
 @inject
 async def unschedule_script(
     script_id: uuid.UUID,
     schedule_service: FromDishka[ScheduleManagementService],
     _key: str = Security(require_write_scope),
-) -> dict[str, Any]:
+) -> None:
     """Remove a scheduled script."""
     audit.info("api.scripts.unschedule", script_id=str(script_id))
     await schedule_service.delete(script_id)
-    return {"message": "Script unscheduled", "script_id": str(script_id)}
 
 
 @router.get("/{script_id}/schedule", response_model=ScheduledJob | None)
@@ -415,38 +415,38 @@ async def get_schedule(
 # --- Execution lifecycle ---
 
 
-@router.post("/executions/{execution_id}/retry")
+@router.post("/executions/{execution_id}/retry", response_model=ScriptRetryResponse)
 @inject
 async def retry_script(
     execution_id: uuid.UUID,
     service: FromDishka[ExecutionLifecycleService],
     _key: str = Security(require_write_scope),
-) -> dict[str, Any]:
+) -> ScriptRetryResponse:
     """Retry a script execution."""
     audit.info("api.scripts.executions.retry", execution_id=str(execution_id))
     result = await service.retry_script(RetryScriptDTO(execution_id=execution_id))
-    return {
-        "execution_id": result.execution_id,
-        "status": result.status,
-        "message": "Script retry scheduled",
-    }
+    return ScriptRetryResponse(
+        execution_id=result.execution_id,
+        status=result.status,
+        message="Script retry scheduled",
+    )
 
 
-@router.post("/executions/{execution_id}/cancel")
+@router.post("/executions/{execution_id}/cancel", response_model=ScriptCancelResponse)
 @inject
 async def cancel_script(
     execution_id: uuid.UUID,
     service: FromDishka[ExecutionLifecycleService],
     _key: str = Security(require_write_scope),
-) -> dict[str, Any]:
+) -> ScriptCancelResponse:
     """Cancel a running script execution."""
     audit.info("api.scripts.executions.cancel", execution_id=str(execution_id))
     await service.cancel_execution(CancelExecutionDTO(execution_id=execution_id))
-    return {
-        "execution_id": str(execution_id),
-        "status": "cancelled",
-        "message": "Execution cancelled",
-    }
+    return ScriptCancelResponse(
+        execution_id=str(execution_id),
+        status="cancelled",
+        message="Execution cancelled",
+    )
 
 
 @router.get("/{script_id}/schedule/history")

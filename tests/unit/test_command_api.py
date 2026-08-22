@@ -185,14 +185,14 @@ class TestCreateCommand:
         assert response.status_code == 422
 
 
-# --- PUT /commands/{id} ---
+# --- PATCH /commands/{id} ---
 
 
 class TestUpdateCommand:
     async def test_found(self, client: AsyncClient, mock_service: AsyncMock) -> None:
         cmd = _make_command(name="updated")
         mock_service.update_command.return_value = cmd
-        response = await client.put(
+        response = await client.patch(
             f"/api/v1/commands/{cmd.id}",
             json={"name": "updated"},
         )
@@ -203,7 +203,7 @@ class TestUpdateCommand:
         self, client: AsyncClient, mock_service: AsyncMock
     ) -> None:
         mock_service.update_command.side_effect = CommandNotFoundError("not found")
-        response = await client.put(
+        response = await client.patch(
             f"/api/v1/commands/{uuid.uuid4()}",
             json={"name": "x"},
         )
@@ -215,7 +215,7 @@ class TestUpdateCommand:
         cmd = _make_command(description=None)
         mock_service.update_command.return_value = cmd
 
-        response = await client.put(
+        response = await client.patch(
             f"/api/v1/commands/{cmd.id}",
             json={"description": None},
         )

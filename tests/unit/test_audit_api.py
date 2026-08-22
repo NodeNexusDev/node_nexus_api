@@ -185,7 +185,5 @@ class TestDeleteAuditLogs:
                 headers={"X-API-Key": "test-master"},
             ) as client:
                 resp = await client.delete("/api/v1/audit/?confirm=yes")
-        assert resp.status_code == 200
-        data = resp.json()
-        assert data["deleted_count"] == 10
+        assert resp.status_code == 204
         mock_service.delete_all_logs.assert_called_once()

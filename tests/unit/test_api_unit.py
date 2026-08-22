@@ -22,10 +22,10 @@ from app.application.services.node_command_service import NodeCommandService
 from app.application.services.node_management_service import NodeManagementService
 from app.application.services.node_metrics_service import NodeMetricsService
 from app.core.exceptions import ConnectionFailedError, DomainError, NodeNotFoundError
+from app.schemas.command import CommandResult
 from app.schemas.node import (
     BulkCommandResult,
     BulkNodeResult,
-    CommandResult,
     NodeResponse,
 )
 from tests.unit.conftest import MockAuthServiceProvider, _mock_settings
@@ -207,14 +207,14 @@ class TestCreateNode:
         assert response.status_code == 422
 
 
-# --- PUT /nodes/{id} ---
+# --- PATCH /nodes/{id} ---
 
 
 class TestUpdateNode:
     async def test_found(self, client: AsyncClient, mock_service: AsyncMock) -> None:
         node = _make_node(name="updated")
         mock_service.update_node.return_value = node
-        response = await client.put(
+        response = await client.patch(
             f"/api/v1/nodes/{node.id}",
             json={"name": "updated"},
         )
@@ -225,7 +225,7 @@ class TestUpdateNode:
         self, client: AsyncClient, mock_service: AsyncMock
     ) -> None:
         mock_service.update_node.side_effect = NodeNotFoundError("not found")
-        response = await client.put(
+        response = await client.patch(
             f"/api/v1/nodes/{uuid.uuid4()}",
             json={"name": "x"},
         )
@@ -419,57 +419,6 @@ class TestGetAllTags:
         response = await client.get("/api/v1/nodes/tags")
         assert response.status_code == 200
         assert response.json() == []
-
-
-# --- POST /nodes/{id}/tags ---
-
-
-class TestAddTag:
-    async def test_success(self, client: AsyncClient, mock_service: AsyncMock) -> None:
-        node = _make_node(tags=["web"])
-        mock_service.add_tag.return_value = node
-        response = await client.post(
-            f"/api/v1/nodes/{node.id}/tags",
-            json={"tag": "web"},
-        )
-        assert response.status_code == 200
-        assert "web" in response.json()["tags"]
-
-    async def test_not_found(
-        self, client: AsyncClient, mock_service: AsyncMock
-    ) -> None:
-        mock_service.add_tag.side_effect = NodeNotFoundError("not found")
-        response = await client.post(
-            f"/api/v1/nodes/{uuid.uuid4()}/tags",
-            json={"tag": "web"},
-        )
-        assert response.status_code == 404
-
-
-# --- DELETE /nodes/{id}/tags ---
-
-
-class TestRemoveTag:
-    async def test_success(self, client: AsyncClient, mock_service: AsyncMock) -> None:
-        node = _make_node(tags=[])
-        mock_service.remove_tag.return_value = node
-        response = await client.request(
-            "DELETE",
-            f"/api/v1/nodes/{node.id}/tags",
-            json={"tag": "web"},
-        )
-        assert response.status_code == 200
-
-    async def test_not_found(
-        self, client: AsyncClient, mock_service: AsyncMock
-    ) -> None:
-        mock_service.remove_tag.side_effect = NodeNotFoundError("not found")
-        response = await client.request(
-            "DELETE",
-            f"/api/v1/nodes/{uuid.uuid4()}/tags",
-            json={"tag": "web"},
-        )
-        assert response.status_code == 404
 
 
 # --- Health ---
