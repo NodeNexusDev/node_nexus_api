@@ -98,7 +98,7 @@ def test_script_crud_full_cycle(e2e_client: httpx.Client) -> None:
     assert data["total"] >= 1
 
     # Update
-    resp = e2e_client.put(
+    resp = e2e_client.patch(
         f"/api/v1/scripts/{script_id}",
         json={"name": "script-updated"},
     )
@@ -147,7 +147,7 @@ def test_script_not_found(e2e_client: httpx.Client) -> None:
     resp = e2e_client.get(f"/api/v1/scripts/{fake_id}")
     assert resp.status_code == 404
 
-    resp = e2e_client.put(f"/api/v1/scripts/{fake_id}", json={"name": "x"})
+    resp = e2e_client.patch(f"/api/v1/scripts/{fake_id}", json={"name": "x"})
     assert resp.status_code == 404
 
     resp = e2e_client.delete(f"/api/v1/scripts/{fake_id}")
@@ -321,7 +321,7 @@ def test_script_execute_multi_node(
 def test_script_partial_update(e2e_client: httpx.Client) -> None:
     script = _create_script(e2e_client, name="script-partial")
 
-    resp = e2e_client.put(
+    resp = e2e_client.patch(
         f"/api/v1/scripts/{script['id']}",
         json={"name": "script-partial-updated"},
     )
@@ -431,8 +431,7 @@ def test_script_unschedule(e2e_client: httpx.Client) -> None:
             json={"cron": "0 9 * * *", "node_ids": [node["id"]]},
         )
         resp = e2e_client.delete(f"/api/v1/scripts/{script['id']}/schedule")
-        assert resp.status_code == 200
-        assert "unscheduled" in resp.json()["message"]
+        assert resp.status_code == 204
     finally:
         e2e_client.delete(f"/api/v1/scripts/{script['id']}")
         e2e_client.delete(f"/api/v1/nodes/{node['id']}")

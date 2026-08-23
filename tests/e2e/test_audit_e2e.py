@@ -354,7 +354,7 @@ def test_audit_logs_track_crud_operations(
     assert "create" in actions
 
     # update action recorded
-    e2e_client.put(f"/api/v1/nodes/{node_id}", json={"name": "audit-crud-upd"})
+    e2e_client.patch(f"/api/v1/nodes/{node_id}", json={"name": "audit-crud-upd"})
     data = _wait_for_audit(e2e_client, query=f"?node_id={node_id}", action="update")
     actions = [log["action"] for log in data["items"]]
     assert "update" in actions
@@ -557,9 +557,7 @@ def test_audit_delete_with_master_key(e2e_client: httpx.Client) -> None:
         "/api/v1/audit/?confirm=yes",
         headers={"X-API-Key": master_key},
     )
-    assert resp.status_code == 200
-    data = resp.json()
-    assert "deleted_count" in data
+    assert resp.status_code == 204
 
 
 # ---------------------------------------------------------------------------

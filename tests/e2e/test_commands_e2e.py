@@ -43,7 +43,7 @@ def test_command_crud_full_cycle(e2e_client: httpx.Client) -> None:
     assert data["total"] >= 1
 
     # Update
-    resp = e2e_client.put(
+    resp = e2e_client.patch(
         f"/api/v1/commands/{cmd_id}",
         json={"name": "cmd-updated"},
     )
@@ -85,7 +85,7 @@ def test_command_not_found(e2e_client: httpx.Client) -> None:
     resp = e2e_client.get(f"/api/v1/commands/{fake_id}")
     assert resp.status_code == 404
 
-    resp = e2e_client.put(f"/api/v1/commands/{fake_id}", json={"name": "x"})
+    resp = e2e_client.patch(f"/api/v1/commands/{fake_id}", json={"name": "x"})
     assert resp.status_code == 404
 
     resp = e2e_client.delete(f"/api/v1/commands/{fake_id}")
@@ -202,7 +202,7 @@ def test_command_pagination(e2e_client: httpx.Client) -> None:
 def test_command_partial_update(e2e_client: httpx.Client) -> None:
     cmd = _create_command(e2e_client, name="cmd-partial")
 
-    resp = e2e_client.put(
+    resp = e2e_client.patch(
         f"/api/v1/commands/{cmd['id']}",
         json={"name": "cmd-partial-updated"},
     )
@@ -220,7 +220,7 @@ def test_bulk_execute_by_ids(
     node2 = e2e_resources.create_ssh_node(name="bulk-2")
 
     resp = e2e_client.post(
-        "/api/v1/nodes/bulk/execute",
+        "/api/v1/commands/bulk/execute",
         json={
             "command": "echo bulk-ok",
             "node_ids": [node1["id"], node2["id"]],
@@ -251,7 +251,7 @@ def test_bulk_execute_by_tags(
     e2e_resources.create_ssh_node(name="bulk-tag-other", tags=["other"])
 
     resp = e2e_client.post(
-        "/api/v1/nodes/bulk/execute",
+        "/api/v1/commands/bulk/execute",
         json={"command": "echo tagged", "tags": ["bulk-test"]},
     )
     assert resp.status_code == 200
@@ -264,7 +264,7 @@ def test_bulk_execute_by_tags(
 
 def test_bulk_execute_no_nodes(e2e_client: httpx.Client) -> None:
     resp = e2e_client.post(
-        "/api/v1/nodes/bulk/execute",
+        "/api/v1/commands/bulk/execute",
         json={"command": "ls", "node_ids": [str(uuid4())]},
     )
     assert resp.status_code == 404
@@ -283,7 +283,7 @@ def test_bulk_execute_partial_failure(
     )
 
     resp = e2e_client.post(
-        "/api/v1/nodes/bulk/execute",
+        "/api/v1/commands/bulk/execute",
         json={
             "command": "echo partial",
             "node_ids": [good_node["id"], bad_node["id"]],
@@ -302,7 +302,7 @@ def test_bulk_execute_partial_failure(
 
 def test_bulk_execute_validation_no_targets(e2e_client: httpx.Client) -> None:
     resp = e2e_client.post(
-        "/api/v1/nodes/bulk/execute",
+        "/api/v1/commands/bulk/execute",
         json={"command": "ls"},
     )
     assert resp.status_code == 422
@@ -310,7 +310,7 @@ def test_bulk_execute_validation_no_targets(e2e_client: httpx.Client) -> None:
 
 def test_bulk_execute_validation_empty_command(e2e_client: httpx.Client) -> None:
     resp = e2e_client.post(
-        "/api/v1/nodes/bulk/execute",
+        "/api/v1/commands/bulk/execute",
         json={"command": "", "node_ids": ["00000000-0000-0000-0000-000000000001"]},
     )
     assert resp.status_code == 422
