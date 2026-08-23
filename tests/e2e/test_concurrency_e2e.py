@@ -271,7 +271,7 @@ async def test_concurrent_bulk_commands(
                 ) as c:
                     await barrier.wait()
                     return await c.post(
-                        "/api/v1/nodes/bulk/execute",
+                        "/api/v1/commands/bulk/execute",
                         json={
                             "node_ids": [n["id"] for n in nodes],
                             "command": "echo bulk-ok",

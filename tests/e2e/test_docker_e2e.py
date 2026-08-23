@@ -508,8 +508,8 @@ class TestDockerBulkByTags:
             # Run a container via SSH exec so we can bulk-start it
             run_cmd = f"docker run -d --name {container_name} alpine sleep 300"
             resp = await client.post(
-                f"/api/v1/nodes/{node['id']}/execute",
-                json={"command": run_cmd},
+                "/api/v1/commands/execute",
+                json={"node_id": node['id'], "command": run_cmd},
             )
             assert resp.status_code == 200
             # Stop it first
@@ -545,8 +545,9 @@ class TestDockerBulkByTags:
         try:
             await self._pull_alpine(client, node["id"])
             await client.post(
-                f"/api/v1/nodes/{node['id']}/execute",
+                "/api/v1/commands/execute",
                 json={
+                    "node_id": node['id'],
                     "command": f"docker run -d --name {container_name} alpine sleep 300"
                 },
             )

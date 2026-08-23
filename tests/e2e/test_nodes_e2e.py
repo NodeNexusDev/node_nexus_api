@@ -48,7 +48,7 @@ def test_crud_full_cycle(e2e_client: httpx.Client) -> None:
     assert data["total"] >= 1
 
     # Update
-    resp = e2e_client.put(
+    resp = e2e_client.patch(
         f"/api/v1/nodes/{node_id}",
         json={"name": "e2e-node-updated"},
     )
@@ -139,8 +139,8 @@ def test_ssh_key_auth_execute(
     """Execute a command via unencrypted SSH key."""
     node = e2e_resources.create_ssh_key_node(encrypted=False)
     resp = e2e_client.post(
-        f"/api/v1/nodes/{node['id']}/execute",
-        json={"command": "echo e2e-key-works"},
+        "/api/v1/commands/execute",
+        json={"node_id": node['id'], "command": "echo e2e-key-works"},
     )
     assert resp.status_code == 200
     result = resp.json()
@@ -166,8 +166,8 @@ def test_ssh_encrypted_key_auth_execute(
     """Execute a command via encrypted SSH key + passphrase."""
     node = e2e_resources.create_ssh_key_node(encrypted=True)
     resp = e2e_client.post(
-        f"/api/v1/nodes/{node['id']}/execute",
-        json={"command": "echo e2e-enc-key-works"},
+        "/api/v1/commands/execute",
+        json={"node_id": node['id'], "command": "echo e2e-enc-key-works"},
     )
     assert resp.status_code == 200
     result = resp.json()
@@ -203,7 +203,7 @@ def test_not_found_errors(e2e_client: httpx.Client) -> None:
     resp = e2e_client.get(f"/api/v1/nodes/{fake_id}")
     assert resp.status_code == 404
 
-    resp = e2e_client.put(
+    resp = e2e_client.patch(
         f"/api/v1/nodes/{fake_id}",
         json={"name": "x"},
     )
@@ -229,8 +229,8 @@ def test_ssh_execute_command(
 ) -> None:
     node = e2e_resources.create_ssh_node(name="ssh-exec")
     resp = e2e_client.post(
-        f"/api/v1/nodes/{node['id']}/execute",
-        json={"command": "echo e2e-works"},
+        "/api/v1/commands/execute",
+        json={"node_id": node['id'], "command": "echo e2e-works"},
     )
     assert resp.status_code == 200
     result = resp.json()
@@ -245,8 +245,8 @@ def test_ssh_execute_command_non_zero_exit(
 ) -> None:
     node = e2e_resources.create_ssh_node(name="ssh-fail")
     resp = e2e_client.post(
-        f"/api/v1/nodes/{node['id']}/execute",
-        json={"command": "exit 42"},
+        "/api/v1/commands/execute",
+        json={"node_id": node['id'], "command": "exit 42"},
     )
     assert resp.status_code == 200
     result = resp.json()
@@ -259,8 +259,8 @@ def test_ssh_execute_command_stderr(
 ) -> None:
     node = e2e_resources.create_ssh_node(name="ssh-stderr")
     resp = e2e_client.post(
-        f"/api/v1/nodes/{node['id']}/execute",
-        json={"command": "echo error-output >&2"},
+        "/api/v1/commands/execute",
+        json={"node_id": node['id'], "command": "echo error-output >&2"},
     )
     assert resp.status_code == 200
     result = resp.json()
@@ -275,8 +275,8 @@ def test_ssh_check_not_found(e2e_client: httpx.Client) -> None:
 
 def test_ssh_execute_not_found(e2e_client: httpx.Client) -> None:
     resp = e2e_client.post(
-        f"/api/v1/nodes/{uuid4()}/execute",
-        json={"command": "ls"},
+        "/api/v1/commands/execute",
+        json={"node_id": str(uuid4()), "command": "ls"},
     )
     assert resp.status_code == 404
 
@@ -348,7 +348,7 @@ def test_partial_update(e2e_client: httpx.Client) -> None:
     node_id = resp.json()["id"]
     original_host = resp.json()["host"]
 
-    resp = e2e_client.put(f"/api/v1/nodes/{node_id}", json={"name": "partial-new"})
+    resp = e2e_client.patch(f"/api/v1/nodes/{node_id}", json={"name": "partial-new"})
     assert resp.status_code == 200
     updated = resp.json()
     assert updated["name"] == "partial-new"
@@ -485,54 +485,6 @@ def test_node_get_all_tags(
     assert "alpha" in tags
     assert "beta" in tags
     assert "gamma" in tags
-
-
-def test_node_add_tag(
-    e2e_client: httpx.Client,
-    e2e_resources: UniqueResourceFactory,
-) -> None:
-    node = e2e_resources.create_node(name="add-tag-node", tags=["existing"])
-
-    resp = e2e_client.post(
-        f"/api/v1/nodes/{node['id']}/tags",
-        json={"tag": "new-tag"},
-    )
-    assert resp.status_code == 200
-    assert "new-tag" in resp.json()["tags"]
-    assert "existing" in resp.json()["tags"]
-
-
-def test_node_add_tag_not_found(e2e_client: httpx.Client) -> None:
-    resp = e2e_client.post(
-        f"/api/v1/nodes/{uuid4()}/tags",
-        json={"tag": "x"},
-    )
-    assert resp.status_code == 404
-
-
-def test_node_remove_tag(
-    e2e_client: httpx.Client,
-    e2e_resources: UniqueResourceFactory,
-) -> None:
-    node = e2e_resources.create_node(name="rm-tag-node", tags=["keep", "remove"])
-
-    resp = e2e_client.request(
-        "DELETE",
-        f"/api/v1/nodes/{node['id']}/tags",
-        json={"tag": "remove"},
-    )
-    assert resp.status_code == 200
-    assert "keep" in resp.json()["tags"]
-    assert "remove" not in resp.json()["tags"]
-
-
-def test_node_remove_tag_not_found(e2e_client: httpx.Client) -> None:
-    resp = e2e_client.request(
-        "DELETE",
-        f"/api/v1/nodes/{uuid4()}/tags",
-        json={"tag": "x"},
-    )
-    assert resp.status_code == 404
 
 
 # ---------------------------------------------------------------------------
