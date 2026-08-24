@@ -94,6 +94,41 @@ class DockerTopResultDTO:
 
 
 @dataclass(frozen=True, slots=True)
+class DockerSystemInfoDTO:
+    """Parsed ``docker info`` output."""
+
+    server_version: str
+    storage_driver: str
+    operating_system: str
+    architecture: str
+    total_memory: str
+    cpus: int
+    containers_running: int
+    containers_stopped: int
+    images: int
+
+
+@dataclass(frozen=True, slots=True)
+class DockerSystemDfDTO:
+    """Parsed ``docker system df`` output."""
+
+    type: str
+    total_count: int
+    active_size: str
+    reclaimable_size: str
+    reclaimable_percent: str
+
+
+@dataclass(frozen=True, slots=True)
+class DockerPruneResultDTO:
+    """Result of a prune operation (container/image)."""
+
+    containers_deleted: tuple[str, ...] = ()
+    images_deleted: tuple[str, ...] = ()
+    space_reclaimed: str = ""
+
+
+@dataclass(frozen=True, slots=True)
 class DockerStatsDTO:
     container_id: str
     name: str

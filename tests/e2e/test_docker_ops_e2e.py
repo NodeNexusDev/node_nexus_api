@@ -1213,3 +1213,92 @@ def test_docker_container_top(
         e2e_client.delete(
             f"/api/v1/nodes/{node['id']}/docker/containers/{container_id}"
         )
+
+
+# ---------------------------------------------------------------------------
+# System info & prune
+# ---------------------------------------------------------------------------
+
+
+def test_docker_system_info(
+    e2e_client,
+    e2e_resources: UniqueResourceFactory,
+):
+    """GET /nodes/{id}/docker/system/info returns Docker system info."""
+    node = e2e_resources.create_docker_node()
+    resp = e2e_client.get(
+        f"/api/v1/nodes/{node['id']}/docker/system/info"
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "server_version" in data
+    assert "storage_driver" in data
+    assert "operating_system" in data
+    assert "architecture" in data
+    assert "total_memory" in data
+    assert "cpus" in data
+    assert isinstance(data["cpus"], int)
+    assert data["cpus"] > 0
+
+
+def test_docker_system_df(
+    e2e_client,
+    e2e_resources: UniqueResourceFactory,
+):
+    """GET /nodes/{id}/docker/system/df returns disk usage."""
+    node = e2e_resources.create_docker_node()
+    resp = e2e_client.get(
+        f"/api/v1/nodes/{node['id']}/docker/system/df"
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert isinstance(data, list)
+    assert len(data) >= 1
+    for item in data:
+        assert "type" in item
+        assert "total_count" in item
+
+
+def test_docker_container_prune(
+    e2e_client,
+    e2e_resources: UniqueResourceFactory,
+):
+    """POST /nodes/{id}/docker/containers/prune prunes stopped containers."""
+    node = e2e_resources.create_docker_node()
+    _docker_pull_alpine(e2e_client, node["id"])
+
+    # Create and stop a container to make it pruneable
+    resp = e2e_client.post(
+        f"/api/v1/nodes/{node['id']}/docker/containers",
+        json={"image": "alpine:latest", "command": "echo done"},
+    )
+    assert resp.status_code == 201
+
+    # Wait for it to stop
+    import time
+    time.sleep(2)
+
+    # Prune
+    resp = e2e_client.post(
+        f"/api/v1/nodes/{node['id']}/docker/containers/prune"
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "containers_deleted" in data
+    assert "space_reclaimed" in data
+
+
+def test_docker_image_prune(
+    e2e_client,
+    e2e_resources: UniqueResourceFactory,
+):
+    """POST /nodes/{id}/docker/images/prune prunes unused images."""
+    node = e2e_resources.create_docker_node()
+
+    resp = e2e_client.post(
+        f"/api/v1/nodes/{node['id']}/docker/images/prune"
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "images_deleted" in data
+    assert "space_reclaimed" in data

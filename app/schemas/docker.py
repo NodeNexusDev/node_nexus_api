@@ -97,6 +97,38 @@ class DockerTopResult(BaseModel):
     processes: list[tuple[str, ...]] = Field(default_factory=list)
 
 
+class DockerSystemInfo(BaseModel):
+    """Response from ``docker info --format json``."""
+
+    server_version: str = ""
+    storage_driver: str = ""
+    operating_system: str = ""
+    architecture: str = ""
+    total_memory: str = ""
+    cpus: int = 0
+    containers_running: int = 0
+    containers_stopped: int = 0
+    images: int = 0
+
+
+class DockerSystemDfItem(BaseModel):
+    """A single row from ``docker system df``."""
+
+    type: str
+    total_count: int = 0
+    active_size: str = "0B"
+    reclaimable_size: str = "0B"
+    reclaimable_percent: str = "0%"
+
+
+class DockerPruneResponse(BaseModel):
+    """Result of a prune operation."""
+
+    containers_deleted: list[str] = Field(default_factory=list)
+    images_deleted: list[str] = Field(default_factory=list)
+    space_reclaimed: str = ""
+
+
 class ContainerVolumeMount(BaseModel):
     """Bind-mount specification for ``docker create``."""
 

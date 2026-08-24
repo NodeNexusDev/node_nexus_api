@@ -21,6 +21,7 @@ from app.application.dto.docker import (
 from app.application.services.docker.container_service import DockerContainerService
 from app.application.services.docker.image_service import DockerImageService
 from app.application.services.docker.resource_service import DockerResourceService
+from app.application.services.docker.system_service import DockerSystemService
 from app.core.docker_validation import (
     validate_container_id,
     validate_container_new_name,
@@ -42,8 +43,11 @@ from app.schemas.docker import (
     DockerImageTagRequest,
     DockerImageTagResponse,
     DockerNetwork,
+    DockerPruneResponse,
     DockerPullResult,
     DockerStats,
+    DockerSystemDfItem,
+    DockerSystemInfo,
     DockerTopResult,
     DockerVolume,
     NetworkConnectRequest,
@@ -678,3 +682,67 @@ async def prune_volumes(
     audit.info("api.docker.volumes.prune", node_id=str(node_id))
     output = await service.prune_volumes(node_id)
     return {"output": output}
+
+
+# ── System ──────────────────────────────────────────────────────────────────
+
+
+@router.get("/system/info")
+@inject
+async def system_info(
+    node_id: uuid.UUID,
+    service: FromDishka[DockerSystemService],
+    _key: str = Security(get_current_api_key),
+) -> DockerSystemInfo:
+    """Return Docker system information."""
+    audit.info("api.docker.system.info", node_id=str(node_id))
+    result = await service.info(node_id)
+    return DockerSystemInfo.model_validate(result, from_attributes=True)
+
+
+@router.get("/system/df")
+@inject
+async def system_df(
+    node_id: uuid.UUID,
+    service: FromDishka[DockerSystemService],
+    _key: str = Security(get_current_api_key),
+) -> list[DockerSystemDfItem]:
+    """Return Docker disk usage."""
+    audit.info("api.docker.system.df", node_id=str(node_id))
+    results = await service.disk_usage(node_id)
+    return [
+        DockerSystemDfItem.model_validate(r, from_attributes=True)
+        for r in results
+    ]
+
+
+@router.post("/containers/prune")
+@inject
+async def prune_containers(
+    node_id: uuid.UUID,
+    service: FromDishka[DockerSystemService],
+    _key: str = Security(require_write_scope),
+) -> DockerPruneResponse:
+    """Prune stopped containers."""
+    audit.info("api.docker.containers.prune", node_id=str(node_id))
+    result = await service.prune_containers(node_id)
+    return DockerPruneResponse(
+        containers_deleted=list(result.containers_deleted),
+        space_reclaimed=result.space_reclaimed,
+    )
+
+
+@router.post("/images/prune")
+@inject
+async def prune_images(
+    node_id: uuid.UUID,
+    service: FromDishka[DockerSystemService],
+    _key: str = Security(require_write_scope),
+) -> DockerPruneResponse:
+    """Prune unused images."""
+    audit.info("api.docker.images.prune", node_id=str(node_id))
+    result = await service.prune_images(node_id)
+    return DockerPruneResponse(
+        images_deleted=list(result.images_deleted),
+        space_reclaimed=result.space_reclaimed,
+    )
