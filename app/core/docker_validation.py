@@ -177,3 +177,37 @@ def validate_docker_host(docker_host: str) -> str:
             "Expected 'unix:///path/to/socket' or 'tcp://host:port'."
         )
     return docker_host
+
+
+_VOLUME_NAME_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9_.\-]*$")
+_NETWORK_DRIVER_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9_.\-]*$")
+_IP_ADDRESS_RE = re.compile(r"^(\d{1,3}\.){3}\d{1,3}(/\d{1,2})?$")
+
+
+def validate_volume_name(name: str) -> str:
+    """Validate a Docker volume name."""
+    if not name or not _VOLUME_NAME_RE.fullmatch(name):
+        raise DockerValidationError(
+            f"Invalid volume name: {name!r}. "
+            "Volume name must start with alphanumeric and contain only "
+            "alphanumeric characters, hyphens, underscores, and dots."
+        )
+    return name
+
+
+def validate_network_driver(driver: str) -> str:
+    """Validate a Docker network driver name."""
+    if not driver or not _NETWORK_DRIVER_RE.fullmatch(driver):
+        raise DockerValidationError(
+            f"Invalid network driver: {driver!r}."
+        )
+    return driver
+
+
+def validate_ip_address(ip: str) -> str:
+    """Validate an IP address or CIDR notation."""
+    if not ip or not _IP_ADDRESS_RE.fullmatch(ip):
+        raise DockerValidationError(
+            f"Invalid IP address: {ip!r}. Expected 'x.x.x.x' or 'x.x.x.x/n'."
+        )
+    return ip

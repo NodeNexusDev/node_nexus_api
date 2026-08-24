@@ -228,6 +228,65 @@ class DockerVolume(BaseModel):
     model_config = {"populate_by_name": True}
 
 
+class NetworkCreateRequest(BaseModel):
+    """Request body for creating a Docker network."""
+
+    name: str = Field(min_length=1, max_length=128)
+    driver: str = Field(default="bridge", max_length=64)
+    subnet: str | None = Field(default=None, max_length=64)
+    gateway: str | None = Field(default=None, max_length=64)
+
+
+class NetworkInspectContainer(BaseModel):
+    """A container connected to a network (from network inspect)."""
+
+    name: str
+    ipv4_address: str = ""
+    ipv6_address: str = ""
+
+
+class NetworkInspectResponse(BaseModel):
+    """Response from ``docker network inspect``."""
+
+    id: str
+    name: str
+    driver: str
+    scope: str
+    subnet: str = ""
+    gateway: str = ""
+    containers: list[NetworkInspectContainer] = Field(default_factory=list)
+
+
+class NetworkConnectRequest(BaseModel):
+    """Request body for connecting a container to a network."""
+
+    container_id: str = Field(min_length=1, max_length=255)
+    ip_address: str | None = Field(default=None, max_length=64)
+
+
+class NetworkDisconnectRequest(BaseModel):
+    """Request body for disconnecting a container from a network."""
+
+    container_id: str = Field(min_length=1, max_length=255)
+    force: bool = False
+
+
+class VolumeCreateRequest(BaseModel):
+    """Request body for creating a Docker volume."""
+
+    name: str | None = Field(default=None, min_length=1, max_length=128)
+    driver: str = Field(default="local", max_length=64)
+
+
+class VolumeInspectResponse(BaseModel):
+    """Response from ``docker volume inspect``."""
+
+    name: str
+    driver: str
+    mountpoint: str
+    labels: dict[str, str] = Field(default_factory=dict)
+
+
 class BulkDockerRequest(BaseModel):
     """Request for bulk Docker operations on multiple nodes."""
 
