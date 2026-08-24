@@ -866,7 +866,7 @@ class TestCreateContainer:
         full_service.create_container.return_value = ContainerCreatedDTO(
             id="abc", name="x", image="alpine", status="created"
         )
-        await full_client.post(
+        response = await full_client.post(
             f"/api/v1/nodes/{NODE_ID}/docker/containers",
             json={
                 "image": "alpine",
@@ -878,6 +878,10 @@ class TestCreateContainer:
                 "restart_policy": "always",
             },
         )
+        assert response.status_code == 201
+        data = response.json()
+        assert data["id"] == "abc"
+        assert data["name"] == "x"
         full_service.create_container.assert_called_once()
         request_dto = full_service.create_container.call_args.args[0]
         assert request_dto.ports == (("80/tcp", "8080"),)

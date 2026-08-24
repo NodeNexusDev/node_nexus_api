@@ -47,7 +47,7 @@ class ScheduledScriptExecutor:
             )
             raise
 
-        if any(node_result.status == "failed" for node_result in result.results):
+        if any(node_result.status == "error" for node_result in result.results):
             error_type = ScheduledScriptExecutionError.__name__
             await self._schedule_writer.mark_failed(
                 script_id,

@@ -14,6 +14,7 @@ from app.application.dto.api_key import (
     APIKeyViewDTO,
 )
 from app.application.services.api_key_authentication import (
+    _LAST_USED_UPDATE_INTERVAL,
     APIKeyAuthenticationService,
 )
 from app.application.services.api_key_management import APIKeyManagementService
@@ -108,3 +109,41 @@ async def test_management_missing_update_and_revoke_use_not_found() -> None:
         await service.update_api_key(uuid4(), APIKeyUpdateDTO(changes=()))
     with pytest.raises(APIKeyNotFoundError):
         await service.revoke_api_key(uuid4())
+
+
+async def test_auth_skips_touch_when_used_within_interval() -> None:
+    """touch_last_used is NOT called when last_used_at is recent."""
+    reader, writer = AsyncMock(), AsyncMock()
+    recent = datetime.now(UTC) - timedelta(seconds=60)
+    reader.get_auth_by_hash.return_value = _auth(last_used_at=recent)
+
+    await APIKeyAuthenticationService(
+        reader, writer, HmacSha256APIKeyHasher()
+    ).authenticate("nnk_secret")
+
+    writer.touch_last_used.assert_not_awaited()
+
+
+async def test_auth_calls_touch_when_interval_elapsed() -> None:
+    """touch_last_used IS called when last_used_at exceeds the interval."""
+    reader, writer = AsyncMock(), AsyncMock()
+    old = datetime.now(UTC) - _LAST_USED_UPDATE_INTERVAL - timedelta(seconds=1)
+    reader.get_auth_by_hash.return_value = _auth(last_used_at=old)
+
+    await APIKeyAuthenticationService(
+        reader, writer, HmacSha256APIKeyHasher()
+    ).authenticate("nnk_secret")
+
+    writer.touch_last_used.assert_awaited_once()
+
+
+async def test_auth_calls_touch_when_last_used_is_none() -> None:
+    """touch_last_used IS called on first use (last_used_at is None)."""
+    reader, writer = AsyncMock(), AsyncMock()
+    reader.get_auth_by_hash.return_value = _auth(last_used_at=None)
+
+    await APIKeyAuthenticationService(
+        reader, writer, HmacSha256APIKeyHasher()
+    ).authenticate("nnk_secret")
+
+    writer.touch_last_used.assert_awaited_once()

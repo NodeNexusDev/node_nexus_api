@@ -58,7 +58,7 @@ def _wait_for_completed_execution(
         response = client.get(f"/api/v1/scripts/{script_id}/executions")
         if response.status_code != 200 or response.json()["total"] == 0:
             return False
-        return response.json()["items"][0]["status"] in ("completed", "failed")
+        return response.json()["items"][0]["status"] in ("success", "error")
 
     wait_for_condition(
         _is_completed,
@@ -164,7 +164,7 @@ def test_reconciliation_restores_schedule_after_restart(
     # Verify exactly one execution (no duplicates from reconciliation)
     executions = _wait_for_completed_execution(e2e_client, script["id"])
     assert len(executions) == 1
-    assert executions[0]["status"] == "completed"
+    assert executions[0]["status"] == "success"
     assert executions[0]["started_at"] is not None
     assert executions[0]["finished_at"] is not None
     assert executions[0]["steps"][0]["exit_code"] == 0
@@ -233,7 +233,7 @@ def test_schedule_replace_removes_old_runtime_job(
 
     executions = _wait_for_completed_execution(e2e_client, script["id"])
     assert len(executions) == 1
-    assert executions[0]["status"] == "completed"
+    assert executions[0]["status"] == "success"
     assert "replace-ok" in executions[0]["steps"][0]["stdout"]
 
     # No duplicate executions from the old far-future cron.
@@ -281,7 +281,7 @@ def test_persistent_schedule_recovers_after_api_restart(
 
     executions = _wait_for_execution(e2e_client, script["id"])
     assert len(executions) == 1
-    assert executions[0]["status"] == "completed"
+    assert executions[0]["status"] == "success"
     assert "scheduler-restart-ok" in executions[0]["steps"][0]["stdout"]
 
 
@@ -333,20 +333,27 @@ async def test_scheduler_replica_failover_has_no_duplicate_execution(
             await asyncio.sleep(1)
         assert execution_count == 1
 
-        await asyncio.sleep(2)
-        assert (
-            await postgres_connection.fetchval(
+        # Wait for execution count to remain at 1 (no duplicates)
+        deadline = time.monotonic() + 5.0
+        while time.monotonic() < deadline:
+            count = await postgres_connection.fetchval(
                 "SELECT count(*) FROM script_executions WHERE script_id = $1",
                 UUID(script["id"]),
             )
-            == 1
-        )
+            assert count == 1
+            time.sleep(0.5)
 
         docker_service_controller.start("api")
         api_stopped = False
         _wait_for_api(e2e_client)
-        await asyncio.sleep(2)
-        # After the primary comes back it should be rejected (replica still owns).
+
+        # Wait for primary to come back and be rejected by replica
+        deadline = time.monotonic() + 15.0
+        while time.monotonic() < deadline:
+            if await _lock_held_by_another(postgres_connection):
+                break
+            time.sleep(1)
+
         assert await _lock_held_by_another(postgres_connection)
         assert (
             await postgres_connection.fetchval(

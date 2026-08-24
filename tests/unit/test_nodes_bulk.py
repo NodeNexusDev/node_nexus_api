@@ -9,6 +9,7 @@ from dishka.integrations.fastapi import setup_dishka
 from fastapi import FastAPI
 from httpx2 import ASGITransport, AsyncClient
 
+from app.api.v1.commands import router as commands_router
 from app.api.v1.nodes import router as nodes_router
 from app.api.v1.nodes_bulk import router as nodes_bulk_router
 from app.application.dto.bulk_node_operation import (
@@ -22,10 +23,7 @@ from app.application.dto.node_metrics import (
     UsageMetricsDTO,
 )
 from app.application.dto.node_status_history import NodeStatusHistoryPageDTO
-from app.application.services.bulk_command_history_service import (
-    BulkCommandHistoryService,
-)
-from app.application.services.command_history_service import CommandHistoryService
+from app.application.services.execution_history_service import ExecutionHistoryService
 from app.application.services.execution_lifecycle_service import (
     ExecutionLifecycleService,
 )
@@ -45,6 +43,7 @@ from tests.unit.conftest import MockAuthServiceProvider, _mock_settings
 
 def _create_nodes_app(**services: AsyncMock) -> FastAPI:
     app = FastAPI()
+    app.include_router(commands_router, prefix="/api/v1")
     app.include_router(nodes_bulk_router, prefix="/api/v1")
     app.include_router(nodes_router, prefix="/api/v1")
 
@@ -78,12 +77,8 @@ def _create_nodes_app(**services: AsyncMock) -> FastAPI:
             return services.get("execution_stats", AsyncMock())
 
         @provide(scope=Scope.REQUEST)
-        def get_bulk_history(self) -> BulkCommandHistoryService:
-            return services.get("bulk_history", AsyncMock())
-
-        @provide(scope=Scope.REQUEST)
-        def get_command_history(self) -> CommandHistoryService:
-            return services.get("command_history", AsyncMock())
+        def get_execution_history(self) -> ExecutionHistoryService:
+            return services.get("execution_history", AsyncMock())
 
         @provide(scope=Scope.REQUEST)
         def get_node_status_history(self) -> NodeStatusHistoryService:
@@ -149,7 +144,7 @@ class TestBulkUpdate:
                 base_url="http://test",
                 headers={"X-API-Key": "test-master"},
             ) as ac:
-                resp = await ac.put(
+                resp = await ac.patch(
                     "/api/v1/nodes/bulk/update",
                     json={
                         "node_ids": [NODE_ID],
@@ -169,10 +164,7 @@ class TestBulkValidateCredentials:
     @pytest.mark.asyncio
     async def test_bulk_validate_credentials(self) -> None:
         svc = AsyncMock()
-        svc._node_reader = AsyncMock()
-        svc._node_reader.get_connections_by_ids = AsyncMock(return_value=[])
-        svc._connector_factory = AsyncMock()
-        svc._credential_cipher = AsyncMock()
+        svc.validate_credentials_bulk = AsyncMock(return_value=[])
         app = _create_nodes_app(node_bulk_cmd=svc)
         with _settings_patcher:
             async with AsyncClient(
@@ -195,8 +187,10 @@ class TestBulkValidateCredentials:
 class TestBulkRetry:
     @pytest.mark.asyncio
     async def test_bulk_retry_commands(self) -> None:
+        from app.core.exceptions import ExecutionNotFoundError
+
         svc = AsyncMock()
-        svc._command_history_reader = None
+        svc.retry_command = AsyncMock(side_effect=ExecutionNotFoundError("not found"))
         app = _create_nodes_app(execution_lifecycle=svc)
         with _settings_patcher:
             async with AsyncClient(
@@ -205,7 +199,7 @@ class TestBulkRetry:
                 headers={"X-API-Key": "test-master"},
             ) as ac:
                 resp = await ac.post(
-                    "/api/v1/nodes/bulk/retry",
+                    "/api/v1/commands/bulk/retry",
                     json={"execution_ids": [NODE_ID]},
                 )
         assert resp.status_code == 200
@@ -230,7 +224,7 @@ class TestBulkCancel:
                 headers={"X-API-Key": "test-master"},
             ) as ac:
                 resp = await ac.post(
-                    "/api/v1/nodes/bulk/cancel",
+                    "/api/v1/commands/bulk/cancel",
                     json={"execution_ids": [NODE_ID]},
                 )
         assert resp.status_code == 200
@@ -259,58 +253,6 @@ class TestBulkDelete:
                 resp = await ac.post(
                     "/api/v1/nodes/bulk/delete",
                     json={"node_ids": [NODE_ID]},
-                )
-        assert resp.status_code == 200
-        data = resp.json()
-        assert data["affected"] == 1
-
-
-# ── bulk/tags/add ──
-
-
-class TestBulkAddTags:
-    @pytest.mark.asyncio
-    async def test_bulk_add_tags(self) -> None:
-        svc = AsyncMock()
-        svc.bulk_add_tags.return_value = BulkNodeOperationResultDTO(
-            affected=1, node_ids=(uuid.UUID(NODE_ID),)
-        )
-        app = _create_nodes_app(node_bulk_op=svc)
-        with _settings_patcher:
-            async with AsyncClient(
-                transport=ASGITransport(app=app),
-                base_url="http://test",
-                headers={"X-API-Key": "test-master"},
-            ) as ac:
-                resp = await ac.post(
-                    "/api/v1/nodes/bulk/tags/add",
-                    json={"node_ids": [NODE_ID], "tags": ["prod"]},
-                )
-        assert resp.status_code == 200
-        data = resp.json()
-        assert data["affected"] == 1
-
-
-# ── bulk/tags/remove ──
-
-
-class TestBulkRemoveTags:
-    @pytest.mark.asyncio
-    async def test_bulk_remove_tags(self) -> None:
-        svc = AsyncMock()
-        svc.bulk_remove_tags.return_value = BulkNodeOperationResultDTO(
-            affected=1, node_ids=(uuid.UUID(NODE_ID),)
-        )
-        app = _create_nodes_app(node_bulk_op=svc)
-        with _settings_patcher:
-            async with AsyncClient(
-                transport=ASGITransport(app=app),
-                base_url="http://test",
-                headers={"X-API-Key": "test-master"},
-            ) as ac:
-                resp = await ac.post(
-                    "/api/v1/nodes/bulk/tags/remove",
-                    json={"node_ids": [NODE_ID], "tags": ["prod"]},
                 )
         assert resp.status_code == 200
         data = resp.json()
@@ -353,7 +295,7 @@ class TestRetryCommand:
                 headers={"X-API-Key": "test-master"},
             ) as ac:
                 resp = await ac.post(
-                    f"/api/v1/nodes/{NODE_ID}/commands/{NODE_ID2}/retry",
+                    f"/api/v1/commands/executions/{NODE_ID2}/retry",
                 )
         assert resp.status_code == 200
         data = resp.json()

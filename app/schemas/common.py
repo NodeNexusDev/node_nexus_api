@@ -3,21 +3,35 @@
 import base64
 import json
 from datetime import UTC, datetime
-from typing import Any, TypeVar
 from uuid import UUID
 
 from pydantic import BaseModel
 
-T = TypeVar("T")
+
+class PaginatedResponse[T](BaseModel):
+    """Paginated response with total count."""
+
+    items: list[T]
+    total: int
+    page: int
+    size: int
 
 
-class CursorPage(BaseModel):
+class CursorPage[T](BaseModel):
     """Cursor-based paginated response."""
 
-    items: list[Any]
+    items: list[T]
     next_cursor: str | None = None
     has_more: bool = False
     limit: int = 20
+
+
+class ErrorResponse(BaseModel):
+    """Unified error response schema."""
+
+    code: str
+    message: str
+    request_id: str | None = None
 
 
 def encode_cursor(created_at: datetime, id: UUID) -> str:

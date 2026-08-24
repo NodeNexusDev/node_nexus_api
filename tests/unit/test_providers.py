@@ -339,17 +339,6 @@ def test_config_provider_returns_cached_settings() -> None:
         assert ConfigProvider().get_settings() is expected
 
 
-def test_tag_management_service_provider() -> None:
-    from app.application.services.tag_management_service import (
-        TagManagementService,
-    )
-
-    svc_provider = ServiceProvider()
-    tag_manager = MagicMock()
-    svc = svc_provider.get_tag_management_service(tag_manager)
-    assert isinstance(svc, TagManagementService)
-
-
 def test_favorite_service_provider() -> None:
     from app.application.services.favorite_service import FavoriteService
 

@@ -46,8 +46,8 @@ def create_test_container(
     container_name = name or f"e2e-ctr-{uuid.uuid4().hex[:8]}"
     docker_cmd = f"docker run -d --name {container_name} {image} {command}"
     resp = e2e_client.post(
-        f"/api/v1/nodes/{node_id}/execute",
-        json={"command": docker_cmd},
+        "/api/v1/commands/execute",
+        json={"node_id": node_id, "command": docker_cmd},
     )
     assert resp.status_code == 200, (
         f"Failed to create container '{container_name}': {resp.status_code} {resp.text}"

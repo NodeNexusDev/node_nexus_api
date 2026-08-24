@@ -3,12 +3,11 @@
 from __future__ import annotations
 
 import uuid
-from typing import Protocol, runtime_checkable
+from typing import Protocol
 
 from app.application.dto.note import NoteCreateDTO, NoteDTO, NoteUpdateDTO
 
 
-@runtime_checkable
 class NoteReader(Protocol):
     async def list_notes(
         self,
@@ -19,7 +18,6 @@ class NoteReader(Protocol):
     async def get_note(self, note_id: uuid.UUID) -> NoteDTO | None: ...
 
 
-@runtime_checkable
 class NoteWriter(Protocol):
     async def create_note(self, data: NoteCreateDTO) -> NoteDTO: ...
     async def update_note(

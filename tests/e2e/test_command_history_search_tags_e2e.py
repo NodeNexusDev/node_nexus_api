@@ -14,15 +14,17 @@ def test_command_execution_is_recorded_in_history(
     command_text = "echo e2e-history-test"
 
     exec_resp = e2e_client.post(
-        f"/api/v1/nodes/{node['id']}/execute",
-        json={"command": command_text},
+        "/api/v1/commands/execute",
+        json={"node_id": node['id'], "command": command_text},
     )
     assert exec_resp.status_code == 200
     exec_data = exec_resp.json()
     assert exec_data["exit_code"] == 0
     assert "e2e-history-test" in exec_data["stdout"]
 
-    history_resp = e2e_client.get(f"/api/v1/nodes/{node['id']}/commands/history")
+    history_resp = e2e_client.get(
+        "/api/v1/commands/history", params={"node_id": node['id']}
+    )
     assert history_resp.status_code == 200
     history = history_resp.json()
     assert history["total"] >= 1
@@ -104,7 +106,7 @@ def test_bulk_execute_and_history(e2e_client: httpx.Client, e2e_resources) -> No
     node2 = e2e_resources.create_ssh_node(name=e2e_resources.unique_name("bulk-2"))
 
     bulk_resp = e2e_client.post(
-        "/api/v1/nodes/bulk/execute",
+        "/api/v1/commands/bulk/execute",
         json={
             "command": "echo bulk-ok",
             "node_ids": [node1["id"], node2["id"]],
@@ -117,7 +119,9 @@ def test_bulk_execute_and_history(e2e_client: httpx.Client, e2e_resources) -> No
 
     # Verify each node's history
     for node in (node1, node2):
-        hist_resp = e2e_client.get(f"/api/v1/nodes/{node['id']}/commands/history")
+        hist_resp = e2e_client.get(
+            "/api/v1/commands/history", params={"node_id": node['id']}
+        )
         assert hist_resp.status_code == 200
         assert hist_resp.json()["total"] >= 1
 
@@ -125,7 +129,7 @@ def test_bulk_execute_and_history(e2e_client: httpx.Client, e2e_resources) -> No
 def test_bulk_history_empty_batch(e2e_client: httpx.Client) -> None:
     """Bulk history for a nonexistent batch_id returns empty list."""
     resp = e2e_client.get(
-        "/api/v1/nodes/bulk/history",
+        "/api/v1/commands/bulk/history",
         params={"batch_id": "00000000-0000-0000-0000-000000000000"},
     )
     assert resp.status_code == 200

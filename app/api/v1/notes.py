@@ -39,7 +39,11 @@ async def list_notes(
     ]
 
 
-@router.post("/notes/{target_type}/{target_id}", response_model=NoteResponse)
+@router.post(
+    "/notes/{target_type}/{target_id}",
+    response_model=NoteResponse,
+    status_code=201,
+)
 @inject
 async def create_note(
     target_type: str,

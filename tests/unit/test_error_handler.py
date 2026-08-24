@@ -1,87 +1,81 @@
 """Tests for domain error handler status code mapping."""
 
+import pytest
 from fastapi import FastAPI
 from httpx2 import ASGITransport, AsyncClient
 
 from app.api.error_mapping import domain_error_handler
 from app.core.exceptions import (
+    APIKeyExpiredError,
     APIKeyNotFoundError,
+    APIKeyRevokedError,
+    AuditWriteError,
     AuthenticationError,
     CommandNotFoundError,
     ConnectionFailedError,
     ContainerNotFoundError,
+    CredentialDecryptionError,
     DockerDaemonError,
     DockerError,
     DockerValidationError,
     DomainError,
+    ExecutionNotFoundError,
+    FavoriteNotFoundError,
     ImageNotFoundError,
+    NodeNameConflictError,
     NodeNotFoundError,
+    NoteNotFoundError,
+    RequestTimeoutError,
+    ScheduledScriptExecutionError,
+    ScheduleNotFoundError,
+    SchedulePersistenceError,
+    SchedulerOwnershipError,
+    ScheduleValidationError,
+    ScriptNotFoundError,
     TagNotFoundError,
     TemplateRenderError,
+    UnsupportedConfigFormatError,
 )
 
 app = FastAPI()
 app.add_exception_handler(DomainError, domain_error_handler)
 
+_ROUTES: dict[str, type[DomainError]] = {
+    "/test-node-not-found": NodeNotFoundError,
+    "/test-node-name-conflict": NodeNameConflictError,
+    "/test-command-not-found": CommandNotFoundError,
+    "/test-script-not-found": ScriptNotFoundError,
+    "/test-apikey-not-found": APIKeyNotFoundError,
+    "/test-apikey-revoked": APIKeyRevokedError,
+    "/test-apikey-expired": APIKeyExpiredError,
+    "/test-authentication": AuthenticationError,
+    "/test-tag-not-found": TagNotFoundError,
+    "/test-connection-failed": ConnectionFailedError,
+    "/test-credential-decryption": CredentialDecryptionError,
+    "/test-template-render": TemplateRenderError,
+    "/test-container-not-found": ContainerNotFoundError,
+    "/test-image-not-found": ImageNotFoundError,
+    "/test-docker-daemon": DockerDaemonError,
+    "/test-docker-validation": DockerValidationError,
+    "/test-docker-error": DockerError,
+    "/test-request-timeout": RequestTimeoutError,
+    "/test-unsupported-config-format": UnsupportedConfigFormatError,
+    "/test-schedule-validation": ScheduleValidationError,
+    "/test-schedule-not-found": ScheduleNotFoundError,
+    "/test-scheduler-ownership": SchedulerOwnershipError,
+    "/test-schedule-persistence": SchedulePersistenceError,
+    "/test-audit-write": AuditWriteError,
+    "/test-execution-not-found": ExecutionNotFoundError,
+    "/test-scheduled-script-execution": ScheduledScriptExecutionError,
+    "/test-favorite-not-found": FavoriteNotFoundError,
+    "/test-note-not-found": NoteNotFoundError,
+}
 
-@app.get("/test-node")
-async def raise_node_not_found() -> None:
-    raise NodeNotFoundError("node not found")
+for _path, _exc_cls in _ROUTES.items():
 
-
-@app.get("/test-command")
-async def raise_command_not_found() -> None:
-    raise CommandNotFoundError("command not found")
-
-
-@app.get("/test-apikey")
-async def raise_apikey_not_found() -> None:
-    raise APIKeyNotFoundError("key not found")
-
-
-@app.get("/test-authentication")
-async def raise_authentication_error() -> None:
-    raise AuthenticationError("invalid credential")
-
-
-@app.get("/test-tag")
-async def raise_tag_not_found() -> None:
-    raise TagNotFoundError("tag not found")
-
-
-@app.get("/test-connection")
-async def raise_connection_failed() -> None:
-    raise ConnectionFailedError("connection failed")
-
-
-@app.get("/test-template")
-async def raise_template_error() -> None:
-    raise TemplateRenderError("bad template")
-
-
-@app.get("/test-docker")
-async def raise_docker_error() -> None:
-    raise DockerError("docker error")
-
-
-@app.get("/test-container")
-async def raise_container_not_found() -> None:
-    raise ContainerNotFoundError("container not found")
-
-
-@app.get("/test-image")
-async def raise_image_not_found() -> None:
-    raise ImageNotFoundError("image not found")
-
-
-@app.get("/test-daemon")
-async def raise_docker_daemon_error() -> None:
-    raise DockerDaemonError("daemon error")
-
-
-@app.get("/test-validation")
-async def raise_docker_validation_error() -> None:
-    raise DockerValidationError("validation error")
+    @app.get(_path)
+    async def _raise(exc_cls: type[DomainError] = _exc_cls) -> None:  # type: ignore[misc]
+        raise exc_cls("test error")
 
 
 @app.get("/test-unknown")
@@ -97,86 +91,13 @@ class TestDomainErrorHandler:
         async with AsyncClient(
             transport=ASGITransport(app=app), base_url="http://test"
         ) as client:
-            resp = await client.get("/test-node")
+            resp = await client.get("/test-node-not-found")
         assert resp.status_code == 404
-        assert resp.json()["detail"] == "node not found"
-
-    async def test_command_not_found_returns_404(self) -> None:
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
-            resp = await client.get("/test-command")
-        assert resp.status_code == 404
-
-    async def test_apikey_not_found_returns_404(self) -> None:
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
-            resp = await client.get("/test-apikey")
-        assert resp.status_code == 404
-
-    async def test_authentication_error_returns_401(self) -> None:
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
-            resp = await client.get("/test-authentication")
-        assert resp.status_code == 401
-
-    async def test_tag_not_found_returns_404(self) -> None:
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
-            resp = await client.get("/test-tag")
-        assert resp.status_code == 404
-
-    async def test_connection_failed_returns_503(self) -> None:
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
-            resp = await client.get("/test-connection")
-        assert resp.status_code == 503
-
-    async def test_template_error_returns_422(self) -> None:
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
-            resp = await client.get("/test-template")
-        assert resp.status_code == 422
-
-    async def test_docker_error_returns_502(self) -> None:
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
-            resp = await client.get("/test-docker")
-        assert resp.status_code == 502
-
-    async def test_container_not_found_returns_404(self) -> None:
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
-            resp = await client.get("/test-container")
-        assert resp.status_code == 404
-
-    async def test_image_not_found_returns_404(self) -> None:
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
-            resp = await client.get("/test-image")
-        assert resp.status_code == 404
-
-    async def test_docker_daemon_error_returns_503(self) -> None:
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
-            resp = await client.get("/test-daemon")
-        assert resp.status_code == 503
-
-    async def test_docker_validation_error_returns_422(self) -> None:
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
-            resp = await client.get("/test-validation")
-        assert resp.status_code == 422
+        body = resp.json()
+        assert body["code"] == "NodeNotFoundError"
+        assert body["detail"] == "test error"
+        assert body["message"] == "test error"
+        assert "request_id" in body
 
     async def test_unknown_domain_error_returns_422(self) -> None:
         async with AsyncClient(
@@ -184,3 +105,83 @@ class TestDomainErrorHandler:
         ) as client:
             resp = await client.get("/test-unknown")
         assert resp.status_code == 422
+
+    @pytest.mark.parametrize(
+        ("path", "expected_status"),
+        [
+            pytest.param("/test-node-not-found", 404, id="NodeNotFoundError"),
+            pytest.param("/test-node-name-conflict", 409, id="NodeNameConflictError"),
+            pytest.param("/test-command-not-found", 404, id="CommandNotFoundError"),
+            pytest.param("/test-script-not-found", 404, id="ScriptNotFoundError"),
+            pytest.param("/test-apikey-not-found", 404, id="APIKeyNotFoundError"),
+            pytest.param("/test-apikey-revoked", 401, id="APIKeyRevokedError"),
+            pytest.param("/test-apikey-expired", 401, id="APIKeyExpiredError"),
+            pytest.param("/test-authentication", 401, id="AuthenticationError"),
+            pytest.param("/test-tag-not-found", 404, id="TagNotFoundError"),
+            pytest.param("/test-connection-failed", 503, id="ConnectionFailedError"),
+            pytest.param(
+                "/test-credential-decryption", 503, id="CredentialDecryptionError"
+            ),
+            pytest.param("/test-template-render", 422, id="TemplateRenderError"),
+            pytest.param("/test-container-not-found", 404, id="ContainerNotFoundError"),
+            pytest.param("/test-image-not-found", 404, id="ImageNotFoundError"),
+            pytest.param("/test-docker-daemon", 503, id="DockerDaemonError"),
+            pytest.param("/test-docker-validation", 422, id="DockerValidationError"),
+            pytest.param("/test-docker-error", 502, id="DockerError"),
+            pytest.param("/test-request-timeout", 504, id="RequestTimeoutError"),
+            pytest.param(
+                "/test-unsupported-config-format",
+                422,
+                id="UnsupportedConfigFormatError",
+            ),
+            pytest.param(
+                "/test-schedule-validation", 422, id="ScheduleValidationError"
+            ),
+            pytest.param("/test-schedule-not-found", 404, id="ScheduleNotFoundError"),
+            pytest.param(
+                "/test-scheduler-ownership", 503, id="SchedulerOwnershipError"
+            ),
+            pytest.param(
+                "/test-schedule-persistence", 503, id="SchedulePersistenceError"
+            ),
+            pytest.param("/test-audit-write", 503, id="AuditWriteError"),
+            pytest.param("/test-execution-not-found", 404, id="ExecutionNotFoundError"),
+            pytest.param(
+                "/test-scheduled-script-execution",
+                422,
+                id="ScheduledScriptExecutionError",
+            ),
+            pytest.param("/test-favorite-not-found", 404, id="FavoriteNotFoundError"),
+            pytest.param("/test-note-not-found", 404, id="NoteNotFoundError"),
+        ],
+    )
+    async def test_exception_maps_to_correct_status(
+        self, path: str, expected_status: int
+    ) -> None:
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            resp = await client.get(path)
+        assert resp.status_code == expected_status
+
+    @pytest.mark.parametrize(
+        "path",
+        [
+            "/test-node-not-found",
+            "/test-apikey-expired",
+            "/test-docker-error",
+            "/test-favorite-not-found",
+            "/test-note-not-found",
+        ],
+    )
+    async def test_error_response_body_contract(self, path: str) -> None:
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            resp = await client.get(path)
+        body = resp.json()
+        assert "code" in body
+        assert "message" in body
+        assert "detail" in body
+        assert "request_id" in body
+        assert body["message"] == body["detail"]

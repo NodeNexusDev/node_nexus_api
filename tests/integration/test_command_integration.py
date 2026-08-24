@@ -250,7 +250,7 @@ async def test_create_command_validation_error(
 
 async def test_update_command_found(integration_client: AsyncClient) -> None:
     cmd = await _create_command(integration_client)
-    resp = await integration_client.put(
+    resp = await integration_client.patch(
         f"/api/v1/commands/{cmd['id']}",
         json={"name": "updated_cmd"},
     )
@@ -260,7 +260,7 @@ async def test_update_command_found(integration_client: AsyncClient) -> None:
 
 
 async def test_update_command_not_found(integration_client: AsyncClient) -> None:
-    resp = await integration_client.put(
+    resp = await integration_client.patch(
         f"/api/v1/commands/{uuid.uuid4()}",
         json={"name": "x"},
     )

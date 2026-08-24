@@ -2,7 +2,7 @@
 
 import uuid
 from datetime import datetime
-from typing import Any, Literal
+from typing import Any, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -58,7 +58,7 @@ class ScriptExecuteRequest(BaseModel):
     params: dict[str, Any] = Field(default_factory=dict)
 
     @model_validator(mode="after")
-    def check_targets(self) -> "ScriptExecuteRequest":
+    def check_targets(self) -> Self:
         if not self.node_ids and not self.node_tags:
             raise ValueError("At least one of node_ids or node_tags must be provided")
         return self
@@ -84,7 +84,7 @@ class ScriptNodeResult(BaseModel):
     execution_id: uuid.UUID
     node_id: uuid.UUID
     node_name: str
-    status: str
+    status: Literal["success", "error"]
     steps: list[ScriptStepResult]
 
 
@@ -93,3 +93,51 @@ class ScriptExecutionBatchResult(BaseModel):
 
     script_id: uuid.UUID
     results: list[ScriptNodeResult]
+
+
+# --- Bulk operation schemas ---
+
+
+class ScriptBulkRetryRequest(BaseModel):
+    """Request to retry multiple script executions."""
+
+    execution_ids: list[uuid.UUID] = Field(..., min_length=1)
+
+
+class ScriptBulkCancelRequest(BaseModel):
+    """Request to cancel multiple running script executions."""
+
+    execution_ids: list[uuid.UUID] = Field(..., min_length=1)
+
+
+class ScriptBulkResult(BaseModel):
+    """Result of a single bulk operation item."""
+
+    execution_id: str
+    status: str
+    message: str
+
+
+class ScriptBulkOperationResponse(BaseModel):
+    """Response for bulk script retry/cancel operations."""
+
+    results: list[ScriptBulkResult]
+    total: int
+    succeeded: int
+    failed: int
+
+
+class ScriptRetryResponse(BaseModel):
+    """Response for script retry operation."""
+
+    execution_id: str
+    status: str
+    message: str
+
+
+class ScriptCancelResponse(BaseModel):
+    """Response for script cancel operation."""
+
+    execution_id: str
+    status: str
+    message: str

@@ -275,7 +275,7 @@ async def test_create_script_validation_error(
 
 async def test_update_script_found(integration_client: AsyncClient) -> None:
     script = await _create_script(integration_client)
-    resp = await integration_client.put(
+    resp = await integration_client.patch(
         f"/api/v1/scripts/{script['id']}",
         json={"name": "updated_script"},
     )
@@ -285,7 +285,7 @@ async def test_update_script_found(integration_client: AsyncClient) -> None:
 
 
 async def test_update_script_not_found(integration_client: AsyncClient) -> None:
-    resp = await integration_client.put(
+    resp = await integration_client.patch(
         f"/api/v1/scripts/{uuid.uuid4()}",
         json={"name": "x"},
     )

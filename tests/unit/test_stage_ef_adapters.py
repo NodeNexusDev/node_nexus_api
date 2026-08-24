@@ -27,7 +27,6 @@ from app.adapters.persistence.node_status_history import (
     SqlAlchemyNodeStatusHistoryGateway,
 )
 from app.adapters.persistence.note import SqlAlchemyNoteGateway
-from app.adapters.persistence.tag_manager import SqlAlchemyTagManager
 from app.application.dto.execution_stats import (
     CommandStatsQueryDTO,
     ExecutionStatsDTO,
@@ -297,40 +296,6 @@ class TestNoteGateway:
 
         result = await gw.list_notes("command", model.target_id)
         assert len(result) == 1
-
-
-# ─── Tag manager adapter ───
-
-
-class TestTagManager:
-    @pytest.mark.asyncio
-    async def test_rename_tag(self) -> None:
-        session = AsyncMock()
-        gw = SqlAlchemyTagManager(session)
-        mock_result = MagicMock()
-        mock_result.rowcount = 2
-        session.execute.return_value = mock_result
-
-        # Mock func.array_cat and func.array to avoid subscript error
-        with patch("app.adapters.persistence.tag_manager.func") as mock_func:
-            mock_func.array_remove.return_value = "removed"
-            mock_func.array.__getitem__ = MagicMock(return_value="arr")
-            mock_func.array_cat.return_value = "cat"
-            result = await gw.rename_tag("old", "new")
-        assert result == 6  # 2 rows * 3 models
-        session.flush.assert_awaited_once()
-
-    @pytest.mark.asyncio
-    async def test_delete_tag(self) -> None:
-        session = AsyncMock()
-        gw = SqlAlchemyTagManager(session)
-        mock_result = MagicMock()
-        mock_result.rowcount = 1
-        session.execute.return_value = mock_result
-
-        result = await gw.delete_tag("toremove")
-        assert result == 3  # 1 row * 3 models
-        session.flush.assert_awaited_once()
 
 
 # ─── Execution stats gateway ───

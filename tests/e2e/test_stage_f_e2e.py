@@ -24,7 +24,7 @@ class TestFavorites:
                 "note": "my favorite node",
             },
         )
-        assert resp.status_code == 200
+        assert resp.status_code == 201
         fav = resp.json()
         assert fav["target_type"] == "node"
         assert fav["target_id"] == node["id"]
@@ -62,7 +62,7 @@ class TestFavorites:
             "/api/v1/favorites",
             json={"target_type": "node", "target_id": node["id"]},
         )
-        assert resp.status_code == 200
+        assert resp.status_code == 201
         assert resp.json()["note"] is None
 
     def test_add_favorite_invalid_target(
@@ -75,7 +75,7 @@ class TestFavorites:
                 "target_id": "00000000-0000-0000-0000-000000000000",
             },
         )
-        assert resp.status_code in (200, 404)
+        assert resp.status_code in (201, 404)
 
 
 # ── Notes ────────────────────────────────────────────────────────────────────
@@ -96,7 +96,7 @@ class TestNotes:
                 "content": "First note",
             },
         )
-        assert resp.status_code == 200
+        assert resp.status_code == 201
         note = resp.json()
         assert note["content"] == "First note"
         assert note["target_type"] == "node"
@@ -111,7 +111,7 @@ class TestNotes:
                 "content": "Second note",
             },
         )
-        assert resp.status_code == 200
+        assert resp.status_code == 201
 
         # List notes
         resp = e2e_client.get(f"/api/v1/notes/node/{node['id']}")
@@ -143,39 +143,6 @@ class TestNotes:
         resp = e2e_client.get(f"/api/v1/notes/node/{node['id']}")
         assert resp.status_code == 200
         assert resp.json() == []
-
-
-# ── Tag Management ───────────────────────────────────────────────────────────
-
-
-class TestTagManagement:
-    def test_rename_and_delete_tag(
-        self, e2e_client: httpx.Client, e2e_resources
-    ) -> None:
-        node = e2e_resources.create_ssh_node(name="tag-test-node")
-
-        # Add tag to node
-        resp = e2e_client.post(
-            f"/api/v1/nodes/{node['id']}/tags",
-            json={"tag": "old-tag"},
-        )
-        assert resp.status_code == 200
-
-        # Rename tag
-        resp = e2e_client.patch(
-            "/api/v1/tags/old-tag",
-            json={"new_name": "new-tag"},
-        )
-        assert resp.status_code == 200
-        data = resp.json()
-        assert data["old_name"] == "old-tag"
-        assert data["new_name"] == "new-tag"
-        assert data["affected"] >= 1
-
-        # Delete tag
-        resp = e2e_client.delete("/api/v1/tags/new-tag")
-        assert resp.status_code == 200
-        assert resp.json()["affected"] >= 1
 
 
 # ── Global Search ────────────────────────────────────────────────────────────
@@ -250,7 +217,9 @@ class TestExecutionStats:
         assert resp.status_code == 200
 
         # Get node stats
-        resp = e2e_client.get(f"/api/v1/nodes/{node['id']}/stats")
+        resp = e2e_client.get(
+            "/api/v1/commands/stats", params={"node_id": node["id"]}
+        )
         assert resp.status_code == 200
         stats = resp.json()
         assert stats["total"] >= 1
