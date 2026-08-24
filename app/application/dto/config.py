@@ -16,6 +16,7 @@ class NodeConfigDTO:
     port: int
     connection_type: str
     username: str | None = None
+    docker_host: str | None = None
     tags: tuple[str, ...] = ()
 
 
