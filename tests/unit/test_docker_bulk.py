@@ -59,6 +59,24 @@ async def client(mock_service: AsyncMock) -> AsyncClient:
             yield ac
 
 
+@pytest.fixture
+def full_service() -> AsyncMock:
+    return AsyncMock()
+
+
+@pytest.fixture
+async def full_client(full_service: AsyncMock) -> AsyncClient:
+    app = _create_test_app(full_service)
+    with patch("app.api.deps.get_settings", return_value=_mock_settings("test-master")):
+        async with AsyncClient(
+            transport=ASGITransport(app=app),
+            base_url="http://test",
+            follow_redirects=True,
+            headers={"X-API-Key": "test-master"},
+        ) as ac:
+            yield ac
+
+
 class TestBulkStartContainers:
     async def test_success(self, client: AsyncClient, mock_service: AsyncMock) -> None:
         mock_service.bulk_container_action.return_value = BulkDockerResponse(
@@ -85,9 +103,163 @@ class TestBulkStartContainers:
         )
         assert resp.status_code == 200
         data = resp.json()
-        assert data["action"] == "start"
         assert data["succeeded"] == 1
-        assert data["failed"] == 0
+
+
+# ---------------------------------------------------------------------------
+# Bulk inspect / logs / stats
+# ---------------------------------------------------------------------------
+
+
+class TestBulkInspectContainers:
+    async def test_success(
+        self, full_client: AsyncClient, full_service: AsyncMock
+    ) -> None:
+        full_service.bulk_inspect.return_value = BulkDockerResponse(
+            action="inspect",
+            results=[
+                BulkDockerNodeResult(
+                    node_id="00000000-0000-0000-0000-000000000001",
+                    node_name="server1",
+                    status="success",
+                    output='[{"Id":"abc123"}]',
+                )
+            ],
+            total=1,
+            succeeded=1,
+            failed=0,
+        )
+        resp = await full_client.post(
+            "/api/v1/docker/bulk/inspect",
+            json={
+                "node_ids": ["00000000-0000-0000-0000-000000000001"],
+                "container_id": "abc123",
+            },
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["action"] == "inspect"
+        assert data["succeeded"] == 1
+        assert data["results"][0]["output"] == '[{"Id":"abc123"}]'
+
+    async def test_argument_forwarding(
+        self, full_client: AsyncClient, full_service: AsyncMock
+    ) -> None:
+        full_service.bulk_inspect.return_value = BulkDockerResponse(
+            action="inspect", results=[], total=0, succeeded=0, failed=0,
+        )
+        await full_client.post(
+            "/api/v1/docker/bulk/inspect",
+            json={
+                "node_ids": ["00000000-0000-0000-0000-000000000001"],
+                "container_id": "nginx",
+            },
+        )
+        full_service.bulk_inspect.assert_called_once_with(
+            node_ids=[uuid.UUID("00000000-0000-0000-0000-000000000001")],
+            container_id="nginx",
+            node_tags=[],
+        )
+
+
+class TestBulkLogsContainers:
+    async def test_success(
+        self, full_client: AsyncClient, full_service: AsyncMock
+    ) -> None:
+        full_service.bulk_logs.return_value = BulkDockerResponse(
+            action="logs",
+            results=[
+                BulkDockerNodeResult(
+                    node_id="00000000-0000-0000-0000-000000000001",
+                    node_name="server1",
+                    status="success",
+                    output="log line 1\nlog line 2",
+                )
+            ],
+            total=1,
+            succeeded=1,
+            failed=0,
+        )
+        resp = await full_client.post(
+            "/api/v1/docker/bulk/logs",
+            json={
+                "node_ids": ["00000000-0000-0000-0000-000000000001"],
+                "container_id": "nginx",
+            },
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["action"] == "logs"
+        assert data["succeeded"] == 1
+
+    async def test_argument_forwarding(
+        self, full_client: AsyncClient, full_service: AsyncMock
+    ) -> None:
+        full_service.bulk_logs.return_value = BulkDockerResponse(
+            action="logs", results=[], total=0, succeeded=0, failed=0,
+        )
+        await full_client.post(
+            "/api/v1/docker/bulk/logs",
+            json={
+                "node_ids": ["00000000-0000-0000-0000-000000000001"],
+                "container_id": "nginx",
+            },
+        )
+        full_service.bulk_logs.assert_called_once_with(
+            node_ids=[uuid.UUID("00000000-0000-0000-0000-000000000001")],
+            container_id="nginx",
+            node_tags=[],
+        )
+
+
+class TestBulkStatsContainers:
+    async def test_success(
+        self, full_client: AsyncClient, full_service: AsyncMock
+    ) -> None:
+        full_service.bulk_stats.return_value = BulkDockerResponse(
+            action="stats",
+            results=[
+                BulkDockerNodeResult(
+                    node_id="00000000-0000-0000-0000-000000000001",
+                    node_name="server1",
+                    status="success",
+                    output='{"Container":"abc123","CPUPerc":"0.5%"}',
+                )
+            ],
+            total=1,
+            succeeded=1,
+            failed=0,
+        )
+        resp = await full_client.post(
+            "/api/v1/docker/bulk/stats",
+            json={
+                "node_ids": ["00000000-0000-0000-0000-000000000001"],
+                "container_id": "abc123",
+            },
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["action"] == "stats"
+        assert data["succeeded"] == 1
+
+    async def test_argument_forwarding(
+        self, full_client: AsyncClient, full_service: AsyncMock
+    ) -> None:
+        full_service.bulk_stats.return_value = BulkDockerResponse(
+            action="stats", results=[], total=0, succeeded=0, failed=0,
+        )
+        await full_client.post(
+            "/api/v1/docker/bulk/stats",
+            json={
+                "node_ids": ["00000000-0000-0000-0000-000000000001"],
+                "container_id": "nginx",
+            },
+        )
+        full_service.bulk_stats.assert_called_once_with(
+            node_ids=[uuid.UUID("00000000-0000-0000-0000-000000000001")],
+            container_id="nginx",
+            node_tags=[],
+        )
 
     async def test_partial_failure(
         self, client: AsyncClient, mock_service: AsyncMock

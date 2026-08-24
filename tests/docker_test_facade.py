@@ -16,14 +16,25 @@ from app.adapters.runtime.docker import SshDockerRuntime
 from app.adapters.security import AesGcmCredentialCipher
 from app.application.dto.docker import (
     BulkDockerResultDTO,
+    ContainerRenameRequestDTO,
     DockerContainerDTO,
     DockerContainerInspectDTO,
     DockerExecResultDTO,
     DockerImageDTO,
     DockerNetworkDTO,
+    DockerNetworkInspectDTO,
+    DockerPruneResultDTO,
     DockerPullResultDTO,
     DockerStatsDTO,
+    DockerSystemDfDTO,
+    DockerSystemInfoDTO,
+    DockerTopResultDTO,
     DockerVolumeDTO,
+    DockerVolumeInspectDTO,
+    NetworkConnectRequestDTO,
+    NetworkCreateRequestDTO,
+    NetworkDisconnectRequestDTO,
+    VolumeCreateRequestDTO,
 )
 from app.application.services.docker.bulk_service import DockerBulkService
 from app.application.services.docker.command_runner import DockerCommandRunner
@@ -167,6 +178,85 @@ class DockerService:
     async def list_volumes(self, node_id: UUID) -> list[DockerVolumeDTO]:
         return await self._resources.list_volumes(node_id)
 
+    # ── Network CRUD ────────────────────────────────────────────────────────
+
+    async def create_network(self, data: NetworkCreateRequestDTO) -> str:
+        return await self._resources.create_network(data)
+
+    async def inspect_network(
+        self, node_id: UUID, network_id: str
+    ) -> DockerNetworkInspectDTO:
+        return await self._resources.inspect_network(node_id, network_id)
+
+    async def remove_network(self, node_id: UUID, network_id: str) -> None:
+        await self._resources.remove_network(node_id, network_id)
+
+    async def connect_to_network(self, data: NetworkConnectRequestDTO) -> None:
+        await self._resources.connect_to_network(data)
+
+    async def disconnect_from_network(self, data: NetworkDisconnectRequestDTO) -> None:
+        await self._resources.disconnect_from_network(data)
+
+    # ── Volume CRUD ─────────────────────────────────────────────────────────
+
+    async def create_volume(self, data: VolumeCreateRequestDTO) -> str:
+        return await self._resources.create_volume(data)
+
+    async def inspect_volume(
+        self, node_id: UUID, volume_name: str
+    ) -> DockerVolumeInspectDTO:
+        return await self._resources.inspect_volume(node_id, volume_name)
+
+    async def remove_volume(self, node_id: UUID, volume_name: str) -> None:
+        await self._resources.remove_volume(node_id, volume_name)
+
+    async def prune_volumes(self, node_id: UUID) -> str:
+        return await self._resources.prune_volumes(node_id)
+
+    # ── Container lifecycle extensions ──────────────────────────────────────
+
+    async def pause_container(self, node_id: UUID, container_id: str) -> None:
+        await self._containers.pause_container(node_id, container_id)
+
+    async def unpause_container(self, node_id: UUID, container_id: str) -> None:
+        await self._containers.unpause_container(node_id, container_id)
+
+    async def rename_container(self, data: ContainerRenameRequestDTO) -> None:
+        await self._containers.rename_container(data)
+
+    async def top_container(
+        self, node_id: UUID, container_id: str
+    ) -> DockerTopResultDTO:
+        return await self._containers.top_container(node_id, container_id)
+
+    # ── System operations ───────────────────────────────────────────────────
+
+    async def info(self, node_id: UUID) -> DockerSystemInfoDTO:
+        from app.application.services.docker.system_service import DockerSystemService
+
+        system = DockerSystemService(self._runner)
+        return await system.info(node_id)
+
+    async def disk_usage(self, node_id: UUID) -> list[DockerSystemDfDTO]:
+        from app.application.services.docker.system_service import DockerSystemService
+
+        system = DockerSystemService(self._runner)
+        return await system.disk_usage(node_id)
+
+    async def prune_containers(self, node_id: UUID) -> DockerPruneResultDTO:
+        from app.application.services.docker.system_service import DockerSystemService
+
+        system = DockerSystemService(self._runner)
+        return await system.prune_containers(node_id)
+
+    async def prune_images(self, node_id: UUID) -> DockerPruneResultDTO:
+        from app.application.services.docker.system_service import DockerSystemService
+
+        system = DockerSystemService(self._runner)
+        return await system.prune_images(node_id)
+
+    # ── Bulk operations ─────────────────────────────────────────────────────
+
     async def bulk_container_action(
         self,
         node_ids: list[UUID],
@@ -182,6 +272,37 @@ class DockerService:
         self, node_ids: list[UUID], container_id: str, command: str, timeout: int = 30
     ) -> BulkDockerResultDTO:
         return await self._bulk.bulk_exec(node_ids, container_id, command, timeout)
+
+    async def bulk_inspect(
+        self,
+        node_ids: list[UUID],
+        container_id: str,
+        node_tags: list[str] | None = None,
+    ) -> BulkDockerResultDTO:
+        return await self._bulk.bulk_inspect(
+            node_ids, container_id, node_tags=node_tags
+        )
+
+    async def bulk_logs(
+        self,
+        node_ids: list[UUID],
+        container_id: str,
+        tail: int = 100,
+        node_tags: list[str] | None = None,
+    ) -> BulkDockerResultDTO:
+        return await self._bulk.bulk_logs(
+            node_ids, container_id, tail=tail, node_tags=node_tags
+        )
+
+    async def bulk_stats(
+        self,
+        node_ids: list[UUID],
+        container_id: str,
+        node_tags: list[str] | None = None,
+    ) -> BulkDockerResultDTO:
+        return await self._bulk.bulk_stats(
+            node_ids, container_id, node_tags=node_tags
+        )
 
 
 class _RepositoryNodeReader:

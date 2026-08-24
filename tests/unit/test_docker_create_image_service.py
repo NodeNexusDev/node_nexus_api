@@ -8,6 +8,7 @@ import pytest
 
 from app.application.dto.docker import (
     ContainerCreateRequestDTO,
+    ContainerRenameRequestDTO,
     DockerImageBuildRequestDTO,
     DockerImageTagRequestDTO,
 )
@@ -26,6 +27,8 @@ from app.application.services.docker.image_service import (
 )
 from app.core.exceptions import (
     ConnectionFailedError,
+    ContainerNotFoundError,
+    DockerError,
     DockerValidationError,
     ImageNotFoundError,
 )
@@ -536,3 +539,148 @@ class TestBulkByTags:
         )
         assert result.action == "exec"
         assert result.results[0].output == "hello"
+
+
+# ---------------------------------------------------------------------------
+# Container pause / unpause / rename / top
+# ---------------------------------------------------------------------------
+
+
+class TestPauseContainer:
+    async def test_success(self) -> None:
+        runner = _make_runner()
+        service = DockerContainerService(runner)
+        await service.pause_container(NODE, "abc123def456")
+        cmd_args = runner.build_command.call_args[0][1]
+        assert "pause" in cmd_args
+        assert "abc123def456" in cmd_args
+
+    async def test_invalid_id_raises(self) -> None:
+        runner = _make_runner()
+        service = DockerContainerService(runner)
+        with pytest.raises(DockerValidationError):
+            await service.pause_container(NODE, "bad;id")
+
+    async def test_docker_error_propagates(self) -> None:
+        runner = _make_runner(
+            stderr="Error: container not paused", exit_code=1
+        )
+        service = DockerContainerService(runner)
+        with pytest.raises(DockerError):
+            await service.pause_container(NODE, "abc123")
+
+
+class TestUnpauseContainer:
+    async def test_success(self) -> None:
+        runner = _make_runner()
+        service = DockerContainerService(runner)
+        await service.unpause_container(NODE, "abc123def456")
+        cmd_args = runner.build_command.call_args[0][1]
+        assert "unpause" in cmd_args
+        assert "abc123def456" in cmd_args
+
+    async def test_invalid_id_raises(self) -> None:
+        runner = _make_runner()
+        service = DockerContainerService(runner)
+        with pytest.raises(DockerValidationError):
+            await service.unpause_container(NODE, "bad;id")
+
+    async def test_docker_error_propagates(self) -> None:
+        runner = _make_runner(
+            stderr="Error: container not paused", exit_code=1
+        )
+        service = DockerContainerService(runner)
+        with pytest.raises(DockerError):
+            await service.unpause_container(NODE, "abc123")
+
+
+class TestRenameContainer:
+    async def test_success(self) -> None:
+        runner = _make_runner()
+        service = DockerContainerService(runner)
+        await service.rename_container(
+            ContainerRenameRequestDTO(
+                node_id=NODE, container_id="abc123def456", new_name="new-name"
+            )
+        )
+        cmd_args = runner.build_command.call_args[0][1]
+        assert "rename" in cmd_args
+        assert "abc123def456" in cmd_args
+        assert "new-name" in cmd_args
+
+    async def test_new_name_shell_quoted(self) -> None:
+        runner = _make_runner()
+        service = DockerContainerService(runner)
+        await service.rename_container(
+            ContainerRenameRequestDTO(
+                node_id=NODE, container_id="abc123", new_name="my ctr"
+            )
+        )
+        cmd_args = runner.build_command.call_args[0][1]
+        assert "'my ctr'" in cmd_args
+
+    async def test_invalid_container_id_raises(self) -> None:
+        runner = _make_runner()
+        service = DockerContainerService(runner)
+        with pytest.raises(DockerValidationError):
+            await service.rename_container(
+                ContainerRenameRequestDTO(
+                    node_id=NODE, container_id="bad;id", new_name="new"
+                )
+            )
+
+    async def test_docker_error_propagates(self) -> None:
+        runner = _make_runner(
+            stderr="Error: rename failed", exit_code=1
+        )
+        service = DockerContainerService(runner)
+        with pytest.raises(DockerError):
+            await service.rename_container(
+                ContainerRenameRequestDTO(
+                    node_id=NODE, container_id="abc123", new_name="new"
+                )
+            )
+
+
+class TestTopContainer:
+    async def test_success(self) -> None:
+        top_output = (
+            "PID   USER     TIME  COMMAND\n"
+            "    1 root      0:00 sleep 300\n"
+            "   15 root      0:00 ps\n"
+        )
+        runner = _make_runner(stdout=top_output)
+        service = DockerContainerService(runner)
+        result = await service.top_container(NODE, "abc123def456")
+        assert result.titles == ("PID", "USER", "TIME", "COMMAND")
+        assert len(result.processes) == 2
+        assert result.processes[0] == ("1", "root", "0:00", "sleep", "300")
+        cmd_args = runner.build_command.call_args[0][1]
+        assert "top" in cmd_args
+        assert "abc123def456" in cmd_args
+
+    async def test_empty_output_raises(self) -> None:
+        runner = _make_runner(stdout="")
+        service = DockerContainerService(runner)
+        with pytest.raises(ContainerNotFoundError):
+            await service.top_container(NODE, "abc123")
+
+    async def test_single_line_raises(self) -> None:
+        runner = _make_runner(stdout="PID   USER     TIME  COMMAND\n")
+        service = DockerContainerService(runner)
+        with pytest.raises(ContainerNotFoundError):
+            await service.top_container(NODE, "abc123")
+
+    async def test_invalid_id_raises(self) -> None:
+        runner = _make_runner()
+        service = DockerContainerService(runner)
+        with pytest.raises(DockerValidationError):
+            await service.top_container(NODE, "bad;id")
+
+    async def test_docker_error_propagates(self) -> None:
+        runner = _make_runner(
+            stderr="Error: container not running", exit_code=1
+        )
+        service = DockerContainerService(runner)
+        with pytest.raises(DockerError):
+            await service.top_container(NODE, "abc123")

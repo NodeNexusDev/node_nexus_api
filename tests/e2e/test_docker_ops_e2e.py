@@ -1302,3 +1302,211 @@ def test_docker_image_prune(
     data = resp.json()
     assert "images_deleted" in data
     assert "space_reclaimed" in data
+
+
+# ---------------------------------------------------------------------------
+# Bulk inspect / logs / stats
+# ---------------------------------------------------------------------------
+
+
+def test_docker_bulk_inspect(
+    e2e_client,
+    e2e_resources: UniqueResourceFactory,
+):
+    """POST /api/v1/docker/bulk/inspect inspects container on multiple nodes."""
+    node = e2e_resources.create_docker_node()
+    _docker_pull_alpine(e2e_client, node["id"])
+    e2e_client.post(
+        "/api/v1/commands/execute",
+        json={
+            "node_id": node["id"],
+            "command": "docker run -d --name bulk-inspect-ctr alpine sleep 300",
+        },
+    )
+
+    resp = e2e_client.post(
+        "/api/v1/docker/bulk/inspect",
+        json={
+            "node_ids": [node["id"]],
+            "container_id": "bulk-inspect-ctr",
+        },
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["action"] == "inspect"
+    assert data["total"] == 1
+    assert data["succeeded"] == 1
+    assert "bulk-inspect-ctr" in data["results"][0]["output"]
+
+
+def test_docker_bulk_logs(
+    e2e_client,
+    e2e_resources: UniqueResourceFactory,
+):
+    """POST /api/v1/docker/bulk/logs gets logs from container on multiple nodes."""
+    node = e2e_resources.create_docker_node()
+    _docker_pull_alpine(e2e_client, node["id"])
+    e2e_client.post(
+        "/api/v1/commands/execute",
+        json={
+            "node_id": node["id"],
+            "command": (
+                "docker run -d --name bulk-logs-ctr alpine"
+                " sh -c 'echo hello-logs; sleep 300'"
+            ),
+        },
+    )
+
+    resp = e2e_client.post(
+        "/api/v1/docker/bulk/logs",
+        json={
+            "node_ids": [node["id"]],
+            "container_id": "bulk-logs-ctr",
+        },
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["action"] == "logs"
+    assert data["total"] == 1
+    assert data["succeeded"] == 1
+
+
+def test_docker_bulk_stats(
+    e2e_client,
+    e2e_resources: UniqueResourceFactory,
+):
+    """POST /api/v1/docker/bulk/stats gets stats from container on multiple nodes."""
+    node = e2e_resources.create_docker_node()
+    _docker_pull_alpine(e2e_client, node["id"])
+    e2e_client.post(
+        "/api/v1/commands/execute",
+        json={
+            "node_id": node["id"],
+            "command": "docker run -d --name bulk-stats-ctr alpine sleep 300",
+        },
+    )
+
+    resp = e2e_client.post(
+        "/api/v1/docker/bulk/stats",
+        json={
+            "node_ids": [node["id"]],
+            "container_id": "bulk-stats-ctr",
+        },
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["action"] == "stats"
+    assert data["total"] == 1
+    assert data["succeeded"] == 1
+
+
+# ---------------------------------------------------------------------------
+# Additional validation E2E tests
+# ---------------------------------------------------------------------------
+
+
+def test_docker_network_create_invalid_driver(
+    e2e_client,
+    e2e_resources: UniqueResourceFactory,
+):
+    """POST /nodes/{id}/docker/networks with invalid driver returns 422."""
+    node = e2e_resources.create_docker_node()
+    resp = e2e_client.post(
+        f"/api/v1/nodes/{node['id']}/docker/networks",
+        json={"name": "test-net", "driver": "bad;driver"},
+    )
+    assert resp.status_code == 422
+
+
+def test_docker_volume_create_named(
+    e2e_client,
+    e2e_resources: UniqueResourceFactory,
+):
+    """POST /nodes/{id}/docker/volumes with explicit name creates named volume."""
+    node = e2e_resources.create_docker_node()
+    resp = e2e_client.post(
+        f"/api/v1/nodes/{node['id']}/docker/volumes",
+        json={"name": "e2e-named-vol", "driver": "local"},
+    )
+    assert resp.status_code == 201
+    data = resp.json()
+    assert data["name"] == "e2e-named-vol"
+
+    # Verify via inspect
+    resp = e2e_client.get(
+        f"/api/v1/nodes/{node['id']}/docker/volumes/e2e-named-vol"
+    )
+    assert resp.status_code == 200
+    assert resp.json()["name"] == "e2e-named-vol"
+
+    # Cleanup
+    e2e_client.delete(
+        f"/api/v1/nodes/{node['id']}/docker/volumes/e2e-named-vol"
+    )
+
+
+def test_docker_container_rename_validation(
+    e2e_client,
+    e2e_resources: UniqueResourceFactory,
+):
+    """POST /containers/{id}/rename with invalid name returns 422."""
+    node = e2e_resources.create_docker_node()
+    _docker_pull_alpine(e2e_client, node["id"])
+    resp = e2e_client.post(
+        f"/api/v1/nodes/{node['id']}/docker/containers",
+        json={"image": "alpine:latest", "command": "sleep 300"},
+    )
+    assert resp.status_code == 201
+    container_id = resp.json()["id"]
+
+    try:
+        resp = e2e_client.post(
+            f"/api/v1/nodes/{node['id']}/docker/containers/{container_id}/rename",
+            json={"new_name": ""},
+        )
+        assert resp.status_code == 422
+    finally:
+        e2e_client.delete(
+            f"/api/v1/nodes/{node['id']}/docker/containers/{container_id}"
+        )
+
+
+def test_docker_system_info_fields(
+    e2e_client,
+    e2e_resources: UniqueResourceFactory,
+):
+    """GET /nodes/{id}/docker/system/info returns all expected fields."""
+    node = e2e_resources.create_docker_node()
+    resp = e2e_client.get(
+        f"/api/v1/nodes/{node['id']}/docker/system/info"
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    expected_fields = [
+        "server_version", "storage_driver", "operating_system",
+        "architecture", "total_memory", "cpus",
+        "containers_running", "containers_stopped", "images",
+    ]
+    for field in expected_fields:
+        assert field in data, f"Missing field: {field}"
+
+
+def test_docker_system_df_fields(
+    e2e_client,
+    e2e_resources: UniqueResourceFactory,
+):
+    """GET /nodes/{id}/docker/system/df returns all expected fields."""
+    node = e2e_resources.create_docker_node()
+    resp = e2e_client.get(
+        f"/api/v1/nodes/{node['id']}/docker/system/df"
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert isinstance(data, list)
+    assert len(data) >= 1
+    for item in data:
+        assert "type" in item
+        assert "total_count" in item
+        assert "active_size" in item
+        assert "reclaimable_size" in item
+        assert "reclaimable_percent" in item

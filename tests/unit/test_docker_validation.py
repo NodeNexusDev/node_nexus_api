@@ -6,15 +6,19 @@ from app.core.docker_validation import (
     validate_build_arg_key,
     validate_container_id,
     validate_container_name,
+    validate_container_new_name,
     validate_docker_host,
     validate_env_vars,
     validate_image_name,
     validate_image_tag,
+    validate_ip_address,
     validate_labels,
+    validate_network_driver,
     validate_network_name,
     validate_port_mappings,
     validate_restart_policy,
     validate_volume_mounts,
+    validate_volume_name,
 )
 from app.core.exceptions import DockerValidationError
 
@@ -295,3 +299,131 @@ class TestValidateDockerHost:
     def test_shell_injection_raises(self) -> None:
         with pytest.raises(DockerValidationError, match="Invalid docker_host"):
             validate_docker_host("tcp://host:2375; rm -rf /")
+
+
+class TestValidateVolumeName:
+    def test_valid_simple(self) -> None:
+        assert validate_volume_name("my-vol") == "my-vol"
+
+    def test_valid_with_underscore(self) -> None:
+        assert validate_volume_name("my_vol_1") == "my_vol_1"
+
+    def test_valid_with_hyphen(self) -> None:
+        assert validate_volume_name("my-vol-1") == "my-vol-1"
+
+    def test_valid_with_dot(self) -> None:
+        assert validate_volume_name("vol.1.0") == "vol.1.0"
+
+    def test_empty_raises(self) -> None:
+        with pytest.raises(DockerValidationError, match="Invalid volume name"):
+            validate_volume_name("")
+
+    def test_starts_with_hyphen_raises(self) -> None:
+        with pytest.raises(DockerValidationError, match="Invalid volume name"):
+            validate_volume_name("-bad")
+
+    def test_shell_injection_semicolon(self) -> None:
+        with pytest.raises(DockerValidationError, match="Invalid volume name"):
+            validate_volume_name("vol;rm -rf /")
+
+    def test_shell_injection_dollar(self) -> None:
+        with pytest.raises(DockerValidationError, match="Invalid volume name"):
+            validate_volume_name("$(whoami)")
+
+    def test_shell_injection_space(self) -> None:
+        with pytest.raises(DockerValidationError, match="Invalid volume name"):
+            validate_volume_name("my vol")
+
+
+class TestValidateContainerNewName:
+    def test_valid_simple(self) -> None:
+        assert validate_container_new_name("my-container") == "my-container"
+
+    def test_valid_with_underscore(self) -> None:
+        assert validate_container_new_name("my_container_1") == "my_container_1"
+
+    def test_valid_with_dot(self) -> None:
+        assert validate_container_new_name("ctr.1.0") == "ctr.1.0"
+
+    def test_empty_raises(self) -> None:
+        with pytest.raises(DockerValidationError, match="Invalid container name"):
+            validate_container_new_name("")
+
+    def test_starts_with_hyphen_raises(self) -> None:
+        with pytest.raises(DockerValidationError, match="Invalid container name"):
+            validate_container_new_name("-bad")
+
+    def test_shell_injection_semicolon(self) -> None:
+        with pytest.raises(DockerValidationError, match="Invalid container name"):
+            validate_container_new_name("ctr;rm -rf /")
+
+    def test_shell_injection_dollar(self) -> None:
+        with pytest.raises(DockerValidationError, match="Invalid container name"):
+            validate_container_new_name("$(whoami)")
+
+    def test_shell_injection_space(self) -> None:
+        with pytest.raises(DockerValidationError, match="Invalid container name"):
+            validate_container_new_name("bad name")
+
+
+class TestValidateNetworkDriver:
+    def test_valid_bridge(self) -> None:
+        assert validate_network_driver("bridge") == "bridge"
+
+    def test_valid_host(self) -> None:
+        assert validate_network_driver("host") == "host"
+
+    def test_valid_overlay(self) -> None:
+        assert validate_network_driver("overlay") == "overlay"
+
+    def test_valid_none(self) -> None:
+        assert validate_network_driver("none") == "none"
+
+    def test_valid_with_underscore(self) -> None:
+        assert validate_network_driver("my_driver") == "my_driver"
+
+    def test_empty_raises(self) -> None:
+        with pytest.raises(DockerValidationError, match="Invalid network driver"):
+            validate_network_driver("")
+
+    def test_shell_injection_semicolon(self) -> None:
+        with pytest.raises(DockerValidationError, match="Invalid network driver"):
+            validate_network_driver("bridge;rm -rf /")
+
+    def test_shell_injection_dollar(self) -> None:
+        with pytest.raises(DockerValidationError, match="Invalid network driver"):
+            validate_network_driver("$(whoami)")
+
+
+class TestValidateIpAddress:
+    def test_valid_ip(self) -> None:
+        assert validate_ip_address("172.20.0.2") == "172.20.0.2"
+
+    def test_valid_cidr(self) -> None:
+        assert validate_ip_address("172.20.0.2/16") == "172.20.0.2/16"
+
+    def test_valid_loopback(self) -> None:
+        assert validate_ip_address("127.0.0.1") == "127.0.0.1"
+
+    def test_valid_zeros(self) -> None:
+        assert validate_ip_address("0.0.0.0") == "0.0.0.0"
+
+    def test_empty_raises(self) -> None:
+        with pytest.raises(DockerValidationError, match="Invalid IP address"):
+            validate_ip_address("")
+
+    def test_invalid_format_no_dots(self) -> None:
+        with pytest.raises(DockerValidationError, match="Invalid IP address"):
+            validate_ip_address("not-an-ip")
+
+    def test_invalid_format_letters(self) -> None:
+        with pytest.raises(DockerValidationError, match="Invalid IP address"):
+            validate_ip_address("abc.def.ghi.jkl")
+
+    def test_shell_injection_semicolon(self) -> None:
+        with pytest.raises(DockerValidationError, match="Invalid IP address"):
+            validate_ip_address("1.2.3.4;rm -rf /")
+
+    def test_shell_injection_dollar(self) -> None:
+        with pytest.raises(DockerValidationError, match="Invalid IP address"):
+            validate_ip_address("$(whoami)")

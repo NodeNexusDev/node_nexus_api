@@ -26,6 +26,7 @@ from app.application.dto.docker import (
 from app.application.services.docker.container_service import DockerContainerService
 from app.application.services.docker.image_service import DockerImageService
 from app.application.services.docker.resource_service import DockerResourceService
+from app.application.services.docker.system_service import DockerSystemService
 from app.core.exceptions import (
     ConnectionFailedError,
     ContainerNotFoundError,
@@ -170,6 +171,10 @@ def _create_test_app(service: DockerService | AsyncMock) -> FastAPI:
 
         @provide(scope=Scope.REQUEST)
         def get_resource_service(self) -> DockerResourceService:
+            return service
+
+        @provide(scope=Scope.REQUEST)
+        def get_system_service(self) -> DockerSystemService:
             return service
 
     container = make_async_container(MockServiceProvider(), MockAuthServiceProvider())
@@ -1053,3 +1058,485 @@ class TestBuildImage:
             json={"tag": "img:1"},
         )
         assert response.status_code == 422
+
+
+# ---------------------------------------------------------------------------
+# Network CRUD
+# ---------------------------------------------------------------------------
+
+
+class TestCreateNetwork:
+    async def test_success(
+        self, full_client: AsyncClient, full_service: AsyncMock
+    ) -> None:
+        full_service.create_network.return_value = "net123abc"
+        response = await full_client.post(
+            f"/api/v1/nodes/{NODE_ID}/docker/networks",
+            json={"name": "test-net", "driver": "bridge"},
+        )
+        assert response.status_code == 201
+        data = response.json()
+        assert data["id"] == "net123abc"
+        assert data["name"] == "test-net"
+
+    async def test_validation_error(
+        self, full_client: AsyncClient, full_service: AsyncMock
+    ) -> None:
+        from app.core.exceptions import DockerValidationError
+
+        full_service.create_network.side_effect = DockerValidationError("bad driver")
+        response = await full_client.post(
+            f"/api/v1/nodes/{NODE_ID}/docker/networks",
+            json={"name": "test-net", "driver": "bad;driver"},
+        )
+        assert response.status_code == 422
+
+    async def test_docker_error(
+        self, full_client: AsyncClient, full_service: AsyncMock
+    ) -> None:
+        full_service.create_network.side_effect = DockerError("daemon error")
+        response = await full_client.post(
+            f"/api/v1/nodes/{NODE_ID}/docker/networks",
+            json={"name": "test-net"},
+        )
+        assert response.status_code == 502
+
+
+class TestInspectNetwork:
+    async def test_success(
+        self, full_client: AsyncClient, full_service: AsyncMock
+    ) -> None:
+        from app.application.dto.docker import DockerNetworkInspectDTO
+
+        full_service.inspect_network.return_value = DockerNetworkInspectDTO(
+            id="net123",
+            name="test-net",
+            driver="bridge",
+            scope="local",
+            subnet="172.20.0.0/16",
+            gateway="172.20.0.1",
+            containers=(),
+        )
+        response = await full_client.get(
+            f"/api/v1/nodes/{NODE_ID}/docker/networks/net123"
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["id"] == "net123"
+        assert data["name"] == "test-net"
+
+    async def test_not_found(
+        self, full_client: AsyncClient, full_service: AsyncMock
+    ) -> None:
+        full_service.inspect_network.side_effect = DockerError("not found")
+        response = await full_client.get(
+            f"/api/v1/nodes/{NODE_ID}/docker/networks/nonexistent"
+        )
+        assert response.status_code == 502
+
+
+class TestRemoveNetwork:
+    async def test_success(
+        self, full_client: AsyncClient, full_service: AsyncMock
+    ) -> None:
+        full_service.remove_network.return_value = None
+        response = await full_client.delete(
+            f"/api/v1/nodes/{NODE_ID}/docker/networks/net123"
+        )
+        assert response.status_code == 204
+
+    async def test_not_found(
+        self, full_client: AsyncClient, full_service: AsyncMock
+    ) -> None:
+        full_service.remove_network.side_effect = DockerError("not found")
+        response = await full_client.delete(
+            f"/api/v1/nodes/{NODE_ID}/docker/networks/nonexistent"
+        )
+        assert response.status_code == 502
+
+
+class TestConnectToNetwork:
+    async def test_success(
+        self, full_client: AsyncClient, full_service: AsyncMock
+    ) -> None:
+        full_service.connect_to_network.return_value = None
+        response = await full_client.post(
+            f"/api/v1/nodes/{NODE_ID}/docker/networks/net1/connect",
+            json={"container_id": "ctr1"},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "connected"
+
+    async def test_validation_error(
+        self, full_client: AsyncClient, full_service: AsyncMock
+    ) -> None:
+        from app.core.exceptions import DockerValidationError
+
+        full_service.connect_to_network.side_effect = DockerValidationError("bad")
+        response = await full_client.post(
+            f"/api/v1/nodes/{NODE_ID}/docker/networks/net1/connect",
+            json={"container_id": "bad;id"},
+        )
+        assert response.status_code == 422
+
+
+class TestDisconnectFromNetwork:
+    async def test_success(
+        self, full_client: AsyncClient, full_service: AsyncMock
+    ) -> None:
+        full_service.disconnect_from_network.return_value = None
+        response = await full_client.post(
+            f"/api/v1/nodes/{NODE_ID}/docker/networks/net1/disconnect",
+            json={"container_id": "ctr1"},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "disconnected"
+
+    async def test_with_force(
+        self, full_client: AsyncClient, full_service: AsyncMock
+    ) -> None:
+        full_service.disconnect_from_network.return_value = None
+        response = await full_client.post(
+            f"/api/v1/nodes/{NODE_ID}/docker/networks/net1/disconnect",
+            json={"container_id": "ctr1", "force": True},
+        )
+        assert response.status_code == 200
+
+
+# ---------------------------------------------------------------------------
+# Volume CRUD
+# ---------------------------------------------------------------------------
+
+
+class TestCreateVolume:
+    async def test_success(
+        self, full_client: AsyncClient, full_service: AsyncMock
+    ) -> None:
+        full_service.create_volume.return_value = "my-vol"
+        response = await full_client.post(
+            f"/api/v1/nodes/{NODE_ID}/docker/volumes",
+            json={"name": "my-vol", "driver": "local"},
+        )
+        assert response.status_code == 201
+        data = response.json()
+        assert data["name"] == "my-vol"
+
+    async def test_docker_error(
+        self, full_client: AsyncClient, full_service: AsyncMock
+    ) -> None:
+        full_service.create_volume.side_effect = DockerError("daemon error")
+        response = await full_client.post(
+            f"/api/v1/nodes/{NODE_ID}/docker/volumes",
+            json={"name": "my-vol"},
+        )
+        assert response.status_code == 502
+
+
+class TestInspectVolume:
+    async def test_success(
+        self, full_client: AsyncClient, full_service: AsyncMock
+    ) -> None:
+        from app.application.dto.docker import DockerVolumeInspectDTO
+
+        full_service.inspect_volume.return_value = DockerVolumeInspectDTO(
+            name="my-vol",
+            driver="local",
+            mountpoint="/var/lib/docker/volumes/my-vol/_data",
+            labels=(("app", "test"),),
+        )
+        response = await full_client.get(
+            f"/api/v1/nodes/{NODE_ID}/docker/volumes/my-vol"
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["name"] == "my-vol"
+        assert data["driver"] == "local"
+
+    async def test_not_found(
+        self, full_client: AsyncClient, full_service: AsyncMock
+    ) -> None:
+        full_service.inspect_volume.side_effect = DockerError("not found")
+        response = await full_client.get(
+            f"/api/v1/nodes/{NODE_ID}/docker/volumes/nonexistent"
+        )
+        assert response.status_code == 502
+
+
+class TestRemoveVolume:
+    async def test_success(
+        self, full_client: AsyncClient, full_service: AsyncMock
+    ) -> None:
+        full_service.remove_volume.return_value = None
+        response = await full_client.delete(
+            f"/api/v1/nodes/{NODE_ID}/docker/volumes/my-vol"
+        )
+        assert response.status_code == 204
+
+    async def test_not_found(
+        self, full_client: AsyncClient, full_service: AsyncMock
+    ) -> None:
+        full_service.remove_volume.side_effect = DockerError("not found")
+        response = await full_client.delete(
+            f"/api/v1/nodes/{NODE_ID}/docker/volumes/nonexistent"
+        )
+        assert response.status_code == 502
+
+
+class TestPruneVolumes:
+    async def test_success(
+        self, full_client: AsyncClient, full_service: AsyncMock
+    ) -> None:
+        full_service.prune_volumes.return_value = "Total reclaimed space: 0B"
+        response = await full_client.post(
+            f"/api/v1/nodes/{NODE_ID}/docker/volumes/prune"
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert "output" in data
+
+
+# ---------------------------------------------------------------------------
+# Container lifecycle extensions
+# ---------------------------------------------------------------------------
+
+
+class TestPauseContainer:
+    async def test_success(
+        self, full_client: AsyncClient, full_service: AsyncMock
+    ) -> None:
+        full_service.pause_container.return_value = None
+        response = await full_client.post(
+            f"/api/v1/nodes/{NODE_ID}/docker/containers/abc123/pause"
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "paused"
+
+    async def test_validation_error(
+        self, full_client: AsyncClient, full_service: AsyncMock
+    ) -> None:
+        from app.core.exceptions import DockerValidationError
+
+        full_service.pause_container.side_effect = DockerValidationError("bad id")
+        response = await full_client.post(
+            f"/api/v1/nodes/{NODE_ID}/docker/containers/bad;id/pause"
+        )
+        assert response.status_code == 422
+
+    async def test_docker_error(
+        self, full_client: AsyncClient, full_service: AsyncMock
+    ) -> None:
+        full_service.pause_container.side_effect = DockerError("not running")
+        response = await full_client.post(
+            f"/api/v1/nodes/{NODE_ID}/docker/containers/abc123/pause"
+        )
+        assert response.status_code == 502
+
+
+class TestUnpauseContainer:
+    async def test_success(
+        self, full_client: AsyncClient, full_service: AsyncMock
+    ) -> None:
+        full_service.unpause_container.return_value = None
+        response = await full_client.post(
+            f"/api/v1/nodes/{NODE_ID}/docker/containers/abc123/unpause"
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "unpaused"
+
+    async def test_docker_error(
+        self, full_client: AsyncClient, full_service: AsyncMock
+    ) -> None:
+        full_service.unpause_container.side_effect = DockerError("not paused")
+        response = await full_client.post(
+            f"/api/v1/nodes/{NODE_ID}/docker/containers/abc123/unpause"
+        )
+        assert response.status_code == 502
+
+
+class TestRenameContainer:
+    async def test_success(
+        self, full_client: AsyncClient, full_service: AsyncMock
+    ) -> None:
+        full_service.rename_container.return_value = None
+        response = await full_client.post(
+            f"/api/v1/nodes/{NODE_ID}/docker/containers/abc123/rename",
+            json={"new_name": "new-name"},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["new_name"] == "new-name"
+
+    async def test_validation_error(
+        self, full_client: AsyncClient, full_service: AsyncMock
+    ) -> None:
+        from app.core.exceptions import DockerValidationError
+
+        full_service.rename_container.side_effect = DockerValidationError("bad name")
+        response = await full_client.post(
+            f"/api/v1/nodes/{NODE_ID}/docker/containers/abc123/rename",
+            json={"new_name": ""},
+        )
+        assert response.status_code == 422
+
+
+class TestTopContainer:
+    async def test_success(
+        self, full_client: AsyncClient, full_service: AsyncMock
+    ) -> None:
+        from app.application.dto.docker import DockerTopResultDTO
+
+        full_service.top_container.return_value = DockerTopResultDTO(
+            titles=("PID", "USER", "TIME", "COMMAND"),
+            processes=(("1", "root", "0:00", "sleep", "300"),),
+        )
+        response = await full_client.get(
+            f"/api/v1/nodes/{NODE_ID}/docker/containers/abc123/top"
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["titles"] == ["PID", "USER", "TIME", "COMMAND"]
+        assert len(data["processes"]) == 1
+
+    async def test_not_found(
+        self, full_client: AsyncClient, full_service: AsyncMock
+    ) -> None:
+        from app.core.exceptions import ContainerNotFoundError
+
+        full_service.top_container.side_effect = ContainerNotFoundError("not found")
+        response = await full_client.get(
+            f"/api/v1/nodes/{NODE_ID}/docker/containers/nonexistent/top"
+        )
+        assert response.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# System info & prune
+# ---------------------------------------------------------------------------
+
+
+class TestSystemInfo:
+    async def test_success(
+        self, full_client: AsyncClient, full_service: AsyncMock
+    ) -> None:
+        from app.application.dto.docker import DockerSystemInfoDTO
+
+        full_service.info.return_value = DockerSystemInfoDTO(
+            server_version="24.0.7",
+            storage_driver="overlay2",
+            operating_system="Alpine Linux",
+            architecture="x86_64",
+            total_memory="16GB",
+            cpus=4,
+            containers_running=2,
+            containers_stopped=1,
+            images=10,
+        )
+        response = await full_client.get(
+            f"/api/v1/nodes/{NODE_ID}/docker/system/info"
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["server_version"] == "24.0.7"
+        assert data["cpus"] == 4
+
+    async def test_docker_error(
+        self, full_client: AsyncClient, full_service: AsyncMock
+    ) -> None:
+        full_service.info.side_effect = DockerError("daemon error")
+        response = await full_client.get(
+            f"/api/v1/nodes/{NODE_ID}/docker/system/info"
+        )
+        assert response.status_code == 502
+
+
+class TestSystemDf:
+    async def test_success(
+        self, full_client: AsyncClient, full_service: AsyncMock
+    ) -> None:
+        from app.application.dto.docker import DockerSystemDfDTO
+
+        full_service.disk_usage.return_value = [
+            DockerSystemDfDTO(
+                type="Images",
+                total_count=10,
+                active_size="100MB",
+                reclaimable_size="50MB",
+                reclaimable_percent="50%",
+            ),
+        ]
+        response = await full_client.get(
+            f"/api/v1/nodes/{NODE_ID}/docker/system/df"
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data) == 1
+        assert data[0]["type"] == "Images"
+
+    async def test_docker_error(
+        self, full_client: AsyncClient, full_service: AsyncMock
+    ) -> None:
+        full_service.disk_usage.side_effect = DockerError("daemon error")
+        response = await full_client.get(
+            f"/api/v1/nodes/{NODE_ID}/docker/system/df"
+        )
+        assert response.status_code == 502
+
+
+class TestPruneContainers:
+    async def test_success(
+        self, full_client: AsyncClient, full_service: AsyncMock
+    ) -> None:
+        from app.application.dto.docker import DockerPruneResultDTO
+
+        full_service.prune_containers.return_value = DockerPruneResultDTO(
+            containers_deleted=("abc123",),
+            space_reclaimed="1.5GB",
+        )
+        response = await full_client.post(
+            f"/api/v1/nodes/{NODE_ID}/docker/containers/prune"
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert "abc123" in data["containers_deleted"]
+        assert data["space_reclaimed"] == "1.5GB"
+
+    async def test_docker_error(
+        self, full_client: AsyncClient, full_service: AsyncMock
+    ) -> None:
+        full_service.prune_containers.side_effect = DockerError("daemon error")
+        response = await full_client.post(
+            f"/api/v1/nodes/{NODE_ID}/docker/containers/prune"
+        )
+        assert response.status_code == 502
+
+
+class TestPruneImages:
+    async def test_success(
+        self, full_client: AsyncClient, full_service: AsyncMock
+    ) -> None:
+        from app.application.dto.docker import DockerPruneResultDTO
+
+        full_service.prune_images.return_value = DockerPruneResultDTO(
+            images_deleted=("sha256:abc",),
+            space_reclaimed="250MB",
+        )
+        response = await full_client.post(
+            f"/api/v1/nodes/{NODE_ID}/docker/images/prune"
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert "sha256:abc" in data["images_deleted"]
+        assert data["space_reclaimed"] == "250MB"
+
+    async def test_docker_error(
+        self, full_client: AsyncClient, full_service: AsyncMock
+    ) -> None:
+        full_service.prune_images.side_effect = DockerError("daemon error")
+        response = await full_client.post(
+            f"/api/v1/nodes/{NODE_ID}/docker/images/prune"
+        )
+        assert response.status_code == 502
