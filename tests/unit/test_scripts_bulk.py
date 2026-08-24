@@ -9,6 +9,7 @@ from fastapi import FastAPI
 from httpx2 import ASGITransport, AsyncClient
 
 from app.api.v1.scripts import router as scripts_router
+from app.api.v1.scripts_bulk import router as scripts_bulk_router
 from app.application.services.execution_lifecycle_service import (
     ExecutionLifecycleService,
 )
@@ -23,6 +24,7 @@ from tests.unit.conftest import MockAuthServiceProvider, _mock_settings
 def _create_scripts_app(**services: AsyncMock) -> FastAPI:
     app = FastAPI()
     app.include_router(scripts_router, prefix="/api/v1")
+    app.include_router(scripts_bulk_router, prefix="/api/v1")
 
     class MockServiceProvider(Provider):
         @provide(scope=Scope.REQUEST)
@@ -244,9 +246,7 @@ class TestBulkRetryEmpty:
                     "/api/v1/scripts/bulk/retry",
                     json={"execution_ids": []},
                 )
-        assert resp.status_code == 200
-        data = resp.json()
-        assert "error" in data
+        assert resp.status_code == 422
 
 
 class TestBulkCancelEmpty:
@@ -264,9 +264,7 @@ class TestBulkCancelEmpty:
                     "/api/v1/scripts/bulk/cancel",
                     json={"execution_ids": []},
                 )
-        assert resp.status_code == 200
-        data = resp.json()
-        assert "error" in data
+        assert resp.status_code == 422
 
 
 class TestBulkRetryException:

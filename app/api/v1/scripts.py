@@ -2,7 +2,6 @@
 
 import uuid
 from datetime import datetime
-from typing import Any
 
 import structlog
 from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
@@ -35,14 +34,16 @@ from app.application.services.schedule_management import (
 from app.application.services.script_execution_service import ScriptExecutionService
 from app.application.services.script_history_service import ScriptHistoryService
 from app.application.services.script_management_service import ScriptManagementService
+from app.schemas.common import PaginatedResponse
 from app.schemas.execution_stats import ExecutionStatsResponse
-from app.schemas.node import PaginatedResponse
 from app.schemas.scheduler import ScheduledJob, ScheduleRequest, ScheduleResponse
 from app.schemas.script import (
+    ScriptCancelResponse,
     ScriptCreate,
     ScriptExecuteRequest,
     ScriptExecutionBatchResult,
     ScriptResponse,
+    ScriptRetryResponse,
     ScriptStep,
     ScriptUpdate,
 )
@@ -239,7 +240,7 @@ async def get_script(
 async def create_script(
     data: ScriptCreate,
     service: FromDishka[ScriptManagementService],
-    _key: str = Security(get_current_api_key),
+    _key: str = Security(require_write_scope),
 ) -> ScriptResponse:
     """Create a new script."""
     audit.info("api.scripts.create", name=data.name)
@@ -254,13 +255,13 @@ async def create_script(
     return _script_response(result)
 
 
-@router.put("/{script_id}", response_model=ScriptResponse)
+@router.patch("/{script_id}", response_model=ScriptResponse)
 @inject
 async def update_script(
     script_id: uuid.UUID,
     data: ScriptUpdate,
     service: FromDishka[ScriptManagementService],
-    _key: str = Security(get_current_api_key),
+    _key: str = Security(require_write_scope),
 ) -> ScriptResponse:
     """Update an existing script."""
     audit.info("api.scripts.update", script_id=str(script_id))
@@ -281,7 +282,7 @@ async def update_script(
 async def delete_script(
     script_id: uuid.UUID,
     service: FromDishka[ScriptManagementService],
-    _key: str = Security(get_current_api_key),
+    _key: str = Security(require_write_scope),
 ) -> None:
     """Delete a script."""
     audit.info("api.scripts.delete", script_id=str(script_id))
@@ -308,7 +309,7 @@ async def execute_script(
     script_id: uuid.UUID,
     data: ScriptExecuteRequest,
     service: FromDishka[ScriptExecutionService],
-    _key: str = Security(get_current_api_key),
+    _key: str = Security(require_write_scope),
 ) -> ScriptExecutionBatchResult:
     """Execute a script on multiple nodes by IDs and/or tags."""
     audit.info(
@@ -387,17 +388,16 @@ async def schedule_script(
     )
 
 
-@router.delete("/{script_id}/schedule", status_code=200)
+@router.delete("/{script_id}/schedule", status_code=204)
 @inject
 async def unschedule_script(
     script_id: uuid.UUID,
     schedule_service: FromDishka[ScheduleManagementService],
     _key: str = Security(require_write_scope),
-) -> dict[str, Any]:
+) -> None:
     """Remove a scheduled script."""
     audit.info("api.scripts.unschedule", script_id=str(script_id))
     await schedule_service.delete(script_id)
-    return {"message": "Script unscheduled", "script_id": str(script_id)}
 
 
 @router.get("/{script_id}/schedule", response_model=ScheduledJob | None)
@@ -405,7 +405,7 @@ async def unschedule_script(
 async def get_schedule(
     script_id: uuid.UUID,
     schedule_service: FromDishka[ScheduleManagementService],
-    _key: str = Security(require_write_scope),
+    _key: str = Security(get_current_api_key),
 ) -> ScheduledJob | None:
     """Get the schedule for a script."""
     audit.info("api.scripts.get_schedule", script_id=str(script_id))
@@ -415,130 +415,38 @@ async def get_schedule(
 # --- Execution lifecycle ---
 
 
-@router.post("/executions/{execution_id}/retry")
+@router.post("/executions/{execution_id}/retry", response_model=ScriptRetryResponse)
 @inject
 async def retry_script(
     execution_id: uuid.UUID,
     service: FromDishka[ExecutionLifecycleService],
     _key: str = Security(require_write_scope),
-) -> dict[str, Any]:
+) -> ScriptRetryResponse:
     """Retry a script execution."""
     audit.info("api.scripts.executions.retry", execution_id=str(execution_id))
     result = await service.retry_script(RetryScriptDTO(execution_id=execution_id))
-    return {
-        "execution_id": result.execution_id,
-        "status": result.status,
-        "message": "Script retry scheduled",
-    }
+    return ScriptRetryResponse(
+        execution_id=result.execution_id,
+        status=result.status,
+        message="Script retry scheduled",
+    )
 
 
-@router.post("/executions/{execution_id}/cancel")
+@router.post("/executions/{execution_id}/cancel", response_model=ScriptCancelResponse)
 @inject
 async def cancel_script(
     execution_id: uuid.UUID,
     service: FromDishka[ExecutionLifecycleService],
     _key: str = Security(require_write_scope),
-) -> dict[str, Any]:
+) -> ScriptCancelResponse:
     """Cancel a running script execution."""
     audit.info("api.scripts.executions.cancel", execution_id=str(execution_id))
     await service.cancel_execution(CancelExecutionDTO(execution_id=execution_id))
-    return {
-        "execution_id": str(execution_id),
-        "status": "cancelled",
-        "message": "Execution cancelled",
-    }
-
-
-@router.post("/bulk/retry")
-@inject
-async def bulk_retry_scripts(
-    data: dict[str, Any],
-    service: FromDishka[ExecutionLifecycleService],
-    _key: str = Security(require_write_scope),
-) -> dict[str, Any]:
-    """Retry multiple script executions."""
-    import asyncio
-
-    execution_ids = [uuid.UUID(eid) for eid in data.get("execution_ids", [])]
-    if not execution_ids:
-        return {"error": "execution_ids is required", "results": []}
-
-    audit.info(
-        "api.scripts.bulk_retry",
-        execution_ids=[str(e) for e in execution_ids],
+    return ScriptCancelResponse(
+        execution_id=str(execution_id),
+        status="cancelled",
+        message="Execution cancelled",
     )
-
-    async def _retry_one(execution_id: uuid.UUID) -> dict[str, Any]:
-        try:
-            result = await service.retry_script(
-                RetryScriptDTO(execution_id=execution_id)
-            )
-            return {
-                "execution_id": result.execution_id,
-                "status": result.status,
-                "message": "Script retry scheduled",
-            }
-        except Exception as exc:
-            return {
-                "execution_id": str(execution_id),
-                "status": "error",
-                "message": str(exc),
-            }
-
-    results = list(await asyncio.gather(*(_retry_one(eid) for eid in execution_ids)))
-    succeeded = sum(1 for r in results if r.get("status") == "retry_scheduled")
-    return {
-        "results": results,
-        "total": len(results),
-        "succeeded": succeeded,
-        "failed": len(results) - succeeded,
-    }
-
-
-@router.post("/bulk/cancel")
-@inject
-async def bulk_cancel_scripts(
-    data: dict[str, Any],
-    service: FromDishka[ExecutionLifecycleService],
-    _key: str = Security(require_write_scope),
-) -> dict[str, Any]:
-    """Cancel multiple running script executions."""
-    import asyncio
-
-    execution_ids = [uuid.UUID(eid) for eid in data.get("execution_ids", [])]
-    if not execution_ids:
-        return {"error": "execution_ids is required", "results": []}
-
-    audit.info(
-        "api.scripts.bulk_cancel",
-        execution_ids=[str(e) for e in execution_ids],
-    )
-
-    async def _cancel_one(execution_id: uuid.UUID) -> dict[str, Any]:
-        try:
-            await service.cancel_execution(
-                CancelExecutionDTO(execution_id=execution_id)
-            )
-            return {
-                "execution_id": str(execution_id),
-                "status": "cancelled",
-                "message": "Execution cancelled",
-            }
-        except Exception as exc:
-            return {
-                "execution_id": str(execution_id),
-                "status": "error",
-                "message": str(exc),
-            }
-
-    results = list(await asyncio.gather(*(_cancel_one(eid) for eid in execution_ids)))
-    succeeded = sum(1 for r in results if r.get("status") == "cancelled")
-    return {
-        "results": results,
-        "total": len(results),
-        "succeeded": succeeded,
-        "failed": len(results) - succeeded,
-    }
 
 
 @router.get("/{script_id}/schedule/history")

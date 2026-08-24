@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
+from typing import Literal
 
 
 @dataclass(frozen=True, slots=True)
@@ -29,3 +30,11 @@ class BulkNodeCheckResultDTO:
     succeeded: int
     failed: int
     node_ids: tuple[uuid.UUID, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class BulkValidateCredentialsResultDTO:
+    node_id: uuid.UUID
+    node_name: str
+    status: Literal["success", "error"]
+    message: str = ""

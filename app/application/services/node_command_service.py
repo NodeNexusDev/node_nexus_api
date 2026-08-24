@@ -19,11 +19,12 @@ if TYPE_CHECKING:
 
 from app.application.command_policy import command_fingerprint
 from app.application.dto.command_execution import CommandRequestDTO, CommandResultDTO
-from app.application.dto.command_history import (
-    CommandHistoryCreateDTO,
-)
 from app.application.dto.node_view import NodeViewDTO
-from app.application.policies.output import bound_output
+from app.application.services.ssh_executor import (
+    build_ssh_connector,
+    execute_ssh,
+    save_history,
+)
 from app.application.types import JsonObject
 from app.core.exceptions import ConnectionFailedError, NodeNotFoundError
 
@@ -69,13 +70,8 @@ class NodeCommandService:
         if node is None:
             raise NodeNotFoundError(f"Node {node_id} not found")
 
-        connector = self._connector_factory.create_ssh(
-            host=node.host,
-            port=node.port,
-            username=node.username,
-            password=self._credential_cipher.decrypt(node.password),
-            ssh_key=self._credential_cipher.decrypt(node.ssh_key),
-            passphrase=self._credential_cipher.decrypt(node.passphrase),
+        connector = build_ssh_connector(
+            node, self._credential_cipher, self._connector_factory
         )
 
         try:
@@ -127,18 +123,13 @@ class NodeCommandService:
         if node is None:
             raise NodeNotFoundError(f"Node {node_id} not found")
 
-        connector_kwargs = {
-            "host": node.host,
-            "port": node.port,
-            "username": node.username,
-            "password": self._credential_cipher.decrypt(node.password),
-            "ssh_key": self._credential_cipher.decrypt(node.ssh_key),
-            "passphrase": self._credential_cipher.decrypt(node.passphrase),
-        }
-        if data.timeout is not None:
-            connector_kwargs["timeout"] = data.timeout
+        connector = build_ssh_connector(
+            node,
+            self._credential_cipher,
+            self._connector_factory,
+            timeout=data.timeout,
+        )
 
-        connector = self._connector_factory.create_ssh(**connector_kwargs)
         if self._audit:
             await self._audit.log_required(
                 "execute.requested",
@@ -147,16 +138,7 @@ class NodeCommandService:
             )
 
         try:
-            from datetime import UTC, datetime
-
-            started_at = datetime.now(UTC)
-            async with connector:
-                stdout, stderr, exit_code = await connector.execute_command(
-                    data.command
-                )
-            finished_at = datetime.now(UTC)
-            bounded_stdout = bound_output(stdout)
-            bounded_stderr = bound_output(stderr)
+            result = await execute_ssh(connector, data.command)
             audit.info(
                 "node.command.executed",
                 node_id=str(node_id),
@@ -165,27 +147,23 @@ class NodeCommandService:
             await self._log(
                 "execute",
                 node_id,
-                {"command": data.command, "exit_code": exit_code},
+                {"command": data.command, "exit_code": result.exit_code},
             )
             if self._history_writer is not None:
-                await self._history_writer.save(
-                    CommandHistoryCreateDTO(
-                        node_id=node_id,
-                        command_fingerprint=command_fingerprint(data.command),
-                        exit_code=exit_code,
-                        stdout=bounded_stdout.value,
-                        stderr=bounded_stderr.value,
-                        stdout_bytes=bounded_stdout.original_bytes,
-                        stderr_bytes=bounded_stderr.original_bytes,
-                        truncated=bounded_stdout.truncated or bounded_stderr.truncated,
-                        started_at=started_at,
-                        finished_at=finished_at,
-                    )
+                await save_history(
+                    self._history_writer,
+                    node_id=node_id,
+                    command=data.command,
+                    exit_code=result.exit_code,
+                    stdout=result.stdout,
+                    stderr=result.stderr,
+                    started_at=result.started_at,
+                    finished_at=result.finished_at,
                 )
             return CommandResultDTO(
-                stdout=stdout,
-                stderr=stderr,
-                exit_code=exit_code,
+                stdout=result.stdout,
+                stderr=result.stderr,
+                exit_code=result.exit_code,
             )
         except ConnectionFailedError as exc:
             audit.error(

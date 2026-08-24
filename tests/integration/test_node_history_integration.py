@@ -22,14 +22,12 @@ from app.adapters.persistence.dao.command_execution import CommandExecutionRepos
 from app.adapters.persistence.node_management import SqlAlchemyNodeManagementGateway
 from app.adapters.security import HmacSha256APIKeyHasher
 from app.api.error_mapping import domain_error_handler
+from app.api.v1.commands import router as commands_router
 from app.api.v1.health import router as health_router
 from app.api.v1.nodes import router as nodes_router
 from app.api.v1.nodes_bulk import router as nodes_bulk_router
 from app.application.services.api_key_authentication import APIKeyAuthenticationService
-from app.application.services.bulk_command_history_service import (
-    BulkCommandHistoryService,
-)
-from app.application.services.command_history_service import CommandHistoryService
+from app.application.services.execution_history_service import ExecutionHistoryService
 from app.application.services.node_management_service import NodeManagementService
 from app.core.exceptions import DomainError
 from app.models.base import Base
@@ -91,18 +89,11 @@ class IntegrationDbProvider(Provider):
         )
 
     @provide(scope=Scope.APP)
-    def get_command_history_service(
+    def get_execution_history_service(
         self,
         gateway: SqlAlchemyCommandHistoryGateway,
-    ) -> CommandHistoryService:
-        return CommandHistoryService(gateway)
-
-    @provide(scope=Scope.APP)
-    def get_bulk_command_history_service(
-        self,
-        gateway: SqlAlchemyCommandHistoryGateway,
-    ) -> BulkCommandHistoryService:
-        return BulkCommandHistoryService(gateway)
+    ) -> ExecutionHistoryService:
+        return ExecutionHistoryService(gateway)
 
     @provide(scope=Scope.REQUEST)
     def get_api_key_service(
@@ -127,6 +118,7 @@ async def integration_client(
     app = FastAPI()
     app.add_exception_handler(DomainError, domain_error_handler)
     app.include_router(health_router)
+    app.include_router(commands_router, prefix="/api/v1")
     app.include_router(nodes_bulk_router, prefix="/api/v1")
     app.include_router(nodes_router, prefix="/api/v1")
     setup_dishka(container, app)
@@ -162,7 +154,10 @@ async def _create_node(client: AsyncClient, **overrides) -> dict:
 
 async def test_node_history_empty(integration_client: AsyncClient) -> None:
     node = await _create_node(integration_client, name="hist-empty")
-    resp = await integration_client.get(f"/api/v1/nodes/{node['id']}/commands/history")
+    resp = await integration_client.get(
+        "/api/v1/commands/history",
+        params={"node_id": node["id"]},
+    )
     assert resp.status_code == 200
     data = resp.json()
     assert data["items"] == []
@@ -205,7 +200,10 @@ async def test_node_history_returns_records(
         )
         await session.commit()
 
-    resp = await integration_client.get(f"/api/v1/nodes/{node['id']}/commands/history")
+    resp = await integration_client.get(
+        "/api/v1/commands/history",
+        params={"node_id": node["id"]},
+    )
     assert resp.status_code == 200
     data = resp.json()
     assert data["total"] == 2
@@ -240,7 +238,8 @@ async def test_node_history_pagination(
         await session.commit()
 
     resp = await integration_client.get(
-        f"/api/v1/nodes/{node['id']}/commands/history?page=1&size=2"
+        "/api/v1/commands/history",
+        params={"node_id": node["id"], "page": "1", "size": "2"},
     )
     assert resp.status_code == 200
     data = resp.json()
@@ -255,7 +254,7 @@ async def test_node_history_pagination(
 
 async def test_bulk_history_empty(integration_client: AsyncClient) -> None:
     resp = await integration_client.get(
-        "/api/v1/nodes/bulk/history",
+        "/api/v1/commands/bulk/history",
         params={"batch_id": str(uuid.uuid4())},
     )
     assert resp.status_code == 200
@@ -301,7 +300,7 @@ async def test_bulk_history_returns_records(
         await session.commit()
 
     resp = await integration_client.get(
-        "/api/v1/nodes/bulk/history",
+        "/api/v1/commands/bulk/history",
         params={"batch_id": str(batch_id)},
     )
     assert resp.status_code == 200
@@ -348,11 +347,11 @@ async def test_bulk_history_filters_by_batch_id(
         await session.commit()
 
     resp_a = await integration_client.get(
-        "/api/v1/nodes/bulk/history",
+        "/api/v1/commands/bulk/history",
         params={"batch_id": str(batch_a)},
     )
     resp_b = await integration_client.get(
-        "/api/v1/nodes/bulk/history",
+        "/api/v1/commands/bulk/history",
         params={"batch_id": str(batch_b)},
     )
     assert resp_a.status_code == 200
@@ -388,7 +387,7 @@ async def test_bulk_history_pagination(
         await session.commit()
 
     resp = await integration_client.get(
-        "/api/v1/nodes/bulk/history",
+        "/api/v1/commands/bulk/history",
         params={"batch_id": str(batch_id), "page": "1", "size": "2"},
     )
     assert resp.status_code == 200
@@ -398,5 +397,5 @@ async def test_bulk_history_pagination(
 
 
 async def test_bulk_history_missing_batch_id(integration_client: AsyncClient) -> None:
-    resp = await integration_client.get("/api/v1/nodes/bulk/history")
+    resp = await integration_client.get("/api/v1/commands/bulk/history")
     assert resp.status_code == 422

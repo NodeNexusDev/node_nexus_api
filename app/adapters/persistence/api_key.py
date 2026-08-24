@@ -1,6 +1,7 @@
 """Short-scope SQLAlchemy adapter for API-key persistence."""
 
 from datetime import datetime
+from typing import Literal, cast
 from uuid import UUID
 
 from sqlalchemy import func, select, update
@@ -105,7 +106,7 @@ class SqlAlchemyAPIKeyGateway:
             id=model.id,
             key_prefix=model.key_prefix,
             is_active=model.is_active,
-            scope=model.scope,
+            scope=cast(Literal["read-only", "read-write"], model.scope),
             expires_at=model.expires_at,
             last_used_at=model.last_used_at,
         )
@@ -117,7 +118,7 @@ class SqlAlchemyAPIKeyGateway:
             name=model.name,
             key_prefix=model.key_prefix,
             is_active=model.is_active,
-            scope=model.scope,
+            scope=cast(Literal["read-only", "read-write"], model.scope),
             created_at=model.created_at,
             last_used_at=model.last_used_at,
             expires_at=model.expires_at,

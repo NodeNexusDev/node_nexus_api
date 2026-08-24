@@ -188,7 +188,7 @@ class ScriptExecutionService:
         """Run one immutable target without persistence dependencies."""
         node = target.node
         results: list[ScriptStepResultDTO] = []
-        status = "completed"
+        status = "success"
         try:
             connector = self._connector_factory.create_ssh(
                 host=node.host,
@@ -222,10 +222,10 @@ class ScriptExecutionService:
                         )
                     )
                     if exit_code != 0 and step.on_failure == "stop":
-                        status = "failed"
+                        status = "error"
                         break
         except Exception as exc:
-            status = "failed"
+            status = "error"
             audit.exception(
                 "script.execute.failed",
                 script_id=str(target.script_id),

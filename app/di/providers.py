@@ -47,7 +47,6 @@ from app.adapters.persistence.node_reader import ScopedNodeConnectionReader
 from app.adapters.persistence.node_status_history import (
     SqlAlchemyNodeStatusHistoryGateway,
 )
-from app.adapters.persistence.node_validation import SshCredentialValidator
 from app.adapters.persistence.note import SqlAlchemyNoteGateway
 from app.adapters.persistence.schedule import SqlAlchemyScheduleGateway
 from app.adapters.persistence.script_gateway import (
@@ -55,9 +54,9 @@ from app.adapters.persistence.script_gateway import (
     ScopedScriptExecutionWriter,
     SqlAlchemyScriptGateway,
 )
-from app.adapters.persistence.tag_manager import SqlAlchemyTagManager
 from app.adapters.runtime.apscheduler_runtime import ApschedulerRuntime
 from app.adapters.runtime.docker import SshDockerRuntime
+from app.adapters.runtime.node_validation import SshCredentialValidator
 from app.adapters.runtime.scheduler import ApschedulerJobScheduler
 from app.adapters.runtime.ssh import SSHConnectorFactory
 from app.adapters.security import AesGcmCredentialCipher, HmacSha256APIKeyHasher
@@ -112,7 +111,6 @@ from app.application.ports.script_persistence import (
     ScriptReader,
     ScriptWriter,
 )
-from app.application.ports.tag_manager import TagManager
 from app.application.services.api_key_authentication import (
     APIKeyAuthenticationService,
 )
@@ -120,11 +118,7 @@ from app.application.services.api_key_management import APIKeyManagementService
 from app.application.services.audit_cleanup_job import AuditCleanupJob
 from app.application.services.audit_event_service import AuditEventService
 from app.application.services.audit_log_service import AuditLogService
-from app.application.services.bulk_command_history_service import (
-    BulkCommandHistoryService,
-)
 from app.application.services.command_execution_service import CommandExecutionService
-from app.application.services.command_history_service import CommandHistoryService
 from app.application.services.command_management_service import CommandManagementService
 from app.application.services.config_service import ConfigService
 from app.application.services.dashboard_metrics_service import (
@@ -136,6 +130,7 @@ from app.application.services.docker.command_runner import DockerCommandRunner
 from app.application.services.docker.container_service import DockerContainerService
 from app.application.services.docker.image_service import DockerImageService
 from app.application.services.docker.resource_service import DockerResourceService
+from app.application.services.execution_history_service import ExecutionHistoryService
 from app.application.services.execution_lifecycle_service import (
     ExecutionLifecycleService,
 )
@@ -169,7 +164,6 @@ from app.application.services.script_execution_service import ScriptExecutionSer
 from app.application.services.script_history_service import ScriptHistoryService
 from app.application.services.script_management_service import ScriptManagementService
 from app.application.services.streaming_command_service import StreamingCommandService
-from app.application.services.tag_management_service import TagManagementService
 from app.core.config import Settings, get_settings
 
 
@@ -505,11 +499,6 @@ class RepositoryProvider(Provider):
         """Bind audit export to the persistence adapter."""
         return SqlAlchemyAuditExporter(session)
 
-    @provide(scope=Scope.REQUEST, provides=TagManager)
-    def get_tag_manager(self, session: AsyncSession) -> TagManager:
-        """Bind tag management to the persistence adapter."""
-        return SqlAlchemyTagManager(session)
-
     @provide(scope=Scope.REQUEST, provides=FavoriteReader)
     def get_favorite_reader(self, session: AsyncSession) -> FavoriteReader:
         """Bind favorite reader to the persistence adapter."""
@@ -779,20 +768,12 @@ class ServiceProvider(Provider):
         return AuditLogService(reader, writer)
 
     @provide(scope=Scope.APP)
-    def get_command_history_service(
+    def get_execution_history_service(
         self,
         reader: CommandHistoryReader,
-    ) -> CommandHistoryService:
-        """Get command execution history query use cases."""
-        return CommandHistoryService(reader)
-
-    @provide(scope=Scope.REQUEST)
-    def get_bulk_command_history_service(
-        self,
-        reader: CommandHistoryReader,
-    ) -> BulkCommandHistoryService:
-        """Get bulk command batch history query use cases."""
-        return BulkCommandHistoryService(reader)
+    ) -> ExecutionHistoryService:
+        """Get unified command execution history query service."""
+        return ExecutionHistoryService(reader)
 
     @provide(scope=Scope.APP)
     def get_audit_cleanup_job(
@@ -1055,14 +1036,6 @@ class ServiceProvider(Provider):
     ) -> DashboardMetricsService:
         """Get dashboard metrics service."""
         return DashboardMetricsService(reader=reader)
-
-    @provide(scope=Scope.REQUEST)
-    def get_tag_management_service(
-        self,
-        tag_manager: TagManager,
-    ) -> TagManagementService:
-        """Get tag management service."""
-        return TagManagementService(tag_manager=tag_manager)
 
     @provide(scope=Scope.REQUEST)
     def get_favorite_service(

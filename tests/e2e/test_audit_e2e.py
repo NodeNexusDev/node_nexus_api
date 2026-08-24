@@ -1,6 +1,5 @@
 """Full-stack audit outbox durability and delivery scenarios."""
 
-import asyncio
 import json
 import time
 import uuid
@@ -11,6 +10,7 @@ import httpx2 as httpx
 import pytest
 
 from tests.e2e.helpers.nodes import wait_for_audit as _wait_for_audit
+from tests.e2e.helpers.polling import wait_for_condition
 from tests.e2e.helpers.resources import UniqueResourceFactory
 from tests.e2e.helpers.service_controller import DockerServiceController
 
@@ -96,7 +96,7 @@ async def test_idempotent_delivery_no_duplicate_log(
     )
 
     # Wait for worker to process the duplicate
-    await asyncio.sleep(3)
+    _wait_for_audit(e2e_client, action="create", node_id=node["id"], timeout=10.0)
 
     # Should still be exactly one audit log
     count_after = await postgres_connection.fetchval(
@@ -145,19 +145,20 @@ async def test_deleted_node_does_not_break_delivery(
     assert resp.status_code == 204
 
     # The delete audit event should still be delivered with node_id=NULL
-    deadline = time.monotonic() + 10.0
-    found = False
-    while time.monotonic() < deadline:
+    def _check_delete_audit() -> bool:
         resp = e2e_client.get("/api/v1/audit/?action=delete")
-        assert resp.status_code == 200
+        if resp.status_code != 200:
+            return False
         for log in resp.json()["items"]:
             if log["node_id"] is None:
-                found = True
-                break
-        if found:
-            break
-        await asyncio.sleep(0.2)
-    assert found, "Delete audit event with nullified node_id not found"
+                return True
+        return False
+
+    wait_for_condition(
+        _check_delete_audit,
+        timeout=10.0,
+        description="delete audit event with nullified node_id",
+    )
 
 
 @pytest.mark.asyncio
@@ -240,17 +241,23 @@ async def test_worker_continues_after_malformed_event(
     _wait_for_audit(e2e_client, action="create")
 
     # Poll until the malformed event is marked as failed (needs 5 retries with backoff)
-    deadline = time.monotonic() + 60.0
-    while time.monotonic() < deadline:
+    async def _check_malformed() -> tuple[str, int]:
         row = await postgres_connection.fetchrow(
             "SELECT status, attempts FROM audit_outbox WHERE id = $1", malformed_id
         )
         assert row is not None
-        if row["status"] == "failed":
+        return row["status"], row["attempts"]
+
+    deadline = time.monotonic() + 60.0
+    status = "pending"
+    attempts = 0
+    while time.monotonic() < deadline:
+        status, attempts = await _check_malformed()
+        if status == "failed":
             break
-        await asyncio.sleep(1)
-    assert row["status"] == "failed"
-    assert row["attempts"] >= 5
+        time.sleep(1)
+    assert status == "failed"
+    assert attempts >= 5
 
 
 @pytest.mark.asyncio
@@ -347,7 +354,7 @@ def test_audit_logs_track_crud_operations(
     assert "create" in actions
 
     # update action recorded
-    e2e_client.put(f"/api/v1/nodes/{node_id}", json={"name": "audit-crud-upd"})
+    e2e_client.patch(f"/api/v1/nodes/{node_id}", json={"name": "audit-crud-upd"})
     data = _wait_for_audit(e2e_client, query=f"?node_id={node_id}", action="update")
     actions = [log["action"] for log in data["items"]]
     assert "update" in actions
@@ -550,9 +557,7 @@ def test_audit_delete_with_master_key(e2e_client: httpx.Client) -> None:
         "/api/v1/audit/?confirm=yes",
         headers={"X-API-Key": master_key},
     )
-    assert resp.status_code == 200
-    data = resp.json()
-    assert "deleted_count" in data
+    assert resp.status_code == 204
 
 
 # ---------------------------------------------------------------------------

@@ -98,7 +98,7 @@ def test_script_crud_full_cycle(e2e_client: httpx.Client) -> None:
     assert data["total"] >= 1
 
     # Update
-    resp = e2e_client.put(
+    resp = e2e_client.patch(
         f"/api/v1/scripts/{script_id}",
         json={"name": "script-updated"},
     )
@@ -147,7 +147,7 @@ def test_script_not_found(e2e_client: httpx.Client) -> None:
     resp = e2e_client.get(f"/api/v1/scripts/{fake_id}")
     assert resp.status_code == 404
 
-    resp = e2e_client.put(f"/api/v1/scripts/{fake_id}", json={"name": "x"})
+    resp = e2e_client.patch(f"/api/v1/scripts/{fake_id}", json={"name": "x"})
     assert resp.status_code == 404
 
     resp = e2e_client.delete(f"/api/v1/scripts/{fake_id}")
@@ -176,7 +176,7 @@ def test_script_execute_on_ssh_node(
     assert len(batch["results"]) == 1
     result = batch["results"][0]
     assert result["node_id"] == node["id"]
-    assert result["status"] == "completed"
+    assert result["status"] == "success"
     assert len(result["steps"]) == 1
     assert result["steps"][0]["exit_code"] == 0
 
@@ -218,7 +218,7 @@ def test_script_executions_history(
     data = resp.json()
     assert data["total"] >= 1
     execution = data["items"][0]
-    assert execution["status"] == "completed"
+    assert execution["status"] == "success"
     assert execution["node_id"] == node["id"]
 
 
@@ -287,7 +287,7 @@ def test_script_execute_with_command_reference(
     batch = resp.json()
     assert len(batch["results"]) == 1
     result = batch["results"][0]
-    assert result["status"] == "completed"
+    assert result["status"] == "success"
     assert result["steps"][0]["stdout"].strip() == "ref-ok"
 
 
@@ -310,7 +310,7 @@ def test_script_execute_multi_node(
     assert node1["id"] in node_ids
     assert node2["id"] in node_ids
     for r in batch["results"]:
-        assert r["status"] == "completed"
+        assert r["status"] == "success"
 
 
 # ---------------------------------------------------------------------------
@@ -321,7 +321,7 @@ def test_script_execute_multi_node(
 def test_script_partial_update(e2e_client: httpx.Client) -> None:
     script = _create_script(e2e_client, name="script-partial")
 
-    resp = e2e_client.put(
+    resp = e2e_client.patch(
         f"/api/v1/scripts/{script['id']}",
         json={"name": "script-partial-updated"},
     )
@@ -431,8 +431,7 @@ def test_script_unschedule(e2e_client: httpx.Client) -> None:
             json={"cron": "0 9 * * *", "node_ids": [node["id"]]},
         )
         resp = e2e_client.delete(f"/api/v1/scripts/{script['id']}/schedule")
-        assert resp.status_code == 200
-        assert "unscheduled" in resp.json()["message"]
+        assert resp.status_code == 204
     finally:
         e2e_client.delete(f"/api/v1/scripts/{script['id']}")
         e2e_client.delete(f"/api/v1/nodes/{node['id']}")
@@ -495,6 +494,38 @@ def test_script_schedule_nonexistent(e2e_client: httpx.Client) -> None:
         json={"cron": "0 9 * * *", "node_ids": [str(uuid4())]},
     )
     assert resp.status_code == 404
+
+
+def test_script_schedule_invalid_cron(e2e_client: httpx.Client) -> None:
+    """POST /scripts/{id}/schedule returns 422 for invalid cron expression."""
+    resp = e2e_client.post(
+        "/api/v1/scripts/",
+        json={"name": "invalid-cron-script", "steps": _INLINE_STEP},
+    )
+    assert resp.status_code == 201
+    script = resp.json()
+
+    resp = e2e_client.post(
+        "/api/v1/nodes/",
+        json={
+            "name": "invalid-cron-node",
+            "host": "10.0.0.1",
+            "port": 22,
+            "connection_type": "ssh",
+        },
+    )
+    assert resp.status_code == 201
+    node = resp.json()
+
+    try:
+        resp = e2e_client.post(
+            f"/api/v1/scripts/{script['id']}/schedule",
+            json={"cron": "not-a-valid-cron", "node_ids": [node["id"]]},
+        )
+        assert resp.status_code == 422
+    finally:
+        e2e_client.delete(f"/api/v1/scripts/{script['id']}")
+        e2e_client.delete(f"/api/v1/nodes/{node['id']}")
 
 
 @pytest.mark.e2e_scheduler
@@ -644,7 +675,7 @@ def test_scheduler_executes_script_on_cron(e2e_client: httpx.Client) -> None:
             if data.get("total", 0) == 0:
                 return False
             exec_item = data["items"][0]
-            return exec_item["status"] == "completed"
+            return exec_item["status"] == "success"
 
         wait_for_condition(
             _execution_completed,

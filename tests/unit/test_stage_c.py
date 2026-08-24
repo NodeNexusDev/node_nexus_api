@@ -237,7 +237,7 @@ async def test_node_validation_service_failure() -> None:
 @pytest.mark.asyncio
 async def test_ssh_credential_validator_success() -> None:
     """SshCredentialValidator should return active on successful connection."""
-    from app.adapters.persistence.node_validation import SshCredentialValidator
+    from app.adapters.runtime.node_validation import SshCredentialValidator
 
     connector = AsyncMock()
     connector.execute_command.return_value = ("ok", "", 0)
@@ -269,7 +269,7 @@ async def test_ssh_credential_validator_success() -> None:
 @pytest.mark.asyncio
 async def test_ssh_credential_validator_connection_failed() -> None:
     """SshCredentialValidator should return unreachable on ConnectionFailedError."""
-    from app.adapters.persistence.node_validation import SshCredentialValidator
+    from app.adapters.runtime.node_validation import SshCredentialValidator
 
     connector = AsyncMock()
     connector.__aenter__ = AsyncMock(
@@ -292,7 +292,7 @@ async def test_ssh_credential_validator_connection_failed() -> None:
 @pytest.mark.asyncio
 async def test_ssh_credential_validator_unexpected_error() -> None:
     """SshCredentialValidator should handle unexpected errors gracefully."""
-    from app.adapters.persistence.node_validation import SshCredentialValidator
+    from app.adapters.runtime.node_validation import SshCredentialValidator
 
     connector = AsyncMock()
     connector.__aenter__ = AsyncMock(side_effect=RuntimeError("unexpected"))

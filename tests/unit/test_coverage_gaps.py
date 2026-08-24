@@ -21,7 +21,7 @@ class TestTelemetryEnabled:
 
     def test_disabled_returns_early(self):
         """init_telemetry returns early when disabled."""
-        from app.core.telemetry import init_telemetry
+        from app.adapters.telemetry import init_telemetry
 
         app = MagicMock()
         settings = MagicMock()
@@ -31,7 +31,7 @@ class TestTelemetryEnabled:
 
     def test_enabled_with_mocked_imports(self):
         """init_telemetry with mocked opentelemetry."""
-        from app.core.telemetry import init_telemetry
+        from app.adapters.telemetry import init_telemetry
 
         app = MagicMock()
         settings = MagicMock()
@@ -99,7 +99,7 @@ class TestTelemetryEnabled:
 
     def test_enabled_handles_import_error(self):
         """init_telemetry handles missing opentelemetry gracefully."""
-        from app.core.telemetry import init_telemetry
+        from app.adapters.telemetry import init_telemetry
 
         app = MagicMock()
         settings = MagicMock()

@@ -474,8 +474,9 @@ async def test_ws_disconnect_terminates_remote_process(
         deadline = asyncio.get_running_loop().time() + 10
         while True:
             response = e2e_client.post(
-                f"/api/v1/nodes/{node['id']}/execute",
+                "/api/v1/commands/execute",
                 json={
+                    "node_id": node['id'],
                     "command": (
                         f"pid=$(cat {pid_file}) && "
                         f"{{ ! kill -0 $pid 2>/dev/null || "
@@ -488,8 +489,9 @@ async def test_ws_disconnect_terminates_remote_process(
                 break
             if asyncio.get_running_loop().time() >= deadline:
                 process_state = e2e_client.post(
-                    f"/api/v1/nodes/{node['id']}/execute",
+                    "/api/v1/commands/execute",
                     json={
+                        "node_id": node['id'],
                         "command": (
                             f"pid=$(cat {pid_file}); "
                             f"sed -n '1,8p' /proc/$pid/status 2>/dev/null"
@@ -503,8 +505,8 @@ async def test_ws_disconnect_terminates_remote_process(
             await asyncio.sleep(0.2)
     finally:
         e2e_client.post(
-            f"/api/v1/nodes/{node['id']}/execute",
-            json={"command": f"rm -f {pid_file}"},
+            "/api/v1/commands/execute",
+            json={"node_id": node['id'], "command": f"rm -f {pid_file}"},
         )
 
 

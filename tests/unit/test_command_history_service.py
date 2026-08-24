@@ -1,4 +1,4 @@
-"""Unit tests for command execution history application service."""
+"""Unit tests for ExecutionHistoryService.get_node_history."""
 
 import uuid
 from datetime import UTC, datetime
@@ -11,7 +11,7 @@ from app.application.dto.command_history import (
     CommandHistoryPageDTO,
     CommandHistoryQueryDTO,
 )
-from app.application.services.command_history_service import CommandHistoryService
+from app.application.services.execution_history_service import ExecutionHistoryService
 
 
 @pytest.fixture
@@ -20,12 +20,12 @@ def reader() -> AsyncMock:
 
 
 @pytest.fixture
-def service(reader: AsyncMock) -> CommandHistoryService:
-    return CommandHistoryService(reader)
+def service(reader: AsyncMock) -> ExecutionHistoryService:
+    return ExecutionHistoryService(reader)
 
 
 async def test_get_node_history_builds_query(
-    service: CommandHistoryService, reader: AsyncMock
+    service: ExecutionHistoryService, reader: AsyncMock
 ) -> None:
     node_id = uuid.uuid4()
     now = datetime.now(UTC)

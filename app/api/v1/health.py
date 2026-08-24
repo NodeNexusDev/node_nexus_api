@@ -9,7 +9,7 @@ from fastapi import APIRouter, Response, status
 from app.application.services.health_service import HealthService
 from app.schemas.health import ReadyCheck, ReadyResponse
 
-router = APIRouter(route_class=DishkaRoute)
+router = APIRouter(tags=["health"], route_class=DishkaRoute)
 
 
 def _get_app_version() -> str:

@@ -7,12 +7,12 @@ Covers:
 - Script bulk: retry, cancel
 """
 
-import time
 import uuid
 
 import httpx2 as httpx
 import pytest
 
+from tests.e2e.helpers.polling import wait_for_condition
 from tests.e2e.helpers.resources import UniqueResourceFactory
 
 pytestmark = pytest.mark.docker
@@ -62,10 +62,26 @@ def test_docker_bulk_remove(
         json={"image": "alpine:latest", "timeout": 120},
     )
     e2e_client.post(
-        f"/api/v1/nodes/{node['id']}/execute",
-        json={"command": "docker run -d --name bulk-rm-test alpine sleep 300"},
+        "/api/v1/commands/execute",
+        json={
+            "node_id": node['id'],
+            "command": "docker run -d --name bulk-rm-test alpine sleep 300",
+        },
     )
-    time.sleep(1)
+
+    # Wait for container to be running
+    def _container_running() -> bool:
+        resp = e2e_client.get(
+            f"/api/v1/nodes/{node['id']}/docker/containers/bulk-rm-test"
+        )
+        if resp.status_code != 200:
+            return False
+        state = resp.json().get("State", {})
+        return state.get("status", "").lower() == "running"
+
+    wait_for_condition(
+        _container_running, timeout=10.0, description="container running"
+    )
 
     resp = e2e_client.post(
         "/api/v1/docker/bulk/remove",
@@ -186,7 +202,7 @@ def test_node_bulk_update(
     node1 = e2e_resources.create_ssh_node(name="bulk-upd-1")
     node2 = e2e_resources.create_ssh_node(name="bulk-upd-2")
 
-    resp = e2e_client.put(
+    resp = e2e_client.patch(
         "/api/v1/nodes/bulk/update",
         json={
             "node_ids": [node1["id"], node2["id"]],
@@ -239,7 +255,7 @@ def test_node_bulk_retry_cancel(
     fake_id = str(uuid.uuid4())
 
     resp = e2e_client.post(
-        "/api/v1/nodes/bulk/retry",
+        "/api/v1/commands/bulk/retry",
         json={"execution_ids": [fake_id]},
     )
     assert resp.status_code == 200
@@ -248,7 +264,7 @@ def test_node_bulk_retry_cancel(
     assert data["failed"] == 1
 
     resp = e2e_client.post(
-        "/api/v1/nodes/bulk/cancel",
+        "/api/v1/commands/bulk/cancel",
         json={"execution_ids": [fake_id]},
     )
     assert resp.status_code == 200

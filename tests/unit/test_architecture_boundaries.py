@@ -318,3 +318,27 @@ def test_models_are_persistence_only() -> None:
         if not (module == "app.models" or module.startswith("app.models."))
     ]
     assert not violations, "Forbidden model dependencies:\n" + "\n".join(violations)
+
+
+def test_api_does_not_access_private_service_attributes() -> None:
+    """API layer must not reach into service private attributes."""
+    import re
+
+    pattern = re.compile(r"service\._\w+")
+    violations: list[str] = []
+    for path in sorted((APP_ROOT / "api").rglob("*.py")):
+        content = path.read_text(encoding="utf-8")
+        for match in pattern.finditer(content):
+            violations.append(f"{path.relative_to(APP_ROOT.parent)}:{match.group()}")
+    assert not violations, "Private attribute access in API:\n" + "\n".join(violations)
+
+
+def test_core_does_not_import_infrastructure() -> None:
+    """Core layer must not depend on FastAPI, SQLAlchemy, or OpenTelemetry."""
+    forbidden = ("fastapi", "sqlalchemy", "opentelemetry", "dishka")
+    violations = [
+        f"{path.relative_to(APP_ROOT.parent)} -> {module}"
+        for path, module in _imports_in("core")
+        if any(module == p or module.startswith(f"{p}.") for p in forbidden)
+    ]
+    assert not violations, "Core imports infrastructure:\n" + "\n".join(violations)
