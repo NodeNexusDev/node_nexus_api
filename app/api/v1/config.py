@@ -126,6 +126,7 @@ def _dry_run_response(result: DryRunPreviewDTO) -> DryRunImportResult:
                     port=n.port,
                     connection_type=n.connection_type,
                     username=n.username,
+                    docker_host=n.docker_host,
                     tags=list(n.tags),
                 )
                 for n in result.would_create_nodes

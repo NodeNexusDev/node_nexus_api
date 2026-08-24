@@ -162,3 +162,18 @@ def validate_build_arg_key(key: str) -> str:
             "alphanumeric characters and underscores."
         )
     return key
+
+
+_DOCKER_HOST_RE = re.compile(
+    r"^(unix:///[\w./\-]+|tcp://[\w.\-]+:\d+)$"
+)
+
+
+def validate_docker_host(docker_host: str) -> str:
+    """Validate a ``DOCKER_HOST`` value (unix socket or tcp endpoint)."""
+    if not docker_host or not _DOCKER_HOST_RE.fullmatch(docker_host):
+        raise DockerValidationError(
+            f"Invalid docker_host value: {docker_host!r}. "
+            "Expected 'unix:///path/to/socket' or 'tcp://host:port'."
+        )
+    return docker_host

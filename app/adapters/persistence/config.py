@@ -61,6 +61,7 @@ class SqlAlchemyConfigGateway:
                     port=node.port,
                     connection_type=node.connection_type,
                     username=node.username,
+                    docker_host=node.docker_host,
                     tags=tuple(node.tags or ()),
                 )
                 for node in nodes
@@ -126,6 +127,7 @@ class SqlAlchemyConfigGateway:
                         "port": node.port,
                         "connection_type": node.connection_type,
                         "username": node.username,
+                        "docker_host": node.docker_host,
                         "tags": list(node.tags),
                     }
                 )

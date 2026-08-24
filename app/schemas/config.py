@@ -25,6 +25,7 @@ class NodeExport(BaseModel):
     port: int
     connection_type: str
     username: str | None = None
+    docker_host: str | None = None
     tags: list[str] = Field(default_factory=list)
 
 
@@ -88,6 +89,7 @@ class DryRunNodePreview(BaseModel):
     port: int
     connection_type: str
     username: str | None = None
+    docker_host: str | None = None
     tags: list[str] = Field(default_factory=list)
 
 

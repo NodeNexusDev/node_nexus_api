@@ -6,6 +6,7 @@ from app.core.docker_validation import (
     validate_build_arg_key,
     validate_container_id,
     validate_container_name,
+    validate_docker_host,
     validate_env_vars,
     validate_image_name,
     validate_image_tag,
@@ -267,3 +268,30 @@ class TestValidateBuildArgKey:
     def test_invalid_char_raises(self) -> None:
         with pytest.raises(DockerValidationError, match="Invalid build arg key"):
             validate_build_arg_key("VERSION=1")
+
+
+class TestValidateDockerHost:
+    def test_valid_unix_socket(self) -> None:
+        assert validate_docker_host("unix:///var/run/docker.sock") == "unix:///var/run/docker.sock"
+
+    def test_valid_tcp(self) -> None:
+        assert validate_docker_host("tcp://192.168.1.100:2375") == "tcp://192.168.1.100:2375"
+
+    def test_valid_tcp_localhost(self) -> None:
+        assert validate_docker_host("tcp://localhost:2376") == "tcp://localhost:2376"
+
+    def test_empty_raises(self) -> None:
+        with pytest.raises(DockerValidationError, match="Invalid docker_host"):
+            validate_docker_host("")
+
+    def test_invalid_scheme_raises(self) -> None:
+        with pytest.raises(DockerValidationError, match="Invalid docker_host"):
+            validate_docker_host("http://localhost:2375")
+
+    def test_tcp_without_port_raises(self) -> None:
+        with pytest.raises(DockerValidationError, match="Invalid docker_host"):
+            validate_docker_host("tcp://localhost")
+
+    def test_shell_injection_raises(self) -> None:
+        with pytest.raises(DockerValidationError, match="Invalid docker_host"):
+            validate_docker_host("tcp://host:2375; rm -rf /")

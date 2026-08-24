@@ -382,5 +382,81 @@ def test_config_import_dry_run_unsupported_version(e2e_client: httpx.Client) -> 
 
 
 # ---------------------------------------------------------------------------
+# docker_host round-trip
+# ---------------------------------------------------------------------------
+
+
+def test_config_export_includes_docker_host(e2e_client: httpx.Client) -> None:
+    """Export includes docker_host when set on a node."""
+    resp = e2e_client.post(
+        "/api/v1/nodes/",
+        json={
+            "name": "docker-host-export",
+            "host": "10.0.0.99",
+            "port": 22,
+            "connection_type": "ssh",
+            "docker_host": "tcp://192.168.1.100:2375",
+        },
+    )
+    assert resp.status_code == 201
+    node_id = resp.json()["id"]
+
+    try:
+        export = e2e_client.get("/api/v1/config/export").json()
+        exported = next(
+            (n for n in export["nodes"] if n["name"] == "docker-host-export"), None
+        )
+        assert exported is not None
+        assert exported["docker_host"] == "tcp://192.168.1.100:2375"
+    finally:
+        e2e_client.delete(f"/api/v1/nodes/{node_id}")
+
+
+def test_config_round_trip_preserves_docker_host(
+    e2e_client: httpx.Client,
+) -> None:
+    """Export → import round-trip preserves docker_host."""
+    resp = e2e_client.post(
+        "/api/v1/nodes/",
+        json={
+            "name": "docker-host-rt",
+            "host": "10.0.0.99",
+            "port": 22,
+            "connection_type": "ssh",
+            "docker_host": "tcp://dind:2375",
+        },
+    )
+    assert resp.status_code == 201
+    node_id = resp.json()["id"]
+
+    try:
+        export1 = e2e_client.get("/api/v1/config/export").json()
+        exported_node = next(
+            n for n in export1["nodes"] if n["name"] == "docker-host-rt"
+        )
+        assert exported_node["docker_host"] == "tcp://dind:2375"
+
+        e2e_client.delete(f"/api/v1/nodes/{node_id}")
+
+        import_resp = e2e_client.post(
+            "/api/v1/config/import",
+            json={"nodes": [exported_node], "commands": [], "scripts": []},
+        )
+        assert import_resp.status_code == 200
+        assert import_resp.json()["nodes_created"] == 1
+
+        export2 = e2e_client.get("/api/v1/config/export").json()
+        reimported = next(
+            n for n in export2["nodes"] if n["name"] == "docker-host-rt"
+        )
+        assert reimported["docker_host"] == "tcp://dind:2375"
+    finally:
+        nodes_resp = e2e_client.get("/api/v1/nodes/")
+        for n in nodes_resp.json()["items"]:
+            if n["name"] == "docker-host-rt":
+                e2e_client.delete(f"/api/v1/nodes/{n['id']}")
+
+
+# ---------------------------------------------------------------------------
 # Script scheduling
 # ---------------------------------------------------------------------------
