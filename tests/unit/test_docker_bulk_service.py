@@ -272,3 +272,208 @@ async def test_bulk_image_build_exception() -> None:
     assert result.total == 1
     assert result.failed == 1
     assert "docker daemon down" in result.results[0].error
+
+
+# -- bulk_inspect --
+
+
+@pytest.mark.asyncio
+async def test_bulk_inspect_success() -> None:
+    runner = _make_runner()
+    node = _make_node()
+    runner.get_target = AsyncMock(return_value=node)
+    runner.execute = AsyncMock(
+        return_value=('[{"Id":"abc123"}]', "", 0)
+    )
+    service = DockerBulkService(runner)
+
+    result = await service.bulk_inspect(
+        node_ids=[node.id],
+        container_id="abc123def456",
+    )
+
+    assert result.total == 1
+    assert result.succeeded == 1
+    assert result.failed == 0
+    assert "abc123" in result.results[0].output
+
+
+@pytest.mark.asyncio
+async def test_bulk_inspect_error() -> None:
+    runner = _make_runner()
+    node = _make_node()
+    runner.get_target = AsyncMock(return_value=node)
+    runner.execute = AsyncMock(
+        return_value=("", "Error: no such container", 1)
+    )
+    service = DockerBulkService(runner)
+
+    result = await service.bulk_inspect(
+        node_ids=[node.id],
+        container_id="nonexistent",
+    )
+
+    assert result.total == 1
+    assert result.failed == 1
+    assert "no such container" in result.results[0].error
+
+
+@pytest.mark.asyncio
+async def test_bulk_inspect_exception() -> None:
+    runner = _make_runner()
+    node = _make_node()
+    runner.get_target = AsyncMock(return_value=node)
+    runner.execute = AsyncMock(side_effect=RuntimeError("ssh timeout"))
+    service = DockerBulkService(runner)
+
+    result = await service.bulk_inspect(
+        node_ids=[node.id],
+        container_id="abc123def456",
+    )
+
+    assert result.total == 1
+    assert result.failed == 1
+    assert "ssh timeout" in result.results[0].error
+
+
+# -- bulk_logs --
+
+
+@pytest.mark.asyncio
+async def test_bulk_logs_success() -> None:
+    runner = _make_runner()
+    node = _make_node()
+    runner.get_target = AsyncMock(return_value=node)
+    runner.execute = AsyncMock(
+        return_value=("log line 1\nlog line 2\n", "", 0)
+    )
+    service = DockerBulkService(runner)
+
+    result = await service.bulk_logs(
+        node_ids=[node.id],
+        container_id="abc123def456",
+    )
+
+    assert result.total == 1
+    assert result.succeeded == 1
+    assert "log line 1" in result.results[0].output
+
+
+@pytest.mark.asyncio
+async def test_bulk_logs_custom_tail() -> None:
+    runner = _make_runner()
+    node = _make_node()
+    runner.get_target = AsyncMock(return_value=node)
+    runner.execute = AsyncMock(return_value=("logs\n", "", 0))
+    service = DockerBulkService(runner)
+
+    result = await service.bulk_logs(
+        node_ids=[node.id],
+        container_id="abc123def456",
+        tail=50,
+    )
+
+    assert result.succeeded == 1
+    cmd_args = runner.build_command.call_args[0][1]
+    assert "--tail 50" in cmd_args
+
+
+@pytest.mark.asyncio
+async def test_bulk_logs_error() -> None:
+    runner = _make_runner()
+    node = _make_node()
+    runner.get_target = AsyncMock(return_value=node)
+    runner.execute = AsyncMock(
+        return_value=("", "Error: no such container", 1)
+    )
+    service = DockerBulkService(runner)
+
+    result = await service.bulk_logs(
+        node_ids=[node.id],
+        container_id="nonexistent",
+    )
+
+    assert result.total == 1
+    assert result.failed == 1
+
+
+@pytest.mark.asyncio
+async def test_bulk_logs_exception() -> None:
+    runner = _make_runner()
+    node = _make_node()
+    runner.get_target = AsyncMock(return_value=node)
+    runner.execute = AsyncMock(side_effect=RuntimeError("connection lost"))
+    service = DockerBulkService(runner)
+
+    result = await service.bulk_logs(
+        node_ids=[node.id],
+        container_id="abc123def456",
+    )
+
+    assert result.total == 1
+    assert result.failed == 1
+    assert "connection lost" in result.results[0].error
+
+
+# -- bulk_stats --
+
+
+@pytest.mark.asyncio
+async def test_bulk_stats_success() -> None:
+    stats_json = (
+        '{"Container":"abc123","Name":"web","CPUPerc":"0.5%",'
+        '"MemUsage":"100MiB","MemPerc":"1.0%","NetIO":"1MB/2MB",'
+        '"BlockIO":"10MB/20MB"}'
+    )
+    runner = _make_runner()
+    node = _make_node()
+    runner.get_target = AsyncMock(return_value=node)
+    runner.execute = AsyncMock(return_value=(stats_json, "", 0))
+    service = DockerBulkService(runner)
+
+    result = await service.bulk_stats(
+        node_ids=[node.id],
+        container_id="abc123def456",
+    )
+
+    assert result.total == 1
+    assert result.succeeded == 1
+    assert "abc123" in result.results[0].output
+
+
+@pytest.mark.asyncio
+async def test_bulk_stats_error() -> None:
+    runner = _make_runner()
+    node = _make_node()
+    runner.get_target = AsyncMock(return_value=node)
+    runner.execute = AsyncMock(
+        return_value=("", "Error: not running", 1)
+    )
+    service = DockerBulkService(runner)
+
+    result = await service.bulk_stats(
+        node_ids=[node.id],
+        container_id="nonexistent",
+    )
+
+    assert result.total == 1
+    assert result.failed == 1
+    assert "not running" in result.results[0].error
+
+
+@pytest.mark.asyncio
+async def test_bulk_stats_exception() -> None:
+    runner = _make_runner()
+    node = _make_node()
+    runner.get_target = AsyncMock(return_value=node)
+    runner.execute = AsyncMock(side_effect=RuntimeError("ssh timeout"))
+    service = DockerBulkService(runner)
+
+    result = await service.bulk_stats(
+        node_ids=[node.id],
+        container_id="abc123def456",
+    )
+
+    assert result.total == 1
+    assert result.failed == 1
+    assert "ssh timeout" in result.results[0].error
