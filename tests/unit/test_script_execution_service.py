@@ -86,7 +86,7 @@ async def test_remote_worker_runs_between_short_writer_calls() -> None:
     )
 
     assert events == ["create", "remote", "update"]
-    assert result.results[0].status == "completed"
+    assert result.results[0].status == "success"
     assert result.results[0].steps[0].stdout == "ok"
 
 
@@ -291,7 +291,7 @@ async def test_run_remote_with_resolution_error_records_stderr() -> None:
         ),
     )
     result = await service._run_remote(target)
-    assert result.status == "failed"
+    assert result.status == "error"
     assert result.steps[0].stderr == "boom"
     assert result.steps[0].exit_code == 1
 
@@ -321,7 +321,7 @@ async def test_run_remote_connector_exception_marks_failed() -> None:
         steps=(ResolvedScriptStepDTO(label="ok", command="true", on_failure="stop"),),
     )
     result = await service._run_remote(target)
-    assert result.status == "failed"
+    assert result.status == "error"
 
 
 @pytest.mark.asyncio
@@ -337,7 +337,7 @@ async def test_log_result_writes_to_audit_when_set() -> None:
         execution_id=uuid.uuid4(),
         node_id=node_id,
         node_name="node",
-        status="completed",
+        status="success",
         steps=(),
     )
     await service._log_result(script_id, result)
