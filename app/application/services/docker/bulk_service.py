@@ -502,3 +502,130 @@ class DockerBulkService:
             succeeded=succeeded,
             failed=failed,
         )
+
+    # ── Bulk inspect / logs / stats ────────────────────────────────────────
+
+    async def bulk_inspect(
+        self,
+        node_ids: list[uuid.UUID],
+        container_id: str,
+        node_tags: list[str] | None = None,
+    ) -> BulkDockerResultDTO:
+        """Inspect a container across multiple nodes."""
+        validated_id = validate_container_id(container_id)
+        resolved_ids = await self._resolve_node_ids(node_ids, list(node_tags or []))
+        prepared, errors = await self._prepare(resolved_ids)
+
+        async def worker(
+            node_id_str: str, node: NodeConnectionDTO
+        ) -> BulkDockerNodeResultDTO:
+            try:
+                args = f"inspect {validated_id}"
+                cmd = self._runner.build_command(node, args)
+                stdout, stderr, exit_code = await self._runner.execute(node, cmd)
+                return BulkDockerNodeResultDTO(
+                    node_id=node_id_str,
+                    node_name=node.name,
+                    status="success" if exit_code == 0 else "error",
+                    output=stdout.strip(),
+                    error=stderr.strip() if exit_code != 0 else "",
+                )
+            except Exception as exc:
+                return BulkDockerNodeResultDTO(
+                    node_id=node_id_str,
+                    node_name="unknown",
+                    status="error",
+                    error=str(exc),
+                )
+
+        remote = list(
+            await asyncio.gather(
+                *(worker(nid, node) for _, nid, node in prepared)
+            )
+        )
+        results = self._finalize(prepared, errors, remote)
+        return self._response("inspect", validated_id, results)
+
+    async def bulk_logs(
+        self,
+        node_ids: list[uuid.UUID],
+        container_id: str,
+        tail: int = 100,
+        node_tags: list[str] | None = None,
+    ) -> BulkDockerResultDTO:
+        """Get logs from a container across multiple nodes."""
+        validated_id = validate_container_id(container_id)
+        resolved_ids = await self._resolve_node_ids(node_ids, list(node_tags or []))
+        prepared, errors = await self._prepare(resolved_ids)
+
+        async def worker(
+            node_id_str: str, node: NodeConnectionDTO
+        ) -> BulkDockerNodeResultDTO:
+            try:
+                args = f"logs --tail {tail} {validated_id}"
+                cmd = self._runner.build_command(node, args)
+                stdout, stderr, exit_code = await self._runner.execute(node, cmd)
+                output = stdout.strip() or stderr.strip()
+                return BulkDockerNodeResultDTO(
+                    node_id=node_id_str,
+                    node_name=node.name,
+                    status="success" if exit_code == 0 else "error",
+                    output=output,
+                    error=stderr.strip() if exit_code != 0 and stderr else "",
+                )
+            except Exception as exc:
+                return BulkDockerNodeResultDTO(
+                    node_id=node_id_str,
+                    node_name="unknown",
+                    status="error",
+                    error=str(exc),
+                )
+
+        remote = list(
+            await asyncio.gather(
+                *(worker(nid, node) for _, nid, node in prepared)
+            )
+        )
+        results = self._finalize(prepared, errors, remote)
+        return self._response("logs", validated_id, results)
+
+    async def bulk_stats(
+        self,
+        node_ids: list[uuid.UUID],
+        container_id: str,
+        node_tags: list[str] | None = None,
+    ) -> BulkDockerResultDTO:
+        """Get stats from a container across multiple nodes."""
+        validated_id = validate_container_id(container_id)
+        resolved_ids = await self._resolve_node_ids(node_ids, list(node_tags or []))
+        prepared, errors = await self._prepare(resolved_ids)
+
+        async def worker(
+            node_id_str: str, node: NodeConnectionDTO
+        ) -> BulkDockerNodeResultDTO:
+            try:
+                args = f"stats --no-stream --format '{{{{json .}}}}' {validated_id}"
+                cmd = self._runner.build_command(node, args)
+                stdout, stderr, exit_code = await self._runner.execute(node, cmd)
+                return BulkDockerNodeResultDTO(
+                    node_id=node_id_str,
+                    node_name=node.name,
+                    status="success" if exit_code == 0 else "error",
+                    output=stdout.strip(),
+                    error=stderr.strip() if exit_code != 0 else "",
+                )
+            except Exception as exc:
+                return BulkDockerNodeResultDTO(
+                    node_id=node_id_str,
+                    node_name="unknown",
+                    status="error",
+                    error=str(exc),
+                )
+
+        remote = list(
+            await asyncio.gather(
+                *(worker(nid, node) for _, nid, node in prepared)
+            )
+        )
+        results = self._finalize(prepared, errors, remote)
+        return self._response("stats", validated_id, results)
