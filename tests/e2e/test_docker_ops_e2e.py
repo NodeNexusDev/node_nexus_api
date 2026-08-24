@@ -1081,3 +1081,135 @@ def test_docker_volume_prune(
     )
     assert resp.status_code == 200
     assert "output" in resp.json()
+
+
+# ---------------------------------------------------------------------------
+# Container lifecycle extensions
+# ---------------------------------------------------------------------------
+
+
+def test_docker_container_pause_unpause(
+    e2e_client,
+    e2e_resources: UniqueResourceFactory,
+):
+    """Pause and unpause a container."""
+    node = e2e_resources.create_docker_node()
+    _docker_pull_alpine(e2e_client, node["id"])
+
+    # Create and start
+    resp = e2e_client.post(
+        f"/api/v1/nodes/{node['id']}/docker/containers",
+        json={"image": "alpine:latest", "command": "sleep 300"},
+    )
+    assert resp.status_code == 201
+    container_id = resp.json()["id"]
+
+    try:
+        e2e_client.post(
+            f"/api/v1/nodes/{node['id']}/docker/containers/{container_id}/start"
+        )
+
+        # Pause
+        resp = e2e_client.post(
+            f"/api/v1/nodes/{node['id']}/docker/containers/{container_id}/pause"
+        )
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "paused"
+
+        # Verify paused state
+        resp = e2e_client.get(
+            f"/api/v1/nodes/{node['id']}/docker/containers/{container_id}"
+        )
+        assert resp.status_code == 200
+        assert resp.json()["state"]["status"] == "paused"
+
+        # Unpause
+        resp = e2e_client.post(
+            f"/api/v1/nodes/{node['id']}/docker/containers/{container_id}/unpause"
+        )
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "unpaused"
+    finally:
+        e2e_client.post(
+            f"/api/v1/nodes/{node['id']}/docker/containers/{container_id}/stop"
+        )
+        e2e_client.delete(
+            f"/api/v1/nodes/{node['id']}/docker/containers/{container_id}"
+        )
+
+
+def test_docker_container_rename(
+    e2e_client,
+    e2e_resources: UniqueResourceFactory,
+):
+    """Rename a container."""
+    node = e2e_resources.create_docker_node()
+    _docker_pull_alpine(e2e_client, node["id"])
+
+    # Create
+    resp = e2e_client.post(
+        f"/api/v1/nodes/{node['id']}/docker/containers",
+        json={"image": "alpine:latest", "command": "sleep 300"},
+    )
+    assert resp.status_code == 201
+    container_id = resp.json()["id"]
+
+    try:
+        # Rename
+        resp = e2e_client.post(
+            f"/api/v1/nodes/{node['id']}/docker/containers/{container_id}/rename",
+            json={"new_name": "e2e-renamed"},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["new_name"] == "e2e-renamed"
+
+        # Inspect should show the new name
+        resp = e2e_client.get(
+            f"/api/v1/nodes/{node['id']}/docker/containers/{container_id}"
+        )
+        assert resp.status_code == 200
+        assert "e2e-renamed" in resp.json()["name"]
+    finally:
+        e2e_client.delete(
+            f"/api/v1/nodes/{node['id']}/docker/containers/{container_id}"
+        )
+
+
+def test_docker_container_top(
+    e2e_client,
+    e2e_resources: UniqueResourceFactory,
+):
+    """List processes inside a running container."""
+    node = e2e_resources.create_docker_node()
+    _docker_pull_alpine(e2e_client, node["id"])
+
+    # Create and start
+    resp = e2e_client.post(
+        f"/api/v1/nodes/{node['id']}/docker/containers",
+        json={"image": "alpine:latest", "command": "sleep 300"},
+    )
+    assert resp.status_code == 201
+    container_id = resp.json()["id"]
+
+    try:
+        e2e_client.post(
+            f"/api/v1/nodes/{node['id']}/docker/containers/{container_id}/start"
+        )
+
+        # Top
+        resp = e2e_client.get(
+            f"/api/v1/nodes/{node['id']}/docker/containers/{container_id}/top"
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "titles" in data
+        assert "processes" in data
+        assert len(data["titles"]) > 0
+        assert len(data["processes"]) >= 1
+    finally:
+        e2e_client.post(
+            f"/api/v1/nodes/{node['id']}/docker/containers/{container_id}/stop"
+        )
+        e2e_client.delete(
+            f"/api/v1/nodes/{node['id']}/docker/containers/{container_id}"
+        )

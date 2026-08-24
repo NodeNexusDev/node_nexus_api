@@ -195,6 +195,17 @@ def validate_volume_name(name: str) -> str:
     return name
 
 
+def validate_container_new_name(name: str) -> str:
+    """Validate a new container name for ``docker rename``."""
+    if not name or not _CONTAINER_REFERENCE_RE.fullmatch(name):
+        raise DockerValidationError(
+            f"Invalid container name: {name!r}. "
+            "Container name must start with an alphanumeric character and "
+            "contain only alphanumeric characters, hyphens, underscores, and dots."
+        )
+    return name
+
+
 def validate_network_driver(driver: str) -> str:
     """Validate a Docker network driver name."""
     if not driver or not _NETWORK_DRIVER_RE.fullmatch(driver):

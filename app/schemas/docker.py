@@ -78,6 +78,25 @@ class DockerExecResult(BaseModel):
     exit_code: int
 
 
+class ContainerRenameRequest(BaseModel):
+    """Request body for renaming a container."""
+
+    new_name: str = Field(min_length=1, max_length=255)
+
+
+class DockerTopProcess(BaseModel):
+    """A single process from ``docker top`` output."""
+
+    values: tuple[str, ...]
+
+
+class DockerTopResult(BaseModel):
+    """Result of ``docker top`` — processes running in a container."""
+
+    titles: tuple[str, ...]
+    processes: list[tuple[str, ...]] = Field(default_factory=list)
+
+
 class ContainerVolumeMount(BaseModel):
     """Bind-mount specification for ``docker create``."""
 

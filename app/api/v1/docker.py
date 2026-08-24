@@ -10,6 +10,7 @@ from fastapi import APIRouter, Query, Security, status
 from app.api.deps import get_current_api_key, require_write_scope
 from app.application.dto.docker import (
     ContainerCreateRequestDTO,
+    ContainerRenameRequestDTO,
     DockerImageBuildRequestDTO,
     DockerImageTagRequestDTO,
     NetworkConnectRequestDTO,
@@ -20,10 +21,15 @@ from app.application.dto.docker import (
 from app.application.services.docker.container_service import DockerContainerService
 from app.application.services.docker.image_service import DockerImageService
 from app.application.services.docker.resource_service import DockerResourceService
-from app.core.docker_validation import validate_container_id, validate_volume_name
+from app.core.docker_validation import (
+    validate_container_id,
+    validate_container_new_name,
+    validate_volume_name,
+)
 from app.schemas.docker import (
     ContainerCreatedResponse,
     ContainerCreateRequest,
+    ContainerRenameRequest,
     DockerContainer,
     DockerContainerInspect,
     DockerExecRequest,
@@ -38,6 +44,7 @@ from app.schemas.docker import (
     DockerNetwork,
     DockerPullResult,
     DockerStats,
+    DockerTopResult,
     DockerVolume,
     NetworkConnectRequest,
     NetworkCreateRequest,
@@ -225,6 +232,97 @@ async def exec_command(
         node_id, validated_id, data.command, timeout=data.timeout
     )
     return DockerExecResult.model_validate(result, from_attributes=True)
+
+
+# ── Container lifecycle extensions ──────────────────────────────────────────
+
+
+@router.post("/containers/{container_id}/pause")
+@inject
+async def pause_container(
+    node_id: uuid.UUID,
+    container_id: str,
+    service: FromDishka[DockerContainerService],
+    _key: str = Security(require_write_scope),
+) -> dict[str, str]:
+    """Pause a running container."""
+    validated_id = validate_container_id(container_id)
+    audit.info(
+        "api.docker.containers.pause",
+        node_id=str(node_id),
+        container_id=validated_id,
+    )
+    await service.pause_container(node_id, validated_id)
+    return {"status": "paused"}
+
+
+@router.post("/containers/{container_id}/unpause")
+@inject
+async def unpause_container(
+    node_id: uuid.UUID,
+    container_id: str,
+    service: FromDishka[DockerContainerService],
+    _key: str = Security(require_write_scope),
+) -> dict[str, str]:
+    """Unpause a paused container."""
+    validated_id = validate_container_id(container_id)
+    audit.info(
+        "api.docker.containers.unpause",
+        node_id=str(node_id),
+        container_id=validated_id,
+    )
+    await service.unpause_container(node_id, validated_id)
+    return {"status": "unpaused"}
+
+
+@router.post("/containers/{container_id}/rename")
+@inject
+async def rename_container(
+    node_id: uuid.UUID,
+    container_id: str,
+    data: ContainerRenameRequest,
+    service: FromDishka[DockerContainerService],
+    _key: str = Security(require_write_scope),
+) -> dict[str, str]:
+    """Rename a container."""
+    validated_id = validate_container_id(container_id)
+    new_name = validate_container_new_name(data.new_name)
+    audit.info(
+        "api.docker.containers.rename",
+        node_id=str(node_id),
+        container_id=validated_id,
+        new_name=new_name,
+    )
+    await service.rename_container(
+        ContainerRenameRequestDTO(
+            node_id=node_id,
+            container_id=validated_id,
+            new_name=new_name,
+        )
+    )
+    return {"status": "renamed", "new_name": new_name}
+
+
+@router.get("/containers/{container_id}/top")
+@inject
+async def top_container(
+    node_id: uuid.UUID,
+    container_id: str,
+    service: FromDishka[DockerContainerService],
+    _key: str = Security(get_current_api_key),
+) -> DockerTopResult:
+    """List processes running inside a container."""
+    validated_id = validate_container_id(container_id)
+    audit.info(
+        "api.docker.containers.top",
+        node_id=str(node_id),
+        container_id=validated_id,
+    )
+    result = await service.top_container(node_id, validated_id)
+    return DockerTopResult(
+        titles=result.titles,
+        processes=[list(p) for p in result.processes],
+    )
 
 
 @router.get("/images")

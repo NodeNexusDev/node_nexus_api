@@ -77,6 +77,23 @@ class DockerExecResultDTO:
 
 
 @dataclass(frozen=True, slots=True)
+class ContainerRenameRequestDTO:
+    """Validated inputs for ``docker rename``."""
+
+    node_id: UUID
+    container_id: str
+    new_name: str
+
+
+@dataclass(frozen=True, slots=True)
+class DockerTopResultDTO:
+    """Result of ``docker top`` — list of processes in a container."""
+
+    titles: tuple[str, ...]
+    processes: tuple[tuple[str, ...], ...]
+
+
+@dataclass(frozen=True, slots=True)
 class DockerStatsDTO:
     container_id: str
     name: str
