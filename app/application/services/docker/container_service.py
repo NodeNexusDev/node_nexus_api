@@ -16,12 +16,14 @@ from app.application.command_policy import command_fingerprint
 from app.application.dto.docker import (
     ContainerCreatedDTO,
     ContainerCreateRequestDTO,
+    ContainerRenameRequestDTO,
     DockerContainerConfigDTO,
     DockerContainerDTO,
     DockerContainerInspectDTO,
     DockerContainerStateDTO,
     DockerExecResultDTO,
     DockerStatsDTO,
+    DockerTopResultDTO,
 )
 from app.application.services.docker.command_runner import DockerCommandRunner
 from app.application.services.docker.error_mapper import raise_for_docker_error
@@ -437,4 +439,88 @@ class DockerContainerService:
             net_io=json_string(item, "NetIO"),
             block_io=json_string(item, "BlockIO"),
             pids=json_optional_string(item, "PIDs"),
+        )
+
+    # ── Container lifecycle extensions ──────────────────────────────────────
+
+    async def pause_container(self, node_id: UUID, container_id: str) -> None:
+        """Pause a running container."""
+        validated_id = validate_container_id(container_id)
+        node = await self._runner.get_target(node_id)
+        cmd = self._runner.build_command(node, f"pause {validated_id}")
+        stdout, stderr, exit_code = await self._runner.execute(node, cmd)
+        raise_for_docker_error(stderr, exit_code)
+        audit.info(
+            "docker.container.pause",
+            node_id=str(node_id),
+            container_id=validated_id,
+        )
+        await self._log(
+            "docker.container.pause", node_id, {"container_id": validated_id}
+        )
+
+    async def unpause_container(self, node_id: UUID, container_id: str) -> None:
+        """Unpause a paused container."""
+        validated_id = validate_container_id(container_id)
+        node = await self._runner.get_target(node_id)
+        cmd = self._runner.build_command(node, f"unpause {validated_id}")
+        stdout, stderr, exit_code = await self._runner.execute(node, cmd)
+        raise_for_docker_error(stderr, exit_code)
+        audit.info(
+            "docker.container.unpause",
+            node_id=str(node_id),
+            container_id=validated_id,
+        )
+        await self._log(
+            "docker.container.unpause", node_id, {"container_id": validated_id}
+        )
+
+    async def rename_container(self, data: ContainerRenameRequestDTO) -> None:
+        """Rename a container."""
+        validated_id = validate_container_id(data.container_id)
+        node = await self._runner.get_target(data.node_id)
+        cmd = self._runner.build_command(
+            node, f"rename {validated_id} {shlex.quote(data.new_name)}"
+        )
+        stdout, stderr, exit_code = await self._runner.execute(node, cmd)
+        raise_for_docker_error(stderr, exit_code)
+        audit.info(
+            "docker.container.rename",
+            node_id=str(data.node_id),
+            container_id=validated_id,
+            new_name=data.new_name,
+        )
+        await self._log(
+            "docker.container.rename",
+            data.node_id,
+            {"container_id": validated_id, "new_name": data.new_name},
+        )
+
+    async def top_container(
+        self, node_id: UUID, container_id: str
+    ) -> DockerTopResultDTO:
+        """List processes running inside a container."""
+        validated_id = validate_container_id(container_id)
+        node = await self._runner.get_target(node_id)
+        cmd = self._runner.build_command(node, f"top {validated_id}")
+        stdout, stderr, exit_code = await self._runner.execute(node, cmd)
+        raise_for_docker_error(stderr, exit_code)
+        lines = [line for line in stdout.strip().splitlines() if line.strip()]
+        if len(lines) < 2:
+            raise ContainerNotFoundError(
+                f"Container {validated_id} not found or not running"
+            )
+        titles = tuple(lines[0].split())
+        processes = []
+        for line in lines[1:]:
+            processes.append(tuple(line.split()))
+        audit.info(
+            "docker.container.top",
+            node_id=str(node_id),
+            container_id=validated_id,
+            process_count=len(processes),
+        )
+        return DockerTopResultDTO(
+            titles=titles,
+            processes=tuple(processes),
         )
