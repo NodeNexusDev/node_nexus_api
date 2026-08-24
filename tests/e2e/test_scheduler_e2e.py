@@ -58,7 +58,7 @@ def _wait_for_completed_execution(
         response = client.get(f"/api/v1/scripts/{script_id}/executions")
         if response.status_code != 200 or response.json()["total"] == 0:
             return False
-        return response.json()["items"][0]["status"] in ("completed", "failed")
+        return response.json()["items"][0]["status"] in ("success", "error")
 
     wait_for_condition(
         _is_completed,
@@ -164,7 +164,7 @@ def test_reconciliation_restores_schedule_after_restart(
     # Verify exactly one execution (no duplicates from reconciliation)
     executions = _wait_for_completed_execution(e2e_client, script["id"])
     assert len(executions) == 1
-    assert executions[0]["status"] == "completed"
+    assert executions[0]["status"] == "success"
     assert executions[0]["started_at"] is not None
     assert executions[0]["finished_at"] is not None
     assert executions[0]["steps"][0]["exit_code"] == 0
@@ -233,7 +233,7 @@ def test_schedule_replace_removes_old_runtime_job(
 
     executions = _wait_for_completed_execution(e2e_client, script["id"])
     assert len(executions) == 1
-    assert executions[0]["status"] == "completed"
+    assert executions[0]["status"] == "success"
     assert "replace-ok" in executions[0]["steps"][0]["stdout"]
 
     # No duplicate executions from the old far-future cron.
@@ -281,7 +281,7 @@ def test_persistent_schedule_recovers_after_api_restart(
 
     executions = _wait_for_execution(e2e_client, script["id"])
     assert len(executions) == 1
-    assert executions[0]["status"] == "completed"
+    assert executions[0]["status"] == "success"
     assert "scheduler-restart-ok" in executions[0]["steps"][0]["stdout"]
 
 

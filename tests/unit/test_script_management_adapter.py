@@ -175,7 +175,7 @@ async def test_list_executions_maps_history_page() -> None:
         script_id=uuid.uuid4(),
         node_id=uuid.uuid4(),
         params={"environment": "prod"},
-        status="completed",
+        status="success",
         steps=[
             {
                 "step_index": 0,

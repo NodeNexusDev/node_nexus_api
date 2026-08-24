@@ -176,7 +176,7 @@ def test_script_execute_on_ssh_node(
     assert len(batch["results"]) == 1
     result = batch["results"][0]
     assert result["node_id"] == node["id"]
-    assert result["status"] == "completed"
+    assert result["status"] == "success"
     assert len(result["steps"]) == 1
     assert result["steps"][0]["exit_code"] == 0
 
@@ -218,7 +218,7 @@ def test_script_executions_history(
     data = resp.json()
     assert data["total"] >= 1
     execution = data["items"][0]
-    assert execution["status"] == "completed"
+    assert execution["status"] == "success"
     assert execution["node_id"] == node["id"]
 
 
@@ -287,7 +287,7 @@ def test_script_execute_with_command_reference(
     batch = resp.json()
     assert len(batch["results"]) == 1
     result = batch["results"][0]
-    assert result["status"] == "completed"
+    assert result["status"] == "success"
     assert result["steps"][0]["stdout"].strip() == "ref-ok"
 
 
@@ -310,7 +310,7 @@ def test_script_execute_multi_node(
     assert node1["id"] in node_ids
     assert node2["id"] in node_ids
     for r in batch["results"]:
-        assert r["status"] == "completed"
+        assert r["status"] == "success"
 
 
 # ---------------------------------------------------------------------------
@@ -675,7 +675,7 @@ def test_scheduler_executes_script_on_cron(e2e_client: httpx.Client) -> None:
             if data.get("total", 0) == 0:
                 return False
             exec_item = data["items"][0]
-            return exec_item["status"] == "completed"
+            return exec_item["status"] == "success"
 
         wait_for_condition(
             _execution_completed,
