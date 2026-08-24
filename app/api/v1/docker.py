@@ -12,11 +12,15 @@ from app.application.dto.docker import (
     ContainerCreateRequestDTO,
     DockerImageBuildRequestDTO,
     DockerImageTagRequestDTO,
+    NetworkConnectRequestDTO,
+    NetworkCreateRequestDTO,
+    NetworkDisconnectRequestDTO,
+    VolumeCreateRequestDTO,
 )
 from app.application.services.docker.container_service import DockerContainerService
 from app.application.services.docker.image_service import DockerImageService
 from app.application.services.docker.resource_service import DockerResourceService
-from app.core.docker_validation import validate_container_id
+from app.core.docker_validation import validate_container_id, validate_volume_name
 from app.schemas.docker import (
     ContainerCreatedResponse,
     ContainerCreateRequest,
@@ -35,6 +39,12 @@ from app.schemas.docker import (
     DockerPullResult,
     DockerStats,
     DockerVolume,
+    NetworkConnectRequest,
+    NetworkCreateRequest,
+    NetworkDisconnectRequest,
+    NetworkInspectResponse,
+    VolumeCreateRequest,
+    VolumeInspectResponse,
 )
 
 audit = structlog.get_logger("audit")
@@ -368,3 +378,205 @@ async def list_volumes(
         DockerVolume.model_validate(item, from_attributes=True)
         for item in await service.list_volumes(node_id)
     ]
+
+
+# ── Network CRUD ────────────────────────────────────────────────────────────
+
+
+@router.post("/networks", status_code=status.HTTP_201_CREATED)
+@inject
+async def create_network(
+    node_id: uuid.UUID,
+    data: NetworkCreateRequest,
+    service: FromDishka[DockerResourceService],
+    _key: str = Security(require_write_scope),
+) -> dict[str, str]:
+    """Create a Docker network."""
+    audit.info("api.docker.networks.create", node_id=str(node_id), name=data.name)
+    network_id = await service.create_network(
+        NetworkCreateRequestDTO(
+            node_id=node_id,
+            name=data.name,
+            driver=data.driver,
+            subnet=data.subnet,
+            gateway=data.gateway,
+        )
+    )
+    return {"id": network_id, "name": data.name}
+
+
+@router.get("/networks/{network_id}")
+@inject
+async def inspect_network(
+    node_id: uuid.UUID,
+    network_id: str,
+    service: FromDishka[DockerResourceService],
+    _key: str = Security(get_current_api_key),
+) -> NetworkInspectResponse:
+    """Inspect a Docker network."""
+    validated_id = validate_container_id(network_id)
+    audit.info(
+        "api.docker.networks.inspect",
+        node_id=str(node_id),
+        network_id=validated_id,
+    )
+    result = await service.inspect_network(node_id, validated_id)
+    return NetworkInspectResponse(
+        id=result.id,
+        name=result.name,
+        driver=result.driver,
+        scope=result.scope,
+        subnet=result.subnet,
+        gateway=result.gateway,
+        containers=[
+            {
+                "name": cdata.get("Name", cid),
+                "ipv4_address": cdata.get("IPv4Address", ""),
+            }
+            for cid, cdata in result.containers
+        ],
+    )
+
+
+@router.delete("/networks/{network_id}", status_code=status.HTTP_204_NO_CONTENT)
+@inject
+async def remove_network(
+    node_id: uuid.UUID,
+    network_id: str,
+    service: FromDishka[DockerResourceService],
+    _key: str = Security(require_write_scope),
+) -> None:
+    """Remove a Docker network."""
+    validated_id = validate_container_id(network_id)
+    audit.info(
+        "api.docker.networks.remove",
+        node_id=str(node_id),
+        network_id=validated_id,
+    )
+    await service.remove_network(node_id, validated_id)
+
+
+@router.post("/networks/{network_id}/connect")
+@inject
+async def connect_to_network(
+    node_id: uuid.UUID,
+    network_id: str,
+    data: NetworkConnectRequest,
+    service: FromDishka[DockerResourceService],
+    _key: str = Security(require_write_scope),
+) -> dict[str, str]:
+    """Connect a container to a network."""
+    validated_id = validate_container_id(network_id)
+    audit.info(
+        "api.docker.networks.connect",
+        node_id=str(node_id),
+        network_id=validated_id,
+        container_id=data.container_id,
+    )
+    await service.connect_to_network(
+        NetworkConnectRequestDTO(
+            node_id=node_id,
+            network_id=validated_id,
+            container_id=data.container_id,
+            ip_address=data.ip_address,
+        )
+    )
+    return {"status": "connected"}
+
+
+@router.post("/networks/{network_id}/disconnect")
+@inject
+async def disconnect_from_network(
+    node_id: uuid.UUID,
+    network_id: str,
+    data: NetworkDisconnectRequest,
+    service: FromDishka[DockerResourceService],
+    _key: str = Security(require_write_scope),
+) -> dict[str, str]:
+    """Disconnect a container from a network."""
+    validated_id = validate_container_id(network_id)
+    audit.info(
+        "api.docker.networks.disconnect",
+        node_id=str(node_id),
+        network_id=validated_id,
+        container_id=data.container_id,
+    )
+    await service.disconnect_from_network(
+        NetworkDisconnectRequestDTO(
+            node_id=node_id,
+            network_id=validated_id,
+            container_id=data.container_id,
+            force=data.force,
+        )
+    )
+    return {"status": "disconnected"}
+
+
+# ── Volume CRUD ─────────────────────────────────────────────────────────────
+
+
+@router.post("/volumes", status_code=status.HTTP_201_CREATED)
+@inject
+async def create_volume(
+    node_id: uuid.UUID,
+    data: VolumeCreateRequest,
+    service: FromDishka[DockerResourceService],
+    _key: str = Security(require_write_scope),
+) -> dict[str, str]:
+    """Create a Docker volume."""
+    audit.info("api.docker.volumes.create", node_id=str(node_id))
+    volume_name = await service.create_volume(
+        VolumeCreateRequestDTO(
+            node_id=node_id,
+            name=data.name,
+            driver=data.driver,
+        )
+    )
+    return {"name": volume_name}
+
+
+@router.get("/volumes/{volume_name}")
+@inject
+async def inspect_volume(
+    node_id: uuid.UUID,
+    volume_name: str,
+    service: FromDishka[DockerResourceService],
+    _key: str = Security(get_current_api_key),
+) -> VolumeInspectResponse:
+    """Inspect a Docker volume."""
+    validated_name = validate_volume_name(volume_name)
+    audit.info("api.docker.volumes.inspect", node_id=str(node_id), name=validated_name)
+    result = await service.inspect_volume(node_id, validated_name)
+    return VolumeInspectResponse(
+        name=result.name,
+        driver=result.driver,
+        mountpoint=result.mountpoint,
+        labels=dict(result.labels),
+    )
+
+
+@router.delete("/volumes/{volume_name}", status_code=status.HTTP_204_NO_CONTENT)
+@inject
+async def remove_volume(
+    node_id: uuid.UUID,
+    volume_name: str,
+    service: FromDishka[DockerResourceService],
+    _key: str = Security(require_write_scope),
+) -> None:
+    """Remove a Docker volume."""
+    validated_name = validate_volume_name(volume_name)
+    audit.info("api.docker.volumes.remove", node_id=str(node_id), name=validated_name)
+    await service.remove_volume(node_id, validated_name)
+
+
+@router.post("/volumes/prune")
+@inject
+async def prune_volumes(
+    node_id: uuid.UUID,
+    service: FromDishka[DockerResourceService],
+    _key: str = Security(require_write_scope),
+) -> dict[str, str]:
+    """Prune unused Docker volumes."""
+    audit.info("api.docker.volumes.prune", node_id=str(node_id))
+    output = await service.prune_volumes(node_id)
+    return {"output": output}

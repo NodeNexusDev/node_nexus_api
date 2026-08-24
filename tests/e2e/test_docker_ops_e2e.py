@@ -873,3 +873,211 @@ def test_docker_image_build(
 
     # Cleanup
     e2e_client.delete(f"/api/v1/nodes/{node['id']}/docker/images/local/e2e-built:v1")
+
+
+# ---------------------------------------------------------------------------
+# Docker Networks CRUD
+# ---------------------------------------------------------------------------
+
+
+def test_docker_network_create_and_inspect(
+    e2e_client,
+    e2e_resources: UniqueResourceFactory,
+):
+    """POST .../networks creates a network, GET inspects it."""
+    node = e2e_resources.create_docker_node()
+    net_name = "e2e-test-net"
+
+    # Create
+    resp = e2e_client.post(
+        f"/api/v1/nodes/{node['id']}/docker/networks",
+        json={"name": net_name, "driver": "bridge"},
+    )
+    assert resp.status_code == 201, f"create failed: {resp.text}"
+    net_id = resp.json()["id"]
+    assert resp.json()["name"] == net_name
+
+    try:
+        # Inspect
+        resp = e2e_client.get(
+            f"/api/v1/nodes/{node['id']}/docker/networks/{net_id}"
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["name"] == net_name
+        assert data["driver"] == "bridge"
+        assert data["id"] == net_id
+    finally:
+        # Cleanup
+        e2e_client.delete(
+            f"/api/v1/nodes/{node['id']}/docker/networks/{net_id}"
+        )
+
+
+def test_docker_network_remove(
+    e2e_client,
+    e2e_resources: UniqueResourceFactory,
+):
+    """DELETE .../networks/{id} removes a network."""
+    node = e2e_resources.create_docker_node()
+
+    # Create
+    resp = e2e_client.post(
+        f"/api/v1/nodes/{node['id']}/docker/networks",
+        json={"name": "e2e-rm-net", "driver": "bridge"},
+    )
+    assert resp.status_code == 201
+    net_id = resp.json()["id"]
+
+    # Remove
+    resp = e2e_client.delete(
+        f"/api/v1/nodes/{node['id']}/docker/networks/{net_id}"
+    )
+    assert resp.status_code == 204
+
+    # Verify removed
+    resp = e2e_client.get(
+        f"/api/v1/nodes/{node['id']}/docker/networks/{net_id}"
+    )
+    assert resp.status_code in (404, 500)
+
+
+def test_docker_network_connect_disconnect(
+    e2e_client,
+    e2e_resources: UniqueResourceFactory,
+):
+    """Connect and disconnect a container from a network."""
+    node = e2e_resources.create_docker_node()
+    _docker_pull_alpine(e2e_client, node["id"])
+
+    # Create network
+    resp = e2e_client.post(
+        f"/api/v1/nodes/{node['id']}/docker/networks",
+        json={"name": "e2e-conn-net", "driver": "bridge"},
+    )
+    assert resp.status_code == 201
+    net_id = resp.json()["id"]
+
+    # Create container
+    resp = e2e_client.post(
+        f"/api/v1/nodes/{node['id']}/docker/containers",
+        json={"image": "alpine:latest", "command": "sleep 300"},
+    )
+    assert resp.status_code == 201
+    container_id = resp.json()["id"]
+
+    try:
+        # Connect
+        resp = e2e_client.post(
+            f"/api/v1/nodes/{node['id']}/docker/networks/{net_id}/connect",
+            json={"container_id": container_id},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "connected"
+
+        # Inspect should show the container
+        resp = e2e_client.get(
+            f"/api/v1/nodes/{node['id']}/docker/networks/{net_id}"
+        )
+        assert resp.status_code == 200
+        connected = [c["name"] for c in resp.json()["containers"]]
+        assert container_id[:12] in connected or container_id in connected
+
+        # Disconnect
+        resp = e2e_client.post(
+            f"/api/v1/nodes/{node['id']}/docker/networks/{net_id}/disconnect",
+            json={"container_id": container_id},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "disconnected"
+    finally:
+        # Cleanup
+        e2e_client.post(
+            f"/api/v1/nodes/{node['id']}/docker/containers/{container_id}/stop"
+        )
+        e2e_client.delete(
+            f"/api/v1/nodes/{node['id']}/docker/containers/{container_id}"
+        )
+        e2e_client.delete(
+            f"/api/v1/nodes/{node['id']}/docker/networks/{net_id}"
+        )
+
+
+# ---------------------------------------------------------------------------
+# Docker Volumes CRUD
+# ---------------------------------------------------------------------------
+
+
+def test_docker_volume_create_and_inspect(
+    e2e_client,
+    e2e_resources: UniqueResourceFactory,
+):
+    """POST .../volumes creates a volume, GET inspects it."""
+    node = e2e_resources.create_docker_node()
+
+    # Create
+    resp = e2e_client.post(
+        f"/api/v1/nodes/{node['id']}/docker/volumes",
+        json={"driver": "local"},
+    )
+    assert resp.status_code == 201, f"create failed: {resp.text}"
+    vol_name = resp.json()["name"]
+    assert vol_name
+
+    try:
+        # Inspect
+        resp = e2e_client.get(
+            f"/api/v1/nodes/{node['id']}/docker/volumes/{vol_name}"
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["name"] == vol_name
+        assert data["driver"] == "local"
+        assert data["mountpoint"]
+    finally:
+        # Cleanup
+        e2e_client.delete(
+            f"/api/v1/nodes/{node['id']}/docker/volumes/{vol_name}"
+        )
+
+
+def test_docker_volume_remove(
+    e2e_client,
+    e2e_resources: UniqueResourceFactory,
+):
+    """DELETE .../volumes/{name} removes a volume."""
+    node = e2e_resources.create_docker_node()
+
+    # Create
+    resp = e2e_client.post(
+        f"/api/v1/nodes/{node['id']}/docker/volumes",
+        json={"driver": "local"},
+    )
+    assert resp.status_code == 201
+    vol_name = resp.json()["name"]
+
+    # Remove
+    resp = e2e_client.delete(
+        f"/api/v1/nodes/{node['id']}/docker/volumes/{vol_name}"
+    )
+    assert resp.status_code == 204
+
+    # Verify removed
+    resp = e2e_client.get(
+        f"/api/v1/nodes/{node['id']}/docker/volumes/{vol_name}"
+    )
+    assert resp.status_code in (404, 500)
+
+
+def test_docker_volume_prune(
+    e2e_client,
+    e2e_resources: UniqueResourceFactory,
+):
+    """POST .../volumes/prune prunes unused volumes."""
+    node = e2e_resources.create_docker_node()
+
+    resp = e2e_client.post(
+        f"/api/v1/nodes/{node['id']}/docker/volumes/prune",
+    )
+    assert resp.status_code == 200
+    assert "output" in resp.json()

@@ -121,9 +121,73 @@ class DockerNetworkDTO:
 
 
 @dataclass(frozen=True, slots=True)
+class DockerNetworkInspectDTO:
+    """Parsed ``docker network inspect`` output."""
+
+    id: str
+    name: str
+    driver: str
+    scope: str
+    subnet: str
+    gateway: str
+    containers: tuple[tuple[str, dict[str, object]], ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class NetworkCreateRequestDTO:
+    """Validated inputs for ``docker network create``."""
+
+    node_id: UUID
+    name: str
+    driver: str = "bridge"
+    subnet: str | None = None
+    gateway: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class NetworkConnectRequestDTO:
+    """Validated inputs for ``docker network connect``."""
+
+    node_id: UUID
+    network_id: str
+    container_id: str
+    ip_address: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class NetworkDisconnectRequestDTO:
+    """Validated inputs for ``docker network disconnect``."""
+
+    node_id: UUID
+    network_id: str
+    container_id: str
+    force: bool = False
+
+
+@dataclass(frozen=True, slots=True)
 class DockerVolumeDTO:
     driver: str
     name: str
+
+
+@dataclass(frozen=True, slots=True)
+class DockerVolumeInspectDTO:
+    """Parsed ``docker volume inspect`` output."""
+
+    name: str
+    driver: str
+    mountpoint: str
+    labels: tuple[tuple[str, str], ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class VolumeCreateRequestDTO:
+    """Validated inputs for ``docker volume create``."""
+
+    node_id: UUID
+    name: str | None = None
+    driver: str = "local"
+    labels: tuple[tuple[str, str], ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
