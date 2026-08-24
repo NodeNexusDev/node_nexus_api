@@ -255,3 +255,72 @@ async def bulk_build_images(
         succeeded=dto.succeeded,
         failed=dto.failed,
     )
+
+
+# ── Bulk inspect / logs / stats ────────────────────────────────────────────
+
+
+@router.post("/bulk/inspect", response_model=BulkDockerResponse)
+@inject
+async def bulk_inspect_containers(
+    data: BulkDockerRequest,
+    service: FromDishka[DockerBulkService],
+    _key: str = Security(require_write_scope),
+) -> BulkDockerResponse:
+    """Inspect a container on multiple nodes."""
+    audit.info(
+        "api.docker.bulk.inspect",
+        node_count=len(data.node_ids),
+        node_tag_count=len(data.node_tags),
+        container_id=data.container_id,
+    )
+    result = await service.bulk_inspect(
+        node_ids=data.node_ids,
+        container_id=data.container_id,
+        node_tags=data.node_tags,
+    )
+    return _bulk_response(result)
+
+
+@router.post("/bulk/logs", response_model=BulkDockerResponse)
+@inject
+async def bulk_logs_containers(
+    data: BulkDockerRequest,
+    service: FromDishka[DockerBulkService],
+    _key: str = Security(require_write_scope),
+) -> BulkDockerResponse:
+    """Get logs from a container on multiple nodes."""
+    audit.info(
+        "api.docker.bulk.logs",
+        node_count=len(data.node_ids),
+        node_tag_count=len(data.node_tags),
+        container_id=data.container_id,
+    )
+    result = await service.bulk_logs(
+        node_ids=data.node_ids,
+        container_id=data.container_id,
+        node_tags=data.node_tags,
+    )
+    return _bulk_response(result)
+
+
+@router.post("/bulk/stats", response_model=BulkDockerResponse)
+@inject
+async def bulk_stats_containers(
+    data: BulkDockerRequest,
+    service: FromDishka[DockerBulkService],
+    _key: str = Security(require_write_scope),
+) -> BulkDockerResponse:
+    """Get stats from a container on multiple nodes."""
+    audit.info(
+        "api.docker.bulk.stats",
+        node_count=len(data.node_ids),
+        node_tag_count=len(data.node_tags),
+        container_id=data.container_id,
+    )
+    result = await service.bulk_stats(
+        node_ids=data.node_ids,
+        container_id=data.container_id,
+        node_tags=data.node_tags,
+    )
+    return _bulk_response(result)
