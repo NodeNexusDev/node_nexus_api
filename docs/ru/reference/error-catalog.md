@@ -2,7 +2,7 @@
 title: Каталог ошибок
 status: stable
 translation_key: reference.error-catalog
-source_revision: "2026-08-18"
+source_revision: "2026-08-25"
 ---
 
 # Каталог ошибок
@@ -12,7 +12,7 @@ source_revision: "2026-08-18"
 | `400` | Некорректный или неподдерживаемый request |
 | `401` | API key отсутствует, невалиден, истёк или отозван |
 | `403` | API key не имеет write scope |
-| `404` | Node, command, script, container, image, tag, schedule, favorite, note или execution не найден |
+| `404` | Node, command, script, execution, container, network, volume, image, tag, schedule, favorite, note или API key не найден |
 | `409` | Конфликт имени ноды |
 | `422` | Ошибка schema, template, Docker, schedule, config format или domain validation |
 | `429` | Превышен process-local rate limit |
@@ -55,17 +55,23 @@ Domain failures используют стабильный JSON-конверт:
 | `DockerDaemonError` | `503` | Docker daemon недоступен |
 | `DockerError` | `502` | Общая ошибка удалённой Docker-операции |
 | `DockerValidationError` | `422` | Ошибка валидации Docker-запроса |
+| `ExecutionNotFoundError` | `404` | Запись выполнения не найдена |
+| `FavoriteNotFoundError` | `404` | Избранное не найдено |
 | `ImageNotFoundError` | `404` | Docker-образ не найден |
 | `NodeNameConflictError` | `409` | Нода с таким именем уже существует |
 | `NodeNotFoundError` | `404` | Нода не найдена |
+| `NetworkNotFoundError` | `404` | Docker-сеть не найдена |
+| `NoteNotFoundError` | `404` | Заметка не найдена |
 | `RequestTimeoutError` | `504` | Запрос превысил глобальный timeout |
 | `ScheduleNotFoundError` | `404` | Расписание не найдено |
 | `SchedulePersistenceError` | `503` | Не удалось обновить runtime-состояние расписания |
 | `ScheduleValidationError` | `422` | Невалидное cron-выражение или список нод |
 | `SchedulerOwnershipError` | `503` | Планировщик не смог получить advisory lock |
+| `ScheduledScriptExecutionError` | `422` | Запланированное выполнение скрипта завершилось с ошибкой |
 | `ScriptNotFoundError` | `404` | Скрипт не найден |
 | `TagNotFoundError` | `404` | Тег не найден |
 | `TemplateRenderError` | `422` | Ошибка рендеринга шаблона команды |
 | `UnsupportedConfigFormatError` | `422` | Формат импорта конфигурации не поддерживается |
+| `VolumeNotFoundError` | `404` | Docker-volume не найден |
 
 Любой подкласс `DomainError`, не перечисленный выше, по умолчанию маппится на `422`.

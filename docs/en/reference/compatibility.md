@@ -2,7 +2,7 @@
 title: Compatibility and support
 status: stable
 translation_key: reference.compatibility
-source_revision: "2026-08-17"
+source_revision: "2026-08-25"
 ---
 
 # Compatibility and support
@@ -26,6 +26,7 @@ and metrics endpoints are excluded from version enforcement.
 
 | Version | Date | Type | Highlights |
 |---------|------|------|------------|
+| 0.16.0 | 2026-08-25 | Minor | Docker CRUD: networks, volumes, container enhancements (inspect, delete, pause, rename, top, logs, stats, prune), system endpoints (info, df), network/volume error mapping (404), audit outbox worker race condition fix, Alembic migration chain fixes |
 | 0.15.1 | 2026-08-18 | Patch | Commit request transaction before sending response, scheduler minute-boundary race fix, OpenAPI contract hash pre-commit hook |
 | 0.15.0 | 2026-08-17 | Minor | Scheduler trigger-now endpoint, failed status propagation, E2E refactoring with shared settings, CI hardening |
 | 0.14.0 | 2026-08-17 | Minor | HMAC-SHA-256 API key hashing, ENCRYPTION_SALT required, CORS restriction, dashboard group_by validation, WebSocket token auth cleanup |

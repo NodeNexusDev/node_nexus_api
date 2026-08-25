@@ -2,7 +2,7 @@
 title: Error catalog
 status: stable
 translation_key: reference.error-catalog
-source_revision: "2026-08-18"
+source_revision: "2026-08-25"
 ---
 
 # Error catalog
@@ -12,7 +12,7 @@ source_revision: "2026-08-18"
 | `400` | Malformed or unsupported request |
 | `401` | Missing, invalid, expired, or revoked API key |
 | `403` | API key lacks write scope |
-| `404` | Node, command, script, container, image, tag, schedule, favorite, note, or execution not found |
+| `404` | Node, command, script, execution, container, network, volume, image, tag, schedule, favorite, note, or API key not found |
 | `409` | Node name conflict |
 | `422` | Schema, template, Docker, schedule, config format, or domain validation failed |
 | `429` | Process-local rate limit exceeded |
@@ -54,17 +54,23 @@ Do not branch client logic on `message` or `detail`; use HTTP status and `code`.
 | `DockerDaemonError` | `503` | Docker daemon is unreachable |
 | `DockerError` | `502` | Generic remote Docker operation failed |
 | `DockerValidationError` | `422` | Docker request validation failed |
+| `ExecutionNotFoundError` | `404` | Execution record does not exist |
+| `FavoriteNotFoundError` | `404` | Favorite does not exist |
 | `ImageNotFoundError` | `404` | Docker image does not exist |
 | `NodeNameConflictError` | `409` | Node name already exists |
 | `NodeNotFoundError` | `404` | Node does not exist |
+| `NetworkNotFoundError` | `404` | Docker network does not exist |
+| `NoteNotFoundError` | `404` | Note does not exist |
 | `RequestTimeoutError` | `504` | Request exceeded the global timeout |
 | `ScheduleNotFoundError` | `404` | Schedule does not exist |
 | `SchedulePersistenceError` | `503` | Schedule runtime state update failed |
 | `ScheduleValidationError` | `422` | Schedule cron expression or node list is invalid |
 | `SchedulerOwnershipError` | `503` | Scheduler could not acquire advisory lock |
+| `ScheduledScriptExecutionError` | `422` | Scheduled script execution reported a failed result |
 | `ScriptNotFoundError` | `404` | Script does not exist |
 | `TagNotFoundError` | `404` | Tag does not exist |
 | `TemplateRenderError` | `422` | Command template rendering failed |
 | `UnsupportedConfigFormatError` | `422` | Config import format is not supported |
+| `VolumeNotFoundError` | `404` | Docker volume does not exist |
 
 Any `DomainError` subclass not listed above maps to `422` by default.
