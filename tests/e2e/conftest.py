@@ -287,7 +287,7 @@ async def e2e_db_isolation(
                 """
                 TRUNCATE audit_logs, audit_outbox, script_executions,
                          command_executions, script_schedules, scripts, commands,
-                         nodes, api_keys, notes, favorites
+                         nodes, node_status_history, api_keys, notes, favorites
                 RESTART IDENTITY CASCADE
                 """
             )

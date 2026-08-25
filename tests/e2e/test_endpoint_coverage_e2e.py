@@ -121,6 +121,32 @@ COVERED_ENDPOINTS: set[str] = {
     "POST /api/v1/docker/bulk/pull",
     "POST /api/v1/docker/bulk/images/remove",
     "POST /api/v1/docker/bulk/images/build",
+    # Docker Container lifecycle extensions
+    "POST /api/v1/nodes/{node_id}/docker/containers/{container_id}/pause",
+    "POST /api/v1/nodes/{node_id}/docker/containers/{container_id}/unpause",
+    "POST /api/v1/nodes/{node_id}/docker/containers/{container_id}/rename",
+    "GET /api/v1/nodes/{node_id}/docker/containers/{container_id}/top",
+    # Docker Network CRUD
+    "POST /api/v1/nodes/{node_id}/docker/networks",
+    "GET /api/v1/nodes/{node_id}/docker/networks/{network_id}",
+    "DELETE /api/v1/nodes/{node_id}/docker/networks/{network_id}",
+    "POST /api/v1/nodes/{node_id}/docker/networks/{network_id}/connect",
+    "POST /api/v1/nodes/{node_id}/docker/networks/{network_id}/disconnect",
+    # Docker Volume CRUD
+    "POST /api/v1/nodes/{node_id}/docker/volumes",
+    "GET /api/v1/nodes/{node_id}/docker/volumes/{volume_name}",
+    "DELETE /api/v1/nodes/{node_id}/docker/volumes/{volume_name}",
+    "POST /api/v1/nodes/{node_id}/docker/volumes/prune",
+    # Docker System
+    "GET /api/v1/nodes/{node_id}/docker/system/info",
+    "GET /api/v1/nodes/{node_id}/docker/system/df",
+    # Docker Prune
+    "POST /api/v1/nodes/{node_id}/docker/containers/prune",
+    "POST /api/v1/nodes/{node_id}/docker/images/prune",
+    # Docker Bulk extended
+    "POST /api/v1/docker/bulk/inspect",
+    "POST /api/v1/docker/bulk/logs",
+    "POST /api/v1/docker/bulk/stats",
     # Favorites (Stage F)
     "GET /api/v1/favorites",
     "POST /api/v1/favorites",
