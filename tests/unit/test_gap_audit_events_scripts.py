@@ -30,6 +30,7 @@ from tests.unit.conftest import MockAuthServiceProvider
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _mock_settings(master_key: str = "test-master") -> Any:
     settings = MagicMock()
     settings.MASTER_API_KEY = master_key
@@ -66,6 +67,7 @@ def _make_row(**overrides: Any) -> AuditExportRowDTO:
 # Audit delete tests
 # ---------------------------------------------------------------------------
 
+
 class TestDeleteAuditLogs:
     """Tests for DELETE /api/v1/audit/ endpoint."""
 
@@ -74,7 +76,8 @@ class TestDeleteAuditLogs:
         app = _create_audit_app(mock_service)
         with patch("app.api.deps.get_settings", return_value=_mock_settings("master")):
             async with AsyncClient(
-                transport=ASGITransport(app=app), base_url="http://test",
+                transport=ASGITransport(app=app),
+                base_url="http://test",
                 headers={"X-API-Key": "master"},
             ) as ac:
                 resp = await ac.delete("/api/v1/audit/?confirm=yes")
@@ -86,7 +89,8 @@ class TestDeleteAuditLogs:
         app = _create_audit_app(mock_service)
         with patch("app.api.deps.get_settings", return_value=_mock_settings("master")):
             async with AsyncClient(
-                transport=ASGITransport(app=app), base_url="http://test",
+                transport=ASGITransport(app=app),
+                base_url="http://test",
                 headers={"X-API-Key": "test-key"},
             ) as ac:
                 resp = await ac.delete("/api/v1/audit/?confirm=yes")
@@ -98,7 +102,8 @@ class TestDeleteAuditLogs:
         app = _create_audit_app(mock_service)
         with patch("app.api.deps.get_settings", return_value=_mock_settings("master")):
             async with AsyncClient(
-                transport=ASGITransport(app=app), base_url="http://test",
+                transport=ASGITransport(app=app),
+                base_url="http://test",
                 headers={"X-API-Key": "master"},
             ) as ac:
                 resp = await ac.delete("/api/v1/audit/")
@@ -110,7 +115,8 @@ class TestDeleteAuditLogs:
         app = _create_audit_app(mock_service)
         with patch("app.api.deps.get_settings", return_value=_mock_settings("master")):
             async with AsyncClient(
-                transport=ASGITransport(app=app), base_url="http://test",
+                transport=ASGITransport(app=app),
+                base_url="http://test",
                 headers={"X-API-Key": "test-key"},
             ) as ac:
                 resp = await ac.delete("/api/v1/audit/")
@@ -121,6 +127,7 @@ class TestDeleteAuditLogs:
 # Audit export tests
 # ---------------------------------------------------------------------------
 
+
 class TestExportAudit:
     """Tests for GET /api/v1/audit/export endpoint."""
 
@@ -130,7 +137,8 @@ class TestExportAudit:
         app = _create_export_app(mock_exporter)
         with patch("app.api.deps.get_settings", return_value=_mock_settings("master")):
             async with AsyncClient(
-                transport=ASGITransport(app=app), base_url="http://test",
+                transport=ASGITransport(app=app),
+                base_url="http://test",
                 headers={"X-API-Key": "test-key"},
             ) as ac:
                 resp = await ac.get("/api/v1/audit/export?fmt=csv")
@@ -143,7 +151,8 @@ class TestExportAudit:
         app = _create_export_app(mock_exporter)
         with patch("app.api.deps.get_settings", return_value=_mock_settings("master")):
             async with AsyncClient(
-                transport=ASGITransport(app=app), base_url="http://test",
+                transport=ASGITransport(app=app),
+                base_url="http://test",
                 headers={"X-API-Key": "test-key"},
             ) as ac:
                 resp = await ac.get("/api/v1/audit/export?fmt=json")
@@ -157,7 +166,8 @@ class TestExportAudit:
         node_id = uuid.uuid4()
         with patch("app.api.deps.get_settings", return_value=_mock_settings("master")):
             async with AsyncClient(
-                transport=ASGITransport(app=app), base_url="http://test",
+                transport=ASGITransport(app=app),
+                base_url="http://test",
                 headers={"X-API-Key": "test-key"},
             ) as ac:
                 await ac.get(
@@ -173,7 +183,8 @@ class TestExportAudit:
         app = _create_export_app(mock_exporter)
         with patch("app.api.deps.get_settings", return_value=_mock_settings("master")):
             async with AsyncClient(
-                transport=ASGITransport(app=app), base_url="http://test",
+                transport=ASGITransport(app=app),
+                base_url="http://test",
                 headers={"X-API-Key": "test-key"},
             ) as ac:
                 resp = await ac.get("/api/v1/audit/export?fmt=csv")
@@ -183,6 +194,7 @@ class TestExportAudit:
 # ---------------------------------------------------------------------------
 # SSE events tests
 # ---------------------------------------------------------------------------
+
 
 class TestEventGenerator:
     """Tests for _event_generator."""
@@ -301,7 +313,8 @@ class TestEventStreamEndpoint:
                 container = make_async_container(MockAuthServiceProvider())
                 setup_dishka(container, app)
                 async with AsyncClient(
-                    transport=ASGITransport(app=app), base_url="http://test",
+                    transport=ASGITransport(app=app),
+                    base_url="http://test",
                     headers={"X-API-Key": "test-key"},
                 ) as ac:
                     resp = await ac.get("/events/stream")
@@ -312,6 +325,7 @@ class TestEventStreamEndpoint:
 # ---------------------------------------------------------------------------
 # Script retry/cancel tests
 # ---------------------------------------------------------------------------
+
 
 class TestRetryScript:
     """Tests for POST /scripts/executions/{id}/retry."""
@@ -325,7 +339,8 @@ class TestRetryScript:
         exec_id = uuid.uuid4()
         with patch("app.api.deps.get_settings", return_value=_mock_settings("master")):
             async with AsyncClient(
-                transport=ASGITransport(app=app), base_url="http://test",
+                transport=ASGITransport(app=app),
+                base_url="http://test",
                 headers={"X-API-Key": "test-key"},
             ) as ac:
                 resp = await ac.post(f"/api/v1/scripts/executions/{exec_id}/retry")
@@ -344,7 +359,8 @@ class TestCancelScript:
         exec_id = uuid.uuid4()
         with patch("app.api.deps.get_settings", return_value=_mock_settings("master")):
             async with AsyncClient(
-                transport=ASGITransport(app=app), base_url="http://test",
+                transport=ASGITransport(app=app),
+                base_url="http://test",
                 headers={"X-API-Key": "test-key"},
             ) as ac:
                 resp = await ac.post(f"/api/v1/scripts/executions/{exec_id}/cancel")
@@ -363,15 +379,21 @@ class TestGetScriptStats:
 
         mock_stats = AsyncMock(spec=ExecutionStatsService)
         mock_stats.get_script_stats.return_value = ExecutionStatsDTO(
-            total=10, successful=8, failed=2, success_rate=0.8,
-            avg_duration_ms=1500.0, min_duration_ms=100.0, max_duration_ms=3000.0,
+            total=10,
+            successful=8,
+            failed=2,
+            success_rate=0.8,
+            avg_duration_ms=1500.0,
+            min_duration_ms=100.0,
+            max_duration_ms=3000.0,
             last_executed_at=datetime.now(UTC),
         )
         app = _create_scripts_app(stats=mock_stats)
         script_id = uuid.uuid4()
         with patch("app.api.deps.get_settings", return_value=_mock_settings("master")):
             async with AsyncClient(
-                transport=ASGITransport(app=app), base_url="http://test",
+                transport=ASGITransport(app=app),
+                base_url="http://test",
                 headers={"X-API-Key": "test-key"},
             ) as ac:
                 resp = await ac.get(f"/api/v1/scripts/{script_id}/stats")
@@ -408,7 +430,8 @@ class TestScheduledExecutionHistory:
         app = _create_scripts_app(history=mock_history)
         with patch("app.api.deps.get_settings", return_value=_mock_settings("master")):
             async with AsyncClient(
-                transport=ASGITransport(app=app), base_url="http://test",
+                transport=ASGITransport(app=app),
+                base_url="http://test",
                 headers={"X-API-Key": "test-key"},
             ) as ac:
                 resp = await ac.get(
@@ -426,6 +449,7 @@ class TestScheduledExecutionHistory:
 # ---------------------------------------------------------------------------
 # Helpers – app factories
 # ---------------------------------------------------------------------------
+
 
 def _create_audit_app(service: AsyncMock) -> FastAPI:
     app = FastAPI()

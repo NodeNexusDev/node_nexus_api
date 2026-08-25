@@ -146,7 +146,11 @@ class TestBulkInspectContainers:
         self, full_client: AsyncClient, full_service: AsyncMock
     ) -> None:
         full_service.bulk_inspect.return_value = BulkDockerResponse(
-            action="inspect", results=[], total=0, succeeded=0, failed=0,
+            action="inspect",
+            results=[],
+            total=0,
+            succeeded=0,
+            failed=0,
         )
         await full_client.post(
             "/api/v1/docker/bulk/inspect",
@@ -196,7 +200,11 @@ class TestBulkLogsContainers:
         self, full_client: AsyncClient, full_service: AsyncMock
     ) -> None:
         full_service.bulk_logs.return_value = BulkDockerResponse(
-            action="logs", results=[], total=0, succeeded=0, failed=0,
+            action="logs",
+            results=[],
+            total=0,
+            succeeded=0,
+            failed=0,
         )
         await full_client.post(
             "/api/v1/docker/bulk/logs",
@@ -246,7 +254,11 @@ class TestBulkStatsContainers:
         self, full_client: AsyncClient, full_service: AsyncMock
     ) -> None:
         full_service.bulk_stats.return_value = BulkDockerResponse(
-            action="stats", results=[], total=0, succeeded=0, failed=0,
+            action="stats",
+            results=[],
+            total=0,
+            succeeded=0,
+            failed=0,
         )
         await full_client.post(
             "/api/v1/docker/bulk/stats",

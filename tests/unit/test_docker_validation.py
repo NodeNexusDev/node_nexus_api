@@ -276,10 +276,16 @@ class TestValidateBuildArgKey:
 
 class TestValidateDockerHost:
     def test_valid_unix_socket(self) -> None:
-        assert validate_docker_host("unix:///var/run/docker.sock") == "unix:///var/run/docker.sock"
+        assert (
+            validate_docker_host("unix:///var/run/docker.sock")
+            == "unix:///var/run/docker.sock"
+        )
 
     def test_valid_tcp(self) -> None:
-        assert validate_docker_host("tcp://192.168.1.100:2375") == "tcp://192.168.1.100:2375"
+        assert (
+            validate_docker_host("tcp://192.168.1.100:2375")
+            == "tcp://192.168.1.100:2375"
+        )
 
     def test_valid_tcp_localhost(self) -> None:
         assert validate_docker_host("tcp://localhost:2376") == "tcp://localhost:2376"

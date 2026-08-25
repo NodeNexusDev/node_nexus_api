@@ -539,9 +539,7 @@ class DockerBulkService:
                 )
 
         remote = list(
-            await asyncio.gather(
-                *(worker(nid, node) for _, nid, node in prepared)
-            )
+            await asyncio.gather(*(worker(nid, node) for _, nid, node in prepared))
         )
         results = self._finalize(prepared, errors, remote)
         return self._response("inspect", validated_id, results)
@@ -582,9 +580,7 @@ class DockerBulkService:
                 )
 
         remote = list(
-            await asyncio.gather(
-                *(worker(nid, node) for _, nid, node in prepared)
-            )
+            await asyncio.gather(*(worker(nid, node) for _, nid, node in prepared))
         )
         results = self._finalize(prepared, errors, remote)
         return self._response("logs", validated_id, results)
@@ -623,9 +619,7 @@ class DockerBulkService:
                 )
 
         remote = list(
-            await asyncio.gather(
-                *(worker(nid, node) for _, nid, node in prepared)
-            )
+            await asyncio.gather(*(worker(nid, node) for _, nid, node in prepared))
         )
         results = self._finalize(prepared, errors, remote)
         return self._response("stats", validated_id, results)

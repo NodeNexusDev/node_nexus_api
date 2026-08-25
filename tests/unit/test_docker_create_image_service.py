@@ -562,9 +562,7 @@ class TestPauseContainer:
             await service.pause_container(NODE, "bad;id")
 
     async def test_docker_error_propagates(self) -> None:
-        runner = _make_runner(
-            stderr="Error: container not paused", exit_code=1
-        )
+        runner = _make_runner(stderr="Error: container not paused", exit_code=1)
         service = DockerContainerService(runner)
         with pytest.raises(DockerError):
             await service.pause_container(NODE, "abc123")
@@ -586,9 +584,7 @@ class TestUnpauseContainer:
             await service.unpause_container(NODE, "bad;id")
 
     async def test_docker_error_propagates(self) -> None:
-        runner = _make_runner(
-            stderr="Error: container not paused", exit_code=1
-        )
+        runner = _make_runner(stderr="Error: container not paused", exit_code=1)
         service = DockerContainerService(runner)
         with pytest.raises(DockerError):
             await service.unpause_container(NODE, "abc123")
@@ -630,9 +626,7 @@ class TestRenameContainer:
             )
 
     async def test_docker_error_propagates(self) -> None:
-        runner = _make_runner(
-            stderr="Error: rename failed", exit_code=1
-        )
+        runner = _make_runner(stderr="Error: rename failed", exit_code=1)
         service = DockerContainerService(runner)
         with pytest.raises(DockerError):
             await service.rename_container(
@@ -678,9 +672,7 @@ class TestTopContainer:
             await service.top_container(NODE, "bad;id")
 
     async def test_docker_error_propagates(self) -> None:
-        runner = _make_runner(
-            stderr="Error: container not running", exit_code=1
-        )
+        runner = _make_runner(stderr="Error: container not running", exit_code=1)
         service = DockerContainerService(runner)
         with pytest.raises(DockerError):
             await service.top_container(NODE, "abc123")
