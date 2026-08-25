@@ -142,9 +142,7 @@ class DockerResourceService:
         if not items:
             raise_for_docker_error(f"Network {network_id!r} not found", 1)
         net = items[0]
-        containers_raw = cast(
-            dict[str, dict[str, object]], net.get("Containers") or {}
-        )
+        containers_raw = cast(dict[str, dict[str, object]], net.get("Containers") or {})
         containers: list[tuple[str, dict[str, object]]] = []
         for cid, cdata in containers_raw.items():
             if isinstance(cdata, dict):
