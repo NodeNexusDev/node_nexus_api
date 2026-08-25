@@ -47,6 +47,7 @@ async def test_runs_enabled_startup_components(configure: MagicMock) -> None:
 
     configure.assert_called_once_with(log_level="info", debug=False)
     dependencies["migration"].run.assert_awaited_once()
+    dependencies["worker"].start.assert_called_once()
     dependencies["scheduler"].configure_executor.assert_called_once_with(
         dependencies["executor"].execute
     )
@@ -64,6 +65,7 @@ async def test_skips_disabled_migrations_and_scheduler() -> None:
     await startup.run()
 
     dependencies["migration"].run.assert_not_awaited()
+    dependencies["worker"].start.assert_called_once()
     dependencies["restorer"].run.assert_not_awaited()
     dependencies["restorer"].mark_disabled.assert_called_once()
 

@@ -329,7 +329,7 @@ async def test_audit_worker_provider_lifecycle() -> None:
         resource = provider.get_audit_outbox_worker(MagicMock())
         assert await anext(resource) is worker
         await resource.aclose()
-    worker.start.assert_called_once()
+    worker.start.assert_not_called()
     worker.stop.assert_awaited_once()
 
 
