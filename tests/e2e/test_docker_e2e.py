@@ -544,12 +544,10 @@ class TestDockerBulkByTags:
         container_name = f"bulk-mixed-ctr-{uuid.uuid4().hex[:8]}"
         try:
             await self._pull_alpine(client, node["id"])
+            cmd = f"docker run -d --name {container_name} alpine sleep 300"
             await client.post(
                 "/api/v1/commands/execute",
-                json={
-                    "node_id": node["id"],
-                    "command": f"docker run -d --name {container_name} alpine sleep 300",
-                },
+                json={"node_id": node["id"], "command": cmd},
             )
             await client.post(
                 f"/api/v1/nodes/{node['id']}/docker/containers/{container_name}/stop"
