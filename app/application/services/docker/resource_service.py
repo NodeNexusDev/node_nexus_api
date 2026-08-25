@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import shlex
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 from uuid import UUID
 
 if TYPE_CHECKING:
@@ -142,9 +142,11 @@ class DockerResourceService:
         if not items:
             raise_for_docker_error(f"Network {network_id!r} not found", 1)
         net = items[0]
-        containers_raw = net.get("Containers") or {}
-        containers = []
-        for cid, cdata in containers_raw.items():  # ty: ignore[unresolved-attribute]
+        containers_raw = cast(
+            dict[str, dict[str, object]], net.get("Containers") or {}
+        )
+        containers: list[tuple[str, dict[str, object]]] = []
+        for cid, cdata in containers_raw.items():
             if isinstance(cdata, dict):
                 containers.append(
                     (
@@ -172,7 +174,7 @@ class DockerResourceService:
             scope=json_string(net, "Scope"),
             subnet=subnet,
             gateway=gateway,
-            containers=tuple(containers),  # ty: ignore[invalid-argument-type]
+            containers=tuple(containers),
         )
 
     async def remove_network(self, node_id: UUID, network_id: str) -> None:
