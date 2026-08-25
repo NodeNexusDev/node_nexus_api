@@ -217,9 +217,7 @@ class TestExecutionStats:
         assert resp.status_code == 200
 
         # Get node stats
-        resp = e2e_client.get(
-            "/api/v1/commands/stats", params={"node_id": node["id"]}
-        )
+        resp = e2e_client.get("/api/v1/commands/stats", params={"node_id": node["id"]})
         assert resp.status_code == 200
         stats = resp.json()
         assert stats["total"] >= 1

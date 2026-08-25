@@ -15,7 +15,7 @@ def test_command_execution_is_recorded_in_history(
 
     exec_resp = e2e_client.post(
         "/api/v1/commands/execute",
-        json={"node_id": node['id'], "command": command_text},
+        json={"node_id": node["id"], "command": command_text},
     )
     assert exec_resp.status_code == 200
     exec_data = exec_resp.json()
@@ -23,7 +23,7 @@ def test_command_execution_is_recorded_in_history(
     assert "e2e-history-test" in exec_data["stdout"]
 
     history_resp = e2e_client.get(
-        "/api/v1/commands/history", params={"node_id": node['id']}
+        "/api/v1/commands/history", params={"node_id": node["id"]}
     )
     assert history_resp.status_code == 200
     history = history_resp.json()
@@ -120,7 +120,7 @@ def test_bulk_execute_and_history(e2e_client: httpx.Client, e2e_resources) -> No
     # Verify each node's history
     for node in (node1, node2):
         hist_resp = e2e_client.get(
-            "/api/v1/commands/history", params={"node_id": node['id']}
+            "/api/v1/commands/history", params={"node_id": node["id"]}
         )
         assert hist_resp.status_code == 200
         assert hist_resp.json()["total"] >= 1
