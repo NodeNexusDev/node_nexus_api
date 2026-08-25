@@ -45,6 +45,7 @@ class ApplicationStartup:
         )
         logger.info("app.startup")
         await self._run_migrations()
+        self._audit_worker.start()
         self._scheduler.configure_executor(self._scheduled_executor.execute)
         await self._restore_schedules()
         await self._cleanup_audit()

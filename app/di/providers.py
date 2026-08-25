@@ -1153,7 +1153,6 @@ class SchedulerProvider(Provider):
     ) -> AsyncIterable[AuditOutboxWorker]:
         """Run durable audit delivery for the application lifetime."""
         worker = AuditOutboxWorker(sessionmaker)
-        worker.start()
         try:
             yield worker
         finally:
