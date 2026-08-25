@@ -2,7 +2,7 @@
 title: Manage remote Docker
 status: stable
 translation_key: guides.docker
-source_revision: "2026-08-11"
+source_revision: "2026-08-25"
 ---
 
 # Manage remote Docker
@@ -20,6 +20,14 @@ List running containers:
 curl --fail-with-body \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
   "${NODE_NEXUS_URL}/api/v1/nodes/${NODE_ID}/docker/containers"
+```
+
+List all containers including stopped:
+
+```bash
+curl --fail-with-body \
+  -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
+  "${NODE_NEXUS_URL}/api/v1/nodes/${NODE_ID}/docker/containers?all=true"
 ```
 
 Create a container from an image. The `command` string is split into separate
@@ -43,8 +51,17 @@ curl --fail-with-body -X POST \
   }'
 ```
 
-Use a returned container ID or name with `/start`, `/stop`, `/restart`, `/logs`,
-`/stats`, or `/exec`. State-changing calls require a read-write key:
+Inspect a container:
+
+```bash
+curl --fail-with-body \
+  -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
+  "${NODE_NEXUS_URL}/api/v1/nodes/${NODE_ID}/docker/containers/${CONTAINER_ID}"
+```
+
+Use a returned container ID or name with `/start`, `/stop`, `/restart`,
+`/pause`, `/unpause`, `/rename`, `/logs`, `/stats`, `/top`, or `/exec`.
+State-changing calls require a read-write key:
 
 ```bash
 curl --fail-with-body -X POST \
@@ -52,6 +69,38 @@ curl --fail-with-body -X POST \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
   -H 'Content-Type: application/json' \
   -d '{"command": "id", "timeout": 30}'
+```
+
+Remove a container:
+
+```bash
+curl --fail-with-body -X DELETE \
+  -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
+  "${NODE_NEXUS_URL}/api/v1/nodes/${NODE_ID}/docker/containers/${CONTAINER_ID}"
+```
+
+View container logs:
+
+```bash
+curl --fail-with-body \
+  -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
+  "${NODE_NEXUS_URL}/api/v1/nodes/${NODE_ID}/docker/containers/${CONTAINER_ID}/logs?tail=100"
+```
+
+Get container resource stats:
+
+```bash
+curl --fail-with-body \
+  -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
+  "${NODE_NEXUS_URL}/api/v1/nodes/${NODE_ID}/docker/containers/${CONTAINER_ID}/stats"
+```
+
+Prune stopped containers:
+
+```bash
+curl --fail-with-body -X POST \
+  -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
+  "${NODE_NEXUS_URL}/api/v1/nodes/${NODE_ID}/docker/containers/prune"
 ```
 
 ## Images
@@ -94,6 +143,102 @@ curl --fail-with-body -X POST \
 curl --fail-with-body -X DELETE \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
   "${NODE_NEXUS_URL}/api/v1/nodes/${NODE_ID}/docker/images/local/alpine:v1.0"
+
+## Prune unused images
+curl --fail-with-body -X POST \
+  -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
+  "${NODE_NEXUS_URL}/api/v1/nodes/${NODE_ID}/docker/images/prune"
+```
+
+## Networks
+
+List, create, inspect, remove Docker networks and manage container membership:
+
+```bash
+## List networks
+curl --fail-with-body \
+  -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
+  "${NODE_NEXUS_URL}/api/v1/nodes/${NODE_ID}/docker/networks"
+
+## Create a bridge network
+curl --fail-with-body -X POST \
+  "${NODE_NEXUS_URL}/api/v1/nodes/${NODE_ID}/docker/networks" \
+  -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
+  -H 'Content-Type: application/json' \
+  -d '{"name": "my-network", "driver": "bridge"}'
+
+## Inspect a network
+curl --fail-with-body \
+  -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
+  "${NODE_NEXUS_URL}/api/v1/nodes/${NODE_ID}/docker/networks/${NETWORK_ID}"
+
+## Connect a container to a network
+curl --fail-with-body -X POST \
+  "${NODE_NEXUS_URL}/api/v1/nodes/${NODE_ID}/docker/networks/${NETWORK_ID}/connect" \
+  -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
+  -H 'Content-Type: application/json' \
+  -d '{"container_id": "${CONTAINER_ID}"}'
+
+## Disconnect a container from a network
+curl --fail-with-body -X POST \
+  "${NODE_NEXUS_URL}/api/v1/nodes/${NODE_ID}/docker/networks/${NETWORK_ID}/disconnect" \
+  -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
+  -H 'Content-Type: application/json' \
+  -d '{"container_id": "${CONTAINER_ID}"}'
+
+## Remove a network
+curl --fail-with-body -X DELETE \
+  -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
+  "${NODE_NEXUS_URL}/api/v1/nodes/${NODE_ID}/docker/networks/${NETWORK_ID}"
+```
+
+## Volumes
+
+List, create, inspect, and remove Docker volumes:
+
+```bash
+## List volumes
+curl --fail-with-body \
+  -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
+  "${NODE_NEXUS_URL}/api/v1/nodes/${NODE_ID}/docker/volumes"
+
+## Create a named volume
+curl --fail-with-body -X POST \
+  "${NODE_NEXUS_URL}/api/v1/nodes/${NODE_ID}/docker/volumes" \
+  -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
+  -H 'Content-Type: application/json' \
+  -d '{"name": "my-vol", "driver": "local"}'
+
+## Inspect a volume
+curl --fail-with-body \
+  -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
+  "${NODE_NEXUS_URL}/api/v1/nodes/${NODE_ID}/docker/volumes/${VOLUME_NAME}"
+
+## Remove a volume
+curl --fail-with-body -X DELETE \
+  -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
+  "${NODE_NEXUS_URL}/api/v1/nodes/${NODE_ID}/docker/volumes/${VOLUME_NAME}"
+
+## Prune unused volumes
+curl --fail-with-body -X POST \
+  -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
+  "${NODE_NEXUS_URL}/api/v1/nodes/${NODE_ID}/docker/volumes/prune"
+```
+
+## System
+
+Query Docker daemon information and disk usage:
+
+```bash
+## Docker info
+curl --fail-with-body \
+  -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
+  "${NODE_NEXUS_URL}/api/v1/nodes/${NODE_ID}/docker/system/info"
+
+## Disk usage
+curl --fail-with-body \
+  -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
+  "${NODE_NEXUS_URL}/api/v1/nodes/${NODE_ID}/docker/system/df"
 ```
 
 ## Bulk operations
@@ -102,6 +247,9 @@ Bulk endpoints under `/api/v1/docker/bulk/` act on multiple nodes. You can
 provide explicit `node_ids`, `node_tags`, or both. Tags are resolved to Docker
 nodes and merged with explicit IDs. Results are returned per node; a partial
 failure does not roll back successful remote operations.
+
+Available bulk actions: `start`, `stop`, `restart`, `exec`, `inspect`, `logs`,
+`stats`.
 
 ```bash
 curl --fail-with-body -X POST \

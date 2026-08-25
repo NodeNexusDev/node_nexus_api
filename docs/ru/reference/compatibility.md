@@ -2,7 +2,7 @@
 title: Совместимость и поддержка
 status: stable
 translation_key: reference.compatibility
-source_revision: "2026-08-17"
+source_revision: "2026-08-25"
 ---
 
 # Совместимость и поддержка
@@ -25,6 +25,7 @@ health, readiness и metrics исключены из проверки верси
 
 | Версия | Дата | Тип | Основные изменения |
 |--------|------|-----|--------------------|
+| 0.16.0 | 2026-08-25 | Minor | Docker CRUD: сети, volumes, расширение контейнеров (inspect, delete, pause, rename, top, logs, stats, prune), системные endpoints (info, df), маппинг ошибок network/volume (404), исправление гонки audit outbox worker, исправления цепочки Alembic миграций |
 | 0.15.1 | 2026-08-18 | Patch | Commit request transaction перед отправкой ответа, исправление гонки scheduler на границе минуты, pre-commit hook для OpenAPI contract hash |
 | 0.15.0 | 2026-08-17 | Minor | Scheduler trigger-now endpoint, propagation failed status, E2E рефакторинг с shared settings, CI hardening |
 | 0.14.0 | 2026-08-17 | Minor | HMAC-SHA-256 для хеширования API ключей, ENCRYPTION_SALT обязателен, ограничение CORS, валидация group_by, очистка WebSocket token auth |
