@@ -130,6 +130,7 @@ from app.application.services.docker.command_runner import DockerCommandRunner
 from app.application.services.docker.container_service import DockerContainerService
 from app.application.services.docker.image_service import DockerImageService
 from app.application.services.docker.resource_service import DockerResourceService
+from app.application.services.docker.system_service import DockerSystemService
 from app.application.services.execution_history_service import ExecutionHistoryService
 from app.application.services.execution_lifecycle_service import (
     ExecutionLifecycleService,
@@ -969,6 +970,12 @@ class ServiceProvider(Provider):
         self, runner: DockerCommandRunner, audit_service: AuditEventSink
     ) -> DockerResourceService:
         return DockerResourceService(runner, audit_service)
+
+    @provide(scope=Scope.REQUEST)
+    def get_docker_system_service(
+        self, runner: DockerCommandRunner, audit_service: AuditEventSink
+    ) -> DockerSystemService:
+        return DockerSystemService(runner, audit_service)
 
     @provide(scope=Scope.REQUEST)
     def get_docker_bulk_service(self, runner: DockerCommandRunner) -> DockerBulkService:
