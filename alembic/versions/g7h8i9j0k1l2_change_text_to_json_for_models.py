@@ -1,15 +1,16 @@
 """Change Text columns to JSON for command parameters, script steps, and execution data.
 
 Revision ID: g7h8i9j0k1l2
-Revises: f7a8b9c0d1e2
+Revises: a3b4c5d6e7f8
 Create Date: 2026-07-19
 
 """
 
 from collections.abc import Sequence
 
-from alembic import op
 import sqlalchemy as sa
+
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = "g7h8i9j0k1l2"

@@ -1,6 +1,6 @@
 """add batch_id to command_executions
 
-Revision ID: a1b2c3d4e5f6
+Revision ID: b7a8c9d0e1f2
 Revises: x9y8z7w6v5u4
 Create Date: 2026-08-12 00:00:00.000000
 
