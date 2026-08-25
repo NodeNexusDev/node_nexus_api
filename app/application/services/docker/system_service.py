@@ -50,10 +50,18 @@ class DockerSystemService:
             operating_system=json_string(info, "OperatingSystem"),
             architecture=json_string(info, "Architecture"),
             total_memory=json_string(info, "MemTotal"),
-            cpus=cast(int, info.get("NCPU", 0)),
-            containers_running=cast(int, info.get("ContainersRunning", 0)),
-            containers_stopped=cast(int, info.get("ContainersStopped", 0)),
-            images=cast(int, info.get("Images", 0)),
+            cpus=cast(int, info.get("NCPU"))
+            if isinstance(info.get("NCPU"), int)
+            else 0,
+            containers_running=cast(int, info.get("ContainersRunning"))
+            if isinstance(info.get("ContainersRunning"), int)
+            else 0,
+            containers_stopped=cast(int, info.get("ContainersStopped"))
+            if isinstance(info.get("ContainersStopped"), int)
+            else 0,
+            images=cast(int, info.get("Images"))
+            if isinstance(info.get("Images"), int)
+            else 0,
         )
 
     async def disk_usage(self, node_id: UUID) -> list[DockerSystemDfDTO]:
