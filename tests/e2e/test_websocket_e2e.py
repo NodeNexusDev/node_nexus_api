@@ -476,13 +476,13 @@ async def test_ws_disconnect_terminates_remote_process(
             response = e2e_client.post(
                 "/api/v1/commands/execute",
                 json={
-                    "node_id": node['id'],
+                    "node_id": node["id"],
                     "command": (
                         f"pid=$(cat {pid_file}) && "
                         f"{{ ! kill -0 $pid 2>/dev/null || "
                         f"[ \"$(awk '{{print $3}}' /proc/$pid/stat "
                         f'2>/dev/null)" = Z ]; }}'
-                    )
+                    ),
                 },
             )
             if response.status_code == 200 and response.json()["exit_code"] == 0:
@@ -491,11 +491,11 @@ async def test_ws_disconnect_terminates_remote_process(
                 process_state = e2e_client.post(
                     "/api/v1/commands/execute",
                     json={
-                        "node_id": node['id'],
+                        "node_id": node["id"],
                         "command": (
                             f"pid=$(cat {pid_file}); "
                             f"sed -n '1,8p' /proc/$pid/status 2>/dev/null"
-                        )
+                        ),
                     },
                 )
                 pytest.fail(
@@ -506,7 +506,7 @@ async def test_ws_disconnect_terminates_remote_process(
     finally:
         e2e_client.post(
             "/api/v1/commands/execute",
-            json={"node_id": node['id'], "command": f"rm -f {pid_file}"},
+            json={"node_id": node["id"], "command": f"rm -f {pid_file}"},
         )
 
 

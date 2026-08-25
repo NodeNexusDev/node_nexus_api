@@ -64,7 +64,7 @@ def test_docker_bulk_remove(
     e2e_client.post(
         "/api/v1/commands/execute",
         json={
-            "node_id": node['id'],
+            "node_id": node["id"],
             "command": "docker run -d --name bulk-rm-test alpine sleep 300",
         },
     )

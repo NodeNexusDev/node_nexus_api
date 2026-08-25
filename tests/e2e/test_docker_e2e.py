@@ -509,7 +509,7 @@ class TestDockerBulkByTags:
             run_cmd = f"docker run -d --name {container_name} alpine sleep 300"
             resp = await client.post(
                 "/api/v1/commands/execute",
-                json={"node_id": node['id'], "command": run_cmd},
+                json={"node_id": node["id"], "command": run_cmd},
             )
             assert resp.status_code == 200
             # Stop it first
@@ -547,8 +547,8 @@ class TestDockerBulkByTags:
             await client.post(
                 "/api/v1/commands/execute",
                 json={
-                    "node_id": node['id'],
-                    "command": f"docker run -d --name {container_name} alpine sleep 300"
+                    "node_id": node["id"],
+                    "command": f"docker run -d --name {container_name} alpine sleep 300",
                 },
             )
             await client.post(

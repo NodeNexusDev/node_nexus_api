@@ -140,7 +140,7 @@ def test_ssh_key_auth_execute(
     node = e2e_resources.create_ssh_key_node(encrypted=False)
     resp = e2e_client.post(
         "/api/v1/commands/execute",
-        json={"node_id": node['id'], "command": "echo e2e-key-works"},
+        json={"node_id": node["id"], "command": "echo e2e-key-works"},
     )
     assert resp.status_code == 200
     result = resp.json()
@@ -167,7 +167,7 @@ def test_ssh_encrypted_key_auth_execute(
     node = e2e_resources.create_ssh_key_node(encrypted=True)
     resp = e2e_client.post(
         "/api/v1/commands/execute",
-        json={"node_id": node['id'], "command": "echo e2e-enc-key-works"},
+        json={"node_id": node["id"], "command": "echo e2e-enc-key-works"},
     )
     assert resp.status_code == 200
     result = resp.json()
@@ -230,7 +230,7 @@ def test_ssh_execute_command(
     node = e2e_resources.create_ssh_node(name="ssh-exec")
     resp = e2e_client.post(
         "/api/v1/commands/execute",
-        json={"node_id": node['id'], "command": "echo e2e-works"},
+        json={"node_id": node["id"], "command": "echo e2e-works"},
     )
     assert resp.status_code == 200
     result = resp.json()
@@ -246,7 +246,7 @@ def test_ssh_execute_command_non_zero_exit(
     node = e2e_resources.create_ssh_node(name="ssh-fail")
     resp = e2e_client.post(
         "/api/v1/commands/execute",
-        json={"node_id": node['id'], "command": "exit 42"},
+        json={"node_id": node["id"], "command": "exit 42"},
     )
     assert resp.status_code == 200
     result = resp.json()
@@ -260,7 +260,7 @@ def test_ssh_execute_command_stderr(
     node = e2e_resources.create_ssh_node(name="ssh-stderr")
     resp = e2e_client.post(
         "/api/v1/commands/execute",
-        json={"node_id": node['id'], "command": "echo error-output >&2"},
+        json={"node_id": node["id"], "command": "echo error-output >&2"},
     )
     assert resp.status_code == 200
     result = resp.json()

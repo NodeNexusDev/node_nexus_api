@@ -409,9 +409,7 @@ class TestNetworkFailures:
             except httpx.HTTPError:
                 return True  # API is down — acceptable
 
-        wait_for_condition(
-            _db_paused, timeout=10.0, description="DB pause detected"
-        )
+        wait_for_condition(_db_paused, timeout=10.0, description="DB pause detected")
 
         docker_service_controller.unpause("db")
 

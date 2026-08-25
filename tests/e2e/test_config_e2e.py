@@ -446,9 +446,7 @@ def test_config_round_trip_preserves_docker_host(
         assert import_resp.json()["nodes_created"] == 1
 
         export2 = e2e_client.get("/api/v1/config/export").json()
-        reimported = next(
-            n for n in export2["nodes"] if n["name"] == "docker-host-rt"
-        )
+        reimported = next(n for n in export2["nodes"] if n["name"] == "docker-host-rt")
         assert reimported["docker_host"] == "tcp://dind:2375"
     finally:
         nodes_resp = e2e_client.get("/api/v1/nodes/")

@@ -39,7 +39,7 @@ def test_large_stdout_ssh_command(
     cmd = "dd if=/dev/zero bs=1K count=100 2>/dev/null | base64 | head -c 102400"
     resp = e2e_client.post(
         "/api/v1/commands/execute",
-        json={"node_id": node['id'], "command": cmd},
+        json={"node_id": node["id"], "command": cmd},
         timeout=60.0,
     )
     assert resp.status_code == 200, f"Large output command failed: {resp.status_code}"
@@ -61,7 +61,7 @@ def test_large_stdout_docker_exec(
         cmd = "docker run -d --name lp-exec-large alpine sleep 300"
         e2e_client.post(
             "/api/v1/commands/execute",
-            json={"node_id": node['id'], "command": cmd},
+            json={"node_id": node["id"], "command": cmd},
         )
         # Exec with large output
         exec_cmd = (
@@ -163,7 +163,7 @@ def test_special_chars_in_ssh_command(
     cmd = """echo 'single-quotes' && echo "double-quotes" && echo dollar-$"""
     resp = e2e_client.post(
         "/api/v1/commands/execute",
-        json={"node_id": node['id'], "command": cmd},
+        json={"node_id": node["id"], "command": cmd},
     )
     assert resp.status_code == 200
     result = resp.json()
