@@ -144,7 +144,7 @@ class DockerResourceService:
         net = items[0]
         containers_raw = net.get("Containers") or {}
         containers = []
-        for cid, cdata in containers_raw.items():
+        for cid, cdata in containers_raw.items():  # ty: ignore[unresolved-attribute]
             if isinstance(cdata, dict):
                 containers.append(
                     (
@@ -172,7 +172,7 @@ class DockerResourceService:
             scope=json_string(net, "Scope"),
             subnet=subnet,
             gateway=gateway,
-            containers=tuple(containers),
+            containers=tuple(containers),  # ty: ignore[invalid-argument-type]
         )
 
     async def remove_network(self, node_id: UUID, network_id: str) -> None:
