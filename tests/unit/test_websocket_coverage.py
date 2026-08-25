@@ -31,6 +31,7 @@ _NODE_ID = uuid4()
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _make_ws(token: str | None = "test-key") -> AsyncMock:
     ws = AsyncMock()
     ws.headers = {"x-api-key": token} if token else {}
@@ -40,7 +41,8 @@ def _make_ws(token: str | None = "test-key") -> AsyncMock:
 def _api_key_service() -> AsyncMock:
     service = AsyncMock()
     service.authenticate.return_value = SimpleNamespace(
-        scope="read-write", key_prefix="nnk_test",
+        scope="read-write",
+        key_prefix="nnk_test",
     )
     return service
 
@@ -192,11 +194,13 @@ class TestSendCommandEvents:
     async def test_success_sends_all_fields(self) -> None:
         """Events with data and exit_code are forwarded with version/type."""
         ws = _make_ws()
-        events = _TrackableAsyncIterator([
-            RemoteStreamEventDTO(type="stdout", data="hello\n"),
-            RemoteStreamEventDTO(type="stderr", data="warn\n"),
-            RemoteStreamEventDTO(type="exit", exit_code=0),
-        ])
+        events = _TrackableAsyncIterator(
+            [
+                RemoteStreamEventDTO(type="stdout", data="hello\n"),
+                RemoteStreamEventDTO(type="stderr", data="warn\n"),
+                RemoteStreamEventDTO(type="exit", exit_code=0),
+            ]
+        )
         session = MagicMock()
         session.execute_events.return_value = events
 
@@ -274,9 +278,11 @@ class TestSendCommandEvents:
     async def test_aclose_called_on_success(self) -> None:
         """aclose() is called in finally even on successful iteration."""
         ws = _make_ws()
-        events = _TrackableAsyncIterator([
-            RemoteStreamEventDTO(type="done", exit_code=0),
-        ])
+        events = _TrackableAsyncIterator(
+            [
+                RemoteStreamEventDTO(type="done", exit_code=0),
+            ]
+        )
         session = MagicMock()
         session.execute_events.return_value = events
 
@@ -335,9 +341,11 @@ class TestSendCommandEvents:
     async def test_event_without_data_or_exit_code(self) -> None:
         """Events with only type are forwarded without extra keys."""
         ws = _make_ws()
-        events = _TrackableAsyncIterator([
-            RemoteStreamEventDTO(type="started"),
-        ])
+        events = _TrackableAsyncIterator(
+            [
+                RemoteStreamEventDTO(type="started"),
+            ]
+        )
         session = MagicMock()
         session.execute_events.return_value = events
 
@@ -434,9 +442,7 @@ class TestExecStreamCommandExecution:
         await _exec(ws, _NODE_ID, service, _api_key_service())
 
         messages = [call.args[0] for call in ws.send_json.await_args_list]
-        assert any(
-            m.get("message") == "A command is already running" for m in messages
-        )
+        assert any(m.get("message") == "A command is already running" for m in messages)
 
     @pytest.mark.asyncio
     async def test_no_error_when_no_active_task(self) -> None:
@@ -542,9 +548,7 @@ class TestExecStreamServiceErrors:
 
         ws.close.assert_awaited_once_with(code=4004, reason="Node not found")
         payloads = [call.args[0] for call in ws.send_json.await_args_list]
-        assert any(
-            m.get("message") == f"Node {_NODE_ID} not found" for m in payloads
-        )
+        assert any(m.get("message") == f"Node {_NODE_ID} not found" for m in payloads)
 
     @pytest.mark.asyncio
     async def test_connection_failed_from_connect(self) -> None:
@@ -555,9 +559,7 @@ class TestExecStreamServiceErrors:
         await _exec(ws, _NODE_ID, service, _api_key_service())
 
         payloads = [call.args[0] for call in ws.send_json.await_args_list]
-        assert any(
-            m.get("message") == "Remote connection failed" for m in payloads
-        )
+        assert any(m.get("message") == "Remote connection failed" for m in payloads)
 
 
 class TestExecStreamUnexpectedErrors:

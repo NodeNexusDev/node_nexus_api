@@ -710,10 +710,7 @@ async def system_df(
     """Return Docker disk usage."""
     audit.info("api.docker.system.df", node_id=str(node_id))
     results = await service.disk_usage(node_id)
-    return [
-        DockerSystemDfItem.model_validate(r, from_attributes=True)
-        for r in results
-    ]
+    return [DockerSystemDfItem.model_validate(r, from_attributes=True) for r in results]
 
 
 @router.post("/containers/prune")

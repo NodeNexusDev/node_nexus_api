@@ -297,9 +297,7 @@ class DockerResourceService:
         """Remove a Docker volume."""
         validate_volume_name(volume_name)
         node = await self._runner.get_target(node_id)
-        cmd = self._runner.build_command(
-            node, f"volume rm {shlex.quote(volume_name)}"
-        )
+        cmd = self._runner.build_command(node, f"volume rm {shlex.quote(volume_name)}")
         stdout, stderr, exit_code = await self._runner.execute(node, cmd)
         raise_for_docker_error(stderr, exit_code)
         audit.info("docker.volumes.remove", node_id=str(node_id), name=volume_name)

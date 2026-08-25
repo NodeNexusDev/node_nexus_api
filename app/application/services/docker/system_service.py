@@ -57,9 +57,7 @@ class DockerSystemService:
             containers_stopped=info.get("ContainersStopped", 0)
             if isinstance(info.get("ContainersStopped"), int)
             else 0,
-            images=info.get("Images", 0)
-            if isinstance(info.get("Images"), int)
-            else 0,
+            images=info.get("Images", 0) if isinstance(info.get("Images"), int) else 0,
         )
 
     async def disk_usage(self, node_id: UUID) -> list[DockerSystemDfDTO]:

@@ -1435,9 +1435,7 @@ class TestSystemInfo:
             containers_stopped=1,
             images=10,
         )
-        response = await full_client.get(
-            f"/api/v1/nodes/{NODE_ID}/docker/system/info"
-        )
+        response = await full_client.get(f"/api/v1/nodes/{NODE_ID}/docker/system/info")
         assert response.status_code == 200
         data = response.json()
         assert data["server_version"] == "24.0.7"
@@ -1447,9 +1445,7 @@ class TestSystemInfo:
         self, full_client: AsyncClient, full_service: AsyncMock
     ) -> None:
         full_service.info.side_effect = DockerError("daemon error")
-        response = await full_client.get(
-            f"/api/v1/nodes/{NODE_ID}/docker/system/info"
-        )
+        response = await full_client.get(f"/api/v1/nodes/{NODE_ID}/docker/system/info")
         assert response.status_code == 502
 
 
@@ -1468,9 +1464,7 @@ class TestSystemDf:
                 reclaimable_percent="50%",
             ),
         ]
-        response = await full_client.get(
-            f"/api/v1/nodes/{NODE_ID}/docker/system/df"
-        )
+        response = await full_client.get(f"/api/v1/nodes/{NODE_ID}/docker/system/df")
         assert response.status_code == 200
         data = response.json()
         assert len(data) == 1
@@ -1480,9 +1474,7 @@ class TestSystemDf:
         self, full_client: AsyncClient, full_service: AsyncMock
     ) -> None:
         full_service.disk_usage.side_effect = DockerError("daemon error")
-        response = await full_client.get(
-            f"/api/v1/nodes/{NODE_ID}/docker/system/df"
-        )
+        response = await full_client.get(f"/api/v1/nodes/{NODE_ID}/docker/system/df")
         assert response.status_code == 502
 
 

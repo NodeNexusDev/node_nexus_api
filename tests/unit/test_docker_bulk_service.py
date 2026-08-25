@@ -282,9 +282,7 @@ async def test_bulk_inspect_success() -> None:
     runner = _make_runner()
     node = _make_node()
     runner.get_target = AsyncMock(return_value=node)
-    runner.execute = AsyncMock(
-        return_value=('[{"Id":"abc123"}]', "", 0)
-    )
+    runner.execute = AsyncMock(return_value=('[{"Id":"abc123"}]', "", 0))
     service = DockerBulkService(runner)
 
     result = await service.bulk_inspect(
@@ -303,9 +301,7 @@ async def test_bulk_inspect_error() -> None:
     runner = _make_runner()
     node = _make_node()
     runner.get_target = AsyncMock(return_value=node)
-    runner.execute = AsyncMock(
-        return_value=("", "Error: no such container", 1)
-    )
+    runner.execute = AsyncMock(return_value=("", "Error: no such container", 1))
     service = DockerBulkService(runner)
 
     result = await service.bulk_inspect(
@@ -344,9 +340,7 @@ async def test_bulk_logs_success() -> None:
     runner = _make_runner()
     node = _make_node()
     runner.get_target = AsyncMock(return_value=node)
-    runner.execute = AsyncMock(
-        return_value=("log line 1\nlog line 2\n", "", 0)
-    )
+    runner.execute = AsyncMock(return_value=("log line 1\nlog line 2\n", "", 0))
     service = DockerBulkService(runner)
 
     result = await service.bulk_logs(
@@ -383,9 +377,7 @@ async def test_bulk_logs_error() -> None:
     runner = _make_runner()
     node = _make_node()
     runner.get_target = AsyncMock(return_value=node)
-    runner.execute = AsyncMock(
-        return_value=("", "Error: no such container", 1)
-    )
+    runner.execute = AsyncMock(return_value=("", "Error: no such container", 1))
     service = DockerBulkService(runner)
 
     result = await service.bulk_logs(
@@ -446,9 +438,7 @@ async def test_bulk_stats_error() -> None:
     runner = _make_runner()
     node = _make_node()
     runner.get_target = AsyncMock(return_value=node)
-    runner.execute = AsyncMock(
-        return_value=("", "Error: not running", 1)
-    )
+    runner.execute = AsyncMock(return_value=("", "Error: not running", 1))
     service = DockerBulkService(runner)
 
     result = await service.bulk_stats(

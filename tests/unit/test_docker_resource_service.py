@@ -328,9 +328,7 @@ class TestCreateVolume:
     async def test_success_auto_name(self) -> None:
         runner = _make_runner(stdout="abc123def456\n")
         service = DockerResourceService(runner)
-        result = await service.create_volume(
-            VolumeCreateRequestDTO(node_id=NODE)
-        )
+        result = await service.create_volume(VolumeCreateRequestDTO(node_id=NODE))
         assert result == "abc123def456"
         cmd_args = runner.build_command.call_args[0][1]
         assert "volume create" in cmd_args
@@ -404,8 +402,7 @@ class TestInspectVolume:
 
     async def test_no_labels(self) -> None:
         inspect_json = (
-            '[{"Name":"vol1","Driver":"local",'
-            '"Mountpoint":"/data","Labels":null}]'
+            '[{"Name":"vol1","Driver":"local","Mountpoint":"/data","Labels":null}]'
         )
         runner = _make_runner(stdout=inspect_json)
         service = DockerResourceService(runner)

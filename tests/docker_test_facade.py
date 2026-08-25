@@ -300,9 +300,7 @@ class DockerService:
         container_id: str,
         node_tags: list[str] | None = None,
     ) -> BulkDockerResultDTO:
-        return await self._bulk.bulk_stats(
-            node_ids, container_id, node_tags=node_tags
-        )
+        return await self._bulk.bulk_stats(node_ids, container_id, node_tags=node_tags)
 
 
 class _RepositoryNodeReader:

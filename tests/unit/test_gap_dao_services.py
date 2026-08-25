@@ -53,8 +53,12 @@ def _mock_session_with_result(result: Any) -> AsyncMock:
 class TestCommandStats:
     async def test_all_filters_produce_correct_where(self) -> None:
         row = _make_row(
-            total=5, successful=4, failed=1, avg_duration_ms=120.5,
-            min_duration_ms=80.0, max_duration_ms=200.0,
+            total=5,
+            successful=4,
+            failed=1,
+            avg_duration_ms=120.5,
+            min_duration_ms=80.0,
+            max_duration_ms=200.0,
             last_executed_at=datetime(2026, 3, 15, tzinfo=UTC),
         )
         execute_result = MagicMock()
@@ -67,7 +71,10 @@ class TestCommandStats:
         dt_to = datetime(2026, 6, 1, tzinfo=UTC)
 
         result = await repo.command_stats(
-            command_id=cmd_id, node_id=node_id, date_from=dt_from, date_to=dt_to,
+            command_id=cmd_id,
+            node_id=node_id,
+            date_from=dt_from,
+            date_to=dt_to,
         )
 
         call_args = session.execute.call_args
@@ -87,8 +94,12 @@ class TestCommandStats:
 
     async def test_no_filters_where_true(self) -> None:
         row = _make_row(
-            total=10, successful=8, failed=2, avg_duration_ms=99.0,
-            min_duration_ms=10.0, max_duration_ms=500.0,
+            total=10,
+            successful=8,
+            failed=2,
+            avg_duration_ms=99.0,
+            min_duration_ms=10.0,
+            max_duration_ms=500.0,
             last_executed_at=datetime(2026, 5, 1, tzinfo=UTC),
         )
         execute_result = MagicMock()
@@ -134,8 +145,12 @@ class TestCommandStats:
 class TestScriptStats:
     async def test_all_filters_produce_correct_where(self) -> None:
         row = _make_row(
-            total=3, successful=2, failed=1, avg_duration_ms=250.0,
-            min_duration_ms=100.0, max_duration_ms=400.0,
+            total=3,
+            successful=2,
+            failed=1,
+            avg_duration_ms=250.0,
+            min_duration_ms=100.0,
+            max_duration_ms=400.0,
             last_executed_at=datetime(2026, 4, 10, tzinfo=UTC),
         )
         execute_result = MagicMock()
@@ -148,7 +163,10 @@ class TestScriptStats:
         dt_to = datetime(2026, 7, 1, tzinfo=UTC)
 
         result = await repo.script_stats(
-            script_id=script_id, node_id=node_id, date_from=dt_from, date_to=dt_to,
+            script_id=script_id,
+            node_id=node_id,
+            date_from=dt_from,
+            date_to=dt_to,
         )
 
         call_args = session.execute.call_args
@@ -167,8 +185,12 @@ class TestScriptStats:
 
     async def test_no_filters_where_true(self) -> None:
         row = _make_row(
-            total=7, successful=6, failed=1, avg_duration_ms=150.0,
-            min_duration_ms=30.0, max_duration_ms=300.0,
+            total=7,
+            successful=6,
+            failed=1,
+            avg_duration_ms=150.0,
+            min_duration_ms=30.0,
+            max_duration_ms=300.0,
             last_executed_at=datetime(2026, 6, 1, tzinfo=UTC),
         )
         execute_result = MagicMock()
@@ -204,8 +226,11 @@ class TestScriptStats:
 class TestCommandMetrics:
     async def test_date_filters_add_where_clauses(self) -> None:
         row = SimpleNamespace(
-            period=datetime(2026, 3, 1, tzinfo=UTC), total=50,
-            successful=45, failed=5, avg_duration_ms=200.0,
+            period=datetime(2026, 3, 1, tzinfo=UTC),
+            total=50,
+            successful=45,
+            failed=5,
+            avg_duration_ms=200.0,
         )
         execute_result = MagicMock()
         execute_result.all.return_value = [row]
@@ -273,8 +298,11 @@ class TestCommandMetrics:
 class TestScriptMetrics:
     async def test_date_filters_add_where_clauses(self) -> None:
         row = SimpleNamespace(
-            period=datetime(2026, 5, 1, tzinfo=UTC), total=30,
-            successful=28, failed=2, avg_duration_ms=180.0,
+            period=datetime(2026, 5, 1, tzinfo=UTC),
+            total=30,
+            successful=28,
+            failed=2,
+            avg_duration_ms=180.0,
         )
         execute_result = MagicMock()
         execute_result.all.return_value = [row]
@@ -337,8 +365,11 @@ class TestScriptMetrics:
 class TestAuditExport:
     async def test_all_filters_applied(self) -> None:
         log1 = SimpleNamespace(
-            id=uuid.uuid4(), action="create", node_id=uuid.uuid4(),
-            user="admin", details='{"name":"s1"}',
+            id=uuid.uuid4(),
+            action="create",
+            node_id=uuid.uuid4(),
+            user="admin",
+            details='{"name":"s1"}',
             created_at=datetime(2026, 3, 1, tzinfo=UTC),
         )
         scalars_mock = MagicMock()
@@ -362,8 +393,11 @@ class TestAuditExport:
 
     async def test_no_filters_returns_all(self) -> None:
         log1 = SimpleNamespace(
-            id=uuid.uuid4(), action="delete", node_id=None,
-            user="ops", details=None,
+            id=uuid.uuid4(),
+            action="delete",
+            node_id=None,
+            user="ops",
+            details=None,
             created_at=datetime(2026, 5, 1, tzinfo=UTC),
         )
         scalars_mock = MagicMock()
@@ -393,8 +427,11 @@ class TestAuditExport:
 
     async def test_row_dto_fields_mapping(self) -> None:
         log = SimpleNamespace(
-            id=uuid.uuid4(), action="update", node_id=uuid.uuid4(),
-            user="admin", details='{"key":"val"}',
+            id=uuid.uuid4(),
+            action="update",
+            node_id=uuid.uuid4(),
+            user="admin",
+            details='{"key":"val"}',
             created_at=datetime(2026, 7, 10, 14, 30, tzinfo=UTC),
         )
         scalars_mock = MagicMock()
@@ -577,8 +614,12 @@ class TestStreamingConnect:
         node_id = uuid.uuid4()
         reader = AsyncMock()
         reader.get_connection.return_value = NodeConnectionDTO(
-            id=node_id, name="n", host="h", port=22,
-            connection_type="ssh", username="root",
+            id=node_id,
+            name="n",
+            host="h",
+            port=22,
+            connection_type="ssh",
+            username="root",
         )
         connector = AsyncMock()
         factory = MagicMock()
@@ -593,6 +634,7 @@ class TestStreamingConnect:
             from app.application.services.streaming_command_service import (
                 StreamingCommandSession,
             )
+
             assert isinstance(session, StreamingCommandSession)
 
         connector.disconnect.assert_awaited_once()
@@ -615,8 +657,12 @@ class TestStreamingConnect:
         node_id = uuid.uuid4()
         reader = AsyncMock()
         reader.get_connection.return_value = NodeConnectionDTO(
-            id=node_id, name="n", host="h", port=22,
-            connection_type="ssh", username="root",
+            id=node_id,
+            name="n",
+            host="h",
+            port=22,
+            connection_type="ssh",
+            username="root",
         )
         connector = AsyncMock()
         factory = MagicMock()
@@ -636,9 +682,15 @@ class TestStreamingConnect:
         node_id = uuid.uuid4()
         reader = AsyncMock()
         reader.get_connection.return_value = NodeConnectionDTO(
-            id=node_id, name="n", host="10.0.0.1", port=2222,
-            connection_type="ssh", username="admin",
-            password="enc_pw", ssh_key="enc_key", passphrase="enc_pass",
+            id=node_id,
+            name="n",
+            host="10.0.0.1",
+            port=2222,
+            connection_type="ssh",
+            username="admin",
+            password="enc_pw",
+            ssh_key="enc_key",
+            passphrase="enc_pass",
         )
         connector = AsyncMock()
         factory = MagicMock()
@@ -677,19 +729,31 @@ class TestGetNodesCursor:
         cursor = (cursor_ts, cursor_id)
 
         node = NodeViewDTO(
-            id=uuid.uuid4(), name="n", host="h", port=22,
-            connection_type="ssh", status="active", username="root",
-            docker_host=None, tags=(), created_at=datetime.now(UTC),
+            id=uuid.uuid4(),
+            name="n",
+            host="h",
+            port=22,
+            connection_type="ssh",
+            status="active",
+            username="root",
+            docker_host=None,
+            tags=(),
+            created_at=datetime.now(UTC),
             updated_at=datetime.now(UTC),
         )
         next_cursor = (datetime(2026, 7, 1, tzinfo=UTC), uuid.uuid4())
         reader.list_nodes_cursor.return_value = SimpleNamespace(
-            items=(node,), next_cursor=next_cursor, has_more=True,
+            items=(node,),
+            next_cursor=next_cursor,
+            has_more=True,
         )
 
         svc = NodeManagementService(reader, writer, cipher)
         items, nc, has_more = await svc.get_nodes_cursor(
-            cursor=cursor, limit=10, tags=["web"], search="prod",
+            cursor=cursor,
+            limit=10,
+            tags=["web"],
+            search="prod",
         )
 
         reader.list_nodes_cursor.assert_awaited_once()
@@ -710,7 +774,9 @@ class TestGetNodesCursor:
         cipher = MagicMock()
 
         reader.list_nodes_cursor.return_value = SimpleNamespace(
-            items=(), next_cursor=None, has_more=False,
+            items=(),
+            next_cursor=None,
+            has_more=False,
         )
 
         svc = NodeManagementService(reader, writer, cipher)
@@ -732,9 +798,16 @@ class TestGetNodesCursor:
 
         nodes = [
             NodeViewDTO(
-                id=uuid.uuid4(), name=f"n{i}", host="h", port=22,
-                connection_type="ssh", status="active", username="root",
-                docker_host=None, tags=(), created_at=datetime.now(UTC),
+                id=uuid.uuid4(),
+                name=f"n{i}",
+                host="h",
+                port=22,
+                connection_type="ssh",
+                status="active",
+                username="root",
+                docker_host=None,
+                tags=(),
+                created_at=datetime.now(UTC),
                 updated_at=datetime.now(UTC),
             )
             for i in range(3)

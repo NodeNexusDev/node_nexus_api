@@ -164,9 +164,7 @@ def validate_build_arg_key(key: str) -> str:
     return key
 
 
-_DOCKER_HOST_RE = re.compile(
-    r"^(unix:///[\w./\-]+|tcp://[\w.\-]+:\d+)$"
-)
+_DOCKER_HOST_RE = re.compile(r"^(unix:///[\w./\-]+|tcp://[\w.\-]+:\d+)$")
 
 
 def validate_docker_host(docker_host: str) -> str:
@@ -209,9 +207,7 @@ def validate_container_new_name(name: str) -> str:
 def validate_network_driver(driver: str) -> str:
     """Validate a Docker network driver name."""
     if not driver or not _NETWORK_DRIVER_RE.fullmatch(driver):
-        raise DockerValidationError(
-            f"Invalid network driver: {driver!r}."
-        )
+        raise DockerValidationError(f"Invalid network driver: {driver!r}.")
     return driver
 
 
