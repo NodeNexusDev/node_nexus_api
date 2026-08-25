@@ -26,6 +26,9 @@ and metrics endpoints are excluded from version enforcement.
 
 | Version | Date | Type | Highlights |
 |---------|------|------|------------|
+| 1.0.0 | 2026-08-25 | Major | First stable release: complete Docker CRUD (containers, images, networks, volumes, system, bulk), full documentation (bilingual), production CI/CD, 95% test coverage |
+| 0.17.1 | 2026-08-25 | Patch | Fix CPU metrics always returning 100% due to wrong vmstat column, remove Any from application layer |
+| 0.17.0 | 2026-08-25 | Minor | Bulk operations (execute, check, delete, tags), API endpoint restructuring, bulk node operations extraction, script execution status alignment, type safety improvements |
 | 0.16.0 | 2026-08-25 | Minor | Docker CRUD: networks, volumes, container enhancements (inspect, delete, pause, rename, top, logs, stats, prune), system endpoints (info, df), network/volume error mapping (404), audit outbox worker race condition fix, Alembic migration chain fixes |
 | 0.15.1 | 2026-08-18 | Patch | Commit request transaction before sending response, scheduler minute-boundary race fix, OpenAPI contract hash pre-commit hook |
 | 0.15.0 | 2026-08-17 | Minor | Scheduler trigger-now endpoint, failed status propagation, E2E refactoring with shared settings, CI hardening |

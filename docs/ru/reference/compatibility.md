@@ -25,6 +25,9 @@ health, readiness и metrics исключены из проверки верси
 
 | Версия | Дата | Тип | Основные изменения |
 |--------|------|-----|--------------------|
+| 1.0.0 | 2026-08-25 | Major | Первый стабильный релиз: полный Docker CRUD (контейнеры, образы, сети, volumes, система, bulk), полная документация (bilingual), production CI/CD, 95% покрытие тестами |
+| 0.17.1 | 2026-08-25 | Patch | Исправление CPU метрик (всегда возвращал 100% из-за неверного столбца vmstat), удаление Any из application layer |
+| 0.17.0 | 2026-08-25 | Minor | Bulk операции (execute, check, delete, tags), реструктуризация API endpoints, извлечение bulk node operations, выравнивание статуса выполнения скриптов, улучшение type safety |
 | 0.16.0 | 2026-08-25 | Minor | Docker CRUD: сети, volumes, расширение контейнеров (inspect, delete, pause, rename, top, logs, stats, prune), системные endpoints (info, df), маппинг ошибок network/volume (404), исправление гонки audit outbox worker, исправления цепочки Alembic миграций |
 | 0.15.1 | 2026-08-18 | Patch | Commit request transaction перед отправкой ответа, исправление гонки scheduler на границе минуты, pre-commit hook для OpenAPI contract hash |
 | 0.15.0 | 2026-08-17 | Minor | Scheduler trigger-now endpoint, propagation failed status, E2E рефакторинг с shared settings, CI hardening |
