@@ -21,6 +21,7 @@ from app.core.exceptions import (
     ExecutionNotFoundError,
     FavoriteNotFoundError,
     ImageNotFoundError,
+    NetworkNotFoundError,
     NodeNameConflictError,
     NodeNotFoundError,
     NoteNotFoundError,
@@ -34,6 +35,7 @@ from app.core.exceptions import (
     TagNotFoundError,
     TemplateRenderError,
     UnsupportedConfigFormatError,
+    VolumeNotFoundError,
 )
 
 logger = structlog.get_logger()
@@ -52,6 +54,8 @@ DOMAIN_ERROR_STATUS: dict[type[DomainError], int] = {
     CredentialDecryptionError: 503,
     TemplateRenderError: 422,
     ContainerNotFoundError: 404,
+    NetworkNotFoundError: 404,
+    VolumeNotFoundError: 404,
     ImageNotFoundError: 404,
     DockerDaemonError: 503,
     DockerValidationError: 422,
