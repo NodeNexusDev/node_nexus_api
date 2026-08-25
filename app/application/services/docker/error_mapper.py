@@ -5,6 +5,8 @@ from app.core.exceptions import (
     DockerDaemonError,
     DockerError,
     ImageNotFoundError,
+    NetworkNotFoundError,
+    VolumeNotFoundError,
 )
 
 
@@ -21,6 +23,14 @@ def raise_for_docker_error(stderr: str, exit_code: int) -> None:
         raise ContainerNotFoundError(stderr)
     if "no such image" in normalized:
         raise ImageNotFoundError(stderr)
+    if "no such network" in normalized or (
+        "network" in normalized and "not found" in normalized
+    ):
+        raise NetworkNotFoundError(stderr)
+    if "no such volume" in normalized or (
+        "volume" in normalized and "not found" in normalized
+    ):
+        raise VolumeNotFoundError(stderr)
     if "cannot connect to the docker daemon" in normalized:
         raise DockerDaemonError(stderr)
     if "is not running" in normalized:

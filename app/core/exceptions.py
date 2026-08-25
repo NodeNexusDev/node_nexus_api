@@ -61,6 +61,14 @@ class ContainerNotFoundError(DockerError):
     """Raised when a Docker container is not found."""
 
 
+class NetworkNotFoundError(DockerError):
+    """Raised when a Docker network is not found."""
+
+
+class VolumeNotFoundError(DockerError):
+    """Raised when a Docker volume is not found."""
+
+
 class ImageNotFoundError(DockerError):
     """Raised when a Docker image is not found."""
 
