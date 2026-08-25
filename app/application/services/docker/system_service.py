@@ -50,14 +50,14 @@ class DockerSystemService:
             operating_system=json_string(info, "OperatingSystem"),
             architecture=json_string(info, "Architecture"),
             total_memory=json_string(info, "MemTotal"),
-            cpus=info.get("NCPU", 0) if isinstance(info.get("NCPU"), int) else 0,
-            containers_running=info.get("ContainersRunning", 0)
+            cpus=info.get("NCPU", 0) if isinstance(info.get("NCPU"), int) else 0,  # ty: ignore[invalid-argument-type]
+            containers_running=info.get("ContainersRunning", 0)  # ty: ignore[invalid-argument-type]
             if isinstance(info.get("ContainersRunning"), int)
             else 0,
-            containers_stopped=info.get("ContainersStopped", 0)
+            containers_stopped=info.get("ContainersStopped", 0)  # ty: ignore[invalid-argument-type]
             if isinstance(info.get("ContainersStopped"), int)
             else 0,
-            images=info.get("Images", 0) if isinstance(info.get("Images"), int) else 0,
+            images=info.get("Images", 0) if isinstance(info.get("Images"), int) else 0,  # ty: ignore[invalid-argument-type]
         )
 
     async def disk_usage(self, node_id: UUID) -> list[DockerSystemDfDTO]:
