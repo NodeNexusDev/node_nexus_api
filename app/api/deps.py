@@ -71,7 +71,7 @@ async def get_current_principal(
         try:
             container = request.state.dishka_container
             jwt_handler: JWTHandler = await container.get(JWTHandler)
-        except Exception:
+        except Exception:  # nosec B110
             # JWTHandler not registered or container unavailable — skip JWT
             pass
         else:
@@ -90,7 +90,7 @@ async def get_current_principal(
                 return Principal(source="jwt", identifier=str(user_id))
             except HTTPException:
                 raise
-            except Exception:
+            except Exception:  # nosec B110
                 # JWT invalid — proceed to API key fallback below
                 pass
 
@@ -136,7 +136,7 @@ async def require_write_or_jwt_scope(
         try:
             container = request.state.dishka_container
             jwt_handler: JWTHandler = await container.get(JWTHandler)
-        except Exception:
+        except Exception:  # nosec B110
             # JWTHandler not registered or container unavailable — skip JWT
             pass
         else:
@@ -151,7 +151,7 @@ async def require_write_or_jwt_scope(
                 return Principal(source="jwt", identifier=str(user_id))
             except HTTPException:
                 raise
-            except Exception:
+            except Exception:  # nosec B110
                 # JWT invalid — proceed to API key fallback below
                 pass
 
