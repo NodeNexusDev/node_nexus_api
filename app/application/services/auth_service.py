@@ -82,7 +82,7 @@ class AuthService:
         return {
             "access_token": access_token,
             "refresh_token": refresh_token,
-            "token_type": "bearer",
+            "token_type": "bearer",  # nosec B105 — OAuth2 token type, not a password
         }
 
     async def refresh_access_token(self, refresh_token_hash: str) -> dict[str, str]:
@@ -125,7 +125,7 @@ class AuthService:
         return {
             "access_token": access_token,
             "refresh_token": refresh_token,
-            "token_type": "bearer",
+            "token_type": "bearer",  # nosec B105 — OAuth2 token type, not a password
         }
 
     async def logout(self, refresh_token_hash: str) -> None:
