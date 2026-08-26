@@ -63,29 +63,7 @@ def _node_response(node: NodeViewDTO) -> NodeResponse:
     )
 
 
-@router.get(
-    "/",
-    response_model=None,
-    responses={
-        200: {
-            "description": "Successful Response",
-            "content": {
-                "application/json": {
-                    "schema": {
-                        "oneOf": [
-                            {
-                                "$ref": "#/components/schemas/NodeOffsetListResponse",
-                            },
-                            {
-                                "$ref": "#/components/schemas/NodeCursorListResponse",
-                            },
-                        ],
-                    },
-                },
-            },
-        },
-    },
-)
+@router.get("/", response_model=NodeOffsetListResponse | NodeCursorListResponse)
 @inject
 async def get_nodes(
     service: FromDishka[NodeManagementService],
