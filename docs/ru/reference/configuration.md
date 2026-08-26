@@ -2,7 +2,7 @@
 title: Справочник конфигурации
 status: stable
 translation_key: reference.configuration
-source_revision: "2026-08-17"
+source_revision: "2026-08-26"
 ---
 
 # Справочник конфигурации
@@ -12,7 +12,7 @@ source_revision: "2026-08-17"
 | Переменная | Обязательно/default | Назначение |
 |---|---|---|
 | `DATABASE_URL` | обязательно | Async SQLAlchemy database URL |
-| `SECRET_KEY` | обязательно | Root secret шифрования credentials |
+| `SECRET_KEY` | обязательно | Root secret шифрования credentials; также используется для подписи JWT (HS256) |
 | `DEBUG` | `false` | Development diagnostics |
 | `LOG_LEVEL` | `INFO` | Application log level |
 | `PORT` | `8000` | HTTP listen port |
@@ -36,5 +36,10 @@ source_revision: "2026-08-17"
 | `OTEL_SERVICE_NAME` | `node-nexus-api` | Trace service name |
 | `SUPPORTED_API_VERSIONS` | `["1"]` | Поддерживаемые версии API |
 | `E2E_ENABLED` | `false` | Включить endpoints E2E test harness |
+| `ACCESS_TOKEN_EXPIRE_MINUTES` | `15` | TTL access token JWT (минуты) |
+| `REFRESH_TOKEN_EXPIRE_DAYS` | `7` | TTL refresh token JWT (дни) |
+| `REFRESH_TOKEN_COOKIE_MAX_AGE` | `604800` | Max-Age refresh cookie (секунды, 7 дней) |
+| `INITIAL_SUPERUSER_EMAIL` | пусто | Email первого суперпользователя (авто-создание при startup) |
+| `INITIAL_SUPERUSER_PASSWORD` | пусто | Пароль первого суперпользователя |
 
 В production переопределите все secrets и environment-specific URLs.

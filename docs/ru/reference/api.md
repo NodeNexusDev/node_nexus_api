@@ -2,13 +2,15 @@
 title: HTTP API
 status: stable
 translation_key: reference.api
-source_revision: "2026-07-30"
+source_routing: "2026-08-26"
 ---
 
 # HTTP API
 
 Base path — `/api/v1`. Запросы и ответы используют JSON, если endpoint не
-говорит иначе. Защищённым операциям нужен `X-API-Key`.
+говорит иначе. Защищённым операциям нужен `X-API-Key` или JWT
+`Authorization: Bearer` токен. Подробности обоих методах см. в
+[руководстве по аутентификации](../guides/authentication.md).
 
 ## Версионирование API
 

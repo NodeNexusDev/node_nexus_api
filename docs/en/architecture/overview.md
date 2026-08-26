@@ -2,7 +2,7 @@
 title: Architecture overview
 status: stable
 translation_key: architecture.overview
-source_revision: "2026-07-30"
+source_revision: "2026-08-26"
 ---
 
 # Architecture overview
@@ -156,12 +156,31 @@ erDiagram
         datetime expires_at
     }
 
+    USER {
+        uuid id PK
+        string email UK
+        string hashed_password
+        bool is_active
+        bool is_superuser
+        datetime created_at
+        datetime updated_at
+    }
+
+    REFRESH_TOKEN {
+        uuid id PK
+        uuid user_id FK
+        string token_hash UK
+        datetime expires_at
+        datetime created_at
+    }
+
     SCRIPT ||--o{ SCRIPT_EXECUTION : "runs as"
     SCRIPT ||--|| SCRIPT_SCHEDULE : "scheduled by"
     NODE ||--o{ SCRIPT_EXECUTION : "targets"
     NODE ||--o{ AUDIT_LOG : "tracks"
+    USER ||--o{ REFRESH_TOKEN : "has"
 ```
 
-`COMMAND`, `AUDIT_OUTBOX`, and `API_KEY` are standalone entities with no foreign
-keys to other tables. Command templates are referenced by scripts through JSON
-steps, not database-level constraints.
+`COMMAND`, `AUDIT_OUTBOX`, `API_KEY`, and `USER` are standalone entities. User
+accounts are managed through `/api/v1/users/` (superuser-only). Refresh tokens
+are stored as SHA-256 hashes and used for JWT token rotation.

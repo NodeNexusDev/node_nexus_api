@@ -2,7 +2,7 @@
 title: Обзор архитектуры
 status: stable
 translation_key: architecture.overview
-source_revision: "2026-07-30"
+source_revision: "2026-08-26"
 ---
 
 # Обзор архитектуры
@@ -157,12 +157,32 @@ erDiagram
         datetime expires_at
     }
 
+    USER {
+        uuid id PK
+        string email UK
+        string hashed_password
+        bool is_active
+        bool is_superuser
+        datetime created_at
+        datetime updated_at
+    }
+
+    REFRESH_TOKEN {
+        uuid id PK
+        uuid user_id FK
+        string token_hash UK
+        datetime expires_at
+        datetime created_at
+    }
+
     SCRIPT ||--o{ SCRIPT_EXECUTION : "runs as"
     SCRIPT ||--|| SCRIPT_SCHEDULE : "scheduled by"
     NODE ||--o{ SCRIPT_EXECUTION : "targets"
     NODE ||--o{ AUDIT_LOG : "tracks"
+    USER ||--o{ REFRESH_TOKEN : "has"
 ```
 
-`COMMAND`, `AUDIT_OUTBOX` и `API_KEY` — независимые сущности без внешних ключей
-к другим таблицам. Шаблоны команд используются скриптами через JSON-шаги, а не
-ограничения уровня БД.
+`COMMAND`, `AUDIT_OUTBOX`, `API_KEY` и `USER` — независимые сущности. Учётные
+записи пользователей управляются через `/api/v1/users/` (только для
+суперпользователя). Refresh tokens хранятся как SHA-256 hashes и используются
+для ротации JWT токенов.
