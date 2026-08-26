@@ -8,7 +8,11 @@ from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
 from fastapi import APIRouter, HTTPException, Query, Security
 from fastapi.responses import PlainTextResponse, Response
 
-from app.api.deps import get_current_api_key, require_write_scope
+from app.api.deps import (
+    Principal,
+    get_current_principal,
+    require_write_or_jwt_scope,
+)
 from app.application.dto.audit import AuditLogDTO
 from app.application.export_utils import rows_to_csv, rows_to_json
 from app.application.ports.export import AuditExporter
@@ -32,7 +36,7 @@ async def get_audit_logs(
     date_to: datetime | None = Query(None, description="Filter to date (ISO 8601)"),
     page: int = Query(1, ge=1),
     size: int = Query(20, ge=1, le=100),
-    _key: str = Security(get_current_api_key),
+    _key: Principal = Security(get_current_principal),
 ) -> PaginatedResponse[AuditLogResponse]:
     """Get audit logs with optional filters and pagination."""
     audit.info(
@@ -65,14 +69,14 @@ async def get_audit_logs(
 async def delete_audit_logs(
     service: FromDishka[AuditLogService],
     confirm: str | None = Query(None),
-    _key: str = Security(require_write_scope),
+    _key: Principal = Security(require_write_or_jwt_scope),
 ) -> None:
     """Delete all audit log entries.
 
     Requires ?confirm=yes parameter to prevent accidental deletion.
     Only master key can delete all logs.
     """
-    if _key != "master":
+    if _key.identifier != "master":
         raise HTTPException(
             status_code=403, detail="Only master key can delete all audit logs"
         )
@@ -125,7 +129,7 @@ async def export_audit(
     action: str | None = Query(None),
     node_id: uuid.UUID | None = Query(None),
     fmt: str = Query("csv", pattern="^(csv|json)$"),
-    _key: str = Security(get_current_api_key),
+    _key: Principal = Security(get_current_principal),
 ) -> Response:
     """Export audit logs as CSV or JSON."""
     from app.application.dto.export import AuditExportQueryDTO

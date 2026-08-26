@@ -6,7 +6,11 @@ import structlog
 from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
 from fastapi import APIRouter, HTTPException, Query, Security
 
-from app.api.deps import get_current_api_key, require_write_scope
+from app.api.deps import (
+    Principal,
+    get_current_principal,
+    require_write_or_jwt_scope,
+)
 from app.application.dto.node_management import (
     NodeCreateDTO,
     NodeUpdateDTO,
@@ -73,7 +77,7 @@ async def get_nodes(
     search: str | None = Query(None, description="Search by name or host"),
     cursor: str | None = Query(None, description="Cursor for keyset pagination"),
     limit: int = Query(20, ge=1, le=100, description="Page size for cursor pagination"),
-    _key: str = Security(get_current_api_key),
+    _key: Principal = Security(get_current_principal),
 ) -> NodeOffsetListResponse | NodeCursorListResponse:
     """Get all nodes with pagination, optional tag filtering and search.
 
@@ -119,7 +123,7 @@ async def get_nodes(
 @inject
 async def get_node_tags(
     service: FromDishka[NodeManagementService],
-    _key: str = Security(get_current_api_key),
+    _key: Principal = Security(get_current_principal),
 ) -> list[str]:
     """Get all unique tags across all nodes."""
     audit.info("api.nodes.tags.list")
@@ -131,7 +135,7 @@ async def get_node_tags(
 async def get_node(
     node_id: uuid.UUID,
     service: FromDishka[NodeManagementService],
-    _key: str = Security(get_current_api_key),
+    _key: Principal = Security(get_current_principal),
 ) -> NodeResponse:
     """Get a node by ID."""
     audit.info("api.nodes.get", node_id=str(node_id))
@@ -143,7 +147,7 @@ async def get_node(
 async def create_node(
     data: NodeCreate,
     service: FromDishka[NodeManagementService],
-    _key: str = Security(require_write_scope),
+    _key: Principal = Security(require_write_or_jwt_scope),
 ) -> NodeResponse:
     """Create a new node."""
     audit.info("api.nodes.create", name=data.name, connection_type=data.connection_type)
@@ -171,7 +175,7 @@ async def update_node(
     node_id: uuid.UUID,
     data: NodeUpdate,
     service: FromDishka[NodeManagementService],
-    _key: str = Security(require_write_scope),
+    _key: Principal = Security(require_write_or_jwt_scope),
 ) -> NodeResponse:
     """Update an existing node."""
     audit.info("api.nodes.update", node_id=str(node_id))
@@ -191,7 +195,7 @@ async def update_node(
 async def delete_node(
     node_id: uuid.UUID,
     service: FromDishka[NodeManagementService],
-    _key: str = Security(require_write_scope),
+    _key: Principal = Security(require_write_or_jwt_scope),
 ) -> None:
     """Delete a node."""
     audit.info("api.nodes.delete", node_id=str(node_id))
@@ -206,7 +210,7 @@ async def delete_node(
 async def check_node(
     node_id: uuid.UUID,
     service: FromDishka[NodeCommandService],
-    _key: str = Security(require_write_scope),
+    _key: Principal = Security(require_write_or_jwt_scope),
 ) -> NodeResponse:
     """Check SSH connectivity to a node."""
     audit.info("api.nodes.check", node_id=str(node_id))
@@ -231,7 +235,7 @@ async def check_node(
 async def validate_credentials(
     data: NodeValidateRequest,
     service: FromDishka[NodeValidationService],
-    _key: str = Security(require_write_scope),
+    _key: Principal = Security(require_write_or_jwt_scope),
 ) -> NodeValidateResponse:
     """Validate SSH credentials without saving a node."""
     audit.info("api.nodes.validate_credentials", host=data.host, port=data.port)
@@ -257,7 +261,7 @@ async def validate_credentials(
 async def get_node_metrics(
     node_id: uuid.UUID,
     service: FromDishka[NodeMetricsService],
-    _key: str = Security(get_current_api_key),
+    _key: Principal = Security(get_current_principal),
 ) -> NodeMetrics:
     """Get system metrics from a node (CPU, memory, disk)."""
     audit.info("api.nodes.metrics", node_id=str(node_id))
@@ -296,7 +300,7 @@ async def get_node_status_history(
     service: FromDishka[NodeStatusHistoryService],
     page: int = Query(1, ge=1),
     size: int = Query(20, ge=1, le=100),
-    _key: str = Security(get_current_api_key),
+    _key: Principal = Security(get_current_principal),
 ) -> NodeStatusHistoryResponse:
     """Get status change history for a node."""
     audit.info("api.nodes.status_history", node_id=str(node_id), page=page, size=size)

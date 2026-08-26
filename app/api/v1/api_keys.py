@@ -6,7 +6,11 @@ import structlog
 from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
 from fastapi import APIRouter, Query, Security
 
-from app.api.deps import get_current_api_key, require_write_scope
+from app.api.deps import (
+    Principal,
+    get_current_principal,
+    require_write_or_jwt_scope,
+)
 from app.application.dto.api_key import (
     APIKeyCreateDTO,
     APIKeyCreateResultDTO,
@@ -65,7 +69,7 @@ def _list_response(page: APIKeyPageDTO, page_num: int, size: int) -> APIKeyList:
 async def create_api_key(
     data: APIKeyCreate,
     service: FromDishka[APIKeyManagementService],
-    _key: str = Security(require_write_scope),
+    _key: Principal = Security(require_write_or_jwt_scope),
 ) -> APIKeyCreated:
     """Create a new API key. The full key is returned only once."""
     audit.info("api.api_keys.create", name=data.name)
@@ -79,7 +83,7 @@ async def create_api_key(
 @inject
 async def list_api_keys(
     service: FromDishka[APIKeyManagementService],
-    _key: str = Security(get_current_api_key),
+    _key: Principal = Security(get_current_principal),
     page: int = Query(1, ge=1),
     size: int = Query(20, ge=1, le=100),
 ) -> APIKeyList:
@@ -96,7 +100,7 @@ async def update_api_key(
     key_id: uuid.UUID,
     data: APIKeyUpdate,
     service: FromDishka[APIKeyManagementService],
-    _key: str = Security(require_write_scope),
+    _key: Principal = Security(require_write_or_jwt_scope),
 ) -> APIKeyResponse:
     """Update an API key (name, is_active, scope, expires_at)."""
     audit.info("api.api_keys.update", key_id=str(key_id))
@@ -112,7 +116,7 @@ async def update_api_key(
 async def revoke_api_key(
     key_id: uuid.UUID,
     service: FromDishka[APIKeyManagementService],
-    _key: str = Security(require_write_scope),
+    _key: Principal = Security(require_write_or_jwt_scope),
 ) -> None:
     """Revoke an API key."""
     audit.info("api.api_keys.revoke", key_id=str(key_id))

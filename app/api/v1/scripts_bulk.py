@@ -7,7 +7,10 @@ import structlog
 from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
 from fastapi import APIRouter, Security
 
-from app.api.deps import require_write_scope
+from app.api.deps import (
+    Principal,
+    require_write_or_jwt_scope,
+)
 from app.application.dto.execution_lifecycle import (
     CancelExecutionDTO,
     RetryScriptDTO,
@@ -32,7 +35,7 @@ router = APIRouter(prefix="/scripts", tags=["scripts"], route_class=DishkaRoute)
 async def bulk_retry_scripts(
     data: ScriptBulkRetryRequest,
     service: FromDishka[ExecutionLifecycleService],
-    _key: str = Security(require_write_scope),
+    _key: Principal = Security(require_write_or_jwt_scope),
 ) -> ScriptBulkOperationResponse:
     """Retry multiple script executions."""
     execution_ids = [uuid.UUID(str(eid)) for eid in data.execution_ids]
@@ -74,7 +77,7 @@ async def bulk_retry_scripts(
 async def bulk_cancel_scripts(
     data: ScriptBulkCancelRequest,
     service: FromDishka[ExecutionLifecycleService],
-    _key: str = Security(require_write_scope),
+    _key: Principal = Security(require_write_or_jwt_scope),
 ) -> ScriptBulkOperationResponse:
     """Cancel multiple running script executions."""
     execution_ids = [uuid.UUID(str(eid)) for eid in data.execution_ids]

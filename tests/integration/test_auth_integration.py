@@ -123,7 +123,7 @@ async def test_unauthenticated_returns_401(
         ) as client:
             resp = await client.get("/api/v1/nodes/")
     assert resp.status_code == 401
-    assert "Missing X-API-Key header" in resp.json()["detail"]
+    assert "Not authenticated" in resp.json()["detail"]
     await app.state._container.close()
 
 

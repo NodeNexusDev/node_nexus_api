@@ -7,7 +7,11 @@ import structlog
 from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
 from fastapi import APIRouter, Security
 
-from app.api.deps import get_current_api_key, require_write_scope
+from app.api.deps import (
+    Principal,
+    get_current_principal,
+    require_write_or_jwt_scope,
+)
 from app.application.dto.bulk_node_operation import (
     BulkNodeDeleteDTO,
 )
@@ -48,7 +52,7 @@ router = APIRouter(prefix="/nodes", tags=["nodes"], route_class=DishkaRoute)
 async def bulk_get_node_metrics(
     data: BulkNodeMetricsRequest,
     service: FromDishka[NodeMetricsService],
-    _key: str = Security(get_current_api_key),
+    _key: Principal = Security(get_current_principal),
 ) -> BulkNodeMetricsResponse:
     """Collect system metrics from multiple nodes in parallel."""
     audit.info(
@@ -111,7 +115,7 @@ async def bulk_get_node_metrics(
 async def bulk_update_nodes(
     data: BulkNodeUpdateRequest,
     service: FromDishka[NodeManagementService],
-    _key: str = Security(require_write_scope),
+    _key: Principal = Security(require_write_or_jwt_scope),
 ) -> BulkNodeUpdateResponse:
     """Update multiple nodes with the same changes."""
     audit.info(
@@ -150,7 +154,7 @@ async def bulk_update_nodes(
 async def bulk_delete_nodes(
     data: BulkNodeDeleteRequest,
     service: FromDishka[NodeBulkOperationService],
-    _key: str = Security(require_write_scope),
+    _key: Principal = Security(require_write_or_jwt_scope),
 ) -> BulkNodeOperationResult:
     """Delete multiple nodes by IDs."""
     audit.info(
@@ -169,7 +173,7 @@ async def bulk_delete_nodes(
 async def bulk_check_nodes(
     data: BulkNodeCheckRequest,
     service: FromDishka[NodeBulkOperationService],
-    _key: str = Security(require_write_scope),
+    _key: Principal = Security(require_write_or_jwt_scope),
 ) -> BulkNodeOperationResult:
     """Check SSH connectivity for multiple nodes."""
     audit.info(
@@ -193,7 +197,7 @@ async def bulk_check_nodes(
 async def bulk_validate_credentials(
     data: BulkValidateCredentialsRequest,
     service: FromDishka[NodeBulkCommandService],
-    _key: str = Security(require_write_scope),
+    _key: Principal = Security(require_write_or_jwt_scope),
 ) -> BulkValidateCredentialsResponse:
     """Validate SSH connectivity for multiple existing nodes."""
     audit.info(

@@ -6,7 +6,11 @@ import structlog
 from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
 from fastapi import APIRouter, Query, Security
 
-from app.api.deps import get_current_api_key, require_write_scope
+from app.api.deps import (
+    Principal,
+    get_current_principal,
+    require_write_or_jwt_scope,
+)
 from app.application.dto.favorite import FavoriteCreateDTO
 from app.application.services.favorite_service import FavoriteService
 from app.schemas.common import PaginatedResponse
@@ -24,7 +28,7 @@ async def list_favorites(
     target_type: str | None = Query(None),
     page: int = Query(1, ge=1),
     size: int = Query(20, ge=1, le=100),
-    _key: str = Security(get_current_api_key),
+    _key: Principal = Security(get_current_principal),
 ) -> PaginatedResponse[FavoriteResponse]:
     audit.info("api.favorites.list", target_type=target_type)
     items, total = await service.list_favorites(
@@ -55,7 +59,7 @@ async def list_favorites(
 async def add_favorite(
     data: FavoriteCreate,
     service: FromDishka[FavoriteService],
-    _key: str = Security(require_write_scope),
+    _key: Principal = Security(require_write_or_jwt_scope),
 ) -> FavoriteResponse:
     audit.info("api.favorites.add", target=data.target_type + ":" + data.target_id)
     result = await service.add_favorite(
@@ -82,7 +86,7 @@ async def remove_favorite(
     target_type: str,
     target_id: str,
     service: FromDishka[FavoriteService],
-    _key: str = Security(require_write_scope),
+    _key: Principal = Security(require_write_or_jwt_scope),
 ) -> None:
     audit.info("api.favorites.remove", target=target_type + ":" + target_id)
     await service.remove_favorite(target_type, target_id)

@@ -8,7 +8,11 @@ import structlog
 from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
 from fastapi import APIRouter, Security
 
-from app.api.deps import get_current_api_key, require_write_scope
+from app.api.deps import (
+    Principal,
+    get_current_principal,
+    require_write_or_jwt_scope,
+)
 from app.application.dto.config import (
     CommandConfigDTO,
     ConfigImportResultDTO,
@@ -38,7 +42,7 @@ router = APIRouter(prefix="/config", tags=["config"], route_class=DishkaRoute)
 @inject
 async def export_config(
     service: FromDishka[ConfigService],
-    _key: str = Security(get_current_api_key),
+    _key: Principal = Security(get_current_principal),
 ) -> ConfigExport:
     """Export all nodes, commands, and scripts configuration.
 
@@ -62,7 +66,7 @@ async def export_config(
 async def import_config(
     data: ConfigImport,
     service: FromDishka[ConfigService],
-    _key: str = Security(require_write_scope),
+    _key: Principal = Security(require_write_or_jwt_scope),
 ) -> ImportResult | DryRunImportResult:
     """Import nodes, commands, and scripts configuration.
 

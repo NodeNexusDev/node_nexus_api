@@ -7,7 +7,11 @@ import structlog
 from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
 from fastapi import APIRouter, Query, Security
 
-from app.api.deps import get_current_api_key, require_write_scope
+from app.api.deps import (
+    Principal,
+    get_current_principal,
+    require_write_or_jwt_scope,
+)
 from app.application.dto.execution_lifecycle import (
     CancelExecutionDTO,
     RetryScriptDTO,
@@ -171,7 +175,7 @@ async def get_scripts(
     size: int = Query(20, ge=1, le=100),
     tag: str | None = Query(None, description="Filter by tag (AND)"),
     search: str | None = Query(None, description="Search by name or description"),
-    _key: str = Security(get_current_api_key),
+    _key: Principal = Security(get_current_principal),
 ) -> PaginatedResponse[ScriptResponse]:
     """Get all scripts with pagination and optional search."""
     tag_list = [t.strip() for t in tag.split(",")] if tag else None
@@ -203,7 +207,7 @@ async def get_script_stats(
     stats_service: FromDishka[ExecutionStatsService],
     date_from: datetime | None = Query(None),
     date_to: datetime | None = Query(None),
-    _key: str = Security(get_current_api_key),
+    _key: Principal = Security(get_current_principal),
 ) -> ExecutionStatsResponse:
     audit.info("api.scripts.stats", script_id=str(script_id))
     stats = await stats_service.get_script_stats(
@@ -216,7 +220,7 @@ async def get_script_stats(
 @inject
 async def get_script_tags(
     service: FromDishka[ScriptManagementService],
-    _key: str = Security(get_current_api_key),
+    _key: Principal = Security(get_current_principal),
 ) -> list[str]:
     """Get all unique tags across all scripts."""
     audit.info("api.scripts.tags.list")
@@ -228,7 +232,7 @@ async def get_script_tags(
 async def get_script(
     script_id: uuid.UUID,
     service: FromDishka[ScriptManagementService],
-    _key: str = Security(get_current_api_key),
+    _key: Principal = Security(get_current_principal),
 ) -> ScriptResponse:
     """Get a script by ID."""
     audit.info("api.scripts.get", script_id=str(script_id))
@@ -240,7 +244,7 @@ async def get_script(
 async def create_script(
     data: ScriptCreate,
     service: FromDishka[ScriptManagementService],
-    _key: str = Security(require_write_scope),
+    _key: Principal = Security(require_write_or_jwt_scope),
 ) -> ScriptResponse:
     """Create a new script."""
     audit.info("api.scripts.create", name=data.name)
@@ -261,7 +265,7 @@ async def update_script(
     script_id: uuid.UUID,
     data: ScriptUpdate,
     service: FromDishka[ScriptManagementService],
-    _key: str = Security(require_write_scope),
+    _key: Principal = Security(require_write_or_jwt_scope),
 ) -> ScriptResponse:
     """Update an existing script."""
     audit.info("api.scripts.update", script_id=str(script_id))
@@ -282,7 +286,7 @@ async def update_script(
 async def delete_script(
     script_id: uuid.UUID,
     service: FromDishka[ScriptManagementService],
-    _key: str = Security(require_write_scope),
+    _key: Principal = Security(require_write_or_jwt_scope),
 ) -> None:
     """Delete a script."""
     audit.info("api.scripts.delete", script_id=str(script_id))
@@ -295,7 +299,7 @@ async def clone_script(
     script_id: uuid.UUID,
     service: FromDishka[ScriptManagementService],
     new_name: str | None = Query(None),
-    _key: str = Security(require_write_scope),
+    _key: Principal = Security(require_write_or_jwt_scope),
 ) -> ScriptResponse:
     """Clone a script."""
     audit.info("api.scripts.clone", script_id=str(script_id))
@@ -309,7 +313,7 @@ async def execute_script(
     script_id: uuid.UUID,
     data: ScriptExecuteRequest,
     service: FromDishka[ScriptExecutionService],
-    _key: str = Security(require_write_scope),
+    _key: Principal = Security(require_write_or_jwt_scope),
 ) -> ScriptExecutionBatchResult:
     """Execute a script on multiple nodes by IDs and/or tags."""
     audit.info(
@@ -336,7 +340,7 @@ async def get_executions(
     service: FromDishka[ScriptHistoryService],
     page: int = Query(1, ge=1),
     size: int = Query(20, ge=1, le=100),
-    _key: str = Security(get_current_api_key),
+    _key: Principal = Security(get_current_principal),
 ) -> PaginatedResponse[ScriptExecutionResponse]:
     """Get execution history for a script."""
     audit.info("api.scripts.executions", script_id=str(script_id))
@@ -358,7 +362,7 @@ async def schedule_script(
     script_id: uuid.UUID,
     data: ScheduleRequest,
     schedule_service: FromDishka[ScheduleManagementService],
-    _key: str = Security(require_write_scope),
+    _key: Principal = Security(require_write_or_jwt_scope),
 ) -> ScheduleResponse:
     """Schedule a script to run periodically via cron expression.
 
@@ -393,7 +397,7 @@ async def schedule_script(
 async def unschedule_script(
     script_id: uuid.UUID,
     schedule_service: FromDishka[ScheduleManagementService],
-    _key: str = Security(require_write_scope),
+    _key: Principal = Security(require_write_or_jwt_scope),
 ) -> None:
     """Remove a scheduled script."""
     audit.info("api.scripts.unschedule", script_id=str(script_id))
@@ -405,7 +409,7 @@ async def unschedule_script(
 async def get_schedule(
     script_id: uuid.UUID,
     schedule_service: FromDishka[ScheduleManagementService],
-    _key: str = Security(get_current_api_key),
+    _key: Principal = Security(get_current_principal),
 ) -> ScheduledJob | None:
     """Get the schedule for a script."""
     audit.info("api.scripts.get_schedule", script_id=str(script_id))
@@ -420,7 +424,7 @@ async def get_schedule(
 async def retry_script(
     execution_id: uuid.UUID,
     service: FromDishka[ExecutionLifecycleService],
-    _key: str = Security(require_write_scope),
+    _key: Principal = Security(require_write_or_jwt_scope),
 ) -> ScriptRetryResponse:
     """Retry a script execution."""
     audit.info("api.scripts.executions.retry", execution_id=str(execution_id))
@@ -437,7 +441,7 @@ async def retry_script(
 async def cancel_script(
     execution_id: uuid.UUID,
     service: FromDishka[ExecutionLifecycleService],
-    _key: str = Security(require_write_scope),
+    _key: Principal = Security(require_write_or_jwt_scope),
 ) -> ScriptCancelResponse:
     """Cancel a running script execution."""
     audit.info("api.scripts.executions.cancel", execution_id=str(execution_id))
@@ -456,7 +460,7 @@ async def get_scheduled_execution_history(
     service: FromDishka[ScriptHistoryService],
     page: int = Query(1, ge=1),
     size: int = Query(20, ge=1, le=100),
-    _key: str = Security(get_current_api_key),
+    _key: Principal = Security(get_current_principal),
 ) -> PaginatedResponse[ScriptExecutionResponse]:
     """Get scheduled execution history for a script."""
     audit.info(
