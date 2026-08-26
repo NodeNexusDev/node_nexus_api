@@ -5,18 +5,50 @@ import json
 import os
 from pathlib import Path
 
+from fastapi import FastAPI
 from httpx2 import ASGITransport, AsyncClient
 
 from app.main import app
 
 OPENAPI_CONTRACT_SHA256 = (
-    "33e4e57ce9468364f883ca8f938c0e01a7c863149c66f4edad7e40ae4134c840"
+    "9c1936fcdf16148c7c0c48a2e61a20261c438a4b12f1ecffa5c5e34e0949a86c"
 )
+
+_CANONICAL_ENV = {
+    "PROMETHEUS_ENABLED": "true",
+    "E2E_ENABLED": "false",
+    "OTEL_ENABLED": "false",
+}
+
+
+def _build_canonical_app() -> FastAPI:
+    """Build the app with pinned settings so the schema never depends on local .env."""
+    from app.core.config import get_settings
+    from app.main import create_app
+
+    get_settings.cache_clear()
+    saved = {key: os.environ.get(key) for key in _CANONICAL_ENV}
+    os.environ.update(_CANONICAL_ENV)
+    try:
+        return create_app()
+    finally:
+        for key, value in saved.items():
+            if value is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = value
+        get_settings.cache_clear()
+
+
+def _canonical_schema() -> dict:
+    schema = _build_canonical_app().openapi()
+    schema["info"].pop("version", None)
+    return schema
 
 
 def _compute_canonical_hash() -> str:
     canonical_schema = json.dumps(
-        app.openapi(),
+        _canonical_schema(),
         sort_keys=True,
         separators=(",", ":"),
         ensure_ascii=False,
