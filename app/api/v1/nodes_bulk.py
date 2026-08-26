@@ -40,7 +40,7 @@ from app.schemas.node import (
 
 audit = structlog.get_logger("audit")
 
-router = APIRouter(prefix="/nodes", tags=["nodes", "bulk"], route_class=DishkaRoute)
+router = APIRouter(prefix="/nodes", tags=["nodes"], route_class=DishkaRoute)
 
 
 @router.post("/bulk/metrics", response_model=BulkNodeMetricsResponse)
