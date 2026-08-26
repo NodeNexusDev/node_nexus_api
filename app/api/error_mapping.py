@@ -21,6 +21,9 @@ from app.core.exceptions import (
     ExecutionNotFoundError,
     FavoriteNotFoundError,
     ImageNotFoundError,
+    InsufficientPermissionsError,
+    InvalidCredentialsError,
+    InvalidTokenError,
     NetworkNotFoundError,
     NodeNameConflictError,
     NodeNotFoundError,
@@ -34,7 +37,10 @@ from app.core.exceptions import (
     ScriptNotFoundError,
     TagNotFoundError,
     TemplateRenderError,
+    TokenExpiredError,
     UnsupportedConfigFormatError,
+    UserAlreadyExistsError,
+    UserNotFoundError,
     VolumeNotFoundError,
 )
 
@@ -71,6 +77,12 @@ DOMAIN_ERROR_STATUS: dict[type[DomainError], int] = {
     ScheduledScriptExecutionError: 422,
     FavoriteNotFoundError: 404,
     NoteNotFoundError: 404,
+    InvalidCredentialsError: 401,
+    UserNotFoundError: 404,
+    UserAlreadyExistsError: 409,
+    TokenExpiredError: 401,
+    InvalidTokenError: 401,
+    InsufficientPermissionsError: 403,
     DomainError: 422,
 }
 

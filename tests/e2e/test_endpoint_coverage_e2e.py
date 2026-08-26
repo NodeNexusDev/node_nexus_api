@@ -170,6 +170,15 @@ COVERED_ENDPOINTS: set[str] = {
     # Script Stats + Clone (Stage F)
     "GET /api/v1/scripts/{script_id}/stats",
     "POST /api/v1/scripts/{script_id}/clone",
+    # JWT Auth
+    "POST /api/v1/auth/login",
+    "POST /api/v1/auth/logout",
+    "POST /api/v1/auth/refresh",
+    "GET /api/v1/auth/me",
+    # User Management
+    "GET /api/v1/users/",
+    "POST /api/v1/users/",
+    "DELETE /api/v1/users/{user_id}",
 }
 
 # Endpoints NOT covered by E2E tests, with justification.

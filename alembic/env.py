@@ -16,9 +16,11 @@ from app.models.command import CommandModel  # noqa: F401
 from app.models.command_execution import CommandExecutionModel  # noqa: F401
 from app.models.node import NodeModel  # noqa: F401
 from app.models.node_status_history import NodeStatusHistoryModel  # noqa: F401
+from app.models.refresh_token import RefreshTokenModel  # noqa: F401
 from app.models.script import ScriptModel  # noqa: F401
 from app.models.script_execution import ScriptExecutionModel  # noqa: F401
 from app.models.script_schedule import ScriptScheduleModel  # noqa: F401
+from app.models.user import UserModel  # noqa: F401
 
 config = context.config
 if config.config_file_name is not None:

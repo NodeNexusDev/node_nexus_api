@@ -45,6 +45,7 @@ class ApplicationStartup:
         )
         logger.info("app.startup")
         await self._run_migrations()
+        await self._ensure_initial_superuser()
         self._audit_worker.start()
         self._scheduler.configure_executor(self._scheduled_executor.execute)
         await self._restore_schedules()
@@ -56,6 +57,32 @@ class ApplicationStartup:
             return
         await self._migration_runner.run()
         logger.info("migrations.applied")
+
+    async def _ensure_initial_superuser(self) -> None:
+        """Create initial superuser from env vars if no users exist."""
+        email = self._settings.INITIAL_SUPERUSER_EMAIL
+        password = self._settings.INITIAL_SUPERUSER_PASSWORD
+        if not email or not password:
+            return
+
+        from app.application.dto.user import UserCreateDTO
+        from app.application.ports.user_persistence import UserReader, UserWriter
+        from app.di.container import container
+
+        try:
+            user_reader = await container.get(UserReader)
+            existing = await user_reader.get_by_email(email)
+            if existing is not None:
+                logger.info("startup.superuser.exists", email=email)
+                return
+
+            user_writer = await container.get(UserWriter)
+            await user_writer.create_user(
+                UserCreateDTO(email=email, password=password, is_superuser=True)
+            )
+            logger.info("startup.superuser.created", email=email)
+        except Exception:
+            logger.warning("startup.superuser.failed", email=email)
 
     async def _restore_schedules(self) -> None:
         if not self._settings.SCHEDULER_ENABLED:

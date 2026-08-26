@@ -54,12 +54,18 @@ from app.adapters.persistence.script_gateway import (
     ScopedScriptExecutionWriter,
     SqlAlchemyScriptGateway,
 )
+from app.adapters.persistence.user import (
+    SqlAlchemyRefreshTokenGateway,
+    SqlAlchemyUserGateway,
+)
 from app.adapters.runtime.apscheduler_runtime import ApschedulerRuntime
 from app.adapters.runtime.docker import SshDockerRuntime
 from app.adapters.runtime.node_validation import SshCredentialValidator
 from app.adapters.runtime.scheduler import ApschedulerJobScheduler
 from app.adapters.runtime.ssh import SSHConnectorFactory
 from app.adapters.security import AesGcmCredentialCipher, HmacSha256APIKeyHasher
+from app.adapters.security.jwt_handler import JWTHandlerAdapter
+from app.adapters.security.password_hasher import PasswordHasherAdapter
 from app.application.ports.api_key import APIKeyReader, APIKeyWriter
 from app.application.ports.api_key_hasher import APIKeyHasher
 from app.application.ports.audit_log import AuditLogReader, AuditLogWriter
@@ -85,6 +91,7 @@ from app.application.ports.export import AuditExporter
 from app.application.ports.favorite import FavoriteReader, FavoriteWriter
 from app.application.ports.global_search import GlobalSearchReader
 from app.application.ports.health import DatabaseHealthProbe
+from app.application.ports.jwt_handler import JWTHandler
 from app.application.ports.node_bulk_operator import NodeBulkOperator
 from app.application.ports.node_management import (
     NodeManagementReader,
@@ -97,6 +104,11 @@ from app.application.ports.node_status_history import (
 )
 from app.application.ports.node_validation import NodeCredentialValidator
 from app.application.ports.note import NoteReader, NoteWriter
+from app.application.ports.password_hasher import PasswordHasher
+from app.application.ports.refresh_token_persistence import (
+    RefreshTokenReader,
+    RefreshTokenWriter,
+)
 from app.application.ports.remote_command import RemoteConnectorFactory
 from app.application.ports.remote_stream import RemoteStreamingConnectorFactory
 from app.application.ports.schedule import (
@@ -111,6 +123,7 @@ from app.application.ports.script_persistence import (
     ScriptReader,
     ScriptWriter,
 )
+from app.application.ports.user_persistence import UserReader, UserWriter
 from app.application.services.api_key_authentication import (
     APIKeyAuthenticationService,
 )
@@ -118,6 +131,7 @@ from app.application.services.api_key_management import APIKeyManagementService
 from app.application.services.audit_cleanup_job import AuditCleanupJob
 from app.application.services.audit_event_service import AuditEventService
 from app.application.services.audit_log_service import AuditLogService
+from app.application.services.auth_service import AuthService
 from app.application.services.command_execution_service import CommandExecutionService
 from app.application.services.command_management_service import CommandManagementService
 from app.application.services.config_service import ConfigService
@@ -165,6 +179,7 @@ from app.application.services.script_execution_service import ScriptExecutionSer
 from app.application.services.script_history_service import ScriptHistoryService
 from app.application.services.script_management_service import ScriptManagementService
 from app.application.services.streaming_command_service import StreamingCommandService
+from app.application.services.user_service import UserService
 from app.core.config import Settings, get_settings
 
 
@@ -596,6 +611,46 @@ class RepositoryProvider(Provider):
         """Bind global search reads to the persistence gateway."""
         return gateway
 
+    @provide(scope=Scope.APP)
+    def get_user_gateway(
+        self,
+        sessionmaker: async_sessionmaker[AsyncSession],
+        password_hasher: PasswordHasher,
+    ) -> SqlAlchemyUserGateway:
+        """Get the user persistence gateway."""
+        return SqlAlchemyUserGateway(sessionmaker, password_hasher)
+
+    @provide(scope=Scope.APP, provides=UserReader)
+    def get_user_reader(self, gateway: SqlAlchemyUserGateway) -> UserReader:
+        """Bind user reads to the persistence gateway."""
+        return gateway
+
+    @provide(scope=Scope.APP, provides=UserWriter)
+    def get_user_writer(self, gateway: SqlAlchemyUserGateway) -> UserWriter:
+        """Bind user writes to the persistence gateway."""
+        return gateway
+
+    @provide(scope=Scope.APP)
+    def get_refresh_token_gateway(
+        self, sessionmaker: async_sessionmaker[AsyncSession]
+    ) -> SqlAlchemyRefreshTokenGateway:
+        """Get the refresh token persistence gateway."""
+        return SqlAlchemyRefreshTokenGateway(sessionmaker)
+
+    @provide(scope=Scope.APP, provides=RefreshTokenReader)
+    def get_refresh_token_reader(
+        self, gateway: SqlAlchemyRefreshTokenGateway
+    ) -> RefreshTokenReader:
+        """Bind refresh token reads to the persistence gateway."""
+        return gateway
+
+    @provide(scope=Scope.APP, provides=RefreshTokenWriter)
+    def get_refresh_token_writer(
+        self, gateway: SqlAlchemyRefreshTokenGateway
+    ) -> RefreshTokenWriter:
+        """Bind refresh token writes to the persistence gateway."""
+        return gateway
+
 
 class ConnectorProvider(Provider):
     """Connector providers."""
@@ -631,6 +686,16 @@ class ConnectorProvider(Provider):
     def get_api_key_hasher(self) -> APIKeyHasher:
         """Bind API-key lookup hashing to the HMAC-SHA-256 adapter."""
         return HmacSha256APIKeyHasher()
+
+    @provide(scope=Scope.APP, provides=JWTHandler)
+    def get_jwt_handler(self) -> JWTHandler:
+        """Bind JWT operations to the PyJWT adapter."""
+        return JWTHandlerAdapter()
+
+    @provide(scope=Scope.APP, provides=PasswordHasher)
+    def get_password_hasher(self) -> PasswordHasher:
+        """Bind password hashing to the bcrypt adapter."""
+        return PasswordHasherAdapter()
 
     @provide(scope=Scope.APP, provides=DockerRuntime)
     def get_docker_runtime(
@@ -1061,6 +1126,33 @@ class ServiceProvider(Provider):
     ) -> NoteService:
         """Get note service."""
         return NoteService(reader=reader, writer=writer)
+
+    @provide(scope=Scope.REQUEST)
+    def get_auth_service(
+        self,
+        user_reader: UserReader,
+        refresh_reader: RefreshTokenReader,
+        refresh_writer: RefreshTokenWriter,
+        jwt_handler: JWTHandler,
+        password_hasher: PasswordHasher,
+    ) -> AuthService:
+        """Get authentication service."""
+        return AuthService(
+            user_reader=user_reader,
+            refresh_reader=refresh_reader,
+            refresh_writer=refresh_writer,
+            jwt_handler=jwt_handler,
+            password_hasher=password_hasher,
+        )
+
+    @provide(scope=Scope.REQUEST)
+    def get_user_service(
+        self,
+        reader: UserReader,
+        writer: UserWriter,
+    ) -> UserService:
+        """Get user management service."""
+        return UserService(reader=reader, writer=writer)
 
 
 class ConfigProvider(Provider):
