@@ -2,7 +2,7 @@
 
 import uuid
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -11,7 +11,7 @@ class CommandParameter(BaseModel):
     """Definition of a single command parameter."""
 
     name: str = Field(..., min_length=1, max_length=100)
-    type: str = Field(default="string", pattern=r"^(string|integer|boolean)$")
+    type: Literal["string", "integer", "boolean"] = Field(default="string")
     required: bool = Field(default=True)
     default: Any = Field(default=None)
     description: str | None = Field(default=None, max_length=500)

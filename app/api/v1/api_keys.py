@@ -51,8 +51,13 @@ def _created_response(item: APIKeyCreateResultDTO) -> APIKeyCreated:
     )
 
 
-def _list_response(page: APIKeyPageDTO) -> APIKeyList:
-    return APIKeyList(items=[_response(item) for item in page.items], total=page.total)
+def _list_response(page: APIKeyPageDTO, page_num: int, size: int) -> APIKeyList:
+    return APIKeyList(
+        items=[_response(item) for item in page.items],
+        total=page.total,
+        page=page_num,
+        size=size,
+    )
 
 
 @router.post("/", response_model=APIKeyCreated, status_code=201)
@@ -80,7 +85,9 @@ async def list_api_keys(
 ) -> APIKeyList:
     """List all API keys."""
     audit.info("api.api_keys.list", page=page, size=size)
-    return _list_response(await service.list_api_keys(page=page, size=size))
+    return _list_response(
+        await service.list_api_keys(page=page, size=size), page_num=page, size=size
+    )
 
 
 @router.patch("/{key_id}", response_model=APIKeyResponse)

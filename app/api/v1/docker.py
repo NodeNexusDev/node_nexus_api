@@ -31,8 +31,10 @@ from app.schemas.docker import (
     ContainerCreatedResponse,
     ContainerCreateRequest,
     ContainerRenameRequest,
+    DockerActionResponse,
     DockerContainer,
     DockerContainerInspect,
+    DockerContainerRenameResponse,
     DockerExecRequest,
     DockerExecResult,
     DockerImage,
@@ -43,6 +45,7 @@ from app.schemas.docker import (
     DockerImageTagRequest,
     DockerImageTagResponse,
     DockerNetwork,
+    DockerNetworkCreateResponse,
     DockerPruneResponse,
     DockerPullResult,
     DockerStats,
@@ -50,6 +53,8 @@ from app.schemas.docker import (
     DockerSystemInfo,
     DockerTopResult,
     DockerVolume,
+    DockerVolumeCreateResponse,
+    DockerVolumePruneResponse,
     NetworkConnectRequest,
     NetworkCreateRequest,
     NetworkDisconnectRequest,
@@ -64,7 +69,11 @@ router = APIRouter(
 )
 
 
-@router.post("/containers", status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/containers",
+    response_model=ContainerCreatedResponse,
+    status_code=status.HTTP_201_CREATED,
+)
 @inject
 async def create_container(
     node_id: uuid.UUID,
@@ -95,7 +104,7 @@ async def create_container(
     return ContainerCreatedResponse.model_validate(result, from_attributes=True)
 
 
-@router.get("/containers")
+@router.get("/containers", response_model=list[DockerContainer])
 @inject
 async def list_containers(
     node_id: uuid.UUID,
@@ -111,7 +120,7 @@ async def list_containers(
     ]
 
 
-@router.get("/containers/{container_id}")
+@router.get("/containers/{container_id}", response_model=DockerContainerInspect)
 @inject
 async def get_container(
     node_id: uuid.UUID,
@@ -197,7 +206,7 @@ async def remove_container(
     await service.remove_container(node_id, validated_id, force=force)
 
 
-@router.get("/containers/{container_id}/logs")
+@router.get("/containers/{container_id}/logs", response_model=str)
 @inject
 async def get_logs(
     node_id: uuid.UUID,
@@ -215,7 +224,7 @@ async def get_logs(
     return await service.get_logs(node_id, validated_id, tail=tail, since=since)
 
 
-@router.post("/containers/{container_id}/exec")
+@router.post("/containers/{container_id}/exec", response_model=DockerExecResult)
 @inject
 async def exec_command(
     node_id: uuid.UUID,
@@ -241,14 +250,14 @@ async def exec_command(
 # ── Container lifecycle extensions ──────────────────────────────────────────
 
 
-@router.post("/containers/{container_id}/pause")
+@router.post("/containers/{container_id}/pause", response_model=DockerActionResponse)
 @inject
 async def pause_container(
     node_id: uuid.UUID,
     container_id: str,
     service: FromDishka[DockerContainerService],
     _key: str = Security(require_write_scope),
-) -> dict[str, str]:
+) -> DockerActionResponse:
     """Pause a running container."""
     validated_id = validate_container_id(container_id)
     audit.info(
@@ -257,17 +266,17 @@ async def pause_container(
         container_id=validated_id,
     )
     await service.pause_container(node_id, validated_id)
-    return {"status": "paused"}
+    return DockerActionResponse(status="paused")
 
 
-@router.post("/containers/{container_id}/unpause")
+@router.post("/containers/{container_id}/unpause", response_model=DockerActionResponse)
 @inject
 async def unpause_container(
     node_id: uuid.UUID,
     container_id: str,
     service: FromDishka[DockerContainerService],
     _key: str = Security(require_write_scope),
-) -> dict[str, str]:
+) -> DockerActionResponse:
     """Unpause a paused container."""
     validated_id = validate_container_id(container_id)
     audit.info(
@@ -276,10 +285,13 @@ async def unpause_container(
         container_id=validated_id,
     )
     await service.unpause_container(node_id, validated_id)
-    return {"status": "unpaused"}
+    return DockerActionResponse(status="unpaused")
 
 
-@router.post("/containers/{container_id}/rename")
+@router.post(
+    "/containers/{container_id}/rename",
+    response_model=DockerContainerRenameResponse,
+)
 @inject
 async def rename_container(
     node_id: uuid.UUID,
@@ -287,7 +299,7 @@ async def rename_container(
     data: ContainerRenameRequest,
     service: FromDishka[DockerContainerService],
     _key: str = Security(require_write_scope),
-) -> dict[str, str]:
+) -> DockerContainerRenameResponse:
     """Rename a container."""
     validated_id = validate_container_id(container_id)
     new_name = validate_container_new_name(data.new_name)
@@ -304,10 +316,10 @@ async def rename_container(
             new_name=new_name,
         )
     )
-    return {"status": "renamed", "new_name": new_name}
+    return DockerContainerRenameResponse(status="renamed", new_name=new_name)
 
 
-@router.get("/containers/{container_id}/top")
+@router.get("/containers/{container_id}/top", response_model=DockerTopResult)
 @inject
 async def top_container(
     node_id: uuid.UUID,
@@ -329,7 +341,7 @@ async def top_container(
     )
 
 
-@router.get("/images")
+@router.get("/images", response_model=list[DockerImage])
 @inject
 async def list_images(
     node_id: uuid.UUID,
@@ -344,7 +356,7 @@ async def list_images(
     ]
 
 
-@router.post("/images/pull")
+@router.post("/images/pull", response_model=DockerPullResult)
 @inject
 async def pull_image(
     node_id: uuid.UUID,
@@ -358,7 +370,7 @@ async def pull_image(
     return DockerPullResult.model_validate(result, from_attributes=True)
 
 
-@router.post("/images/build")
+@router.post("/images/build", response_model=DockerImageBuildResponse)
 @inject
 async def build_image(
     node_id: uuid.UUID,
@@ -384,7 +396,7 @@ async def build_image(
     return DockerImageBuildResponse.model_validate(result, from_attributes=True)
 
 
-@router.get("/images/{image_id:path}")
+@router.get("/images/{image_id:path}", response_model=DockerImageInspectResponse)
 @inject
 async def inspect_image(
     node_id: uuid.UUID,
@@ -411,7 +423,7 @@ async def remove_image(
     await service.remove_image(node_id, image_id)
 
 
-@router.post("/images/{image_id:path}/tag")
+@router.post("/images/{image_id:path}/tag", response_model=DockerImageTagResponse)
 @inject
 async def tag_image(
     node_id: uuid.UUID,
@@ -435,7 +447,7 @@ async def tag_image(
     return DockerImageTagResponse.model_validate(result, from_attributes=True)
 
 
-@router.get("/containers/{container_id}/stats")
+@router.get("/containers/{container_id}/stats", response_model=DockerStats)
 @inject
 async def get_stats(
     node_id: uuid.UUID,
@@ -452,7 +464,7 @@ async def get_stats(
     return DockerStats.model_validate(result, from_attributes=True)
 
 
-@router.get("/networks")
+@router.get("/networks", response_model=list[DockerNetwork])
 @inject
 async def list_networks(
     node_id: uuid.UUID,
@@ -467,7 +479,7 @@ async def list_networks(
     ]
 
 
-@router.get("/volumes")
+@router.get("/volumes", response_model=list[DockerVolume])
 @inject
 async def list_volumes(
     node_id: uuid.UUID,
@@ -485,14 +497,18 @@ async def list_volumes(
 # ── Network CRUD ────────────────────────────────────────────────────────────
 
 
-@router.post("/networks", status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/networks",
+    response_model=DockerNetworkCreateResponse,
+    status_code=status.HTTP_201_CREATED,
+)
 @inject
 async def create_network(
     node_id: uuid.UUID,
     data: NetworkCreateRequest,
     service: FromDishka[DockerResourceService],
     _key: str = Security(require_write_scope),
-) -> dict[str, str]:
+) -> DockerNetworkCreateResponse:
     """Create a Docker network."""
     audit.info("api.docker.networks.create", node_id=str(node_id), name=data.name)
     network_id = await service.create_network(
@@ -504,10 +520,10 @@ async def create_network(
             gateway=data.gateway,
         )
     )
-    return {"id": network_id, "name": data.name}
+    return DockerNetworkCreateResponse(id=network_id, name=data.name)
 
 
-@router.get("/networks/{network_id}")
+@router.get("/networks/{network_id}", response_model=NetworkInspectResponse)
 @inject
 async def inspect_network(
     node_id: uuid.UUID,
@@ -558,7 +574,7 @@ async def remove_network(
     await service.remove_network(node_id, validated_id)
 
 
-@router.post("/networks/{network_id}/connect")
+@router.post("/networks/{network_id}/connect", response_model=DockerActionResponse)
 @inject
 async def connect_to_network(
     node_id: uuid.UUID,
@@ -566,7 +582,7 @@ async def connect_to_network(
     data: NetworkConnectRequest,
     service: FromDishka[DockerResourceService],
     _key: str = Security(require_write_scope),
-) -> dict[str, str]:
+) -> DockerActionResponse:
     """Connect a container to a network."""
     validated_id = validate_container_id(network_id)
     audit.info(
@@ -583,10 +599,10 @@ async def connect_to_network(
             ip_address=data.ip_address,
         )
     )
-    return {"status": "connected"}
+    return DockerActionResponse(status="connected")
 
 
-@router.post("/networks/{network_id}/disconnect")
+@router.post("/networks/{network_id}/disconnect", response_model=DockerActionResponse)
 @inject
 async def disconnect_from_network(
     node_id: uuid.UUID,
@@ -594,7 +610,7 @@ async def disconnect_from_network(
     data: NetworkDisconnectRequest,
     service: FromDishka[DockerResourceService],
     _key: str = Security(require_write_scope),
-) -> dict[str, str]:
+) -> DockerActionResponse:
     """Disconnect a container from a network."""
     validated_id = validate_container_id(network_id)
     audit.info(
@@ -611,20 +627,24 @@ async def disconnect_from_network(
             force=data.force,
         )
     )
-    return {"status": "disconnected"}
+    return DockerActionResponse(status="disconnected")
 
 
 # ── Volume CRUD ─────────────────────────────────────────────────────────────
 
 
-@router.post("/volumes", status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/volumes",
+    response_model=DockerVolumeCreateResponse,
+    status_code=status.HTTP_201_CREATED,
+)
 @inject
 async def create_volume(
     node_id: uuid.UUID,
     data: VolumeCreateRequest,
     service: FromDishka[DockerResourceService],
     _key: str = Security(require_write_scope),
-) -> dict[str, str]:
+) -> DockerVolumeCreateResponse:
     """Create a Docker volume."""
     audit.info("api.docker.volumes.create", node_id=str(node_id))
     volume_name = await service.create_volume(
@@ -634,10 +654,10 @@ async def create_volume(
             driver=data.driver,
         )
     )
-    return {"name": volume_name}
+    return DockerVolumeCreateResponse(name=volume_name)
 
 
-@router.get("/volumes/{volume_name}")
+@router.get("/volumes/{volume_name}", response_model=VolumeInspectResponse)
 @inject
 async def inspect_volume(
     node_id: uuid.UUID,
@@ -671,23 +691,23 @@ async def remove_volume(
     await service.remove_volume(node_id, validated_name)
 
 
-@router.post("/volumes/prune")
+@router.post("/volumes/prune", response_model=DockerVolumePruneResponse)
 @inject
 async def prune_volumes(
     node_id: uuid.UUID,
     service: FromDishka[DockerResourceService],
     _key: str = Security(require_write_scope),
-) -> dict[str, str]:
+) -> DockerVolumePruneResponse:
     """Prune unused Docker volumes."""
     audit.info("api.docker.volumes.prune", node_id=str(node_id))
     output = await service.prune_volumes(node_id)
-    return {"output": output}
+    return DockerVolumePruneResponse(output=output)
 
 
 # ── System ──────────────────────────────────────────────────────────────────
 
 
-@router.get("/system/info")
+@router.get("/system/info", response_model=DockerSystemInfo)
 @inject
 async def system_info(
     node_id: uuid.UUID,
@@ -700,7 +720,7 @@ async def system_info(
     return DockerSystemInfo.model_validate(result, from_attributes=True)
 
 
-@router.get("/system/df")
+@router.get("/system/df", response_model=list[DockerSystemDfItem])
 @inject
 async def system_df(
     node_id: uuid.UUID,
@@ -713,7 +733,7 @@ async def system_df(
     return [DockerSystemDfItem.model_validate(r, from_attributes=True) for r in results]
 
 
-@router.post("/containers/prune")
+@router.post("/containers/prune", response_model=DockerPruneResponse)
 @inject
 async def prune_containers(
     node_id: uuid.UUID,
@@ -729,7 +749,7 @@ async def prune_containers(
     )
 
 
-@router.post("/images/prune")
+@router.post("/images/prune", response_model=DockerPruneResponse)
 @inject
 async def prune_images(
     node_id: uuid.UUID,

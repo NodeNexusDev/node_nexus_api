@@ -23,21 +23,22 @@ from app.application.services.node_status_history_service import (
     NodeStatusHistoryService,
 )
 from app.application.services.node_validation_service import NodeValidationService
-from app.schemas.common import CursorPage, decode_cursor, encode_cursor
+from app.schemas.common import decode_cursor, encode_cursor
 from app.schemas.node import (
     CpuMetrics,
     DiskMetrics,
     LoadAverage,
     MemoryMetrics,
     NodeCreate,
+    NodeCursorListResponse,
     NodeMetrics,
+    NodeOffsetListResponse,
     NodeResponse,
     NodeStatusHistoryItem,
     NodeStatusHistoryResponse,
     NodeUpdate,
     NodeValidateRequest,
     NodeValidateResponse,
-    PaginatedResponse,
 )
 
 audit = structlog.get_logger("audit")
@@ -62,7 +63,29 @@ def _node_response(node: NodeViewDTO) -> NodeResponse:
     )
 
 
-@router.get("/")
+@router.get(
+    "/",
+    response_model=None,
+    responses={
+        200: {
+            "description": "Successful Response",
+            "content": {
+                "application/json": {
+                    "schema": {
+                        "oneOf": [
+                            {
+                                "$ref": "#/components/schemas/NodeOffsetListResponse",
+                            },
+                            {
+                                "$ref": "#/components/schemas/NodeCursorListResponse",
+                            },
+                        ],
+                    },
+                },
+            },
+        },
+    },
+)
 @inject
 async def get_nodes(
     service: FromDishka[NodeManagementService],
@@ -73,7 +96,7 @@ async def get_nodes(
     cursor: str | None = Query(None, description="Cursor for keyset pagination"),
     limit: int = Query(20, ge=1, le=100, description="Page size for cursor pagination"),
     _key: str = Security(get_current_api_key),
-):
+) -> NodeOffsetListResponse | NodeCursorListResponse:
     """Get all nodes with pagination, optional tag filtering and search.
 
     Supports two pagination modes:
@@ -92,7 +115,7 @@ async def get_nodes(
         items, next_cursor_key, has_more = await service.get_nodes_cursor(
             cursor=decoded, limit=limit, tags=tag_list, search=search
         )
-        return CursorPage(
+        return NodeCursorListResponse(
             items=[_node_response(node) for node in items],
             next_cursor=(
                 encode_cursor(*next_cursor_key) if next_cursor_key is not None else None
@@ -106,7 +129,7 @@ async def get_nodes(
     nodes, total = await service.get_all_nodes(
         page=page, size=size, tags=tag_list, search=search
     )
-    return PaginatedResponse(
+    return NodeOffsetListResponse(
         items=[_node_response(node) for node in nodes],
         total=total,
         page=page,

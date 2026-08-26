@@ -1,10 +1,12 @@
 """Authentication API endpoints."""
 
+import uuid
+
 import structlog
 from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
-from fastapi import APIRouter, Cookie, HTTPException, Request, Response, status
+from fastapi import APIRouter, Cookie, HTTPException, Response, Security, status
 
-from app.api.deps import _decode_access_token, _extract_bearer_token
+from app.api.deps import get_current_user_id
 from app.application.dto.user import UserViewDTO
 from app.application.ports.jwt_handler import JWTHandler
 from app.application.services.auth_service import AuthService
@@ -113,15 +115,9 @@ async def refresh_token(
 @router.get("/me", response_model=UserResponse)
 @inject
 async def get_me(
-    request: Request,
     service: FromDishka[AuthService],
-    jwt_handler: FromDishka[JWTHandler],
+    user_id: uuid.UUID = Security(get_current_user_id),
 ) -> UserResponse:
     """Get current authenticated user."""
-    token = _extract_bearer_token(request)
-    if not token:
-        raise HTTPException(status_code=401, detail="Not authenticated")
-
-    user_id, _claims = _decode_access_token(jwt_handler, token)
     user = await service.get_current_user(user_id)
     return _user_response(user)

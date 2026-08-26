@@ -1,9 +1,13 @@
+"""Global search API schemas."""
+
 import uuid
 
 from pydantic import BaseModel, ConfigDict
 
 
 class SearchResultItem(BaseModel):
+    """A single entity returned by global search."""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
@@ -12,6 +16,8 @@ class SearchResultItem(BaseModel):
 
 
 class GlobalSearchResponse(BaseModel):
+    """Aggregated global search results across entities."""
+
     model_config = ConfigDict(from_attributes=True)
 
     nodes: list[SearchResultItem]

@@ -97,7 +97,26 @@ def _to_response(log: AuditLogDTO) -> AuditLogResponse:
     )
 
 
-@router.get("/export")
+@router.get(
+    "/export",
+    response_model=None,
+    responses={
+        200: {
+            "description": "Audit logs exported in the requested format.",
+            "content": {
+                "application/json": {
+                    "schema": {
+                        "type": "array",
+                        "items": {"$ref": "#/components/schemas/AuditLogResponse"},
+                    },
+                },
+                "text/csv": {
+                    "schema": {"type": "string"},
+                },
+            },
+        },
+    },
+)
 @inject
 async def export_audit(
     exporter: FromDishka[AuditExporter],
