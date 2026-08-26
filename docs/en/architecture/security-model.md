@@ -2,16 +2,32 @@
 title: Security model
 status: stable
 translation_key: architecture.security-model
-source_revision: "2026-08-17"
+source_revision: "2026-08-26"
 ---
 
 # Security model
 
-API keys authenticate clients through `X-API-Key`; scopes authorize read and
-write operations. Managed keys are stored as SHA-256 hashes. SSH passwords and
-private keys are encrypted at rest using a key derived from `SECRET_KEY` and
-`ENCRYPTION_SALT`. The salt defaults to empty (acceptable for dev/test);
-production deployments must set it via `.env`. New ciphertext uses the
+Node Nexus supports two authentication methods: **API keys** (`X-API-Key`) for
+programmatic access and **JWT Bearer tokens** for browser/SPA clients.
+
+**API keys** authenticate clients through `X-API-Key`; scopes authorize read and
+write operations. Managed keys are stored as SHA-256 hashes. The master key
+configured through `MASTER_API_KEY` always has read-write access.
+
+**JWT tokens** are obtained by POSTing credentials to `/api/v1/auth/login`.
+The response contains an access token (short-lived, default 15 minutes) and sets
+a refresh token as an `HttpOnly`, `Secure`, `SameSite=Lax` cookie. The access
+token is sent as `Authorization: Bearer <token>`. Refresh tokens are rotated on
+each use; old tokens are immediately invalidated. JWT is signed with HS256 using
+`SECRET_KEY`.
+
+Endpoints that require superuser privileges (`/api/v1/users/*`) check the JWT
+`is_superuser` claim. API keys cannot be used for these endpoints — a JWT token
+is required.
+
+SSH passwords and private keys are encrypted at rest using a key derived from
+`SECRET_KEY` and `ENCRYPTION_SALT`. The salt defaults to empty (acceptable for
+dev/test); production deployments must set it via `.env`. New ciphertext uses the
 `enc:v1:` envelope and decryption fails closed; a prefixed or legacy-shaped
 ciphertext is never reused as a password after a cryptographic error.
 
