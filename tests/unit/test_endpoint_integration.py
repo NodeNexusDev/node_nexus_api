@@ -45,11 +45,11 @@ async def _noop_auth(*a, **kw):  # noqa: ANN001, ANN002, ANN003
 
 _MODULE_IMPORTS: dict[str, list[str]] = {
     "app.api.v1.commands": ["get_current_principal", "require_write_or_jwt_scope"],
-    "app.api.v1.events": ["get_current_api_key"],
+    "app.api.v1.events": ["get_current_principal"],
     "app.api.v1.favorites": ["get_current_principal", "require_write_or_jwt_scope"],
     "app.api.v1.notes": ["get_current_principal", "require_write_or_jwt_scope"],
     "app.api.v1.scripts": ["get_current_principal", "require_write_or_jwt_scope"],
-    "app.api.v1.search": ["get_current_api_key"],
+    "app.api.v1.search": ["get_current_principal"],
     "app.api.v1.nodes": ["get_current_principal", "require_write_or_jwt_scope"],
 }
 

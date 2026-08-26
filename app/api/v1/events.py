@@ -8,7 +8,7 @@ from dishka.integrations.fastapi import DishkaRoute, inject
 from fastapi import APIRouter, Security
 from fastapi.responses import StreamingResponse
 
-from app.api.deps import get_current_api_key
+from app.api.deps import Principal, get_current_principal
 from app.application.services.sse_broadcaster import get_sse_broadcaster
 
 audit = structlog.get_logger("audit")
@@ -37,7 +37,7 @@ async def _event_generator(sub_id: str, queue):
 @router.get("/events/stream")
 @inject
 async def event_stream(
-    _key: str = Security(get_current_api_key),
+    _key: Principal = Security(get_current_principal),
 ) -> StreamingResponse:
     """Subscribe to live server-sent events.
 

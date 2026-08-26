@@ -4,7 +4,7 @@ import structlog
 from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
 from fastapi import APIRouter, Query, Security
 
-from app.api.deps import get_current_api_key
+from app.api.deps import Principal, get_current_principal
 from app.application.services.global_search_service import GlobalSearchService
 from app.schemas.global_search import GlobalSearchResponse, SearchResultItem
 
@@ -19,7 +19,7 @@ async def global_search(
     q: str = Query(..., min_length=1, description="Search query"),
     limit: int = Query(20, ge=1, le=100),
     service: FromDishka[GlobalSearchService] = None,  # ty: ignore[invalid-parameter-default]
-    _key: str = Security(get_current_api_key),
+    _key: Principal = Security(get_current_principal),
 ) -> GlobalSearchResponse:
     audit.info("api.search", query=q, limit=limit)
     result = await service.search(q=q, limit=limit)

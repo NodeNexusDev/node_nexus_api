@@ -3,9 +3,9 @@
 import uuid
 
 from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, HTTPException, Security, status
 
-from app.api.deps import get_current_api_key
+from app.api.deps import Principal, get_current_principal
 from app.application.ports.audit_outbox_controller import AuditOutboxController
 from app.application.ports.schedule import JobSchedulerPort, ScheduleReader
 from app.application.services.scheduled_script_executor import ScheduledScriptExecutor
@@ -23,7 +23,7 @@ router = APIRouter(
 @inject
 async def pause_background_tasks(
     audit_worker: FromDishka[AuditOutboxController],
-    _api_key: str = Depends(get_current_api_key),
+    _api_key: Principal = Security(get_current_principal),
 ) -> dict[str, str]:
     """Pause audit outbox worker for clean E2E DB truncation."""
     await audit_worker.stop()
@@ -34,7 +34,7 @@ async def pause_background_tasks(
 @inject
 async def resume_background_tasks(
     audit_worker: FromDishka[AuditOutboxController],
-    _api_key: str = Depends(get_current_api_key),
+    _api_key: Principal = Security(get_current_principal),
 ) -> dict[str, str]:
     """Resume audit outbox worker after E2E DB truncation."""
     audit_worker.start()
@@ -49,7 +49,7 @@ async def trigger_scheduled_script_now(
     schedule_reader: FromDishka[ScheduleReader],
     executor: FromDishka[ScheduledScriptExecutor],
     settings: FromDishka[Settings],
-    _api_key: str = Depends(get_current_api_key),
+    _api_key: Principal = Security(get_current_principal),
 ) -> dict[str, str]:
     """Immediately execute a scheduled script for E2E verification.
 
