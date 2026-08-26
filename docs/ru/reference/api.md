@@ -2,7 +2,7 @@
 title: HTTP API
 status: stable
 translation_key: reference.api
-source_routing: "2026-08-26"
+source_revision: "2026-08-26"
 ---
 
 # HTTP API
