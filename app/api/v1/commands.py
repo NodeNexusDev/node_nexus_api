@@ -504,6 +504,7 @@ async def clone_command(
     new_name: str | None = Query(None),
     _key: str = Security(require_write_scope),
 ) -> CommandResponse:
+    """Clone a command template."""
     audit.info("api.commands.clone", command_id=str(command_id))
     cloned = await service.clone_command(command_id, new_name=new_name)
     return _command_response(cloned)

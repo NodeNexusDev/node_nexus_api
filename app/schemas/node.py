@@ -6,7 +6,7 @@ from typing import Any, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from app.schemas.common import PaginatedResponse
+from app.schemas.common import CursorPage, PaginatedResponse
 
 ConnectionType = Literal["ssh", "docker", "proxmox"]
 NodeStatus = Literal["active", "unreachable", "error"]
@@ -18,7 +18,7 @@ class NodeCreate(BaseModel):
     name: str = Field(min_length=1, max_length=255)
     host: str = Field(min_length=1, max_length=255)
     port: int = Field(default=22, ge=1, le=65535)
-    connection_type: ConnectionType
+    connection_type: ConnectionType = "ssh"
     username: str | None = None
     password: str | None = None
     ssh_key: str | None = None
@@ -63,6 +63,14 @@ class NodeResponse(BaseModel):
     tags: list[str]
     created_at: datetime
     updated_at: datetime
+
+
+class NodeOffsetListResponse(PaginatedResponse[NodeResponse]):
+    """Offset-based paginated list of nodes."""
+
+
+class NodeCursorListResponse(CursorPage[NodeResponse]):
+    """Cursor-based paginated list of nodes."""
 
 
 class CommandRequest(BaseModel):

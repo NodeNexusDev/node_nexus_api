@@ -6,6 +6,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.schemas.common import PaginatedResponse
+
 
 class APIKeyCreate(BaseModel):
     """Schema for creating an API key."""
@@ -48,8 +50,5 @@ class APIKeyResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-class APIKeyList(BaseModel):
+class APIKeyList(PaginatedResponse[APIKeyResponse]):
     """Paginated list of API keys."""
-
-    items: list[APIKeyResponse]
-    total: int

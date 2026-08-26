@@ -133,7 +133,39 @@ class ContainerVolumeMount(BaseModel):
     """Bind-mount specification for ``docker create``."""
 
     bind: str = Field(min_length=1, max_length=4096)
-    mode: str = Field(default="rw", pattern="^(rw|ro)$")
+    mode: Literal["rw", "ro"] = Field(default="rw")
+
+
+class DockerActionResponse(BaseModel):
+    """Result of a simple Docker mutation action."""
+
+    status: str
+
+
+class DockerContainerRenameResponse(BaseModel):
+    """Result of renaming a Docker container."""
+
+    status: str
+    new_name: str
+
+
+class DockerNetworkCreateResponse(BaseModel):
+    """Result of creating a Docker network."""
+
+    id: str
+    name: str
+
+
+class DockerVolumeCreateResponse(BaseModel):
+    """Result of creating a Docker volume."""
+
+    name: str
+
+
+class DockerVolumePruneResponse(BaseModel):
+    """Result of pruning Docker volumes."""
+
+    output: str
 
 
 class ContainerCreateRequest(BaseModel):
@@ -345,7 +377,15 @@ class BulkDockerRequest(BaseModel):
     node_tags: list[str] = Field(default_factory=list)
     container_id: str = Field(min_length=1, max_length=255)
     timeout: int | None = Field(default=None, ge=1, le=300)
-    command: str | None = Field(default=None, min_length=1, max_length=4096)
+    command: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=4096,
+        description=(
+            "Command to execute. Required for 'exec' action, "
+            "ignored for start/stop/restart/remove/inspect/logs/stats."
+        ),
+    )
 
     @model_validator(mode="after")
     def _require_targets(self) -> Self:

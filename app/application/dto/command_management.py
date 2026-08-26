@@ -2,9 +2,12 @@
 
 from dataclasses import dataclass, field
 from datetime import datetime
+from typing import Literal
 from uuid import UUID
 
 from app.application.types import JsonValue
+
+ParameterType = Literal["string", "integer", "boolean"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -12,7 +15,7 @@ class CommandParameterDTO:
     """Transport-independent command parameter definition."""
 
     name: str
-    type: str = "string"
+    type: ParameterType = "string"
     required: bool = True
     default: JsonValue = None
     description: str | None = None

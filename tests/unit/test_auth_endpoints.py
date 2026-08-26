@@ -13,6 +13,9 @@ from httpx2 import ASGITransport, AsyncClient
 
 from app.application.dto.user import UserViewDTO
 from app.application.ports.jwt_handler import JWTHandler
+from app.application.services.api_key_authentication import (
+    APIKeyAuthenticationService,
+)
 from app.application.services.auth_service import AuthService
 from app.core.exceptions import (
     DomainError,
@@ -92,6 +95,10 @@ def _create_app(
         @provide(scope=Scope.APP)
         def get_jwt_handler(self) -> JWTHandler:
             return mock_jwt
+
+        @provide(scope=Scope.REQUEST)
+        def get_api_key_service(self) -> APIKeyAuthenticationService:
+            return AsyncMock(spec=APIKeyAuthenticationService)
 
     container = make_async_container(MockProvider())
     setup_dishka(container, app)
