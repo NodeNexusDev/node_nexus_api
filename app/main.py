@@ -103,7 +103,6 @@ def create_app() -> FastAPI:
             {"name": "nodes", "description": "CRUD-операции и SSH-команды для нод"},
             {"name": "commands", "description": "Шаблоны команд с параметрами"},
             {"name": "scripts", "description": "Пайплайны команд для нод"},
-            {"name": "bulk", "description": "Массовые операции над нодами"},
             {"name": "audit", "description": "Просмотр аудит-лога операций"},
             {
                 "name": "docker",
