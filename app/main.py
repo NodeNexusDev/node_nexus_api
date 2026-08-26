@@ -28,6 +28,7 @@ from app.api.middleware import (
 )
 from app.api.v1.api_keys import router as api_keys_router
 from app.api.v1.audit import router as audit_router
+from app.api.v1.auth import router as auth_router
 from app.api.v1.commands import router as commands_router
 from app.api.v1.config import router as config_router
 from app.api.v1.dashboard import router as dashboard_router
@@ -43,6 +44,7 @@ from app.api.v1.notes import router as notes_router
 from app.api.v1.scripts import router as scripts_router
 from app.api.v1.scripts_bulk import router as scripts_bulk_router
 from app.api.v1.search import router as search_router
+from app.api.v1.users import router as users_router
 from app.api.v1.websocket import router as ws_router
 from app.core.config import get_settings
 from app.core.exceptions import DomainError
@@ -213,6 +215,8 @@ def create_app() -> FastAPI:
     app.include_router(search_router, prefix="/api/v1")
     app.include_router(favorites_router, prefix="/api/v1")
     app.include_router(notes_router, prefix="/api/v1")
+    app.include_router(auth_router, prefix="/api/v1")
+    app.include_router(users_router, prefix="/api/v1")
     if settings.E2E_ENABLED:
         app.include_router(internal_router, prefix="/api/v1")
 

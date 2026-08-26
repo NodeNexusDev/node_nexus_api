@@ -123,3 +123,27 @@ class FavoriteNotFoundError(DomainError):
 
 class NoteNotFoundError(DomainError):
     """Raised when a note is not found."""
+
+
+class InvalidCredentialsError(DomainError):
+    """Raised when login credentials are invalid."""
+
+
+class UserNotFoundError(DomainError):
+    """Raised when a user is not found."""
+
+
+class UserAlreadyExistsError(DomainError):
+    """Raised when a user with the given email already exists."""
+
+
+class TokenExpiredError(DomainError):
+    """Raised when a JWT token has expired."""
+
+
+class InvalidTokenError(DomainError):
+    """Raised when a JWT token is invalid."""
+
+
+class InsufficientPermissionsError(DomainError):
+    """Raised when the user lacks required permissions."""

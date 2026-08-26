@@ -65,6 +65,13 @@ class Settings(BaseSettings):
     # E2E test harness endpoints (disable in production)
     E2E_ENABLED: bool = False
 
+    # JWT Authentication
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+    REFRESH_TOKEN_COOKIE_MAX_AGE: int = 60 * 60 * 24 * 7  # 7 days in seconds
+    INITIAL_SUPERUSER_EMAIL: str = ""
+    INITIAL_SUPERUSER_PASSWORD: str = ""
+
 
 @lru_cache
 def get_settings() -> Settings:
