@@ -79,9 +79,11 @@ async def get_current_principal(
                 user_id, claims = _decode_access_token(jwt_handler, token)
                 settings = get_settings()
                 x_api_key_claim = claims.get("x-api-key")
-                if settings.MASTER_API_KEY and isinstance(
-                    x_api_key_claim, str
-                ) and hmac.compare_digest(x_api_key_claim, settings.MASTER_API_KEY):
+                if (
+                    settings.MASTER_API_KEY
+                    and isinstance(x_api_key_claim, str)
+                    and hmac.compare_digest(x_api_key_claim, settings.MASTER_API_KEY)
+                ):
                     audit.info("auth.master_key_used")
                     return Principal(source="jwt", identifier="master")
                 audit.info("auth.jwt_used", user_id=str(user_id))
@@ -165,9 +167,7 @@ async def require_write_or_jwt_scope(
         principal = await api_key_service.authenticate(api_key)
         if principal.scope == "read-only":
             audit.warning("auth.read_only_denied", key_prefix=principal.key_prefix)
-            raise HTTPException(
-                status_code=403, detail="API key has read-only scope"
-            )
+            raise HTTPException(status_code=403, detail="API key has read-only scope")
         audit.info("auth.write_allowed_api_key", key_prefix=principal.key_prefix)
         return Principal(source="api_key", identifier=principal.key_prefix)
 
