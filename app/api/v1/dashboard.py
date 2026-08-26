@@ -8,7 +8,7 @@ import structlog
 from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
 from fastapi import APIRouter, Query, Security
 
-from app.api.deps import get_current_api_key
+from app.api.deps import Principal, get_current_principal
 from app.application.dto.dashboard import (
     DashboardDTO,
 )
@@ -63,7 +63,7 @@ def _to_response(dto: DashboardDTO) -> DashboardResponse:
 @inject
 async def get_dashboard(
     service: FromDishka[DashboardService],
-    _key: str = Security(get_current_api_key),
+    _key: Principal = Security(get_current_principal),
 ) -> DashboardResponse:
     """Get aggregated dashboard overview."""
     audit.info("api.dashboard.get")
@@ -78,7 +78,7 @@ async def get_dashboard_metrics(
     date_from: datetime | None = Query(None),
     date_to: datetime | None = Query(None),
     group_by: Literal["day", "hour", "week", "month"] = Query("day"),
-    _key: str = Security(get_current_api_key),
+    _key: Principal = Security(get_current_principal),
 ) -> DashboardMetricsResponse:
     """Get time-series execution metrics for charts."""
     audit.info(
