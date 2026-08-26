@@ -6,7 +6,11 @@ import structlog
 from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
 from fastapi import APIRouter, Security
 
-from app.api.deps import get_current_api_key, require_write_scope
+from app.api.deps import (
+    Principal,
+    get_current_principal,
+    require_write_or_jwt_scope,
+)
 from app.application.dto.note import NoteCreateDTO, NoteUpdateDTO
 from app.application.services.note_service import NoteService
 from app.schemas.note import NoteCreate, NoteResponse, NoteUpdate
@@ -22,7 +26,7 @@ async def list_notes(
     target_type: str,
     target_id: str,
     service: FromDishka[NoteService],
-    _key: str = Security(get_current_api_key),
+    _key: Principal = Security(get_current_principal),
 ) -> list[NoteResponse]:
     audit.info("api.notes.list", target=target_type + ":" + target_id)
     items = await service.list_notes(target_type, target_id)
@@ -50,7 +54,7 @@ async def create_note(
     target_id: str,
     data: NoteCreate,
     service: FromDishka[NoteService],
-    _key: str = Security(require_write_scope),
+    _key: Principal = Security(require_write_or_jwt_scope),
 ) -> NoteResponse:
     audit.info("api.notes.create", target=target_type + ":" + target_id)
     result = await service.create_note(
@@ -76,7 +80,7 @@ async def update_note(
     note_id: str,
     data: NoteUpdate,
     service: FromDishka[NoteService],
-    _key: str = Security(require_write_scope),
+    _key: Principal = Security(require_write_or_jwt_scope),
 ) -> NoteResponse:
     audit.info("api.notes.update", note_id=note_id)
     result = await service.update_note(note_id, NoteUpdateDTO(content=data.content))
@@ -95,7 +99,7 @@ async def update_note(
 async def delete_note(
     note_id: str,
     service: FromDishka[NoteService],
-    _key: str = Security(require_write_scope),
+    _key: Principal = Security(require_write_or_jwt_scope),
 ) -> None:
     audit.info("api.notes.delete", note_id=note_id)
     await service.delete_note(note_id)

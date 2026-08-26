@@ -2,11 +2,14 @@
 
 import hmac
 import uuid
+from dataclasses import dataclass
+from typing import Literal
 
 import structlog
 from dishka.integrations.fastapi import FromDishka, inject
-from fastapi import HTTPException, Request, Security
+from fastapi import HTTPException, Security
 from fastapi.security import APIKeyHeader
+from starlette.requests import Request
 
 from app.application.ports.jwt_handler import JWTHandler
 from app.application.services.api_key_authentication import (
@@ -25,6 +28,153 @@ def _extract_bearer_token(request: Request) -> str | None:
     if auth_header.startswith("Bearer "):
         return auth_header[7:]
     return None
+
+
+# ── Unified Principal ────────────────────────────────────────────────────────
+
+
+@dataclass(frozen=True, slots=True)
+class Principal:
+    """Unified identity across JWT and API key authentication.
+
+    ``identifier`` is always a plain string suitable for direct storage
+    (JWT user UUID or API key prefix).  ``source`` tells which mechanism was used.
+    """
+
+    source: Literal["jwt", "api_key"]
+    identifier: str
+
+
+# ── Dual-auth principal resolver ─────────────────────────────────────────────
+
+
+@inject
+async def get_current_principal(
+    request: Request,
+    api_key_service: FromDishka[APIKeyAuthenticationService],
+    api_key: str | None = Security(API_KEY_HEADER),
+) -> Principal:
+    """Resolve a :class:`Principal` via JWT first, then API key fallback.
+
+    Priority:
+        1. ``Authorization: Bearer <token>`` → JWT
+        2. ``X-API-Key`` header → API key (including master key shortcut)
+        3. If neither present → 401
+        4. If JWT decode fails but an API key exists → falls back to API key logic
+
+    Returns:
+        Principal with ``source == "jwt"`` or ``"api_key"``.
+        For master keys the identifier is ``"master"`` and source is ``"jwt"``.
+    """
+    token = _extract_bearer_token(request)
+    if token:
+        try:
+            container = request.state.dishka_container
+            jwt_handler: JWTHandler = await container.get(JWTHandler)
+        except Exception:
+            # JWTHandler not registered or container unavailable — skip JWT
+            pass
+        else:
+            try:
+                user_id, claims = _decode_access_token(jwt_handler, token)
+                settings = get_settings()
+                x_api_key_claim = claims.get("x-api-key")
+                if settings.MASTER_API_KEY and isinstance(
+                    x_api_key_claim, str
+                ) and hmac.compare_digest(x_api_key_claim, settings.MASTER_API_KEY):
+                    audit.info("auth.master_key_used")
+                    return Principal(source="jwt", identifier="master")
+                audit.info("auth.jwt_used", user_id=str(user_id))
+                return Principal(source="jwt", identifier=str(user_id))
+            except HTTPException:
+                raise
+            except Exception:
+                # JWT invalid — proceed to API key fallback below
+                pass
+
+    # Fallback: X-API-Key
+    if api_key:
+        settings = get_settings()
+        if settings.MASTER_API_KEY and hmac.compare_digest(
+            api_key, settings.MASTER_API_KEY
+        ):
+            audit.info("auth.master_key_used")
+            return Principal(source="jwt", identifier="master")
+
+        principal = await api_key_service.authenticate(api_key)
+        audit.info("auth.api_key_used", key_prefix=principal.key_prefix)
+        return Principal(source="api_key", identifier=principal.key_prefix)
+
+    raise HTTPException(status_code=401, detail="Not authenticated")
+
+
+# ── Write scope resolver (dual-auth) ─────────────────────────────────────────
+
+
+@inject
+async def require_write_or_jwt_scope(
+    request: Request,
+    api_key_service: FromDishka[APIKeyAuthenticationService],
+    api_key: str | None = Security(API_KEY_HEADER),
+) -> Principal:
+    """Require write authorization for both JWT and API key flows.
+
+    - JWT superuser → accepted
+    - JWT non-superuser → 403
+    - API key with ``read-write`` → accepted
+    - API key with ``read-only`` → 403
+    - No auth → 401
+    - Invalid JWT → still attempts API key fallback
+
+    Returns:
+        The resolved :class:`Principal`.
+    """
+    token = _extract_bearer_token(request)
+    if token:
+        try:
+            container = request.state.dishka_container
+            jwt_handler: JWTHandler = await container.get(JWTHandler)
+        except Exception:
+            # JWTHandler not registered or container unavailable — skip JWT
+            pass
+        else:
+            try:
+                user_id, claims = _decode_access_token(jwt_handler, token)
+                if not claims.get("is_superuser"):
+                    audit.warning("auth.write_denied_jwt_user", user_id=str(user_id))
+                    raise HTTPException(
+                        status_code=403, detail="Superuser privileges required"
+                    )
+                audit.info("auth.write_allowed_superuser", user_id=str(user_id))
+                return Principal(source="jwt", identifier=str(user_id))
+            except HTTPException:
+                raise
+            except Exception:
+                # JWT invalid — proceed to API key fallback below
+                pass
+
+    # Fallback: X-API-Key
+    if api_key:
+        settings = get_settings()
+        if settings.MASTER_API_KEY and hmac.compare_digest(
+            api_key, settings.MASTER_API_KEY
+        ):
+            audit.info("auth.master_key_used")
+            return Principal(source="jwt", identifier="master")
+
+        principal = await api_key_service.authenticate(api_key)
+        if principal.scope == "read-only":
+            audit.warning("auth.read_only_denied", key_prefix=principal.key_prefix)
+            raise HTTPException(
+                status_code=403, detail="API key has read-only scope"
+            )
+        audit.info("auth.write_allowed_api_key", key_prefix=principal.key_prefix)
+        return Principal(source="api_key", identifier=principal.key_prefix)
+
+    raise HTTPException(status_code=401, detail="Not authenticated")
+
+
+# ── Legacy helpers (kept for gradual migration) ──────────────────────────────
 
 
 def _decode_access_token(
@@ -52,11 +202,7 @@ async def get_current_api_key(
     api_key_service: FromDishka[APIKeyAuthenticationService],
     api_key: str | None = Security(API_KEY_HEADER),
 ) -> str:
-    """Validate API key from X-API-Key header.
-
-    Returns:
-        "master" for master key, or the key prefix for DB keys.
-    """
+    """Validate API key from X-API-Key header (legacy)."""
     if not api_key:
         raise HTTPException(status_code=401, detail="Missing X-API-Key header")
 
@@ -76,17 +222,7 @@ async def require_write_scope(
     api_key_service: FromDishka[APIKeyAuthenticationService],
     api_key: str | None = Security(API_KEY_HEADER),
 ) -> str:
-    """Require write scope for the API key.
-
-    Master key always has read-write scope.
-    DB keys must have "read-write" scope to access write endpoints.
-
-    Returns:
-        The API key prefix.
-
-    Raises:
-        HTTPException: 401 if key is missing/invalid, 403 if read-only.
-    """
+    """Require write scope for the API key (legacy)."""
     if not api_key:
         raise HTTPException(status_code=401, detail="Missing X-API-Key header")
 
@@ -112,16 +248,12 @@ async def get_current_user_id(
     jwt_handler: FromDishka[JWTHandler],
     api_key: str | None = Security(APIKeyHeader(name="X-API-Key", auto_error=False)),
 ) -> uuid.UUID:
-    """Extract user ID from JWT token in Authorization header.
-
-    Priority: JWT (Authorization) → API key (X-API-Key) → Master key.
-    """
+    """Extract user ID from JWT token in Authorization header."""
     token = _extract_bearer_token(request)
     if token:
         user_id, _claims = _decode_access_token(jwt_handler, token)
         return user_id
 
-    # Try API key
     if api_key:
         settings = get_settings()
         if settings.MASTER_API_KEY and hmac.compare_digest(
@@ -147,11 +279,7 @@ async def require_superuser(
     jwt_handler: FromDishka[JWTHandler],
     api_key: str | None = Security(APIKeyHeader(name="X-API-Key", auto_error=False)),
 ) -> uuid.UUID:
-    """Require JWT authentication with superuser role.
-
-    Raises:
-        HTTPException: 401 if not authenticated, 403 if not superuser.
-    """
+    """Require JWT authentication with superuser role."""
     token = _extract_bearer_token(request)
     if token:
         user_id, claims = _decode_access_token(jwt_handler, token)
@@ -159,7 +287,6 @@ async def require_superuser(
             raise HTTPException(status_code=403, detail="Superuser privileges required")
         return user_id
 
-    # API key fallback: validate then reject (JWT required for superuser check)
     if api_key:
         settings = get_settings()
         if settings.MASTER_API_KEY and hmac.compare_digest(

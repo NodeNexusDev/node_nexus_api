@@ -4,7 +4,10 @@ import structlog
 from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
 from fastapi import APIRouter, HTTPException, Security
 
-from app.api.deps import require_write_scope
+from app.api.deps import (
+    Principal,
+    require_write_or_jwt_scope,
+)
 from app.application.services.docker.bulk_service import DockerBulkService
 from app.schemas.docker import (
     BulkDockerImageBuildRequest,
@@ -34,7 +37,7 @@ def _bulk_response(result: object) -> BulkDockerResponse:
 async def bulk_start_containers(
     data: BulkDockerRequest,
     service: FromDishka[DockerBulkService],
-    _key: str = Security(require_write_scope),
+    _key: Principal = Security(require_write_or_jwt_scope),
 ) -> BulkDockerResponse:
     """Start containers on multiple nodes."""
     audit.info(
@@ -56,7 +59,7 @@ async def bulk_start_containers(
 async def bulk_stop_containers(
     data: BulkDockerRequest,
     service: FromDishka[DockerBulkService],
-    _key: str = Security(require_write_scope),
+    _key: Principal = Security(require_write_or_jwt_scope),
 ) -> BulkDockerResponse:
     """Stop containers on multiple nodes."""
     audit.info(
@@ -79,7 +82,7 @@ async def bulk_stop_containers(
 async def bulk_restart_containers(
     data: BulkDockerRequest,
     service: FromDishka[DockerBulkService],
-    _key: str = Security(require_write_scope),
+    _key: Principal = Security(require_write_or_jwt_scope),
 ) -> BulkDockerResponse:
     """Restart containers on multiple nodes."""
     audit.info(
@@ -102,7 +105,7 @@ async def bulk_restart_containers(
 async def bulk_remove_containers(
     data: BulkDockerRequest,
     service: FromDishka[DockerBulkService],
-    _key: str = Security(require_write_scope),
+    _key: Principal = Security(require_write_or_jwt_scope),
 ) -> BulkDockerResponse:
     """Remove containers on multiple nodes."""
     audit.info(
@@ -124,7 +127,7 @@ async def bulk_remove_containers(
 async def bulk_exec_in_containers(
     data: BulkDockerRequest,
     service: FromDishka[DockerBulkService],
-    _key: str = Security(require_write_scope),
+    _key: Principal = Security(require_write_or_jwt_scope),
 ) -> BulkDockerResponse:
     """Execute a command in containers on multiple nodes."""
     if not data.command:
@@ -149,7 +152,7 @@ async def bulk_exec_in_containers(
 async def bulk_pull_images(
     data: BulkDockerPullRequest,
     service: FromDishka[DockerBulkService],
-    _key: str = Security(require_write_scope),
+    _key: Principal = Security(require_write_or_jwt_scope),
 ) -> BulkDockerPullResponse:
     """Pull Docker images on multiple nodes."""
     audit.info(
@@ -186,7 +189,7 @@ async def bulk_pull_images(
 async def bulk_remove_images(
     data: BulkDockerImageRemoveRequest,
     service: FromDishka[DockerBulkService],
-    _key: str = Security(require_write_scope),
+    _key: Principal = Security(require_write_or_jwt_scope),
 ) -> BulkDockerImageRemoveResponse:
     """Remove Docker images on multiple nodes."""
     audit.info(
@@ -222,7 +225,7 @@ async def bulk_remove_images(
 async def bulk_build_images(
     data: BulkDockerImageBuildRequest,
     service: FromDishka[DockerBulkService],
-    _key: str = Security(require_write_scope),
+    _key: Principal = Security(require_write_or_jwt_scope),
 ) -> BulkDockerImageBuildResponse:
     """Build Docker images on multiple nodes."""
     audit.info(
@@ -265,7 +268,7 @@ async def bulk_build_images(
 async def bulk_inspect_containers(
     data: BulkDockerRequest,
     service: FromDishka[DockerBulkService],
-    _key: str = Security(require_write_scope),
+    _key: Principal = Security(require_write_or_jwt_scope),
 ) -> BulkDockerResponse:
     """Inspect a container on multiple nodes."""
     audit.info(
@@ -287,7 +290,7 @@ async def bulk_inspect_containers(
 async def bulk_logs_containers(
     data: BulkDockerRequest,
     service: FromDishka[DockerBulkService],
-    _key: str = Security(require_write_scope),
+    _key: Principal = Security(require_write_or_jwt_scope),
 ) -> BulkDockerResponse:
     """Get logs from a container on multiple nodes."""
     audit.info(
@@ -309,7 +312,7 @@ async def bulk_logs_containers(
 async def bulk_stats_containers(
     data: BulkDockerRequest,
     service: FromDishka[DockerBulkService],
-    _key: str = Security(require_write_scope),
+    _key: Principal = Security(require_write_or_jwt_scope),
 ) -> BulkDockerResponse:
     """Get stats from a container on multiple nodes."""
     audit.info(

@@ -9,7 +9,11 @@ import structlog
 from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
 from fastapi import APIRouter, Query, Security
 
-from app.api.deps import get_current_api_key, require_write_scope
+from app.api.deps import (
+    Principal,
+    get_current_principal,
+    require_write_or_jwt_scope,
+)
 from app.application.dto.command_execution import (
     BulkCommandRequestDTO,
     CommandRequestDTO,
@@ -105,7 +109,7 @@ async def get_commands(
     size: int = Query(20, ge=1, le=100),
     tag: str | None = Query(None, description="Filter by tag (AND)"),
     search: str | None = Query(None, description="Search by name or description"),
-    _key: str = Security(get_current_api_key),
+    _key: Principal = Security(get_current_principal),
 ) -> PaginatedResponse[CommandResponse]:
     """Get all commands with pagination and optional search."""
     tag_list = [t.strip() for t in tag.split(",")] if tag else None
@@ -134,7 +138,7 @@ async def get_commands(
 @inject
 async def get_command_tags(
     service: FromDishka[CommandManagementService],
-    _key: str = Security(get_current_api_key),
+    _key: Principal = Security(get_current_principal),
 ) -> list[str]:
     """Get all unique tags across all command templates."""
     audit.info("api.commands.tags.list")
@@ -149,7 +153,7 @@ async def get_command_tags(
 async def execute_raw_command(
     data: CommandExecuteRawRequest,
     service: FromDishka[NodeCommandService],
-    _key: str = Security(require_write_scope),
+    _key: Principal = Security(require_write_or_jwt_scope),
 ) -> CommandResult:
     """Execute a raw command on a node via SSH."""
     audit.info("api.commands.execute", node_id=str(data.node_id), command=data.command)
@@ -171,7 +175,7 @@ async def get_command_history(
     service: FromDishka[ExecutionHistoryService],
     page: int = Query(1, ge=1),
     size: int = Query(20, ge=1, le=100),
-    _key: str = Security(get_current_api_key),
+    _key: Principal = Security(get_current_principal),
 ) -> PaginatedResponse[CommandHistoryResponse]:
     """Get command execution history, optionally filtered by node."""
     audit.info("api.commands.history", node_id=str(node_id), page=page, size=size)
@@ -206,7 +210,7 @@ async def get_node_command_stats(
     stats_service: FromDishka[ExecutionStatsService],
     date_from: datetime | None = Query(None),
     date_to: datetime | None = Query(None),
-    _key: str = Security(get_current_api_key),
+    _key: Principal = Security(get_current_principal),
 ) -> ExecutionStatsResponse:
     """Get aggregated command execution stats for a node."""
     audit.info("api.commands.stats", node_id=str(node_id))
@@ -224,7 +228,7 @@ async def get_node_command_stats(
 async def retry_command(
     execution_id: uuid.UUID,
     service: FromDishka[ExecutionLifecycleService],
-    _key: str = Security(require_write_scope),
+    _key: Principal = Security(require_write_or_jwt_scope),
 ) -> ExecutionRetryResponse:
     """Retry a command execution."""
     audit.info("api.commands.executions.retry", execution_id=str(execution_id))
@@ -244,7 +248,7 @@ async def retry_command(
 async def bulk_execute_raw_command(
     data: BulkCommandRequest,
     service: FromDishka[NodeBulkCommandService],
-    _key: str = Security(require_write_scope),
+    _key: Principal = Security(require_write_or_jwt_scope),
 ) -> BulkCommandResult:
     """Execute a raw command on multiple nodes by IDs and/or tags."""
     audit.info(
@@ -283,7 +287,7 @@ async def bulk_execute_raw_command(
 async def get_bulk_command_history(
     batch_id: Annotated[uuid.UUID, Query(description="Batch ID to retrieve")],
     service: FromDishka[ExecutionHistoryService],
-    _key: str = Security(get_current_api_key),
+    _key: Principal = Security(get_current_principal),
     page: Annotated[int, Query(ge=1)] = 1,
     size: Annotated[int, Query(ge=1, le=100)] = 20,
 ) -> BulkCommandHistoryResponse:
@@ -308,7 +312,7 @@ async def get_bulk_command_history(
 async def bulk_retry_commands(
     data: BulkRetryCommandRequest,
     service: FromDishka[ExecutionLifecycleService],
-    _key: str = Security(require_write_scope),
+    _key: Principal = Security(require_write_or_jwt_scope),
 ) -> BulkRetryCommandResponse:
     """Retry multiple command executions."""
     audit.info(
@@ -344,7 +348,7 @@ async def bulk_retry_commands(
 async def bulk_cancel_commands(
     data: BulkCancelCommandRequest,
     service: FromDishka[ExecutionLifecycleService],
-    _key: str = Security(require_write_scope),
+    _key: Principal = Security(require_write_or_jwt_scope),
 ) -> BulkCancelCommandResponse:
     """Cancel multiple running command executions."""
     audit.info(
@@ -388,7 +392,7 @@ async def bulk_cancel_commands(
 async def get_command(
     command_id: uuid.UUID,
     service: FromDishka[CommandManagementService],
-    _key: str = Security(get_current_api_key),
+    _key: Principal = Security(get_current_principal),
 ) -> CommandResponse:
     """Get a command by ID."""
     audit.info("api.commands.get", command_id=str(command_id))
@@ -400,7 +404,7 @@ async def get_command(
 async def create_command(
     data: CommandCreate,
     service: FromDishka[CommandManagementService],
-    _key: str = Security(require_write_scope),
+    _key: Principal = Security(require_write_or_jwt_scope),
 ) -> CommandResponse:
     """Create a new command template."""
     audit.info("api.commands.create", name=data.name)
@@ -422,7 +426,7 @@ async def update_command(
     command_id: uuid.UUID,
     data: CommandUpdate,
     service: FromDishka[CommandManagementService],
-    _key: str = Security(require_write_scope),
+    _key: Principal = Security(require_write_or_jwt_scope),
 ) -> CommandResponse:
     """Update an existing command template."""
     audit.info("api.commands.update", command_id=str(command_id))
@@ -445,7 +449,7 @@ async def update_command(
 async def delete_command(
     command_id: uuid.UUID,
     service: FromDishka[CommandManagementService],
-    _key: str = Security(require_write_scope),
+    _key: Principal = Security(require_write_or_jwt_scope),
 ) -> None:
     """Delete a command template."""
     audit.info("api.commands.delete", command_id=str(command_id))
@@ -458,7 +462,7 @@ async def execute_command(
     command_id: uuid.UUID,
     data: CommandExecuteRequest,
     service: FromDishka[CommandExecutionService],
-    _key: str = Security(require_write_scope),
+    _key: Principal = Security(require_write_or_jwt_scope),
 ) -> CommandResult:
     """Execute a command template on a node."""
     audit.info(
@@ -487,7 +491,7 @@ async def get_command_stats(
     stats_service: FromDishka[ExecutionStatsService],
     date_from: datetime | None = Query(None),
     date_to: datetime | None = Query(None),
-    _key: str = Security(get_current_api_key),
+    _key: Principal = Security(get_current_principal),
 ) -> ExecutionStatsResponse:
     audit.info("api.commands.stats", command_id=str(command_id))
     stats = await stats_service.get_command_stats(
@@ -502,7 +506,7 @@ async def clone_command(
     command_id: uuid.UUID,
     service: FromDishka[CommandManagementService],
     new_name: str | None = Query(None),
-    _key: str = Security(require_write_scope),
+    _key: Principal = Security(require_write_or_jwt_scope),
 ) -> CommandResponse:
     """Clone a command template."""
     audit.info("api.commands.clone", command_id=str(command_id))
@@ -517,7 +521,7 @@ async def bulk_execute_command(
     data: BulkCommandRequest,
     service: FromDishka[CommandManagementService],
     bulk_service: FromDishka[NodeBulkCommandService],
-    _key: str = Security(require_write_scope),
+    _key: Principal = Security(require_write_or_jwt_scope),
 ) -> BulkCommandResult:
     """Execute a command template on multiple nodes in parallel."""
     audit.info(

@@ -7,7 +7,11 @@ import structlog
 from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
 from fastapi import APIRouter, Query, Security, status
 
-from app.api.deps import get_current_api_key, require_write_scope
+from app.api.deps import (
+    Principal,
+    get_current_principal,
+    require_write_or_jwt_scope,
+)
 from app.application.dto.docker import (
     ContainerCreateRequestDTO,
     ContainerRenameRequestDTO,
@@ -79,7 +83,7 @@ async def create_container(
     node_id: uuid.UUID,
     data: ContainerCreateRequest,
     service: FromDishka[DockerContainerService],
-    _key: str = Security(require_write_scope),
+    _key: Principal = Security(require_write_or_jwt_scope),
 ) -> ContainerCreatedResponse:
     """Create a container on a Docker node via ``docker create``."""
     audit.info(
@@ -110,7 +114,7 @@ async def list_containers(
     node_id: uuid.UUID,
     service: FromDishka[DockerContainerService],
     all: bool = Query(False, description="Show stopped containers"),
-    _key: str = Security(get_current_api_key),
+    _key: Principal = Security(get_current_principal),
 ) -> list[DockerContainer]:
     """List containers on a Docker node."""
     audit.info("api.docker.containers.list", node_id=str(node_id), all=all)
@@ -126,7 +130,7 @@ async def get_container(
     node_id: uuid.UUID,
     container_id: str,
     service: FromDishka[DockerContainerService],
-    _key: str = Security(get_current_api_key),
+    _key: Principal = Security(get_current_principal),
 ) -> DockerContainerInspect:
     """Get container details."""
     validated_id = validate_container_id(container_id)
@@ -145,7 +149,7 @@ async def start_container(
     node_id: uuid.UUID,
     container_id: str,
     service: FromDishka[DockerContainerService],
-    _key: str = Security(require_write_scope),
+    _key: Principal = Security(require_write_or_jwt_scope),
 ) -> None:
     """Start a container."""
     validated_id = validate_container_id(container_id)
@@ -162,7 +166,7 @@ async def stop_container(
     container_id: str,
     service: FromDishka[DockerContainerService],
     timeout: int = Query(10, ge=1, le=300),
-    _key: str = Security(require_write_scope),
+    _key: Principal = Security(require_write_or_jwt_scope),
 ) -> None:
     """Stop a container."""
     validated_id = validate_container_id(container_id)
@@ -179,7 +183,7 @@ async def restart_container(
     container_id: str,
     service: FromDishka[DockerContainerService],
     timeout: int = Query(10, ge=1, le=300),
-    _key: str = Security(require_write_scope),
+    _key: Principal = Security(require_write_or_jwt_scope),
 ) -> None:
     """Restart a container."""
     validated_id = validate_container_id(container_id)
@@ -196,7 +200,7 @@ async def remove_container(
     container_id: str,
     service: FromDishka[DockerContainerService],
     force: bool = Query(False),
-    _key: str = Security(require_write_scope),
+    _key: Principal = Security(require_write_or_jwt_scope),
 ) -> None:
     """Remove a container."""
     validated_id = validate_container_id(container_id)
@@ -214,7 +218,7 @@ async def get_logs(
     service: FromDishka[DockerContainerService],
     tail: int = Query(100, ge=1, le=10000),
     since: str | None = Query(None),
-    _key: str = Security(get_current_api_key),
+    _key: Principal = Security(get_current_principal),
 ) -> str:
     """Get container logs."""
     validated_id = validate_container_id(container_id)
@@ -231,7 +235,7 @@ async def exec_command(
     container_id: str,
     data: DockerExecRequest,
     service: FromDishka[DockerContainerService],
-    _key: str = Security(require_write_scope),
+    _key: Principal = Security(require_write_or_jwt_scope),
 ) -> DockerExecResult:
     """Execute a command in a container."""
     validated_id = validate_container_id(container_id)
@@ -256,7 +260,7 @@ async def pause_container(
     node_id: uuid.UUID,
     container_id: str,
     service: FromDishka[DockerContainerService],
-    _key: str = Security(require_write_scope),
+    _key: Principal = Security(require_write_or_jwt_scope),
 ) -> DockerActionResponse:
     """Pause a running container."""
     validated_id = validate_container_id(container_id)
@@ -275,7 +279,7 @@ async def unpause_container(
     node_id: uuid.UUID,
     container_id: str,
     service: FromDishka[DockerContainerService],
-    _key: str = Security(require_write_scope),
+    _key: Principal = Security(require_write_or_jwt_scope),
 ) -> DockerActionResponse:
     """Unpause a paused container."""
     validated_id = validate_container_id(container_id)
@@ -298,7 +302,7 @@ async def rename_container(
     container_id: str,
     data: ContainerRenameRequest,
     service: FromDishka[DockerContainerService],
-    _key: str = Security(require_write_scope),
+    _key: Principal = Security(require_write_or_jwt_scope),
 ) -> DockerContainerRenameResponse:
     """Rename a container."""
     validated_id = validate_container_id(container_id)
@@ -325,7 +329,7 @@ async def top_container(
     node_id: uuid.UUID,
     container_id: str,
     service: FromDishka[DockerContainerService],
-    _key: str = Security(get_current_api_key),
+    _key: Principal = Security(get_current_principal),
 ) -> DockerTopResult:
     """List processes running inside a container."""
     validated_id = validate_container_id(container_id)
@@ -346,7 +350,7 @@ async def top_container(
 async def list_images(
     node_id: uuid.UUID,
     service: FromDishka[DockerImageService],
-    _key: str = Security(get_current_api_key),
+    _key: Principal = Security(get_current_principal),
 ) -> list[DockerImage]:
     """List images on a Docker node."""
     audit.info("api.docker.images.list", node_id=str(node_id))
@@ -362,7 +366,7 @@ async def pull_image(
     node_id: uuid.UUID,
     data: DockerImagePullRequest,
     service: FromDishka[DockerImageService],
-    _key: str = Security(require_write_scope),
+    _key: Principal = Security(require_write_or_jwt_scope),
 ) -> DockerPullResult:
     """Pull a Docker image."""
     audit.info("api.docker.images.pull", node_id=str(node_id), image=data.image)
@@ -376,7 +380,7 @@ async def build_image(
     node_id: uuid.UUID,
     data: DockerImageBuildRequest,
     service: FromDishka[DockerImageService],
-    _key: str = Security(require_write_scope),
+    _key: Principal = Security(require_write_or_jwt_scope),
 ) -> DockerImageBuildResponse:
     """Build a Docker image from a Dockerfile piped through stdin."""
     audit.info(
@@ -402,7 +406,7 @@ async def inspect_image(
     node_id: uuid.UUID,
     image_id: str,
     service: FromDishka[DockerImageService],
-    _key: str = Security(get_current_api_key),
+    _key: Principal = Security(get_current_principal),
 ) -> DockerImageInspectResponse:
     """Inspect a Docker image."""
     audit.info("api.docker.images.inspect", node_id=str(node_id), image_id=image_id)
@@ -416,7 +420,7 @@ async def remove_image(
     node_id: uuid.UUID,
     image_id: str,
     service: FromDishka[DockerImageService],
-    _key: str = Security(require_write_scope),
+    _key: Principal = Security(require_write_or_jwt_scope),
 ) -> None:
     """Remove a Docker image."""
     audit.info("api.docker.images.remove", node_id=str(node_id), image_id=image_id)
@@ -430,7 +434,7 @@ async def tag_image(
     image_id: str,
     data: DockerImageTagRequest,
     service: FromDishka[DockerImageService],
-    _key: str = Security(require_write_scope),
+    _key: Principal = Security(require_write_or_jwt_scope),
 ) -> DockerImageTagResponse:
     """Tag a Docker image."""
     audit.info(
@@ -453,7 +457,7 @@ async def get_stats(
     node_id: uuid.UUID,
     container_id: str,
     service: FromDishka[DockerContainerService],
-    _key: str = Security(get_current_api_key),
+    _key: Principal = Security(get_current_principal),
 ) -> DockerStats:
     """Get container stats."""
     validated_id = validate_container_id(container_id)
@@ -469,7 +473,7 @@ async def get_stats(
 async def list_networks(
     node_id: uuid.UUID,
     service: FromDishka[DockerResourceService],
-    _key: str = Security(get_current_api_key),
+    _key: Principal = Security(get_current_principal),
 ) -> list[DockerNetwork]:
     """List Docker networks."""
     audit.info("api.docker.networks.list", node_id=str(node_id))
@@ -484,7 +488,7 @@ async def list_networks(
 async def list_volumes(
     node_id: uuid.UUID,
     service: FromDishka[DockerResourceService],
-    _key: str = Security(get_current_api_key),
+    _key: Principal = Security(get_current_principal),
 ) -> list[DockerVolume]:
     """List Docker volumes."""
     audit.info("api.docker.volumes.list", node_id=str(node_id))
@@ -507,7 +511,7 @@ async def create_network(
     node_id: uuid.UUID,
     data: NetworkCreateRequest,
     service: FromDishka[DockerResourceService],
-    _key: str = Security(require_write_scope),
+    _key: Principal = Security(require_write_or_jwt_scope),
 ) -> DockerNetworkCreateResponse:
     """Create a Docker network."""
     audit.info("api.docker.networks.create", node_id=str(node_id), name=data.name)
@@ -529,7 +533,7 @@ async def inspect_network(
     node_id: uuid.UUID,
     network_id: str,
     service: FromDishka[DockerResourceService],
-    _key: str = Security(get_current_api_key),
+    _key: Principal = Security(get_current_principal),
 ) -> NetworkInspectResponse:
     """Inspect a Docker network."""
     validated_id = validate_container_id(network_id)
@@ -562,7 +566,7 @@ async def remove_network(
     node_id: uuid.UUID,
     network_id: str,
     service: FromDishka[DockerResourceService],
-    _key: str = Security(require_write_scope),
+    _key: Principal = Security(require_write_or_jwt_scope),
 ) -> None:
     """Remove a Docker network."""
     validated_id = validate_container_id(network_id)
@@ -581,7 +585,7 @@ async def connect_to_network(
     network_id: str,
     data: NetworkConnectRequest,
     service: FromDishka[DockerResourceService],
-    _key: str = Security(require_write_scope),
+    _key: Principal = Security(require_write_or_jwt_scope),
 ) -> DockerActionResponse:
     """Connect a container to a network."""
     validated_id = validate_container_id(network_id)
@@ -609,7 +613,7 @@ async def disconnect_from_network(
     network_id: str,
     data: NetworkDisconnectRequest,
     service: FromDishka[DockerResourceService],
-    _key: str = Security(require_write_scope),
+    _key: Principal = Security(require_write_or_jwt_scope),
 ) -> DockerActionResponse:
     """Disconnect a container from a network."""
     validated_id = validate_container_id(network_id)
@@ -643,7 +647,7 @@ async def create_volume(
     node_id: uuid.UUID,
     data: VolumeCreateRequest,
     service: FromDishka[DockerResourceService],
-    _key: str = Security(require_write_scope),
+    _key: Principal = Security(require_write_or_jwt_scope),
 ) -> DockerVolumeCreateResponse:
     """Create a Docker volume."""
     audit.info("api.docker.volumes.create", node_id=str(node_id))
@@ -663,7 +667,7 @@ async def inspect_volume(
     node_id: uuid.UUID,
     volume_name: str,
     service: FromDishka[DockerResourceService],
-    _key: str = Security(get_current_api_key),
+    _key: Principal = Security(get_current_principal),
 ) -> VolumeInspectResponse:
     """Inspect a Docker volume."""
     validated_name = validate_volume_name(volume_name)
@@ -683,7 +687,7 @@ async def remove_volume(
     node_id: uuid.UUID,
     volume_name: str,
     service: FromDishka[DockerResourceService],
-    _key: str = Security(require_write_scope),
+    _key: Principal = Security(require_write_or_jwt_scope),
 ) -> None:
     """Remove a Docker volume."""
     validated_name = validate_volume_name(volume_name)
@@ -696,7 +700,7 @@ async def remove_volume(
 async def prune_volumes(
     node_id: uuid.UUID,
     service: FromDishka[DockerResourceService],
-    _key: str = Security(require_write_scope),
+    _key: Principal = Security(require_write_or_jwt_scope),
 ) -> DockerVolumePruneResponse:
     """Prune unused Docker volumes."""
     audit.info("api.docker.volumes.prune", node_id=str(node_id))
@@ -712,7 +716,7 @@ async def prune_volumes(
 async def system_info(
     node_id: uuid.UUID,
     service: FromDishka[DockerSystemService],
-    _key: str = Security(get_current_api_key),
+    _key: Principal = Security(get_current_principal),
 ) -> DockerSystemInfo:
     """Return Docker system information."""
     audit.info("api.docker.system.info", node_id=str(node_id))
@@ -725,7 +729,7 @@ async def system_info(
 async def system_df(
     node_id: uuid.UUID,
     service: FromDishka[DockerSystemService],
-    _key: str = Security(get_current_api_key),
+    _key: Principal = Security(get_current_principal),
 ) -> list[DockerSystemDfItem]:
     """Return Docker disk usage."""
     audit.info("api.docker.system.df", node_id=str(node_id))
@@ -738,7 +742,7 @@ async def system_df(
 async def prune_containers(
     node_id: uuid.UUID,
     service: FromDishka[DockerSystemService],
-    _key: str = Security(require_write_scope),
+    _key: Principal = Security(require_write_or_jwt_scope),
 ) -> DockerPruneResponse:
     """Prune stopped containers."""
     audit.info("api.docker.containers.prune", node_id=str(node_id))
@@ -754,7 +758,7 @@ async def prune_containers(
 async def prune_images(
     node_id: uuid.UUID,
     service: FromDishka[DockerSystemService],
-    _key: str = Security(require_write_scope),
+    _key: Principal = Security(require_write_or_jwt_scope),
 ) -> DockerPruneResponse:
     """Prune unused images."""
     audit.info("api.docker.images.prune", node_id=str(node_id))
