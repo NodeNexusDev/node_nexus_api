@@ -26,14 +26,19 @@ Endpoints that require superuser privileges (`/api/v1/users/*`) check the JWT
 is required.
 
 SSH passwords and private keys are encrypted at rest using a key derived from
-`SECRET_KEY` and `ENCRYPTION_SALT`. The salt defaults to empty (acceptable for
-dev/test); production deployments must set it via `.env`. New ciphertext uses the
-`enc:v1:` envelope and decryption fails closed; a prefixed or legacy-shaped
+`SECRET_KEY` and `ENCRYPTION_SALT`. Production startup requires at least 32
+characters for the secret and 16 for the salt. Weaker test credentials are only
+accepted when `ENVIRONMENT` is explicitly `development` or `test`. New
+ciphertext uses the `enc:v1:` envelope and decryption fails closed; a prefixed or legacy-shaped
 ciphertext is never reused as a password after a cryptographic error.
 
 SSH host-key verification is strict by default. Generate `known_hosts` through
 a trusted channel, mount it read-only, and set `SSH_KNOWN_HOSTS_PATH`.
 `SSH_STRICT_HOST_KEY_CHECKING=false` is reserved for isolated tests.
+
+Non-streaming SSH output is drained through bounded buffers before it reaches
+application services. Infrastructure exceptions are exposed through stable
+public messages; raw remote stderr is not returned as an HTTP error detail.
 
 Trust boundaries exist at HTTP clients, the database, SSH hosts, Docker daemons,
 and telemetry exporters. Validate all boundary input, use parameterized

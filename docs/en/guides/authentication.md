@@ -125,8 +125,12 @@ users are created via `POST /api/v1/users/` by an existing superuser.
 When a request includes both `X-API-Key` and `Authorization: Bearer`, the
 security dependency checks in this order:
 
-1. **Bearer token** — if present, JWT claims are used for authorization
-2. **API key** — fallback for programmatic access
+1. **Bearer token** — if present, JWT claims are used for authorization; an
+   invalid token fails closed with `401`
+2. **API key** — used only when the Bearer header is absent
+
+The server never hides an invalid Bearer token by falling back to a second
+credential supplied in the same request.
 
 For superuser endpoints (`/api/v1/users/*`), only JWT is accepted. API keys
 are rejected with `401`.
