@@ -1,0 +1,28 @@
+version: 2
+
+updates:
+  - package-ecosystem: docker
+    directory: "/"
+    target-branch: dev
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Moscow
+    groups:
+      docker-images:
+        patterns:
+          - "*"
+
+  - package-ecosystem: docker
+    directory: "/tests"
+    target-branch: dev
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Moscow
+    groups:
+      docker-test-images:
+        patterns:
+          - "*"
