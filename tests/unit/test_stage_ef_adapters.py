@@ -799,7 +799,7 @@ class TestExecutionLifecycleGateway:
             assert result is True
 
     @pytest.mark.asyncio
-    async def test_cancel_script_execution_completed(self) -> None:
+    async def test_cancel_script_execution_succeeded(self) -> None:
         session = AsyncMock()
         session_ctx = AsyncMock()
         session_ctx.__aenter__.return_value = session
@@ -816,7 +816,7 @@ class TestExecutionLifecycleGateway:
         cmd_repo.get_by_id = AsyncMock(return_value=None)
         script_repo = MagicMock()
         script_model = MagicMock()
-        script_model.status = "completed"
+        script_model.status = "success"
         script_repo.get_by_id = AsyncMock(return_value=script_model)
 
         with (

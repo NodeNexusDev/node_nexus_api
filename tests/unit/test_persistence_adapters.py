@@ -118,7 +118,7 @@ async def test_execution_writer_commits_short_transactions() -> None:
     ):
         writer = ScopedScriptExecutionWriter(boundary)
         assert await writer.create_execution({"script_id": uuid4()}) == execution_id
-        await writer.update_execution(execution_id, {"status": "completed"})
+        await writer.update_execution(execution_id, {"status": "success"})
     repository.update.assert_awaited_once()
     assert boundary.transaction_entries == 2
     assert boundary.transaction_exits == 2

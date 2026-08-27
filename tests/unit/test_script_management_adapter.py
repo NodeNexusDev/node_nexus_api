@@ -203,7 +203,22 @@ async def test_list_executions_maps_history_page() -> None:
         )
 
     assert result.total == 1
+    assert result.items[0].status == "success"
     assert result.items[0].steps[0].stdout == "ok"
     repository.get_by_script_id.assert_awaited_once_with(
         execution.script_id, skip=20, limit=10, trigger=None
     )
+
+
+def test_execution_mapping_normalizes_legacy_terminal_statuses() -> None:
+    now = datetime.now(UTC)
+    execution = ScriptExecutionModel(
+        id=uuid.uuid4(),
+        script_id=uuid.uuid4(),
+        status="completed",
+        started_at=now,
+    )
+
+    result = SqlAlchemyScriptGateway._to_execution(execution)
+
+    assert result.status == "success"

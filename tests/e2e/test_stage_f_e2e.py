@@ -202,7 +202,10 @@ class TestExecutionStats:
         resp = e2e_client.get(f"/api/v1/commands/{cmd['id']}/stats")
         assert resp.status_code == 200
         stats = resp.json()
-        assert stats["total"] >= 1
+        assert stats["total"] == 1
+        assert stats["successful"] == 1
+        assert stats["failed"] == 0
+        assert stats["success_rate"] == 1.0
         assert stats["successful"] >= 0
 
     def test_node_stats(self, e2e_client: httpx.Client, e2e_resources) -> None:
@@ -295,16 +298,23 @@ class TestDashboardMetrics:
         # Execute something to generate metrics
         node = e2e_resources.create_ssh_node()
         cmd = e2e_resources.create_command()
+        script = e2e_resources.create_script()
         e2e_client.post(
             f"/api/v1/commands/{cmd['id']}/execute",
             json={"node_id": node["id"]},
         )
+        script_resp = e2e_client.post(
+            f"/api/v1/scripts/{script['id']}/execute",
+            json={"node_ids": [node["id"]]},
+        )
+        assert script_resp.status_code == 200
 
         resp = e2e_client.get("/api/v1/dashboard/metrics")
         assert resp.status_code == 200
         data = resp.json()
         assert "command_metrics" in data
         assert "script_metrics" in data
+        assert sum(bucket["successful"] for bucket in data["script_metrics"]) >= 1
 
 
 # ── Audit Export ─────────────────────────────────────────────────────────────

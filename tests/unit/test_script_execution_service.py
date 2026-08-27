@@ -297,6 +297,45 @@ async def test_run_remote_with_resolution_error_records_stderr() -> None:
 
 
 @pytest.mark.asyncio
+async def test_run_remote_continue_keeps_running_but_marks_result_as_error() -> None:
+    """A failed continue step must not turn the overall result into success."""
+    connector = AsyncMock()
+    connector.execute_command.side_effect = [
+        ("", "first failed", 1),
+        ("second ran", "", 0),
+    ]
+    service = _make_service_for_resolve(connector=connector)
+    from app.application.dto.script_execution import (
+        ResolvedScriptStepDTO,
+        ScriptExecutionTargetDTO,
+    )
+
+    target = ScriptExecutionTargetDTO(
+        execution_id=uuid.uuid4(),
+        script_id=uuid.uuid4(),
+        node=_node(uuid.uuid4()),
+        steps=(
+            ResolvedScriptStepDTO(
+                label="first",
+                command="false",
+                on_failure="continue",
+            ),
+            ResolvedScriptStepDTO(
+                label="second",
+                command="echo second",
+                on_failure="stop",
+            ),
+        ),
+    )
+
+    result = await service._run_remote(target)
+
+    assert result.status == "error"
+    assert [step.exit_code for step in result.steps] == [1, 0]
+    assert connector.execute_command.await_count == 2
+
+
+@pytest.mark.asyncio
 async def test_run_remote_connector_exception_marks_failed() -> None:
     """_run_remote catches connector exceptions and marks status as failed."""
     connector = AsyncMock()

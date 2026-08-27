@@ -114,7 +114,7 @@ class TestScriptExecutionResponse:
             script_id=uuid.uuid4(),
             node_id=uuid.uuid4(),
             params={"key": "value"},
-            status="completed",
+            status="success",
             steps=[
                 {
                     "step_index": 0,
@@ -127,7 +127,7 @@ class TestScriptExecutionResponse:
             started_at=datetime.now(UTC),
             finished_at=datetime.now(UTC),
         )
-        assert resp.status == "completed"
+        assert resp.status == "success"
         assert resp.node_id is not None
 
     def test_optional_fields(self) -> None:
@@ -136,7 +136,7 @@ class TestScriptExecutionResponse:
             script_id=uuid.uuid4(),
             node_id=None,
             params=None,
-            status="failed",
+            status="error",
             steps=None,
             started_at=datetime.now(UTC),
             finished_at=None,
@@ -145,3 +145,17 @@ class TestScriptExecutionResponse:
         assert resp.params is None
         assert resp.steps is None
         assert resp.finished_at is None
+
+    @pytest.mark.parametrize("legacy_status", ["completed", "failed"])
+    def test_legacy_status_rejected(self, legacy_status: str) -> None:
+        with pytest.raises(ValidationError):
+            ScriptExecutionResponse(
+                id=uuid.uuid4(),
+                script_id=uuid.uuid4(),
+                node_id=None,
+                params=None,
+                status=legacy_status,
+                steps=None,
+                started_at=datetime.now(UTC),
+                finished_at=datetime.now(UTC),
+            )
