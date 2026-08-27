@@ -23,6 +23,7 @@ from app.api.error_mapping import domain_error_handler
 from app.api.v1.api_keys import router as api_keys_router
 from app.api.v1.health import router as health_router
 from app.api.v1.nodes import router as nodes_router
+from app.application.ports.jwt_handler import JWTHandler
 from app.application.services.api_key_authentication import APIKeyAuthenticationService
 from app.application.services.api_key_management import APIKeyManagementService
 from app.application.services.node_management_service import NodeManagementService
@@ -61,6 +62,10 @@ class IntegrationAuthProvider(Provider):
     @provide(scope=Scope.APP)
     def get_api_key_gateway(self) -> SqlAlchemyAPIKeyGateway:
         return SqlAlchemyAPIKeyGateway(self._sm)
+
+    @provide(scope=Scope.APP)
+    def get_jwt_handler(self) -> JWTHandler:
+        return MagicMock(spec=JWTHandler)
 
     @provide(scope=Scope.REQUEST)
     def get_node_repo(self, session: AsyncSession) -> NodeRepository:

@@ -21,6 +21,23 @@ audit = structlog.get_logger("audit")  # security: access, commands, failures
 _ALLOWED_SIGNALS = frozenset({"SIGINT", "SIGTERM", "SIGHUP"})
 _STREAM_QUEUE_SIZE = 128
 _PROCESS_TERMINATION_TIMEOUT = 5.0
+_MAX_CAPTURED_OUTPUT_BYTES = 1_048_576
+_OUTPUT_TRUNCATED_MARKER = "\n...[remote output truncated]"
+
+
+async def _read_bounded_stream(stream: Any, max_bytes: int) -> str:
+    """Drain an SSH stream while retaining at most ``max_bytes`` in memory."""
+    captured = bytearray()
+    truncated = False
+    async for chunk in stream:
+        encoded = str(chunk).encode("utf-8")
+        remaining = max_bytes - len(captured)
+        if remaining > 0:
+            captured.extend(encoded[:remaining])
+        if len(encoded) > remaining:
+            truncated = True
+    value = captured.decode("utf-8", errors="replace")
+    return value + _OUTPUT_TRUNCATED_MARKER if truncated else value
 
 
 class SSHConnector:
@@ -133,23 +150,36 @@ class SSHConnector:
             command_fingerprint=fingerprint,
         )
         try:
-            result = await self._connection.run(command, timeout=self._timeout)
-            exit_code = result.exit_status or 0
+            async with asyncio.timeout(self._timeout):
+                async with self._connection.create_process(command) as process:
+                    async with asyncio.TaskGroup() as tasks:
+                        stdout_task = tasks.create_task(
+                            _read_bounded_stream(
+                                process.stdout,
+                                _MAX_CAPTURED_OUTPUT_BYTES,
+                            )
+                        )
+                        stderr_task = tasks.create_task(
+                            _read_bounded_stream(
+                                process.stderr,
+                                _MAX_CAPTURED_OUTPUT_BYTES,
+                            )
+                        )
+                        await process.wait()
+                    stdout = stdout_task.result()
+                    stderr = stderr_task.result()
+                    exit_code = process.exit_status or 0
             audit.info(
                 "ssh.command.ok",
                 host=self._host,
                 command_length=len(command),
                 command_fingerprint=fingerprint,
                 exit_code=exit_code,
-                stdout_length=len(str(result.stdout)),
-                stderr_length=len(str(result.stderr)),
+                stdout_length=len(stdout),
+                stderr_length=len(stderr),
             )
-            return (
-                str(result.stdout),
-                str(result.stderr),
-                exit_code,
-            )
-        except asyncssh.Error as exc:
+            return stdout, stderr, exit_code
+        except (asyncssh.Error, TimeoutError) as exc:
             audit.error(
                 "ssh.command.failed",
                 host=self._host,

@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from datetime import datetime
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -37,10 +38,14 @@ class SqlAlchemyUserGateway:
             user = await UserRepository(session).get_by_email(email)
             return self._to_view(user) if user is not None else None
 
-    async def list_users(self) -> list[UserViewDTO]:
+    async def list_users(self, offset: int, limit: int) -> list[UserViewDTO]:
         async with self._sessionmaker() as session:
-            users = await UserRepository(session).get_all()
+            users = await UserRepository(session).get_all(offset, limit)
             return [self._to_view(u) for u in users]
+
+    async def count_users(self) -> int:
+        async with self._sessionmaker() as session:
+            return await UserRepository(session).count()
 
     async def get_user_id_by_email(self, email: str) -> UUID | None:
         async with self._sessionmaker() as session:
@@ -104,10 +109,28 @@ class SqlAlchemyRefreshTokenGateway:
         async with self._sessionmaker() as session:
             return await RefreshTokenRepository(session).get_user_id_by_hash(token_hash)
 
-    async def create(self, user_id: UUID, token_hash: str, expires_at: Any) -> None:
+    async def create(
+        self, user_id: UUID, token_hash: str, expires_at: datetime
+    ) -> None:
         async with self._sessionmaker.begin() as session:
             await RefreshTokenRepository(session).create(
                 user_id, token_hash, expires_at
+            )
+
+    async def rotate(
+        self,
+        old_token_hash: str,
+        user_id: UUID,
+        new_token_hash: str,
+        expires_at: datetime,
+    ) -> bool:
+        """Atomically consume one refresh token and persist its replacement."""
+        async with self._sessionmaker.begin() as session:
+            return await RefreshTokenRepository(session).rotate(
+                old_token_hash,
+                user_id,
+                new_token_hash,
+                expires_at,
             )
 
     async def delete(self, token_hash: str) -> bool:

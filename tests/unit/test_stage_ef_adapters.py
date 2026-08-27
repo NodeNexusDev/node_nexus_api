@@ -55,6 +55,7 @@ class TestFavoriteGateway:
     @pytest.mark.asyncio
     async def test_add_favorite(self) -> None:
         session = AsyncMock()
+        session.add = MagicMock()
         gw = SqlAlchemyFavoriteGateway(session)
         data = FavoriteCreateDTO(
             target_type="command",
@@ -174,6 +175,7 @@ class TestNoteGateway:
     @pytest.mark.asyncio
     async def test_create_note(self) -> None:
         session = AsyncMock()
+        session.add = MagicMock()
         gw = SqlAlchemyNoteGateway(session)
         data = NoteCreateDTO(
             target_type="node",
@@ -633,6 +635,7 @@ class TestNodeStatusHistoryDAO:
     @pytest.mark.asyncio
     async def test_create(self) -> None:
         session = AsyncMock()
+        session.add = MagicMock()
         repo = NodeStatusHistoryRepository(session)
         data = {
             "node_id": uuid.uuid4(),
@@ -683,6 +686,7 @@ class TestNodeStatusHistoryGateway:
     @pytest.mark.asyncio
     async def test_save(self) -> None:
         session = AsyncMock()
+        session.add = MagicMock()
         session_ctx = AsyncMock()
         session_ctx.__aenter__.return_value = session
         session_ctx.__aexit__.return_value = False

@@ -34,9 +34,6 @@ def test_execute_script_with_node_ids(
     assert resp.status_code == 404
 
 
-@pytest.mark.xfail(
-    reason="infra issue: 500 on tag-based script execution in Docker E2E",
-)
 def test_execute_script_with_node_tags(
     e2e_client: httpx.Client,
     e2e_resources: UniqueResourceFactory,
@@ -55,9 +52,6 @@ def test_execute_script_with_node_tags(
     assert data["results"][0]["node_id"] == node["id"]
 
 
-@pytest.mark.xfail(
-    reason="infra issue: 500 on tag-based script execution in Docker E2E",
-)
 def test_execute_script_with_node_ids_and_tags(
     e2e_client: httpx.Client,
     e2e_resources: UniqueResourceFactory,

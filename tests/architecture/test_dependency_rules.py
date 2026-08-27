@@ -73,6 +73,16 @@ def test_application_boundaries_do_not_use_any() -> None:
     assert not violations, "Unbounded application values:\n" + "\n".join(violations)
 
 
+def test_application_does_not_import_concrete_settings() -> None:
+    """Application use cases receive configuration values through composition."""
+    violations = [
+        str(path.relative_to(APP_ROOT))
+        for path in (APP_ROOT / "application").rglob("*.py")
+        if "app.core.config" in _imports(path)
+    ]
+    assert not violations, "Concrete settings imports:\n" + "\n".join(violations)
+
+
 def test_api_does_not_construct_services_or_repositories() -> None:
     violations: list[str] = []
     for path in (APP_ROOT / "api").rglob("*.py"):

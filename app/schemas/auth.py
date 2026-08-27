@@ -10,7 +10,7 @@ class LoginRequest(BaseModel):
     """Schema for login request."""
 
     email: EmailStr
-    password: str = Field(..., min_length=1)
+    password: str = Field(..., min_length=1, max_length=1024)
 
 
 class TokenResponse(BaseModel):
@@ -24,7 +24,7 @@ class UserCreate(BaseModel):
     """Schema for creating a user."""
 
     email: EmailStr
-    password: str = Field(..., min_length=1)
+    password: str = Field(..., min_length=12, max_length=1024)
     is_superuser: bool = False
 
 

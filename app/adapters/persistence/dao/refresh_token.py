@@ -39,6 +39,38 @@ class RefreshTokenRepository:
         self._session.add(token)
         await self._session.flush()
 
+    async def rotate(
+        self,
+        old_token_hash: str,
+        user_id: UUID,
+        new_token_hash: str,
+        expires_at: datetime,
+    ) -> bool:
+        """Atomically replace a valid refresh token if it is still unused."""
+        now = datetime.now(UTC)
+        result = await self._session.execute(
+            delete(RefreshTokenModel)
+            .where(
+                RefreshTokenModel.token_hash == old_token_hash,
+                RefreshTokenModel.user_id == user_id,
+                RefreshTokenModel.expires_at > now,
+            )
+            .returning(RefreshTokenModel.user_id)
+        )
+        consumed_user_id = result.scalar_one_or_none()
+        result.close()
+        if consumed_user_id is None:
+            return False
+        self._session.add(
+            RefreshTokenModel(
+                user_id=user_id,
+                token_hash=new_token_hash,
+                expires_at=expires_at,
+            )
+        )
+        await self._session.flush()
+        return True
+
     async def delete(self, token_hash: str) -> bool:
         """Delete a refresh token by hash."""
         result = await self._session.execute(

@@ -1,5 +1,7 @@
 """E2E tests for JWT authentication flow."""
 
+from concurrent.futures import ThreadPoolExecutor
+from threading import Barrier
 from uuid import uuid4
 
 import httpx2 as httpx
@@ -99,10 +101,8 @@ class TestRefresh:
         refresh_cookie = login_resp.cookies["refresh_token"]
 
         with httpx.Client(base_url=api_base_url, timeout=30.0) as client:
-            result = client.post(
-                "/api/v1/auth/refresh",
-                cookies={"refresh_token": refresh_cookie},
-            )
+            client.cookies.set("refresh_token", refresh_cookie)
+            result = client.post("/api/v1/auth/refresh")
         assert result.status_code == 200
         body = result.json()
         assert "access_token" in body
@@ -117,20 +117,35 @@ class TestRefresh:
         old_refresh = login_resp.cookies["refresh_token"]
 
         with httpx.Client(base_url=api_base_url, timeout=30.0) as client:
-            resp1 = client.post(
-                "/api/v1/auth/refresh",
-                cookies={"refresh_token": old_refresh},
-            )
+            client.cookies.set("refresh_token", old_refresh)
+            resp1 = client.post("/api/v1/auth/refresh")
         new_refresh = resp1.cookies["refresh_token"]
         assert new_refresh != old_refresh
 
         # Old refresh token should no longer work (rotation)
         with httpx.Client(base_url=api_base_url, timeout=30.0) as client:
-            resp2 = client.post(
-                "/api/v1/auth/refresh",
-                cookies={"refresh_token": old_refresh},
-            )
+            client.cookies.set("refresh_token", old_refresh)
+            resp2 = client.post("/api/v1/auth/refresh")
         assert resp2.status_code == 401
+
+    def test_concurrent_refresh_consumes_token_once(
+        self, e2e_client: httpx.Client, api_base_url: str
+    ) -> None:
+        login_resp = _login(e2e_client)
+        old_refresh = login_resp.cookies["refresh_token"]
+        barrier = Barrier(2)
+
+        def refresh_once() -> int:
+            barrier.wait(timeout=10)
+            with httpx.Client(base_url=api_base_url, timeout=30.0) as client:
+                client.cookies.set("refresh_token", old_refresh)
+                response = client.post("/api/v1/auth/refresh")
+            return response.status_code
+
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            statuses = list(executor.map(lambda _index: refresh_once(), range(2)))
+
+        assert sorted(statuses) == [200, 401]
 
     def test_refresh_missing_cookie(self, api_base_url: str) -> None:
         with httpx.Client(base_url=api_base_url, timeout=30.0) as client:
@@ -140,10 +155,8 @@ class TestRefresh:
 
     def test_refresh_invalid_token(self, api_base_url: str) -> None:
         with httpx.Client(base_url=api_base_url, timeout=30.0) as client:
-            result = client.post(
-                "/api/v1/auth/refresh",
-                cookies={"refresh_token": "invalid-refresh-token"},
-            )
+            client.cookies.set("refresh_token", "invalid-refresh-token")
+            result = client.post("/api/v1/auth/refresh")
         assert result.status_code == 401
 
 
@@ -155,10 +168,8 @@ class TestLogout:
         refresh_cookie = login_resp.cookies["refresh_token"]
 
         with httpx.Client(base_url=api_base_url, timeout=30.0) as client:
-            result = client.post(
-                "/api/v1/auth/logout",
-                cookies={"refresh_token": refresh_cookie},
-            )
+            client.cookies.set("refresh_token", refresh_cookie)
+            result = client.post("/api/v1/auth/logout")
         assert result.status_code == 204
 
     def test_logout_without_cookie(self, api_base_url: str) -> None:
@@ -173,13 +184,9 @@ class TestLogout:
         refresh_cookie = login_resp.cookies["refresh_token"]
 
         with httpx.Client(base_url=api_base_url, timeout=30.0) as client:
-            client.post(
-                "/api/v1/auth/logout",
-                cookies={"refresh_token": refresh_cookie},
-            )
+            client.cookies.set("refresh_token", refresh_cookie)
+            client.post("/api/v1/auth/logout")
             # Try to use the same refresh token after logout
-            result = client.post(
-                "/api/v1/auth/refresh",
-                cookies={"refresh_token": refresh_cookie},
-            )
+            client.cookies.set("refresh_token", refresh_cookie)
+            result = client.post("/api/v1/auth/refresh")
         assert result.status_code == 401

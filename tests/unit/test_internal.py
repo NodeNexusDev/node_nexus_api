@@ -75,6 +75,7 @@ class TestResumeBackground:
     @pytest.mark.asyncio
     async def test_resume_background_tasks(self) -> None:
         svc = AsyncMock()
+        svc.start = MagicMock()
         svc.resume.return_value = None
         app = _create_internal_app(audit_controller=svc)
         with _settings_patcher:

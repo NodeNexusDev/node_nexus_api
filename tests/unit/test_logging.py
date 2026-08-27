@@ -30,3 +30,20 @@ def test_redact_secrets_removes_url_credentials() -> None:
 
     assert result["connection"] == "postgresql+asyncpg://[REDACTED]@db:5432/app"
     assert "canary" not in result["connection"]
+
+
+def test_redact_secrets_removes_command_but_keeps_fingerprint() -> None:
+    result = redact_secrets(
+        None,
+        "info",
+        {
+            "command": "curl -H 'Authorization: Bearer canary' example.com",
+            "command_fingerprint": "safe-fingerprint",
+            "command_length": 56,
+        },
+    )
+
+    assert result["command"] == REDACTED
+    assert result["command_fingerprint"] == "safe-fingerprint"
+    assert result["command_length"] == 56
+    assert "canary" not in str(result)

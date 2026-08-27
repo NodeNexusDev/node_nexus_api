@@ -110,6 +110,9 @@ async def _post(app: FastAPI, path: str, **kwargs) -> dict:
         transport=ASGITransport(app=app, raise_app_exceptions=False),
         base_url="http://test",
     ) as client:
+        cookies = kwargs.pop("cookies", None)
+        if cookies:
+            client.cookies.update(cookies)
         resp = await client.post(path, **kwargs)
         body = {}
         if resp.content:

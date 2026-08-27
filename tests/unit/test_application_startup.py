@@ -2,6 +2,8 @@
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
+
 from app.adapters.lifecycle.application_startup import ApplicationStartup
 
 
@@ -17,6 +19,8 @@ def _startup(
         "restorer": MagicMock(),
         "cleanup": MagicMock(run=AsyncMock(return_value=0)),
         "worker": MagicMock(),
+        "user_reader": MagicMock(get_by_email=AsyncMock(return_value=None)),
+        "user_writer": MagicMock(create_user=AsyncMock()),
     }
     dependencies["restorer"].run = AsyncMock(
         return_value=MagicMock(restored=2, failed=0)
@@ -26,6 +30,8 @@ def _startup(
         DEBUG=False,
         AUTO_MIGRATE=auto_migrate,
         SCHEDULER_ENABLED=scheduler_enabled,
+        INITIAL_SUPERUSER_EMAIL="",
+        INITIAL_SUPERUSER_PASSWORD="",
     )
     startup = ApplicationStartup(
         settings=settings,
@@ -35,6 +41,8 @@ def _startup(
         schedule_restorer=dependencies["restorer"],
         audit_cleanup=dependencies["cleanup"],
         audit_worker=dependencies["worker"],
+        user_reader=dependencies["user_reader"],
+        user_writer=dependencies["user_writer"],
     )
     return startup, dependencies
 
@@ -77,3 +85,30 @@ async def test_audit_cleanup_failure_does_not_abort_startup() -> None:
     await startup.run()
 
     dependencies["scheduler"].start_reconciliation.assert_called_once()
+
+
+async def test_configured_initial_superuser_is_created() -> None:
+    startup, dependencies = _startup()
+    startup._settings.INITIAL_SUPERUSER_EMAIL = "admin@example.com"
+    startup._settings.INITIAL_SUPERUSER_PASSWORD = "strong-password"
+
+    await startup.run()
+
+    dependencies["user_reader"].get_by_email.assert_awaited_once_with(
+        "admin@example.com"
+    )
+    dependencies["user_writer"].create_user.assert_awaited_once()
+
+
+async def test_initial_superuser_failure_aborts_startup() -> None:
+    startup, dependencies = _startup()
+    startup._settings.INITIAL_SUPERUSER_EMAIL = "admin@example.com"
+    startup._settings.INITIAL_SUPERUSER_PASSWORD = "strong-password"
+    dependencies["user_writer"].create_user.side_effect = RuntimeError(
+        "database unavailable"
+    )
+
+    with pytest.raises(RuntimeError, match="database unavailable"):
+        await startup.run()
+
+    dependencies["worker"].start.assert_not_called()

@@ -17,8 +17,12 @@ class UserReader(Protocol):
         """Return one user by email."""
         ...
 
-    async def list_users(self) -> list[UserViewDTO]:
-        """Return all users."""
+    async def list_users(self, offset: int, limit: int) -> list[UserViewDTO]:
+        """Return one bounded page of users."""
+        ...
+
+    async def count_users(self) -> int:
+        """Return the total user count."""
         ...
 
     async def get_user_id_by_email(self, email: str) -> UUID | None:

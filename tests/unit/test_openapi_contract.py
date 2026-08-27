@@ -11,7 +11,7 @@ from httpx2 import ASGITransport, AsyncClient
 from app.main import app
 
 OPENAPI_CONTRACT_SHA256 = (
-    "1f19f8c7709ede81bf72b7d2666f3dd22bd4483fe17ee7526aff5ca664f0f376"
+    "640caac8c6494f85c0854952cbe2f940018ffa1cbfcfc4983a0d370eb4585e3f"
 )
 
 _CANONICAL_ENV = {

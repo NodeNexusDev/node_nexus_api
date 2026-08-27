@@ -1135,6 +1135,7 @@ class ServiceProvider(Provider):
         refresh_writer: RefreshTokenWriter,
         jwt_handler: JWTHandler,
         password_hasher: PasswordHasher,
+        settings: Settings,
     ) -> AuthService:
         """Get authentication service."""
         return AuthService(
@@ -1143,6 +1144,7 @@ class ServiceProvider(Provider):
             refresh_writer=refresh_writer,
             jwt_handler=jwt_handler,
             password_hasher=password_hasher,
+            refresh_token_expire_days=settings.REFRESH_TOKEN_EXPIRE_DAYS,
         )
 
     @provide(scope=Scope.REQUEST)
@@ -1267,6 +1269,8 @@ class SchedulerProvider(Provider):
         schedule_restorer: ScheduleRestorer,
         audit_cleanup: AuditCleanupJob,
         audit_worker: AuditOutboxWorker,
+        user_reader: UserReader,
+        user_writer: UserWriter,
     ) -> ApplicationStartup:
         """Compose the application lifecycle startup adapter."""
         return ApplicationStartup(
@@ -1277,6 +1281,8 @@ class SchedulerProvider(Provider):
             schedule_restorer=schedule_restorer,
             audit_cleanup=audit_cleanup,
             audit_worker=audit_worker,
+            user_reader=user_reader,
+            user_writer=user_writer,
         )
 
 

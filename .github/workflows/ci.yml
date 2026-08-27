@@ -20,6 +20,7 @@ jobs:
     env:
       DATABASE_URL: "sqlite+aiosqlite:///:memory:"
       SECRET_KEY: docs-ci-only
+      ENVIRONMENT: test
       MASTER_API_KEY: docs-ci-only
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -111,6 +112,7 @@ jobs:
     env:
       DATABASE_URL: "sqlite+aiosqlite:///test.db"
       SECRET_KEY: test-secret-key-for-ci
+      ENVIRONMENT: test
       MASTER_API_KEY: test-master-key-for-ci
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -174,6 +176,7 @@ jobs:
           docker run --rm \
             -e DATABASE_URL=sqlite+aiosqlite:///test.db \
             -e SECRET_KEY=test-secret-key \
+            -e ENVIRONMENT=test \
             -e MASTER_API_KEY=test-master-key \
             node-nexus-api:test python -c "from app.main import app; print('App loaded successfully')"
 

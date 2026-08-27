@@ -56,6 +56,7 @@ def service(
         refresh_writer=refresh_writer,
         jwt_handler=jwt_handler,
         password_hasher=password_hasher,
+        refresh_token_expire_days=7,
     )
 
 
@@ -177,13 +178,34 @@ class TestRefreshAccessToken:
         refresh_reader.get_by_hash.return_value = user.id
         user_reader.is_user_active.return_value = True
         user_reader.get_user.return_value = user
+        refresh_writer.rotate.return_value = True
 
         result = await service.refresh_access_token("old-hash")
 
         assert result["access_token"] == "access-token-123"
         assert result["refresh_token"] == "refresh-token-456"
-        refresh_writer.delete.assert_called_once_with("old-hash")
-        refresh_writer.create.assert_called_once()
+        refresh_writer.rotate.assert_awaited_once()
+        assert refresh_writer.rotate.await_args.args[:3] == (
+            "old-hash",
+            user.id,
+            "hashed-refresh-token",
+        )
+
+    async def test_rejects_token_consumed_by_concurrent_refresh(
+        self,
+        service: AuthService,
+        refresh_reader: AsyncMock,
+        refresh_writer: AsyncMock,
+        user_reader: AsyncMock,
+    ) -> None:
+        user = _user_view()
+        refresh_reader.get_by_hash.return_value = user.id
+        user_reader.is_user_active.return_value = True
+        user_reader.get_user.return_value = user
+        refresh_writer.rotate.return_value = False
+
+        with pytest.raises(TokenExpiredError, match="Invalid or expired refresh token"):
+            await service.refresh_access_token("already-consumed-hash")
 
 
 class TestLogout:

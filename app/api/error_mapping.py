@@ -86,6 +86,17 @@ DOMAIN_ERROR_STATUS: dict[type[DomainError], int] = {
     DomainError: 422,
 }
 
+PUBLIC_ERROR_MESSAGES: dict[type[DomainError], str] = {
+    ConnectionFailedError: "Remote connection failed",
+    CredentialDecryptionError: "Credential processing failed",
+    ContainerNotFoundError: "Docker container not found",
+    NetworkNotFoundError: "Docker network not found",
+    VolumeNotFoundError: "Docker volume not found",
+    ImageNotFoundError: "Docker image not found",
+    DockerDaemonError: "Docker daemon unavailable",
+    DockerError: "Docker operation failed",
+}
+
 
 def status_for_domain_error(exc: DomainError) -> int:
     """Return the most specific HTTP status registered for an error."""
@@ -111,7 +122,7 @@ async def domain_error_handler(request: Request, exc: Exception) -> JSONResponse
         error_type=type(exc).__name__,
         status_code=status_code,
     )
-    message = str(exc)
+    message = PUBLIC_ERROR_MESSAGES.get(type(exc), str(exc))
     request_id = getattr(request.state, "request_id", None)
     return JSONResponse(
         status_code=status_code,

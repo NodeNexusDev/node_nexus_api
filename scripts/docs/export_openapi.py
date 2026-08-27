@@ -13,6 +13,7 @@ sys.path.insert(0, str(ROOT))
 
 os.environ.setdefault("DATABASE_URL", "sqlite+aiosqlite:///:memory:")
 os.environ.setdefault("SECRET_KEY", "openapi-export-only")
+os.environ.setdefault("ENVIRONMENT", "test")
 os.environ.setdefault("MASTER_API_KEY", "openapi-export-only")
 os.environ.setdefault("PROMETHEUS_ENABLED", "false")
 os.environ.setdefault("OTEL_ENABLED", "false")

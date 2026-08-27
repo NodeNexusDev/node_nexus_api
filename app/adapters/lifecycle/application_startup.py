@@ -5,6 +5,8 @@ import structlog
 from app.adapters.lifecycle.migration_runner import MigrationRunner
 from app.adapters.persistence.audit_outbox_worker import AuditOutboxWorker
 from app.adapters.runtime.apscheduler_runtime import ApschedulerRuntime
+from app.application.dto.user import UserCreateDTO
+from app.application.ports.user_persistence import UserReader, UserWriter
 from app.application.services.audit_cleanup_job import AuditCleanupJob
 from app.application.services.schedule_restorer import ScheduleRestorer
 from app.application.services.scheduled_script_executor import (
@@ -28,6 +30,8 @@ class ApplicationStartup:
         schedule_restorer: ScheduleRestorer,
         audit_cleanup: AuditCleanupJob,
         audit_worker: AuditOutboxWorker,
+        user_reader: UserReader,
+        user_writer: UserWriter,
     ) -> None:
         self._settings = settings
         self._migration_runner = migration_runner
@@ -36,6 +40,8 @@ class ApplicationStartup:
         self._schedule_restorer = schedule_restorer
         self._audit_cleanup = audit_cleanup
         self._audit_worker = audit_worker
+        self._user_reader = user_reader
+        self._user_writer = user_writer
 
     async def run(self) -> None:
         """Configure runtime components and execute startup jobs."""
@@ -65,24 +71,19 @@ class ApplicationStartup:
         if not email or not password:
             return
 
-        from app.application.dto.user import UserCreateDTO
-        from app.application.ports.user_persistence import UserReader, UserWriter
-        from app.di.container import container
-
         try:
-            user_reader = await container.get(UserReader)
-            existing = await user_reader.get_by_email(email)
+            existing = await self._user_reader.get_by_email(email)
             if existing is not None:
                 logger.info("startup.superuser.exists", email=email)
                 return
 
-            user_writer = await container.get(UserWriter)
-            await user_writer.create_user(
+            await self._user_writer.create_user(
                 UserCreateDTO(email=email, password=password, is_superuser=True)
             )
             logger.info("startup.superuser.created", email=email)
         except Exception:
-            logger.warning("startup.superuser.failed", email=email)
+            logger.exception("startup.superuser.failed", email=email)
+            raise
 
     async def _restore_schedules(self) -> None:
         if not self._settings.SCHEDULER_ENABLED:

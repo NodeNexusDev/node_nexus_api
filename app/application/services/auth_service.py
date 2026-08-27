@@ -9,7 +9,6 @@ from uuid import UUID
 import structlog
 
 from app.application.dto.user import UserViewDTO
-from app.core.config import get_settings
 from app.core.exceptions import InvalidCredentialsError, TokenExpiredError
 
 if TYPE_CHECKING:
@@ -34,12 +33,14 @@ class AuthService:
         refresh_writer: RefreshTokenWriter,
         jwt_handler: JWTHandler,
         password_hasher: PasswordHasher,
+        refresh_token_expire_days: int,
     ) -> None:
         self._user_reader = user_reader
         self._refresh_reader = refresh_reader
         self._refresh_writer = refresh_writer
         self._jwt = jwt_handler
         self._password_hasher = password_hasher
+        self._refresh_token_expire_days = refresh_token_expire_days
 
     async def login(self, email: str, password: str) -> dict[str, str]:
         """Authenticate user and return tokens.
@@ -71,10 +72,7 @@ class AuthService:
         refresh_token = self._jwt.encode_refresh_token(str(user_id))
 
         # Store refresh token hash
-        settings = get_settings()
-        expires_at = datetime.now(UTC) + timedelta(
-            days=settings.REFRESH_TOKEN_EXPIRE_DAYS
-        )
+        expires_at = datetime.now(UTC) + timedelta(days=self._refresh_token_expire_days)
         token_hash = self._jwt.hash_token(refresh_token)
         await self._refresh_writer.create(user_id, token_hash, expires_at)
 
@@ -99,9 +97,6 @@ class AuthService:
         if not await self._user_reader.is_user_active(user_id):
             raise InvalidCredentialsError("User is inactive")
 
-        # Delete old refresh token (rotation)
-        await self._refresh_writer.delete(refresh_token_hash)
-
         # Load user info for new tokens
         user = await self._user_reader.get_user(user_id)
         if user is None:
@@ -114,12 +109,16 @@ class AuthService:
         refresh_token = self._jwt.encode_refresh_token(str(user_id))
 
         # Store new refresh token hash
-        settings = get_settings()
-        expires_at = datetime.now(UTC) + timedelta(
-            days=settings.REFRESH_TOKEN_EXPIRE_DAYS
-        )
+        expires_at = datetime.now(UTC) + timedelta(days=self._refresh_token_expire_days)
         token_hash = self._jwt.hash_token(refresh_token)
-        await self._refresh_writer.create(user_id, token_hash, expires_at)
+        rotated = await self._refresh_writer.rotate(
+            refresh_token_hash,
+            user_id,
+            token_hash,
+            expires_at,
+        )
+        if not rotated:
+            raise TokenExpiredError("Invalid or expired refresh token")
 
         audit.info("auth.refresh.ok", user_id=str(user_id))
         return {

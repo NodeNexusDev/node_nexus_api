@@ -4,7 +4,7 @@ import asyncio
 import json
 import time
 import uuid
-from collections import defaultdict
+from collections import OrderedDict, deque
 from typing import override
 
 import structlog
@@ -152,12 +152,14 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         app,
         requests: int = 100,
         window: int = 60,  # noqa: ANN001
+        max_clients: int = 10_000,
     ) -> None:
         super().__init__(app)
         self._requests = requests
         self._window = window
+        self._max_clients = max_clients
         # TODO: consider Redis-backed rate limiting for multi-replica deployments
-        self._ip_counts: dict[str, list[float]] = defaultdict(list)
+        self._ip_counts: OrderedDict[str, deque[float]] = OrderedDict()
 
     def clear(self) -> None:
         """Clear all rate limit state (for testing)."""
@@ -166,7 +168,10 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
     def _cleanup_old_entries(self, ip: str, now: float) -> None:
         """Remove timestamps older than the window."""
         cutoff = now - self._window
-        self._ip_counts[ip] = [ts for ts in self._ip_counts[ip] if ts > cutoff]
+        entries = deque(self._ip_counts.get(ip, ()))
+        while entries and entries[0] <= cutoff:
+            entries.popleft()
+        self._ip_counts[ip] = entries
 
     @override
     async def dispatch(
@@ -176,9 +181,16 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
 
         client_ip = request.client.host if request.client else "unknown"
-        now = time.time()
+        now = time.monotonic()
+
+        if (
+            client_ip not in self._ip_counts
+            and len(self._ip_counts) >= self._max_clients
+        ):
+            self._ip_counts.popitem(last=False)
 
         self._cleanup_old_entries(client_ip, now)
+        self._ip_counts.move_to_end(client_ip)
         current_count = len(self._ip_counts[client_ip])
 
         remaining = max(0, self._requests - current_count - 1)

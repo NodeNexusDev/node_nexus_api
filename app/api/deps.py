@@ -52,15 +52,16 @@ class Principal:
 async def get_current_principal(
     request: Request,
     api_key_service: FromDishka[APIKeyAuthenticationService],
+    jwt_handler: FromDishka[JWTHandler],
     api_key: str | None = Security(API_KEY_HEADER),
 ) -> Principal:
-    """Resolve a :class:`Principal` via JWT first, then API key fallback.
+    """Resolve a principal using an unambiguous, fail-closed credential order.
 
     Priority:
         1. ``Authorization: Bearer <token>`` → JWT
         2. ``X-API-Key`` header → API key (including master key shortcut)
         3. If neither present → 401
-        4. If JWT decode fails but an API key exists → falls back to API key logic
+        4. If a Bearer token is present but invalid → 401 without API key fallback
 
     Returns:
         Principal with ``source == "jwt"`` or ``"api_key"``.
@@ -68,31 +69,18 @@ async def get_current_principal(
     """
     token = _extract_bearer_token(request)
     if token:
-        try:
-            container = request.state.dishka_container
-            jwt_handler: JWTHandler = await container.get(JWTHandler)
-        except Exception:  # nosec B110
-            # JWTHandler not registered or container unavailable — skip JWT
-            pass
-        else:
-            try:
-                user_id, claims = _decode_access_token(jwt_handler, token)
-                settings = get_settings()
-                x_api_key_claim = claims.get("x-api-key")
-                if (
-                    settings.MASTER_API_KEY
-                    and isinstance(x_api_key_claim, str)
-                    and hmac.compare_digest(x_api_key_claim, settings.MASTER_API_KEY)
-                ):
-                    audit.info("auth.master_key_used")
-                    return Principal(source="jwt", identifier="master")
-                audit.info("auth.jwt_used", user_id=str(user_id))
-                return Principal(source="jwt", identifier=str(user_id))
-            except HTTPException:
-                raise
-            except Exception:  # nosec B110
-                # JWT invalid — proceed to API key fallback below
-                pass
+        user_id, claims = _decode_access_token(jwt_handler, token)
+        settings = get_settings()
+        x_api_key_claim = claims.get("x-api-key")
+        if (
+            settings.MASTER_API_KEY
+            and isinstance(x_api_key_claim, str)
+            and hmac.compare_digest(x_api_key_claim, settings.MASTER_API_KEY)
+        ):
+            audit.info("auth.master_key_used")
+            return Principal(source="jwt", identifier="master")
+        audit.info("auth.jwt_used", user_id=str(user_id))
+        return Principal(source="jwt", identifier=str(user_id))
 
     # Fallback: X-API-Key
     if api_key:
@@ -117,6 +105,7 @@ async def get_current_principal(
 async def require_write_or_jwt_scope(
     request: Request,
     api_key_service: FromDishka[APIKeyAuthenticationService],
+    jwt_handler: FromDishka[JWTHandler],
     api_key: str | None = Security(API_KEY_HEADER),
 ) -> Principal:
     """Require write authorization for both JWT and API key flows.
@@ -126,34 +115,19 @@ async def require_write_or_jwt_scope(
     - API key with ``read-write`` → accepted
     - API key with ``read-only`` → 403
     - No auth → 401
-    - Invalid JWT → still attempts API key fallback
+    - Invalid JWT → 401 without API key fallback
 
     Returns:
         The resolved :class:`Principal`.
     """
     token = _extract_bearer_token(request)
     if token:
-        try:
-            container = request.state.dishka_container
-            jwt_handler: JWTHandler = await container.get(JWTHandler)
-        except Exception:  # nosec B110
-            # JWTHandler not registered or container unavailable — skip JWT
-            pass
-        else:
-            try:
-                user_id, claims = _decode_access_token(jwt_handler, token)
-                if not claims.get("is_superuser"):
-                    audit.warning("auth.write_denied_jwt_user", user_id=str(user_id))
-                    raise HTTPException(
-                        status_code=403, detail="Superuser privileges required"
-                    )
-                audit.info("auth.write_allowed_superuser", user_id=str(user_id))
-                return Principal(source="jwt", identifier=str(user_id))
-            except HTTPException:
-                raise
-            except Exception:  # nosec B110
-                # JWT invalid — proceed to API key fallback below
-                pass
+        user_id, claims = _decode_access_token(jwt_handler, token)
+        if not claims.get("is_superuser"):
+            audit.warning("auth.write_denied_jwt_user", user_id=str(user_id))
+            raise HTTPException(status_code=403, detail="Superuser privileges required")
+        audit.info("auth.write_allowed_superuser", user_id=str(user_id))
+        return Principal(source="jwt", identifier=str(user_id))
 
     # Fallback: X-API-Key
     if api_key:
