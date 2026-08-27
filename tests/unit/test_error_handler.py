@@ -107,6 +107,30 @@ class TestDomainErrorHandler:
         assert resp.status_code == 422
 
     @pytest.mark.parametrize(
+        ("path", "expected_message"),
+        [
+            ("/test-connection-failed", "Remote connection failed"),
+            ("/test-credential-decryption", "Credential processing failed"),
+            ("/test-container-not-found", "Docker container not found"),
+            ("/test-image-not-found", "Docker image not found"),
+            ("/test-docker-daemon", "Docker daemon unavailable"),
+            ("/test-docker-error", "Docker operation failed"),
+        ],
+    )
+    async def test_infrastructure_error_details_are_not_exposed(
+        self, path: str, expected_message: str
+    ) -> None:
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            resp = await client.get(path)
+
+        body = resp.json()
+        assert body["message"] == expected_message
+        assert body["detail"] == expected_message
+        assert "test error" not in str(body)
+
+    @pytest.mark.parametrize(
         ("path", "expected_status"),
         [
             pytest.param("/test-node-not-found", 404, id="NodeNotFoundError"),

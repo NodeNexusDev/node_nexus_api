@@ -93,7 +93,7 @@ class NodeBulkCommandService:
         for result in results:
             succeeded = result.exit_code == 0
             details: JsonObject = {
-                "command": data.command,
+                "command_fingerprint": command_fingerprint(data.command),
                 "exit_code": result.exit_code,
             }
             if not succeeded:
@@ -177,7 +177,12 @@ class NodeBulkCommandService:
 
             try:
                 result = await execute_ssh(connector, command)
-                audit.info("node.bulk.executed", node_id=str(node.id), command=command)
+                audit.info(
+                    "node.bulk.executed",
+                    node_id=str(node.id),
+                    command_fingerprint=command_fingerprint(command),
+                    command_length=len(command),
+                )
                 return CommandExecutionDTO(
                     node_id=node.id,
                     node_name=node.name,
@@ -189,7 +194,8 @@ class NodeBulkCommandService:
                 audit.error(
                     "node.bulk.execute.failed",
                     node_id=str(node.id),
-                    command=command,
+                    command_fingerprint=command_fingerprint(command),
+                    command_length=len(command),
                     error=str(exc),
                 )
                 return self._error_result(node, exc)
@@ -197,7 +203,8 @@ class NodeBulkCommandService:
                 audit.error(
                     "node.bulk.execute.unexpected_error",
                     node_id=str(node.id),
-                    command=command,
+                    command_fingerprint=command_fingerprint(command),
+                    command_length=len(command),
                     error_type=type(exc).__name__,
                     error=str(exc),
                 )

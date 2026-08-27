@@ -11,7 +11,7 @@ from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from httpx2 import ASGITransport, AsyncClient
 
-from app.application.dto.user import UserViewDTO
+from app.application.dto.user import UserPageDTO, UserViewDTO
 from app.application.ports.jwt_handler import JWTHandler
 from app.application.services.user_service import UserService
 from app.core.exceptions import (
@@ -70,7 +70,9 @@ def _create_app(
 
     if mock_service is None:
         mock_service = AsyncMock(spec=UserService)
-        mock_service.list_users.return_value = [_user_view()]
+        mock_service.list_users.return_value = UserPageDTO(
+            items=(_user_view(),), total=1
+        )
         mock_service.create_user.return_value = _user_view()
         mock_service.delete_user.return_value = True
 
@@ -156,12 +158,32 @@ class TestListUsers:
         assert result["status"] == 200
         assert result["json"]["total"] == 1
 
+    async def test_pagination_is_forwarded(self) -> None:
+        mock_service = AsyncMock(spec=UserService)
+        mock_service.list_users.return_value = UserPageDTO(items=(), total=25)
+        app = _create_app(mock_service=mock_service)
+
+        result = await _get(
+            app,
+            "/users/?page=2&size=10",
+            headers={"Authorization": "Bearer token"},
+        )
+
+        assert result["status"] == 200
+        mock_service.list_users.assert_awaited_once_with(
+            offset=10,
+            limit=10,
+            caller_is_superuser=True,
+        )
+
 
 class TestCreateUser:
     async def test_no_auth(self) -> None:
         app = _create_app()
         result = await _post(
-            app, "/users/", json={"email": "new@x.com", "password": "pass"}
+            app,
+            "/users/",
+            json={"email": "new@x.com", "password": "strong-password"},
         )
         assert result["status"] == 401
 
@@ -170,7 +192,7 @@ class TestCreateUser:
         result = await _post(
             app,
             "/users/",
-            json={"email": "new@x.com", "password": "pass"},
+            json={"email": "new@x.com", "password": "strong-password"},
             headers={"Authorization": "Bearer token"},
         )
         assert result["status"] == 403
@@ -182,7 +204,7 @@ class TestCreateUser:
         result = await _post(
             app,
             "/users/",
-            json={"email": "dup@x.com", "password": "pass"},
+            json={"email": "dup@x.com", "password": "strong-password"},
             headers={"Authorization": "Bearer token"},
         )
         assert result["status"] == 409
@@ -192,7 +214,7 @@ class TestCreateUser:
         result = await _post(
             app,
             "/users/",
-            json={"email": "new@x.com", "password": "pass"},
+            json={"email": "new@x.com", "password": "strong-password"},
             headers={"Authorization": "Bearer token"},
         )
         assert result["status"] == 201

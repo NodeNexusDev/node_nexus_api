@@ -65,6 +65,7 @@ class GraphOverrides(Provider):
         return Settings(
             DATABASE_URL="sqlite+aiosqlite:///:memory:",
             SECRET_KEY="test-secret-key-for-container-graph",
+            ENVIRONMENT="test",
             AUTO_MIGRATE=False,
             SCHEDULER_ENABLED=False,
         )

@@ -12,6 +12,7 @@ from app.api.deps import (
     get_current_principal,
     require_write_or_jwt_scope,
 )
+from app.application.command_policy import command_fingerprint
 from app.application.dto.docker import (
     ContainerCreateRequestDTO,
     ContainerRenameRequestDTO,
@@ -243,7 +244,8 @@ async def exec_command(
         "api.docker.containers.exec",
         node_id=str(node_id),
         container_id=validated_id,
-        command=data.command,
+        command_fingerprint=command_fingerprint(data.command),
+        command_length=len(data.command),
     )
     result = await service.exec_command(
         node_id, validated_id, data.command, timeout=data.timeout

@@ -27,8 +27,13 @@ class UserRepository:
         )
         return result.scalar_one_or_none()
 
-    async def get_all(self) -> list[UserModel]:
-        result = await self._session.execute(select(UserModel))
+    async def get_all(self, offset: int, limit: int) -> list[UserModel]:
+        result = await self._session.execute(
+            select(UserModel)
+            .order_by(UserModel.created_at, UserModel.id)
+            .offset(offset)
+            .limit(limit)
+        )
         return list(result.scalars().all())
 
     async def create(self, data: dict[str, Any]) -> UserModel:

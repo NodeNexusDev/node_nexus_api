@@ -26,6 +26,7 @@ class TestCommandExecutionRepository:
     @pytest.mark.asyncio
     async def test_create(self) -> None:
         session = AsyncMock()
+        session.add = MagicMock()
         repo = CommandExecutionRepository(session)
         data = {
             "node_id": uuid.uuid4(),

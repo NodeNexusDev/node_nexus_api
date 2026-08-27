@@ -26,6 +26,14 @@ class UserCreateDTO:
 
 
 @dataclass(frozen=True, slots=True)
+class UserPageDTO:
+    """Bounded page of users."""
+
+    items: tuple[UserViewDTO, ...]
+    total: int
+
+
+@dataclass(frozen=True, slots=True)
 class AuthIdentityDTO:
     """Unified authentication result."""
 

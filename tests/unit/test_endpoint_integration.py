@@ -4,12 +4,12 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from dishka import Provider, Scope, make_async_container
 from dishka.integrations.fastapi import setup_dishka
 from fastapi import FastAPI
-from fastapi.testclient import TestClient
+from httpx2 import ASGITransport, AsyncClient, Response
 
 from app.api.v1 import (
     commands,
@@ -24,6 +24,7 @@ from app.application.dto.favorite import FavoriteDTO
 from app.application.dto.global_search import GlobalSearchResultDTO
 from app.application.dto.note import NoteDTO
 from app.application.dto.script_management import ScriptViewDTO
+from app.application.ports.jwt_handler import JWTHandler
 from app.application.services.api_key_authentication import (
     APIKeyAuthenticationService,
 )
@@ -86,14 +87,27 @@ def _build_app_with_service(service_type, service_mock):
         provides=APIKeyAuthenticationService,
         scope=Scope.REQUEST,
     )
+    p.provide(
+        lambda: MagicMock(spec=JWTHandler),
+        provides=JWTHandler,
+        scope=Scope.REQUEST,
+    )
 
     container = make_async_container(p)
     setup_dishka(container, app)
     return app
 
 
+async def _request(app: FastAPI, method: str, path: str, **kwargs) -> Response:
+    async with AsyncClient(
+        transport=ASGITransport(app=app),
+        base_url="http://test",
+    ) as client:
+        return await client.request(method, path, **kwargs)
+
+
 class TestNoteEndpoints:
-    def test_list(self) -> None:
+    async def test_list(self) -> None:
         mock_svc = AsyncMock(spec=NoteService)
         mock_svc.list_notes.return_value = []
 
@@ -102,8 +116,9 @@ class TestNoteEndpoints:
 
         patches = _patch_auth()
         try:
-            client = TestClient(app)
-            resp = client.get(
+            resp = await _request(
+                app,
+                "GET",
                 f"/notes/command/{uuid.uuid4()}",
                 headers={"X-API-Key": "test"},
             )
@@ -111,7 +126,7 @@ class TestNoteEndpoints:
             _stop_patches(patches)
         assert resp.status_code == 200
 
-    def test_create(self) -> None:
+    async def test_create(self) -> None:
         mock_svc = AsyncMock(spec=NoteService)
         target_id = uuid.uuid4()
         mock_svc.create_note.return_value = NoteDTO(
@@ -128,8 +143,9 @@ class TestNoteEndpoints:
 
         patches = _patch_auth()
         try:
-            client = TestClient(app)
-            resp = client.post(
+            resp = await _request(
+                app,
+                "POST",
                 f"/notes/command/{target_id}",
                 json={
                     "target_type": "command",
@@ -143,7 +159,7 @@ class TestNoteEndpoints:
         assert resp.status_code == 201
         assert resp.json()["content"] == "note"
 
-    def test_update(self) -> None:
+    async def test_update(self) -> None:
         mock_svc = AsyncMock(spec=NoteService)
         mock_svc.update_note.return_value = NoteDTO(
             id=uuid.uuid4(),
@@ -159,8 +175,9 @@ class TestNoteEndpoints:
 
         patches = _patch_auth()
         try:
-            client = TestClient(app)
-            resp = client.put(
+            resp = await _request(
+                app,
+                "PUT",
                 f"/notes/{uuid.uuid4()}",
                 json={"content": "updated"},
                 headers={"X-API-Key": "test"},
@@ -170,7 +187,7 @@ class TestNoteEndpoints:
         assert resp.status_code == 200
         assert resp.json()["content"] == "updated"
 
-    def test_delete(self) -> None:
+    async def test_delete(self) -> None:
         mock_svc = AsyncMock(spec=NoteService)
         mock_svc.delete_note.return_value = True
 
@@ -179,8 +196,9 @@ class TestNoteEndpoints:
 
         patches = _patch_auth()
         try:
-            client = TestClient(app)
-            resp = client.delete(
+            resp = await _request(
+                app,
+                "DELETE",
                 f"/notes/{uuid.uuid4()}",
                 headers={"X-API-Key": "test"},
             )
@@ -190,7 +208,7 @@ class TestNoteEndpoints:
 
 
 class TestFavoriteEndpoints:
-    def test_list(self) -> None:
+    async def test_list(self) -> None:
         mock_svc = AsyncMock(spec=FavoriteService)
         mock_svc.list_favorites.return_value = ([], 0)
 
@@ -199,13 +217,14 @@ class TestFavoriteEndpoints:
 
         patches = _patch_auth()
         try:
-            client = TestClient(app)
-            resp = client.get("/favorites", headers={"X-API-Key": "test"})
+            resp = await _request(
+                app, "GET", "/favorites", headers={"X-API-Key": "test"}
+            )
         finally:
             _stop_patches(patches)
         assert resp.status_code == 200
 
-    def test_add(self) -> None:
+    async def test_add(self) -> None:
         mock_svc = AsyncMock(spec=FavoriteService)
         mock_svc.add_favorite.return_value = FavoriteDTO(
             id=uuid.uuid4(),
@@ -221,8 +240,9 @@ class TestFavoriteEndpoints:
 
         patches = _patch_auth()
         try:
-            client = TestClient(app)
-            resp = client.post(
+            resp = await _request(
+                app,
+                "POST",
                 "/favorites",
                 json={"target_type": "command", "target_id": str(uuid.uuid4())},
                 headers={"X-API-Key": "test"},
@@ -231,7 +251,7 @@ class TestFavoriteEndpoints:
             _stop_patches(patches)
         assert resp.status_code == 201
 
-    def test_remove(self) -> None:
+    async def test_remove(self) -> None:
         mock_svc = AsyncMock(spec=FavoriteService)
         mock_svc.remove_favorite.return_value = True
 
@@ -240,8 +260,9 @@ class TestFavoriteEndpoints:
 
         patches = _patch_auth()
         try:
-            client = TestClient(app)
-            resp = client.delete(
+            resp = await _request(
+                app,
+                "DELETE",
                 f"/favorites/command/{uuid.uuid4()}",
                 headers={"X-API-Key": "test"},
             )
@@ -251,7 +272,7 @@ class TestFavoriteEndpoints:
 
 
 class TestSearchEndpoint:
-    def test_search(self) -> None:
+    async def test_search(self) -> None:
         mock_svc = AsyncMock(spec=GlobalSearchService)
         mock_svc.search.return_value = GlobalSearchResultDTO(
             nodes=(),
@@ -265,8 +286,9 @@ class TestSearchEndpoint:
 
         patches = _patch_auth()
         try:
-            client = TestClient(app)
-            resp = client.get("/search?q=web", headers={"X-API-Key": "test"})
+            resp = await _request(
+                app, "GET", "/search?q=web", headers={"X-API-Key": "test"}
+            )
         finally:
             _stop_patches(patches)
         assert resp.status_code == 200
@@ -274,7 +296,7 @@ class TestSearchEndpoint:
 
 
 class TestCommandEndpoints:
-    def test_stats(self) -> None:
+    async def test_stats(self) -> None:
         mock_svc = AsyncMock(spec=ExecutionStatsService)
         mock_svc.get_command_stats.return_value = ExecutionStatsDTO(
             total=10,
@@ -292,8 +314,9 @@ class TestCommandEndpoints:
 
         patches = _patch_auth()
         try:
-            client = TestClient(app)
-            resp = client.get(
+            resp = await _request(
+                app,
+                "GET",
                 f"/commands/{uuid.uuid4()}/stats",
                 headers={"X-API-Key": "test"},
             )
@@ -302,7 +325,7 @@ class TestCommandEndpoints:
         assert resp.status_code == 200
         assert resp.json()["total"] == 10
 
-    def test_clone(self) -> None:
+    async def test_clone(self) -> None:
         mock_svc = AsyncMock(spec=CommandManagementService)
         mock_svc.clone_command.return_value = CommandViewDTO(
             id=uuid.uuid4(),
@@ -320,8 +343,9 @@ class TestCommandEndpoints:
 
         patches = _patch_auth()
         try:
-            client = TestClient(app)
-            resp = client.post(
+            resp = await _request(
+                app,
+                "POST",
                 f"/commands/{uuid.uuid4()}/clone",
                 headers={"X-API-Key": "test"},
             )
@@ -332,7 +356,7 @@ class TestCommandEndpoints:
 
 
 class TestScriptEndpoints:
-    def test_clone(self) -> None:
+    async def test_clone(self) -> None:
         mock_svc = AsyncMock(spec=ScriptManagementService)
         mock_svc.clone_script.return_value = ScriptViewDTO(
             id=uuid.uuid4(),
@@ -349,8 +373,9 @@ class TestScriptEndpoints:
 
         patches = _patch_auth()
         try:
-            client = TestClient(app)
-            resp = client.post(
+            resp = await _request(
+                app,
+                "POST",
                 f"/scripts/{uuid.uuid4()}/clone",
                 headers={"X-API-Key": "test"},
             )

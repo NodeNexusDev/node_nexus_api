@@ -141,7 +141,9 @@ class TestGetCurrentPrincipalJWT:
         assert data["identifier"] == "master"
 
     @patch("app.api.deps.get_settings")
-    async def test_jwt_invalid_fallback(self, mock_get_settings: Any) -> None:
+    async def test_invalid_jwt_fails_closed_when_api_key_is_also_present(
+        self, mock_get_settings: Any
+    ) -> None:
         mock_get_settings.return_value = _mock_settings("")
         mock_jwt = MagicMock(spec=JWTHandler)
         mock_jwt.decode_token.side_effect = Exception("bad token")
@@ -152,11 +154,16 @@ class TestGetCurrentPrincipalJWT:
         app = _create_app_principal(
             mock_api_key_service=mock_service, mock_jwt=mock_jwt
         )
-        resp = await _get(app, "/test-principal", {"X-API-Key": "nnk_validkey123"})
-        assert resp.status_code == 200
-        data = resp.json()
-        assert data["source"] == "api_key"
-        assert data["identifier"] == "nnk_vali"
+        resp = await _get(
+            app,
+            "/test-principal",
+            {
+                "Authorization": "Bearer invalid-token",
+                "X-API-Key": "nnk_validkey123",
+            },
+        )
+        assert resp.status_code == 401
+        mock_service.authenticate.assert_not_awaited()
 
 
 class TestGetCurrentPrincipalAPIKey:
@@ -282,7 +289,9 @@ class TestRequireWriteOrJwtScopeJWT:
         assert "Superuser" in resp.json()["detail"]
 
     @patch("app.api.deps.get_settings")
-    async def test_jwt_invalid_fallback(self, mock_get_settings: Any) -> None:
+    async def test_invalid_jwt_fails_closed_when_write_key_is_also_present(
+        self, mock_get_settings: Any
+    ) -> None:
         mock_get_settings.return_value = _mock_settings("")
         mock_jwt = MagicMock(spec=JWTHandler)
         mock_jwt.decode_token.side_effect = Exception("bad")
@@ -293,10 +302,16 @@ class TestRequireWriteOrJwtScopeJWT:
         app = _create_app_write_scope(
             mock_api_key_service=mock_service, mock_jwt=mock_jwt
         )
-        resp = await _get(app, "/test-write", {"X-API-Key": "nnk_validkey123"})
-        assert resp.status_code == 200
-        data = resp.json()
-        assert data["source"] == "api_key"
+        resp = await _get(
+            app,
+            "/test-write",
+            {
+                "Authorization": "Bearer invalid-token",
+                "X-API-Key": "nnk_validkey123",
+            },
+        )
+        assert resp.status_code == 401
+        mock_service.authenticate.assert_not_awaited()
 
 
 class TestRequireWriteOrJwtScopeAPIKey:

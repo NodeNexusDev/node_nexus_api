@@ -1,8 +1,9 @@
 """Application configuration."""
 
 from functools import lru_cache
+from typing import Literal
 
-from pydantic import Field
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -15,6 +16,7 @@ class Settings(BaseSettings):
 
     DATABASE_URL: str
     SECRET_KEY: str
+    ENVIRONMENT: Literal["development", "test", "production"] = "production"
     DEBUG: bool = False
     LOG_LEVEL: str = "INFO"
     PORT: int = 8000
@@ -43,6 +45,11 @@ class Settings(BaseSettings):
     # Rate limiting
     RATE_LIMIT_REQUESTS: int = 100  # max requests per window
     RATE_LIMIT_WINDOW: int = 60  # window in seconds
+    RATE_LIMIT_MAX_CLIENTS: int = Field(
+        default=10_000,
+        ge=1,
+        description="Maximum in-memory client buckets for rate limiting",
+    )
 
     # Audit log retention
     AUDIT_LOG_RETENTION_DAYS: int = 90  # 0 = disabled
@@ -71,6 +78,27 @@ class Settings(BaseSettings):
     REFRESH_TOKEN_COOKIE_MAX_AGE: int = 60 * 60 * 24 * 7  # 7 days in seconds
     INITIAL_SUPERUSER_EMAIL: str = ""
     INITIAL_SUPERUSER_PASSWORD: str = ""
+
+    @model_validator(mode="after")
+    def validate_security_configuration(self) -> "Settings":
+        """Reject unsafe credentials when running in production."""
+        if self.ENVIRONMENT == "production":
+            if len(self.SECRET_KEY) < 32:
+                raise ValueError("SECRET_KEY must contain at least 32 characters")
+            if len(self.ENCRYPTION_SALT) < 16:
+                raise ValueError("ENCRYPTION_SALT must contain at least 16 characters")
+            if self.MASTER_API_KEY and len(self.MASTER_API_KEY) < 32:
+                raise ValueError(
+                    "MASTER_API_KEY must contain at least 32 characters when configured"
+                )
+        if (
+            self.INITIAL_SUPERUSER_PASSWORD
+            and len(self.INITIAL_SUPERUSER_PASSWORD) < 12
+        ):
+            raise ValueError(
+                "INITIAL_SUPERUSER_PASSWORD must contain at least 12 characters"
+            )
+        return self
 
 
 @lru_cache

@@ -38,6 +38,7 @@ from app.api.v1.dashboard import router as dashboard_router
 from app.api.v1.health import router as health_router
 from app.api.v1.nodes import router as nodes_router
 from app.api.v1.scripts import router as scripts_router
+from app.application.ports.jwt_handler import JWTHandler
 from app.application.services.api_key_authentication import APIKeyAuthenticationService
 from app.application.services.audit_log_service import AuditLogService
 from app.application.services.command_execution_service import CommandExecutionService
@@ -84,6 +85,10 @@ class IntegrationDbProvider(Provider):
     @provide(scope=Scope.APP)
     def get_api_key_gateway(self) -> SqlAlchemyAPIKeyGateway:
         return SqlAlchemyAPIKeyGateway(self._sm)
+
+    @provide(scope=Scope.APP)
+    def get_jwt_handler(self) -> JWTHandler:
+        return MagicMock(spec=JWTHandler)
 
     @provide(scope=Scope.APP)
     def get_node_management_gateway(self) -> SqlAlchemyNodeManagementGateway:

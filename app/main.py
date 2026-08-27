@@ -137,6 +137,7 @@ def create_app() -> FastAPI:
         RateLimitMiddleware,
         requests=settings.RATE_LIMIT_REQUESTS,
         window=settings.RATE_LIMIT_WINDOW,
+        max_clients=settings.RATE_LIMIT_MAX_CLIENTS,
     )
     app.add_middleware(CommitOnResponseMiddleware)
 

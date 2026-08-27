@@ -401,7 +401,7 @@ class DockerContainerService:
             node_id,
             {
                 "container_id": validated_id,
-                "command": command,
+                "command_fingerprint": command_fingerprint(command),
                 "exit_code": exit_code,
             },
         )

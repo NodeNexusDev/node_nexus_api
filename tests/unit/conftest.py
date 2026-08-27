@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 from dishka import Provider, Scope, provide
 
+from app.application.ports.jwt_handler import JWTHandler
 from app.application.services.api_key_authentication import (
     APIKeyAuthenticationService,
     AuthenticatedPrincipal,
@@ -30,6 +31,10 @@ class MockAuthServiceProvider(Provider):
             scope="read-write",
         )
         return mock
+
+    @provide(scope=Scope.APP)
+    def get_jwt_handler(self) -> JWTHandler:
+        return MagicMock(spec=JWTHandler)
 
 
 def make_orm_node(**overrides: Any) -> Any:

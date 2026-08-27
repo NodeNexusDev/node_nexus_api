@@ -4,7 +4,7 @@ import uuid
 
 import structlog
 from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
-from fastapi import APIRouter, Security, status
+from fastapi import APIRouter, Query, Security, status
 
 from app.api.deps import require_superuser
 from app.application.dto.user import UserViewDTO
@@ -31,14 +31,20 @@ def _user_response(user: UserViewDTO) -> UserResponse:
 @inject
 async def get_users(
     service: FromDishka[UserService],
+    page: int = Query(1, ge=1),
+    size: int = Query(20, ge=1, le=100),
     _key: uuid.UUID = Security(require_superuser),
 ) -> UserListResponse:
-    """List all users (superuser only)."""
-    audit.info("api.users.list")
-    users = await service.list_users(caller_is_superuser=True)
+    """List one page of users (superuser only)."""
+    audit.info("api.users.list", page=page, size=size)
+    result = await service.list_users(
+        offset=(page - 1) * size,
+        limit=size,
+        caller_is_superuser=True,
+    )
     return UserListResponse(
-        items=[_user_response(u) for u in users],
-        total=len(users),
+        items=[_user_response(user) for user in result.items],
+        total=result.total,
     )
 
 

@@ -28,6 +28,7 @@ from app.adapters.security import AesGcmCredentialCipher, HmacSha256APIKeyHasher
 from app.api.error_mapping import domain_error_handler
 from app.api.v1.health import router as health_router
 from app.api.v1.scripts import router as scripts_router
+from app.application.ports.jwt_handler import JWTHandler
 from app.application.services.api_key_authentication import APIKeyAuthenticationService
 from app.application.services.script_execution_service import ScriptExecutionService
 from app.application.services.script_history_service import ScriptHistoryService
@@ -74,6 +75,10 @@ class IntegrationDbProvider(Provider):
     @provide(scope=Scope.APP)
     def get_api_key_gateway(self) -> SqlAlchemyAPIKeyGateway:
         return SqlAlchemyAPIKeyGateway(self._sm)
+
+    @provide(scope=Scope.APP)
+    def get_jwt_handler(self) -> JWTHandler:
+        return MagicMock(spec=JWTHandler)
 
     @provide(scope=Scope.REQUEST)
     def get_management_service(

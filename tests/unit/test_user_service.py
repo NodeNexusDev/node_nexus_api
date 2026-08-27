@@ -80,13 +80,16 @@ class TestCreateUser:
 class TestListUsers:
     async def test_not_superuser(self, service: UserService) -> None:
         with pytest.raises(InsufficientPermissionsError, match="Only superusers"):
-            await service.list_users(caller_is_superuser=False)
+            await service.list_users(0, 20, caller_is_superuser=False)
 
     async def test_success(self, service: UserService, reader: AsyncMock) -> None:
         users = [_user_view(), _user_view(email="other@example.com")]
         reader.list_users.return_value = users
-        result = await service.list_users(caller_is_superuser=True)
-        assert result == users
+        reader.count_users.return_value = 7
+        result = await service.list_users(20, 20, caller_is_superuser=True)
+        assert result.items == tuple(users)
+        assert result.total == 7
+        reader.list_users.assert_awaited_once_with(20, 20)
 
 
 class TestDeleteUser:

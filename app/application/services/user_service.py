@@ -7,7 +7,7 @@ from uuid import UUID
 
 import structlog
 
-from app.application.dto.user import UserCreateDTO, UserViewDTO
+from app.application.dto.user import UserCreateDTO, UserPageDTO, UserViewDTO
 from app.core.exceptions import (
     InsufficientPermissionsError,
     UserAlreadyExistsError,
@@ -59,8 +59,12 @@ class UserService:
         return result
 
     async def list_users(
-        self, *, caller_is_superuser: bool = False
-    ) -> list[UserViewDTO]:
+        self,
+        offset: int,
+        limit: int,
+        *,
+        caller_is_superuser: bool = False,
+    ) -> UserPageDTO:
         """List all users.
 
         Raises:
@@ -68,7 +72,9 @@ class UserService:
         """
         if not caller_is_superuser:
             raise InsufficientPermissionsError("Only superusers can list users")
-        return await self._reader.list_users()
+        users = await self._reader.list_users(offset, limit)
+        total = await self._reader.count_users()
+        return UserPageDTO(items=tuple(users), total=total)
 
     async def delete_user(
         self, user_id: UUID, *, caller_is_superuser: bool = False

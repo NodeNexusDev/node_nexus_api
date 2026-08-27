@@ -18,6 +18,7 @@ from app.application.dto.api_key import (
     APIKeyPageDTO,
     APIKeyViewDTO,
 )
+from app.application.ports.jwt_handler import JWTHandler
 from app.application.services.api_key_authentication import (
     APIKeyAuthenticationService,
 )
@@ -65,6 +66,10 @@ def _create_test_app(service: APIKeyManagementService | AsyncMock) -> FastAPI:
         @provide(scope=Scope.REQUEST)
         def get_auth_service(self) -> APIKeyAuthenticationService:
             return AsyncMock(spec=APIKeyAuthenticationService)
+
+        @provide(scope=Scope.APP)
+        def get_jwt_handler(self) -> JWTHandler:
+            return MagicMock(spec=JWTHandler)
 
     container = make_async_container(MockServiceProvider())
     setup_dishka(container, app)

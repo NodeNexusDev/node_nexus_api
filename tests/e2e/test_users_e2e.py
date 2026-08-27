@@ -116,11 +116,11 @@ class TestCreateUser:
         with _superuser_client(api_base_url) as sc:
             sc.post(
                 "/api/v1/users/",
-                json={"email": email, "password": "pass-1"},
+                json={"email": email, "password": "duplicate-pass-1"},
             )
             result = sc.post(
                 "/api/v1/users/",
-                json={"email": email, "password": "pass-2"},
+                json={"email": email, "password": "duplicate-pass-2"},
             )
         assert result.status_code == 409
 
@@ -129,7 +129,7 @@ class TestCreateUser:
         with _non_superuser_client(api_base_url) as nc:
             result = nc.post(
                 "/api/v1/users/",
-                json={"email": email, "password": "pass-123"},
+                json={"email": email, "password": "forbidden-pass-123"},
             )
         assert result.status_code == 403
 
@@ -140,7 +140,7 @@ class TestDeleteUser:
         with _superuser_client(api_base_url) as sc:
             create_resp = sc.post(
                 "/api/v1/users/",
-                json={"email": email, "password": "pass-123"},
+                json={"email": email, "password": "delete-pass-123"},
             )
             user_id = create_resp.json()["id"]
             result = sc.delete(f"/api/v1/users/{user_id}")
@@ -163,7 +163,7 @@ class TestDeleteUser:
         with _superuser_client(api_base_url) as sc:
             create_resp = sc.post(
                 "/api/v1/users/",
-                json={"email": email, "password": "pass-123"},
+                json={"email": email, "password": "protected-pass-123"},
             )
             user_id = create_resp.json()["id"]
         with _non_superuser_client(api_base_url) as nc:

@@ -16,13 +16,16 @@ _SENSITIVE_KEY_PARTS = (
     "authorization",
     "database_url",
 )
+_SENSITIVE_EXACT_KEYS = frozenset({"command"})
 _CREDENTIAL_URL_RE = re.compile(r"(?P<scheme>[a-z][a-z0-9+.-]*://)[^/@\s]+@")
 REDACTED = "[REDACTED]"
 
 
 def _is_sensitive_key(key: object) -> bool:
     normalized = str(key).lower().replace("-", "_")
-    return any(part in normalized for part in _SENSITIVE_KEY_PARTS)
+    return normalized in _SENSITIVE_EXACT_KEYS or any(
+        part in normalized for part in _SENSITIVE_KEY_PARTS
+    )
 
 
 def _redact_value(value: Any) -> Any:

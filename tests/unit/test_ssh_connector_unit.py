@@ -22,6 +22,21 @@ class AsyncChunks:
             yield chunk
 
 
+def _command_context(
+    stdout: tuple[str, ...],
+    stderr: tuple[str, ...],
+    exit_status: int | None,
+) -> AsyncMock:
+    process = AsyncMock()
+    process.stdout = AsyncChunks(*stdout)
+    process.stderr = AsyncChunks(*stderr)
+    process.exit_status = exit_status
+    process.wait = AsyncMock()
+    context = AsyncMock()
+    context.__aenter__.return_value = process
+    return context
+
+
 class TestSSHConnector:
     async def test_not_connected_raises(self) -> None:
         connector = SSHConnector(host="127.0.0.1")
@@ -104,12 +119,8 @@ class TestSSHConnector:
 
     async def test_execute_command_returns_tuple(self) -> None:
         connector = SSHConnector(host="127.0.0.1")
-        mock_conn = AsyncMock()
-        mock_result = MagicMock()
-        mock_result.stdout = "output"
-        mock_result.stderr = ""
-        mock_result.exit_status = 0
-        mock_conn.run = AsyncMock(return_value=mock_result)
+        mock_conn = MagicMock()
+        mock_conn.create_process.return_value = _command_context(("output",), (), 0)
         connector._connection = mock_conn
 
         stdout, stderr, exit_code = await connector.execute_command("echo hi")
@@ -119,12 +130,10 @@ class TestSSHConnector:
 
     async def test_execute_command_non_zero_exit(self) -> None:
         connector = SSHConnector(host="127.0.0.1")
-        mock_conn = AsyncMock()
-        mock_result = MagicMock()
-        mock_result.stdout = ""
-        mock_result.stderr = "command not found"
-        mock_result.exit_status = 127
-        mock_conn.run = AsyncMock(return_value=mock_result)
+        mock_conn = MagicMock()
+        mock_conn.create_process.return_value = _command_context(
+            (), ("command not found",), 127
+        )
         connector._connection = mock_conn
 
         stdout, stderr, exit_code = await connector.execute_command("bad-cmd")
@@ -197,8 +206,8 @@ class TestSSHConnector:
         import asyncssh
 
         connector = SSHConnector(host="127.0.0.1")
-        mock_conn = AsyncMock()
-        mock_conn.run = AsyncMock(side_effect=asyncssh.Error("Channel closed", ""))
+        mock_conn = MagicMock()
+        mock_conn.create_process.side_effect = asyncssh.Error("Channel closed", "")
         connector._connection = mock_conn
 
         with pytest.raises(ConnectionFailedError):
@@ -206,16 +215,28 @@ class TestSSHConnector:
 
     async def test_execute_command_exit_status_none(self) -> None:
         connector = SSHConnector(host="127.0.0.1")
-        mock_conn = AsyncMock()
-        mock_result = MagicMock()
-        mock_result.stdout = "output"
-        mock_result.stderr = ""
-        mock_result.exit_status = None
-        mock_conn.run = AsyncMock(return_value=mock_result)
+        mock_conn = MagicMock()
+        mock_conn.create_process.return_value = _command_context(("output",), (), None)
         connector._connection = mock_conn
 
         stdout, stderr, exit_code = await connector.execute_command("echo hi")
         assert exit_code == 0
+
+    async def test_execute_command_bounds_each_output_stream(self) -> None:
+        connector = SSHConnector(host="127.0.0.1")
+        mock_conn = MagicMock()
+        mock_conn.create_process.return_value = _command_context(
+            ("abcdef", "ghijkl"),
+            ("123456",),
+            0,
+        )
+        connector._connection = mock_conn
+
+        with patch("app.adapters.runtime.ssh._MAX_CAPTURED_OUTPUT_BYTES", 8):
+            stdout, stderr, _ = await connector.execute_command("large-output")
+
+        assert stdout == "abcdefgh\n...[remote output truncated]"
+        assert stderr == "123456"
 
     async def test_legacy_streaming_yields_stdout(self) -> None:
         connector = SSHConnector(host="127.0.0.1")

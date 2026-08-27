@@ -19,11 +19,16 @@ async def _call_next(request: Request) -> JSONResponse:
 
 
 def _create_middleware(
-    requests: int = 3, window: int = 60
+    requests: int = 3, window: int = 60, max_clients: int = 10_000
 ) -> tuple[Starlette, RateLimitMiddleware]:
     """Create a Starlette app with RateLimitMiddleware."""
     app = Starlette(routes=[Route("/api/test", _endpoint)])
-    middleware = RateLimitMiddleware(app, requests=requests, window=window)
+    middleware = RateLimitMiddleware(
+        app,
+        requests=requests,
+        window=window,
+        max_clients=max_clients,
+    )
     return app, middleware
 
 
@@ -167,3 +172,14 @@ async def test_rate_limit_default_values() -> None:
     middleware = RateLimitMiddleware(app)
     assert middleware._requests == 100
     assert middleware._window == 60
+
+
+async def test_rate_limit_evicts_least_recent_client_at_capacity() -> None:
+    _app, middleware = _create_middleware(max_clients=2)
+
+    for client_ip in ("10.0.0.1", "10.0.0.2", "10.0.0.3"):
+        request = Request(_make_scope(client_ip=client_ip))
+        response = await middleware.dispatch(request, _call_next)
+        assert response.status_code == 200
+
+    assert list(middleware._ip_counts) == ["10.0.0.2", "10.0.0.3"]

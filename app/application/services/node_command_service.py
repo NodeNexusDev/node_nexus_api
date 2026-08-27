@@ -139,15 +139,20 @@ class NodeCommandService:
 
         try:
             result = await execute_ssh(connector, data.command)
+            fingerprint = command_fingerprint(data.command)
             audit.info(
                 "node.command.executed",
                 node_id=str(node_id),
-                command=data.command,
+                command_fingerprint=fingerprint,
+                command_length=len(data.command),
             )
             await self._log(
                 "execute",
                 node_id,
-                {"command": data.command, "exit_code": result.exit_code},
+                {
+                    "command_fingerprint": fingerprint,
+                    "exit_code": result.exit_code,
+                },
             )
             if self._history_writer is not None:
                 await save_history(
@@ -169,27 +174,35 @@ class NodeCommandService:
             audit.error(
                 "node.command.failed",
                 node_id=str(node_id),
-                command=data.command,
+                command_fingerprint=command_fingerprint(data.command),
+                command_length=len(data.command),
                 error=str(exc),
             )
             await self._log(
                 "execute_failed",
                 node_id,
-                {"command": data.command, "error": str(exc)},
+                {
+                    "command_fingerprint": command_fingerprint(data.command),
+                    "error": str(exc),
+                },
             )
             raise
         except Exception as exc:
             audit.error(
                 "node.command.unexpected_error",
                 node_id=str(node_id),
-                command=data.command,
+                command_fingerprint=command_fingerprint(data.command),
+                command_length=len(data.command),
                 error_type=type(exc).__name__,
                 error=str(exc),
             )
             await self._log(
                 "execute_failed",
                 node_id,
-                {"command": data.command, "error": str(exc)},
+                {
+                    "command_fingerprint": command_fingerprint(data.command),
+                    "error": str(exc),
+                },
             )
             raise ConnectionFailedError(
                 f"Failed to execute command on node {node_id}: {exc}"

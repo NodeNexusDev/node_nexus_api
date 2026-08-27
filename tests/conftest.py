@@ -1,7 +1,10 @@
 """Shared test fixtures."""
 
+import os
 import socket
 from unittest.mock import MagicMock
+
+os.environ.setdefault("ENVIRONMENT", "test")
 
 
 def is_port_open(host: str, port: int) -> bool:

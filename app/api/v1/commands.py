@@ -14,6 +14,7 @@ from app.api.deps import (
     get_current_principal,
     require_write_or_jwt_scope,
 )
+from app.application.command_policy import command_fingerprint
 from app.application.dto.command_execution import (
     BulkCommandRequestDTO,
     CommandRequestDTO,
@@ -156,7 +157,12 @@ async def execute_raw_command(
     _key: Principal = Security(require_write_or_jwt_scope),
 ) -> CommandResult:
     """Execute a raw command on a node via SSH."""
-    audit.info("api.commands.execute", node_id=str(data.node_id), command=data.command)
+    audit.info(
+        "api.commands.execute",
+        node_id=str(data.node_id),
+        command_fingerprint=command_fingerprint(data.command),
+        command_length=len(data.command),
+    )
     result = await service.execute_command(
         data.node_id,
         CommandRequestDTO(command=data.command, timeout=data.timeout),
@@ -253,7 +259,8 @@ async def bulk_execute_raw_command(
     """Execute a raw command on multiple nodes by IDs and/or tags."""
     audit.info(
         "api.commands.bulk_execute",
-        command=data.command,
+        command_fingerprint=command_fingerprint(data.command),
+        command_length=len(data.command),
         node_ids=[str(n) for n in (data.node_ids or [])],
         tags=data.tags,
     )
