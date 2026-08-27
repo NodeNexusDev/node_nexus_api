@@ -18,6 +18,9 @@ _GROUP_MAP = {
 }
 
 _DUR = "EXTRACT(EPOCH FROM ({t}.finished_at - {t}.started_at)) * 1000"
+_SCRIPT_TERMINAL_STATUSES = "('success', 'error', 'completed', 'failed')"
+_SCRIPT_SUCCESS_STATUSES = "('success', 'completed')"
+_SCRIPT_FAILURE_STATUSES = "('error', 'failed')"
 
 
 class DashboardMetricsRepository:
@@ -83,10 +86,10 @@ class DashboardMetricsRepository:
         sql = text(  # nosec B608: false positive – dur/where_sql built from whitelisted constants
             "SELECT "
             f"  date_trunc(:grp, se.started_at) AS period, "  # nosec B608
-            "  COUNT(*)::int AS total, "
-            "  COUNT(*) FILTER (WHERE se.status = 'completed')::int AS successful, "  # noqa: E501
-            "  COUNT(*) FILTER (WHERE se.status != 'completed')::int AS failed, "  # noqa: E501
-            f"  AVG({dur}) AS avg_duration_ms "  # nosec B608
+            f"  COUNT(*) FILTER (WHERE se.status IN {_SCRIPT_TERMINAL_STATUSES})::int AS total, "  # nosec B608  # noqa: E501
+            f"  COUNT(*) FILTER (WHERE se.status IN {_SCRIPT_SUCCESS_STATUSES})::int AS successful, "  # nosec B608  # noqa: E501
+            f"  COUNT(*) FILTER (WHERE se.status IN {_SCRIPT_FAILURE_STATUSES})::int AS failed, "  # nosec B608  # noqa: E501
+            f"  AVG({dur}) FILTER (WHERE se.status IN {_SCRIPT_TERMINAL_STATUSES}) AS avg_duration_ms "  # nosec B608  # noqa: E501
             "FROM script_executions se "
             f"WHERE {where_sql} "  # nosec B608
             f"GROUP BY date_trunc(:grp, se.started_at) "  # nosec B608

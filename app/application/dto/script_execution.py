@@ -2,10 +2,20 @@
 
 from dataclasses import dataclass
 from datetime import datetime
+from typing import Literal
 from uuid import UUID
 
 from app.application.dto.node_connection import NodeConnectionDTO
 from app.application.types import JsonValue
+
+ScriptExecutionStatus = Literal[
+    "pending",
+    "running",
+    "success",
+    "error",
+    "cancelled",
+]
+ScriptTerminalStatus = Literal["success", "error"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -61,7 +71,7 @@ class ScriptNodeResultDTO:
     execution_id: UUID
     node_id: UUID
     node_name: str
-    status: str
+    status: ScriptTerminalStatus
     steps: tuple[ScriptStepResultDTO, ...]
 
 
@@ -81,7 +91,7 @@ class ScriptExecutionDTO:
     script_id: UUID
     node_id: UUID | None
     params: tuple[tuple[str, JsonValue], ...]
-    status: str
+    status: ScriptExecutionStatus
     steps: tuple[ScriptStepResultDTO, ...]
     started_at: datetime
     finished_at: datetime | None

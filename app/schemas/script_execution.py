@@ -6,6 +6,8 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
+from app.application.dto.script_execution import ScriptExecutionStatus
+
 
 class ScriptExecutionResponse(BaseModel):
     """Schema for a single script execution record."""
@@ -16,7 +18,7 @@ class ScriptExecutionResponse(BaseModel):
     script_id: uuid.UUID
     node_id: uuid.UUID | None
     params: dict[str, Any] | None
-    status: str
+    status: ScriptExecutionStatus
     steps: list[dict[str, Any]] | None
     started_at: datetime
     finished_at: datetime | None

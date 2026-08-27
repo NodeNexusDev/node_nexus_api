@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import JSON, DateTime, ForeignKey, Index, String
+from sqlalchemy import JSON, CheckConstraint, DateTime, ForeignKey, Index, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, _utcnow
@@ -20,6 +20,10 @@ class ScriptExecutionModel(Base):
     __tablename__ = "script_executions"
 
     __table_args__ = (
+        CheckConstraint(
+            "status IN ('pending', 'running', 'success', 'error', 'cancelled')",
+            name="ck_script_executions_status",
+        ),
         Index("ix_script_executions_script_id", "script_id"),
         Index("ix_script_executions_node_id", "node_id"),
         Index("ix_script_executions_trigger", "trigger"),

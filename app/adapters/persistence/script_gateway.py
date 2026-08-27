@@ -12,6 +12,7 @@ from app.application.dto.script_execution import (
     ScriptExecutionDTO,
     ScriptExecutionPageDTO,
     ScriptExecutionQueryDTO,
+    ScriptExecutionStatus,
     ScriptStepResultDTO,
 )
 from app.application.dto.script_management import (
@@ -24,6 +25,11 @@ from app.application.dto.script_management import (
 )
 from app.models.script import ScriptModel
 from app.models.script_execution import ScriptExecutionModel
+
+_LEGACY_EXECUTION_STATUSES = {
+    "completed": "success",
+    "failed": "error",
+}
 
 
 class ScopedScriptDefinitionReader:
@@ -200,12 +206,15 @@ class SqlAlchemyScriptGateway:
             )
             for step in (execution.steps or ())
         )
+        normalized_status = _LEGACY_EXECUTION_STATUSES.get(
+            execution.status, execution.status
+        )
         return ScriptExecutionDTO(
             id=execution.id,
             script_id=execution.script_id,
             node_id=execution.node_id,
             params=tuple((execution.params or {}).items()),
-            status=execution.status,
+            status=cast(ScriptExecutionStatus, normalized_status),
             steps=step_results,
             started_at=execution.started_at,
             finished_at=execution.finished_at,

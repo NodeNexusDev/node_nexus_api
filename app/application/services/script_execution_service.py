@@ -18,6 +18,7 @@ from app.application.dto.script_execution import (
     ScriptExecutionTargetDTO,
     ScriptNodeResultDTO,
     ScriptStepResultDTO,
+    ScriptTerminalStatus,
 )
 from app.application.policies.output import bound_output
 from app.application.services._target_resolver import resolve_targets
@@ -188,7 +189,7 @@ class ScriptExecutionService:
         """Run one immutable target without persistence dependencies."""
         node = target.node
         results: list[ScriptStepResultDTO] = []
-        status = "success"
+        status: ScriptTerminalStatus = "success"
         try:
             connector = self._connector_factory.create_ssh(
                 host=node.host,
@@ -221,9 +222,10 @@ class ScriptExecutionService:
                             exit_code=exit_code,
                         )
                     )
-                    if exit_code != 0 and step.on_failure == "stop":
+                    if exit_code != 0:
                         status = "error"
-                        break
+                        if step.on_failure == "stop":
+                            break
         except Exception as exc:
             status = "error"
             audit.exception(
