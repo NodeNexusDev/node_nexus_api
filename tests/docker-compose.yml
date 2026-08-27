@@ -1,6 +1,6 @@
 services:
   dind:
-    image: docker:27-dind
+    image: docker:27-dind@sha256:aa3df78ecf320f5fafdce71c659f1629e96e9de0968305fe1de670e0ca9176ce
     privileged: true
     environment:
       DOCKER_TLS_CERTDIR: ""
@@ -18,7 +18,7 @@ services:
         max-file: "3"
 
   ssh-server:
-    image: lscr.io/linuxserver/openssh-server:latest
+    image: lscr.io/linuxserver/openssh-server:latest@sha256:96b9a4d3b5106746d08d43a6911650d4d21f7d5c7f2ac9660e792bdb5e63157c
     environment:
       - PUID=1000
       - PGID=1000
