@@ -126,8 +126,12 @@ Endpoints в `/api/v1/users/` требуют JWT с claim `is_superuser`. API ke
 Когда запрос содержит и `X-API-Key`, и `Authorization: Bearer`, security
 dependency проверяет в следующем порядке:
 
-1. **Bearer token** — если присутствуют, используются JWT claims для авторизации
-2. **API key** — fallback для программного доступа
+1. **Bearer token** — если присутствует, используются JWT claims; невалидный
+   токен приводит к fail-closed ответу `401`
+2. **API key** — используется только при отсутствии Bearer header
+
+Сервер не скрывает ошибку Bearer token через fallback на второй credential из
+того же запроса.
 
 Для endpoints суперпользователя (`/api/v1/users/*`) принимается только JWT.
 API keys отклоняются с `401`.

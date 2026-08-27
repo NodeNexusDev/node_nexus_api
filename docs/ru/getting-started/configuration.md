@@ -11,10 +11,13 @@ source_revision: "2026-07-29"
 
 ```dotenv
 DATABASE_URL=postgresql+asyncpg://node_nexus:change-me@db:5432/node_nexus
-SECRET_KEY=replace-with-a-random-secret
-MASTER_API_KEY=replace-with-a-long-random-key
+ENVIRONMENT=production
+SECRET_KEY=replace-with-at-least-32-random-characters
+ENCRYPTION_SALT=replace-with-at-least-16-random-characters
+MASTER_API_KEY=replace-with-at-least-32-random-characters
 ```
 
 `SECRET_KEY` защищает сохранённые SSH-учётные данные. После его замены ранее
-зашифрованные значения нельзя прочитать. Полный список, сверенный с кодом,
+зашифрованные значения нельзя прочитать. Production startup отклоняет secrets
+короче указанных ограничений. Полный список, сверенный с кодом,
 находится в [справочнике конфигурации](../reference/configuration.md).
