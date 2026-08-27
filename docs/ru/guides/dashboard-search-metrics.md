@@ -37,6 +37,9 @@ curl --fail-with-body \
 | `date_from` | — | Начало диапазона (ISO 8601) |
 | `date_to` | — | Конец диапазона (ISO 8601) |
 
+Ответ содержит массивы `command_metrics` и `script_metrics`. Каждый бакет
+содержит `period`, `total`, `successful`, `failed` и `avg_duration_ms`.
+
 ## Глобальный поиск
 
 ```bash
@@ -66,16 +69,18 @@ curl --fail-with-body \
   "${NODE_NEXUS_URL}/api/v1/scripts/<script-id>/stats"
 ```
 
-### Статистика нод
+### Статистика команд для ноды
 
 ```bash
 curl --fail-with-body \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
-  "${NODE_NEXUS_URL}/api/v1/nodes/<node-id>/stats"
+  "${NODE_NEXUS_URL}/api/v1/commands/stats?node_id=<node-id>"
 ```
 
-Каждый эндпоинт возвращает `total`, `success`, `failure` и
-`avg_duration_seconds`.
+Каждый эндпоинт возвращает `total`, `successful`, `failed`, `success_rate`,
+`avg_duration_ms`, `min_duration_ms`, `max_duration_ms` и `last_executed_at`.
+Для скриптов в `total` входят только завершённые состояния `success` и `error`;
+`pending`, `running` и `cancelled` исключаются.
 
 ## SSE поток событий
 

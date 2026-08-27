@@ -8,8 +8,9 @@ source_revision: "2026-08-16"
 # Scripts and schedules
 
 A script is an ordered pipeline of inline commands and saved command templates.
-Each step chooses `stop` or `continue` failure behavior. Execution can target
-multiple nodes and produces per-node results.
+Each step chooses `stop` or `continue` failure behavior. A non-zero exit code
+always marks the per-node result as `error`; `continue` only allows subsequent
+steps to run. Execution can target multiple nodes and produces per-node results.
 
 Schedule definitions are stored in PostgreSQL and restored during startup.
 `timezone` uses an IANA name and defaults to `UTC`; missed runs are coalesced,
