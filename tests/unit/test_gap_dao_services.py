@@ -182,6 +182,9 @@ class TestScriptStats:
         assert params["date_from"] == dt_from
         assert params["date_to"] == dt_to
         assert result["total"] == 3
+        assert "se.status IN ('success', 'completed')" in sql
+        assert "se.status IN ('error', 'failed')" in sql
+        assert "se.status !=" not in sql
 
     async def test_no_filters_where_true(self) -> None:
         row = _make_row(
@@ -324,6 +327,9 @@ class TestScriptMetrics:
         assert params["date_to"] == dt_to
         assert len(result) == 1
         assert result[0].avg_duration_ms == 180.0
+        assert "se.status IN ('success', 'completed')" in sql
+        assert "se.status IN ('error', 'failed')" in sql
+        assert "se.status !=" not in sql
 
     async def test_no_filters_where_true(self) -> None:
         execute_result = MagicMock()

@@ -418,7 +418,7 @@ class TestScheduledExecutionHistory:
         mock_execution.id = exec_id
         mock_execution.script_id = script_id
         mock_execution.node_id = node_id
-        mock_execution.status = "completed"
+        mock_execution.status = "success"
         mock_execution.exit_code = 0
         mock_execution.started_at = datetime(2025, 1, 1, tzinfo=UTC)
         mock_execution.finished_at = datetime(2025, 1, 1, 0, 1, tzinfo=UTC)

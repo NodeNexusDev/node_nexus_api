@@ -18,6 +18,7 @@ from app.models.base import Base
 from app.models.node import NodeModel  # noqa: F401
 from app.models.script import ScriptModel  # noqa: F401
 from app.models.script_execution import ScriptExecutionModel  # noqa: F401
+from app.models.script_schedule import ScriptScheduleModel  # noqa: F401
 
 
 @pytest_asyncio.fixture
@@ -94,12 +95,12 @@ async def test_get_by_id_found(
     execution = await repo.create(
         {
             "script_id": script_id,
-            "status": "completed",
+            "status": "success",
         }
     )
     result = await repo.get_by_id(execution.id)
     assert result is not None
-    assert result.status == "completed"
+    assert result.status == "success"
 
 
 async def test_get_by_id_not_found(repo: ScriptExecutionRepository) -> None:
@@ -121,9 +122,9 @@ async def test_get_by_script_id_with_data(
     script_id = await _create_script(script_repo)
     node1 = uuid.uuid4()
     node2 = uuid.uuid4()
-    await repo.create({"script_id": script_id, "node_id": node1, "status": "completed"})
-    await repo.create({"script_id": script_id, "node_id": node1, "status": "failed"})
-    await repo.create({"script_id": script_id, "node_id": node2, "status": "completed"})
+    await repo.create({"script_id": script_id, "node_id": node1, "status": "success"})
+    await repo.create({"script_id": script_id, "node_id": node1, "status": "error"})
+    await repo.create({"script_id": script_id, "node_id": node2, "status": "success"})
 
     results = await repo.get_by_script_id(script_id)
     assert len(results) == 3
@@ -134,7 +135,7 @@ async def test_get_by_script_id_pagination(
 ) -> None:
     script_id = await _create_script(script_repo)
     for _ in range(5):
-        await repo.create({"script_id": script_id, "status": "completed"})
+        await repo.create({"script_id": script_id, "status": "success"})
 
     results = await repo.get_by_script_id(script_id, skip=1, limit=2)
     assert len(results) == 2
@@ -144,8 +145,8 @@ async def test_get_by_script_id_ordered_by_started_at_desc(
     repo: ScriptExecutionRepository, script_repo: ScriptRepository
 ) -> None:
     script_id = await _create_script(script_repo)
-    e1 = await repo.create({"script_id": script_id, "status": "completed"})
-    e2 = await repo.create({"script_id": script_id, "status": "completed"})
+    e1 = await repo.create({"script_id": script_id, "status": "success"})
+    e2 = await repo.create({"script_id": script_id, "status": "success"})
 
     results = await repo.get_by_script_id(script_id)
     assert results[0].id == e2.id
@@ -157,9 +158,9 @@ async def test_count_by_script_id(
 ) -> None:
     script_id = await _create_script(script_repo)
     other_script_id = await _create_script(script_repo)
-    await repo.create({"script_id": script_id, "status": "completed"})
-    await repo.create({"script_id": script_id, "status": "failed"})
-    await repo.create({"script_id": other_script_id, "status": "completed"})
+    await repo.create({"script_id": script_id, "status": "success"})
+    await repo.create({"script_id": script_id, "status": "error"})
+    await repo.create({"script_id": other_script_id, "status": "success"})
 
     count = await repo.count_by_script_id(script_id)
     assert count == 2
@@ -173,14 +174,14 @@ async def test_update(
     updated = await repo.update(
         execution.id,
         {
-            "status": "completed",
+            "status": "success",
             "steps": [{"step_index": 0, "exit_code": 0}],
         },
     )
     assert updated is not None
-    assert updated.status == "completed"
+    assert updated.status == "success"
 
 
 async def test_update_not_found(repo: ScriptExecutionRepository) -> None:
-    result = await repo.update(uuid.uuid4(), {"status": "completed"})
+    result = await repo.update(uuid.uuid4(), {"status": "success"})
     assert result is None
