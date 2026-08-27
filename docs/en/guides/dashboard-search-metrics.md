@@ -57,10 +57,11 @@ Returns time-bucketed execution metrics for charts. Parameters:
 {
   "command_metrics": [
     {
-      "bucket": "2026-08-17T00:00:00",
+      "period": "2026-08-17 00:00:00+00:00",
       "total": 42,
-      "success": 38,
-      "failure": 4
+      "successful": 38,
+      "failed": 4,
+      "avg_duration_ms": 1250.5
     }
   ],
   "script_metrics": [...]
@@ -97,16 +98,18 @@ curl --fail-with-body \
   "${NODE_NEXUS_URL}/api/v1/scripts/<script-id>/stats"
 ```
 
-### Node stats
+### Command stats for a node
 
 ```bash
 curl --fail-with-body \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
-  "${NODE_NEXUS_URL}/api/v1/nodes/<node-id>/stats"
+  "${NODE_NEXUS_URL}/api/v1/commands/stats?node_id=<node-id>"
 ```
 
-Each stats endpoint returns `total`, `success`, `failure` counts and
-`avg_duration_seconds`.
+Each stats endpoint returns `total`, `successful`, `failed`, `success_rate`,
+`avg_duration_ms`, `min_duration_ms`, `max_duration_ms`, and
+`last_executed_at`. Script totals include terminal `success` and `error`
+executions; `pending`, `running`, and `cancelled` executions are excluded.
 
 ## SSE event stream
 
