@@ -3,6 +3,8 @@
 from dataclasses import dataclass, field
 from uuid import UUID
 
+from app.core.types import ConnectionType
+
 
 @dataclass(frozen=True, slots=True)
 class NodeConnectionDTO:
@@ -12,7 +14,7 @@ class NodeConnectionDTO:
     name: str
     host: str
     port: int
-    connection_type: str
+    connection_type: ConnectionType
     username: str | None
     password: str | None = field(default=None, repr=False)
     ssh_key: str | None = field(default=None, repr=False)

@@ -1,5 +1,6 @@
 """Short-scope SQLAlchemy adapter for node management ports."""
 
+from typing import cast
 from uuid import UUID
 
 from sqlalchemy.exc import IntegrityError
@@ -16,6 +17,7 @@ from app.application.dto.node_management import (
 )
 from app.application.dto.node_view import NodeViewDTO
 from app.core.exceptions import NodeNameConflictError
+from app.core.types import ConnectionType, NodeStatus
 from app.models.node import NodeModel
 
 
@@ -149,8 +151,8 @@ class SqlAlchemyNodeManagementGateway:
             name=node.name,
             host=node.host,
             port=node.port,
-            connection_type=node.connection_type,
-            status=node.status,
+            connection_type=cast(ConnectionType, node.connection_type),
+            status=cast(NodeStatus, node.status),
             username=node.username,
             docker_host=node.docker_host,
             tags=tuple(node.tags or ()),

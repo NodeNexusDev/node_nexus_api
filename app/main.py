@@ -51,6 +51,7 @@ from app.api.v1.websocket import router as ws_router
 from app.core.config import get_settings
 from app.core.exceptions import DomainError
 from app.di.container import container
+from app.schemas.common import AUTHENTICATED_ERROR_RESPONSES
 
 
 def stable_operation_id(route: APIRoute) -> str:
@@ -163,7 +164,12 @@ def create_app() -> FastAPI:
     ) -> JSONResponse:
         """Return HTTPException detail together with the request id."""
         request_id = getattr(request.state, "request_id", None)
-        content: dict[str, object] = {"detail": exc.detail}
+        message = exc.detail if isinstance(exc.detail, str) else "HTTP request failed"
+        content: dict[str, object] = {
+            "code": f"HTTP_{exc.status_code}",
+            "message": message,
+            "detail": exc.detail,
+        }
         if request_id:
             content["request_id"] = request_id
         return JSONResponse(
@@ -178,7 +184,11 @@ def create_app() -> FastAPI:
     ) -> JSONResponse:
         """Return validation errors together with the request id."""
         request_id = getattr(request.state, "request_id", None)
-        content: dict[str, object] = {"detail": jsonable_encoder(exc.errors())}
+        content: dict[str, object] = {
+            "code": "RequestValidationError",
+            "message": "Request validation failed",
+            "detail": jsonable_encoder(exc.errors()),
+        }
         if request_id:
             content["request_id"] = request_id
         return JSONResponse(
@@ -192,7 +202,12 @@ def create_app() -> FastAPI:
     ) -> JSONResponse:
         """Return Starlette HTTPException detail together with the request id."""
         request_id = getattr(request.state, "request_id", None)
-        content: dict[str, object] = {"detail": exc.detail}
+        message = exc.detail if isinstance(exc.detail, str) else "HTTP request failed"
+        content: dict[str, object] = {
+            "code": f"HTTP_{exc.status_code}",
+            "message": message,
+            "detail": exc.detail,
+        }
         if request_id:
             content["request_id"] = request_id
         return JSONResponse(
@@ -205,24 +220,32 @@ def create_app() -> FastAPI:
 
     setup_dishka(container, app)
     app.include_router(health_router)
-    app.include_router(nodes_bulk_router, prefix="/api/v1")
-    app.include_router(nodes_router, prefix="/api/v1")
-    app.include_router(commands_router, prefix="/api/v1")
-    app.include_router(scripts_router, prefix="/api/v1")
-    app.include_router(scripts_bulk_router, prefix="/api/v1")
-    app.include_router(audit_router, prefix="/api/v1")
-    app.include_router(dashboard_router, prefix="/api/v1")
-    app.include_router(api_keys_router, prefix="/api/v1")
-    app.include_router(config_router, prefix="/api/v1")
-    app.include_router(docker_router, prefix="/api/v1")
-    app.include_router(docker_bulk_router, prefix="/api/v1")
-    app.include_router(events_router, prefix="/api/v1")
-    app.include_router(ws_router, prefix="/api/v1")
-    app.include_router(search_router, prefix="/api/v1")
-    app.include_router(favorites_router, prefix="/api/v1")
-    app.include_router(notes_router, prefix="/api/v1")
+    protected_routers = (
+        nodes_bulk_router,
+        nodes_router,
+        commands_router,
+        scripts_router,
+        scripts_bulk_router,
+        audit_router,
+        dashboard_router,
+        api_keys_router,
+        config_router,
+        docker_router,
+        docker_bulk_router,
+        events_router,
+        ws_router,
+        search_router,
+        favorites_router,
+        notes_router,
+        users_router,
+    )
+    for protected_router in protected_routers:
+        app.include_router(
+            protected_router,
+            prefix="/api/v1",
+            responses=AUTHENTICATED_ERROR_RESPONSES,
+        )
     app.include_router(auth_router, prefix="/api/v1")
-    app.include_router(users_router, prefix="/api/v1")
     if settings.E2E_ENABLED:
         app.include_router(internal_router, prefix="/api/v1")
 

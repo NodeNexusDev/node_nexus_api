@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from datetime import datetime
 
 from app.application.types import JsonObject
+from app.core.types import ConnectionType
 
 CONFIG_FORMAT_VERSION = "1.0"
 LEGACY_CONFIG_VERSION = "0.5.0"
@@ -14,7 +15,7 @@ class NodeConfigDTO:
     name: str
     host: str
     port: int
-    connection_type: str
+    connection_type: ConnectionType
     username: str | None = None
     docker_host: str | None = None
     tags: tuple[str, ...] = ()

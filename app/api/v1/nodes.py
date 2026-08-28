@@ -119,7 +119,7 @@ async def get_nodes(
     )
 
 
-@router.get("/tags")
+@router.get("/tags", response_model=list[str])
 @inject
 async def get_node_tags(
     service: FromDishka[NodeManagementService],

@@ -13,7 +13,7 @@ from app.main import app
 from tests.types import UnvalidatedJsonObject
 
 OPENAPI_CONTRACT_SHA256 = (
-    "b209ab45075bbb4d0fe12b81bc76973004a29b266302f1367d04c203d0625c47"
+    "ffa7012934f962dcd560aa6c5b9d7fb4d52895a9031825cce8206bdd19a9fc17"
 )
 
 _CANONICAL_ENV = {
@@ -110,6 +110,51 @@ def test_openapi_auth_and_sse_contracts_are_explicit() -> None:
 
     auth_me_get = schema["paths"]["/api/v1/auth/me"]["get"]
     assert auth_me_get["security"] == [{"HTTPBearer": []}]
+
+
+def test_protected_operations_document_standard_auth_errors() -> None:
+    """Require the shared error contract on every secured HTTP operation."""
+    schema = app.openapi()
+    methods = {"get", "post", "put", "patch", "delete"}
+
+    for path_item in schema["paths"].values():
+        for method, operation in path_item.items():
+            if method not in methods or not operation.get("security"):
+                continue
+            responses = operation["responses"]
+            expected_statuses = {"401", "403", "404", "409", "422", "429", "503"}
+            assert expected_statuses <= responses.keys()
+            for status_code in expected_statuses:
+                response_schema = responses[status_code]["content"]["application/json"][
+                    "schema"
+                ]
+                assert response_schema == {
+                    "$ref": "#/components/schemas/ErrorResponse"
+                }
+
+
+def test_public_response_schemas_never_expose_credentials() -> None:
+    """Guard public entity responses against accidental credential leakage."""
+    schema = app.openapi()
+    public_responses = {
+        "APIKeyResponse",
+        "CommandResponse",
+        "NodeResponse",
+        "ScriptResponse",
+        "UserResponse",
+    }
+    forbidden_fields = {
+        "password",
+        "passphrase",
+        "secret",
+        "secret_key",
+        "ssh_key",
+        "token",
+    }
+
+    for schema_name in public_responses:
+        properties = schema["components"]["schemas"][schema_name]["properties"]
+        assert forbidden_fields.isdisjoint(properties), schema_name
 
 
 async def test_runtime_api_documentation_endpoints() -> None:
