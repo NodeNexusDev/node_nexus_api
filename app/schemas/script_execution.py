@@ -2,11 +2,12 @@
 
 import uuid
 from datetime import datetime
-from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
 from app.application.dto.script_execution import ScriptExecutionStatus
+from app.core.types import JsonObject
+from app.schemas.script import ScriptStepResult
 
 
 class ScriptExecutionResponse(BaseModel):
@@ -17,8 +18,8 @@ class ScriptExecutionResponse(BaseModel):
     id: uuid.UUID
     script_id: uuid.UUID
     node_id: uuid.UUID | None
-    params: dict[str, Any] | None
+    params: JsonObject | None
     status: ScriptExecutionStatus
-    steps: list[dict[str, Any]] | None
+    steps: list[ScriptStepResult] | None
     started_at: datetime
     finished_at: datetime | None

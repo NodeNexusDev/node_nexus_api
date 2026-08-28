@@ -1,6 +1,13 @@
 from __future__ import annotations
 
-from app.application.dto.export import AuditExportQueryDTO, AuditExportRowDTO
+from datetime import datetime
+from uuid import UUID
+
+from app.application.dto.export import (
+    AuditExportFormat,
+    AuditExportQueryDTO,
+    AuditExportRowDTO,
+)
 from app.application.ports.export import AuditExporter
 
 
@@ -10,11 +17,11 @@ class ExportService:
 
     async def export_audit(
         self,
-        date_from=None,
-        date_to=None,
-        action=None,
-        node_id=None,
-        fmt="csv",
+        date_from: datetime | None = None,
+        date_to: datetime | None = None,
+        action: str | None = None,
+        node_id: UUID | None = None,
+        fmt: AuditExportFormat = "csv",
     ) -> list[AuditExportRowDTO]:
         return await self._audit_exporter.export_audit(
             AuditExportQueryDTO(

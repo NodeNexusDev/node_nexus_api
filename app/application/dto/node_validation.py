@@ -1,6 +1,6 @@
 """Transport-independent node credential validation objects."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Literal
 
 
@@ -12,9 +12,9 @@ class NodeValidationRequestDTO:
     port: int = 22
     connection_type: str = "ssh"
     username: str | None = None
-    password: str | None = None
-    ssh_key: str | None = None
-    passphrase: str | None = None
+    password: str | None = field(default=None, repr=False)
+    ssh_key: str | None = field(default=None, repr=False)
+    passphrase: str | None = field(default=None, repr=False)
 
 
 @dataclass(frozen=True, slots=True)

@@ -2,9 +2,11 @@
 
 import uuid
 from datetime import datetime
-from typing import Any, Literal
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
+
+from app.core.types import JsonObject, JsonValue
 
 
 class CommandParameter(BaseModel):
@@ -13,7 +15,7 @@ class CommandParameter(BaseModel):
     name: str = Field(..., min_length=1, max_length=100)
     type: Literal["string", "integer", "boolean"] = Field(default="string")
     required: bool = Field(default=True)
-    default: Any = Field(default=None)
+    default: JsonValue = Field(default=None)
     description: str | None = Field(default=None, max_length=500)
 
 
@@ -56,7 +58,7 @@ class CommandExecuteRequest(BaseModel):
     """Request to execute a command on a node."""
 
     node_id: uuid.UUID
-    params: dict[str, Any] = Field(default_factory=dict)
+    params: JsonObject = Field(default_factory=dict)
 
 
 class CommandResult(BaseModel):

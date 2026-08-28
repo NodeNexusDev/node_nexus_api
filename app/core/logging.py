@@ -3,7 +3,6 @@
 import logging
 import re
 from collections.abc import Mapping, MutableMapping
-from typing import Any
 
 import structlog
 
@@ -28,7 +27,7 @@ def _is_sensitive_key(key: object) -> bool:
     )
 
 
-def _redact_value(value: Any) -> Any:
+def _redact_value(value: object) -> object:
     if isinstance(value, Mapping):
         return {
             key: REDACTED if _is_sensitive_key(key) else _redact_value(item)
@@ -44,8 +43,8 @@ def _redact_value(value: Any) -> Any:
 
 
 def redact_secrets(
-    _logger: Any, _method_name: str, event_dict: MutableMapping[str, Any]
-) -> MutableMapping[str, Any]:
+    _logger: object, _method_name: str, event_dict: MutableMapping[str, object]
+) -> MutableMapping[str, object]:
     """Redact secrets from structured event fields and nested containers."""
     return {
         key: REDACTED if _is_sensitive_key(key) else _redact_value(value)

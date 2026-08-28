@@ -2,9 +2,11 @@
 
 import uuid
 from datetime import datetime
-from typing import Any, Literal, Self
+from typing import Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+from app.core.types import JsonObject
 
 
 class ScriptStep(BaseModel):
@@ -14,7 +16,7 @@ class ScriptStep(BaseModel):
     type: Literal["inline", "command"]
     command: str | None = Field(default=None, max_length=4096)
     command_id: uuid.UUID | None = None
-    params: dict[str, Any] = Field(default_factory=dict)
+    params: JsonObject = Field(default_factory=dict)
     on_failure: Literal["stop", "continue"] = Field(default="stop")
 
 
@@ -55,7 +57,7 @@ class ScriptExecuteRequest(BaseModel):
 
     node_ids: list[uuid.UUID] | None = Field(default=None, min_length=1)
     node_tags: list[str] | None = Field(default=None, min_length=1)
-    params: dict[str, Any] = Field(default_factory=dict)
+    params: JsonObject = Field(default_factory=dict)
 
     @model_validator(mode="after")
     def check_targets(self) -> Self:
@@ -69,11 +71,11 @@ class ScriptStepResult(BaseModel):
 
     step_index: int
     label: str
-    command_fingerprint: str
+    command_fingerprint: str = ""
     stdout: str
     stderr: str
-    stdout_bytes: int
-    stderr_bytes: int
+    stdout_bytes: int = 0
+    stderr_bytes: int = 0
     truncated: bool = False
     exit_code: int
 

@@ -1,6 +1,5 @@
 """Short-scope SQLAlchemy adapters for script execution."""
 
-from typing import Any, cast
 from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -12,7 +11,6 @@ from app.application.dto.script_execution import (
     ScriptExecutionDTO,
     ScriptExecutionPageDTO,
     ScriptExecutionQueryDTO,
-    ScriptExecutionStatus,
     ScriptStepResultDTO,
 )
 from app.application.dto.script_management import (
@@ -23,6 +21,8 @@ from app.application.dto.script_management import (
     ScriptUpdateDTO,
     ScriptViewDTO,
 )
+from app.application.types import PersistenceObject
+from app.core.types import JsonObject
 from app.models.script import ScriptModel
 from app.models.script_execution import ScriptExecutionModel
 
@@ -52,12 +52,14 @@ class ScopedScriptExecutionWriter:
     def __init__(self, sessionmaker: async_sessionmaker[AsyncSession]) -> None:
         self._sessionmaker = sessionmaker
 
-    async def create_execution(self, data: dict[str, Any]) -> UUID:
+    async def create_execution(self, data: PersistenceObject) -> UUID:
         async with self._sessionmaker.begin() as session:
             execution = await ScriptExecutionRepository(session).create(data)
             return execution.id
 
-    async def update_execution(self, execution_id: UUID, data: dict[str, Any]) -> None:
+    async def update_execution(
+        self, execution_id: UUID, data: PersistenceObject
+    ) -> None:
         async with self._sessionmaker.begin() as session:
             await ScriptExecutionRepository(session).update(execution_id, data)
 
@@ -112,8 +114,9 @@ class SqlAlchemyScriptGateway:
         changes: dict[str, object] = dict(data.changes)
         steps = changes.get("steps")
         if isinstance(steps, tuple):
-            step_dtos = cast(tuple[ScriptStepDTO, ...], steps)
-            changes["steps"] = [self._step_to_dict(step) for step in step_dtos]
+            if not all(isinstance(step, ScriptStepDTO) for step in steps):
+                raise TypeError("Script update contains an invalid step")
+            changes["steps"] = [self._step_to_dict(step) for step in steps]
         tags = changes.get("tags")
         if isinstance(tags, tuple):
             changes["tags"] = list(tags)
@@ -169,18 +172,30 @@ class SqlAlchemyScriptGateway:
         )
 
     @staticmethod
-    def _step_from_dict(step: dict[str, Any]) -> ScriptStepDTO:
+    def _step_from_dict(step: JsonObject) -> ScriptStepDTO:
+        label = _required_str(step, "label")
+        step_type = _required_str(step, "type")
+        if step_type not in ("inline", "command"):
+            raise ValueError("Stored script step type is invalid")
+        command = _optional_str(step, "command")
+        command_id_value = _optional_str(step, "command_id")
+        params_value = step.get("params", {})
+        if not isinstance(params_value, dict):
+            raise ValueError("Stored script step params must be an object")
+        failure_policy = _required_str(step, "on_failure", default="stop")
+        if failure_policy not in ("stop", "continue"):
+            raise ValueError("Stored script failure policy is invalid")
         return ScriptStepDTO(
-            label=step["label"],
-            type=step["type"],
-            command=step.get("command"),
-            command_id=UUID(step["command_id"]) if step.get("command_id") else None,
-            params=tuple((step.get("params") or {}).items()),
-            on_failure=step.get("on_failure", "stop"),
+            label=label,
+            type=step_type,
+            command=command,
+            command_id=UUID(command_id_value) if command_id_value else None,
+            params=tuple(params_value.items()),
+            on_failure=failure_policy,
         )
 
     @staticmethod
-    def _step_to_dict(step: ScriptStepDTO) -> dict[str, Any]:
+    def _step_to_dict(step: ScriptStepDTO) -> JsonObject:
         return {
             "label": step.label,
             "type": step.type,
@@ -193,29 +208,68 @@ class SqlAlchemyScriptGateway:
     @staticmethod
     def _to_execution(execution: ScriptExecutionModel) -> ScriptExecutionDTO:
         step_results = tuple(
-            ScriptStepResultDTO(
-                step_index=step["step_index"],
-                label=step["label"],
-                command_fingerprint=step["command_fingerprint"],
-                stdout=step["stdout"],
-                stderr=step["stderr"],
-                stdout_bytes=step["stdout_bytes"],
-                stderr_bytes=step["stderr_bytes"],
-                truncated=step.get("truncated", False),
-                exit_code=step["exit_code"],
-            )
-            for step in (execution.steps or ())
+            _step_result_from_dict(step) for step in (execution.steps or ())
         )
         normalized_status = _LEGACY_EXECUTION_STATUSES.get(
             execution.status, execution.status
         )
+        if normalized_status not in (
+            "pending",
+            "running",
+            "success",
+            "error",
+            "cancelled",
+        ):
+            raise ValueError("Stored script execution status is invalid")
         return ScriptExecutionDTO(
             id=execution.id,
             script_id=execution.script_id,
             node_id=execution.node_id,
             params=tuple((execution.params or {}).items()),
-            status=cast(ScriptExecutionStatus, normalized_status),
+            status=normalized_status,
             steps=step_results,
             started_at=execution.started_at,
             finished_at=execution.finished_at,
         )
+
+
+def _required_str(data: JsonObject, key: str, *, default: str | None = None) -> str:
+    value = data.get(key, default)
+    if not isinstance(value, str):
+        raise ValueError(f"Stored field {key!r} must be a string")
+    return value
+
+
+def _optional_str(data: JsonObject, key: str) -> str | None:
+    value = data.get(key)
+    if value is not None and not isinstance(value, str):
+        raise ValueError(f"Stored field {key!r} must be a string or null")
+    return value
+
+
+def _required_int(data: JsonObject, key: str) -> int:
+    value = data.get(key)
+    if not isinstance(value, int) or isinstance(value, bool):
+        raise ValueError(f"Stored field {key!r} must be an integer")
+    return value
+
+
+def _required_bool(data: JsonObject, key: str, *, default: bool = False) -> bool:
+    value = data.get(key, default)
+    if not isinstance(value, bool):
+        raise ValueError(f"Stored field {key!r} must be a boolean")
+    return value
+
+
+def _step_result_from_dict(step: JsonObject) -> ScriptStepResultDTO:
+    return ScriptStepResultDTO(
+        step_index=_required_int(step, "step_index"),
+        label=_required_str(step, "label"),
+        command_fingerprint=_required_str(step, "command_fingerprint"),
+        stdout=_required_str(step, "stdout"),
+        stderr=_required_str(step, "stderr"),
+        stdout_bytes=_required_int(step, "stdout_bytes"),
+        stderr_bytes=_required_int(step, "stderr_bytes"),
+        truncated=_required_bool(step, "truncated"),
+        exit_code=_required_int(step, "exit_code"),
+    )

@@ -3,6 +3,9 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass
 from datetime import datetime
+from typing import Literal
+
+type AuditExportFormat = Literal["csv", "json"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -11,7 +14,7 @@ class AuditExportQueryDTO:
     date_to: datetime | None = None
     action: str | None = None
     node_id: uuid.UUID | None = None
-    fmt: str = "csv"
+    fmt: AuditExportFormat = "csv"
 
 
 @dataclass(frozen=True, slots=True)

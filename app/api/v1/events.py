@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+from collections.abc import AsyncGenerator
 
 import structlog
 from dishka.integrations.fastapi import DishkaRoute, inject
@@ -9,14 +10,16 @@ from fastapi import APIRouter, Security
 from fastapi.responses import StreamingResponse
 
 from app.api.deps import Principal, get_current_principal
-from app.application.services.sse_broadcaster import get_sse_broadcaster
+from app.application.services.sse_broadcaster import SseEvent, get_sse_broadcaster
 
 audit = structlog.get_logger("audit")
 
 router = APIRouter(tags=["events"], route_class=DishkaRoute)
 
 
-async def _event_generator(sub_id: str, queue):
+async def _event_generator(
+    sub_id: str, queue: asyncio.Queue[SseEvent | None]
+) -> AsyncGenerator[str]:
     broadcaster = get_sse_broadcaster()
     try:
         yield ":\n\n"
@@ -34,7 +37,17 @@ async def _event_generator(sub_id: str, queue):
         broadcaster.unsubscribe(sub_id)
 
 
-@router.get("/events/stream")
+@router.get(
+    "/events/stream",
+    response_class=StreamingResponse,
+    response_model=None,
+    responses={
+        200: {
+            "description": "Server-sent event stream",
+            "content": {"text/event-stream": {"schema": {"type": "string"}}},
+        }
+    },
+)
 @inject
 async def event_stream(
     _key: Principal = Security(get_current_principal),

@@ -25,7 +25,10 @@ class RefreshTokenRepository:
             )
         )
         row = result.first()
-        return row[0] if row else None
+        if row is None:
+            return None
+        user_id = row[0]
+        return user_id if isinstance(user_id, UUID) else None
 
     async def create(
         self, user_id: UUID, token_hash: str, expires_at: datetime

@@ -1,13 +1,12 @@
 from __future__ import annotations
 
-from typing import Any
-
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.adapters.persistence.dao.execution_stats import ExecutionStatsRepository
 from app.application.dto.execution_stats import (
     CommandStatsQueryDTO,
     ExecutionStatsDTO,
+    ExecutionStatsRow,
     ScriptStatsQueryDTO,
 )
 
@@ -60,7 +59,7 @@ class SqlAlchemyExecutionStatsGateway:
         return await self.get_script_stats(query)
 
     @staticmethod
-    def _to_stats_dto(row: dict[str, Any]) -> ExecutionStatsDTO:
+    def _to_stats_dto(row: ExecutionStatsRow) -> ExecutionStatsDTO:
         total = row["total"]
         successful = row["successful"]
         failed = row["failed"]

@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 from uuid import UUID
 
-from app.application.types import JsonObject
+from app.application.dto.command_management import CommandParameterDTO
 
 
 @dataclass(frozen=True, slots=True)
@@ -12,4 +12,4 @@ class CommandTemplateDTO:
 
     id: UUID
     command: str
-    parameters: tuple[JsonObject, ...]
+    parameters: tuple[CommandParameterDTO, ...]

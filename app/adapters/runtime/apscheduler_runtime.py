@@ -6,7 +6,7 @@ import asyncio
 import time
 from collections.abc import Awaitable, Callable
 from datetime import datetime
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, TypedDict
 from zoneinfo import ZoneInfo
 
 import structlog
@@ -30,18 +30,33 @@ from app.core.metrics import (
     SCHEDULER_SKIPPED_OVERLAP,
     SCHEDULER_START_LAG,
 )
+from app.core.types import JsonObject
 
 if TYPE_CHECKING:
     from uuid import UUID
 
 logger = structlog.get_logger()
 
-ScheduledScriptExecutor = Callable[
-    ["UUID", list["UUID"], dict[str, Any]], Awaitable[None]
-]
+ScheduledScriptExecutor = Callable[["UUID", list["UUID"], JsonObject], Awaitable[None]]
 ScheduleReconciler = Callable[[], Awaitable[tuple[int, int]]]
 _SCHEDULER_LOCK_ID = 5_642_395_847_322_111
 _DEFAULT_OWNERSHIP_POLL_SECONDS = 5.0
+
+
+class RuntimeScheduleInfo(TypedDict):
+    """Legacy scheduler inspection payload with a fixed shape."""
+
+    job_id: str
+    cron: str
+    next_run_time: str | None
+
+
+class RuntimeScheduleDetail(TypedDict):
+    """Legacy detail payload for one runtime schedule."""
+
+    script_id: str
+    cron: str
+    next_run_time: str | None
 
 
 class ApschedulerRuntime:
@@ -235,9 +250,9 @@ class ApschedulerRuntime:
         script_id: UUID,
         cron: str,
         node_ids: list[UUID],
-        callback: object = None,
+        callback: ScheduledScriptExecutor | None = None,
         *,
-        params: dict[str, Any] | None = None,
+        params: JsonObject | None = None,
         timezone: str = "UTC",
         misfire_grace_seconds: int = 60,
         schedule_id: UUID | None = None,
@@ -282,7 +297,7 @@ class ApschedulerRuntime:
         self,
         script_id: UUID,
         node_ids: list[UUID],
-        params: dict[str, Any] | None = None,
+        params: JsonObject | None = None,
     ) -> None:
         """Execute a job through the callback configured by the composition root."""
         if not self._owns_execution:
@@ -325,7 +340,7 @@ class ApschedulerRuntime:
             logger.info("scheduler.script.unscheduled", script_id=str(script_id))
         return found
 
-    def get_schedule(self, script_id: UUID) -> dict[str, Any] | None:
+    def get_schedule(self, script_id: UUID) -> RuntimeScheduleDetail | None:
         """Get schedule info for a script."""
         job_id = str(script_id)
         job = self._scheduler.get_job(job_id)
@@ -344,9 +359,9 @@ class ApschedulerRuntime:
         value = getattr(job, "next_run_time", None) if job else None
         return value if isinstance(value, datetime) else None
 
-    def list_schedules(self) -> list[dict[str, Any]]:
+    def list_schedules(self) -> list[RuntimeScheduleInfo]:
         """List all scheduled jobs."""
-        jobs = []
+        jobs: list[RuntimeScheduleInfo] = []
         for job in self._scheduler.get_jobs():
             next_run = getattr(job, "next_run_time", None)
             jobs.append(

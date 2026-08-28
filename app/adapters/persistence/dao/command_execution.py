@@ -1,6 +1,6 @@
 """Internal SQLAlchemy DAO for command execution history."""
 
-from typing import Any
+from collections.abc import Mapping
 from uuid import UUID
 
 from sqlalchemy import func, select
@@ -15,7 +15,7 @@ class CommandExecutionRepository:
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
 
-    async def create(self, data: dict[str, Any]) -> CommandExecutionModel:
+    async def create(self, data: Mapping[str, object]) -> CommandExecutionModel:
         """Create a new command execution record."""
         execution = CommandExecutionModel(**data)
         self._session.add(execution)
