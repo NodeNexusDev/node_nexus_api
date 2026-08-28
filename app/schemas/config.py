@@ -6,6 +6,7 @@ from importlib.metadata import PackageNotFoundError, version
 from pydantic import BaseModel, Field
 
 from app.application.dto.config import CONFIG_FORMAT_VERSION, LEGACY_CONFIG_VERSION
+from app.core.types import ConnectionType
 from app.schemas.command import CommandParameter
 from app.schemas.script import ScriptStep
 
@@ -24,7 +25,7 @@ class NodeExport(BaseModel):
     name: str
     host: str
     port: int
-    connection_type: str
+    connection_type: ConnectionType
     username: str | None = None
     docker_host: str | None = None
     tags: list[str] = Field(default_factory=list)
@@ -88,7 +89,7 @@ class DryRunNodePreview(BaseModel):
     name: str
     host: str
     port: int
-    connection_type: str
+    connection_type: ConnectionType
     username: str | None = None
     docker_host: str | None = None
     tags: list[str] = Field(default_factory=list)
