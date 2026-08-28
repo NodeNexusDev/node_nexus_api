@@ -1,6 +1,7 @@
 """Unit tests for focused node SSH services."""
 
 import uuid
+from typing import cast
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -15,6 +16,7 @@ from app.application.dto.node_connection import NodeConnectionDTO
 from app.application.services.node_bulk_command_service import NodeBulkCommandService
 from app.application.services.node_command_service import NodeCommandService
 from app.core.exceptions import ConnectionFailedError, NodeNotFoundError
+from app.core.types import ConnectionType
 from tests.unit.conftest import make_node_view, make_orm_node, make_response
 
 
@@ -244,7 +246,7 @@ class TestBulkExecuteConnectionFailed:
             name=orm_node.name,
             host=orm_node.host,
             port=orm_node.port,
-            connection_type=orm_node.connection_type,
+            connection_type=cast(ConnectionType, orm_node.connection_type),
             username=orm_node.username,
             password=orm_node.password,
             ssh_key=orm_node.ssh_key,

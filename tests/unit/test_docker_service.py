@@ -2,7 +2,7 @@
 
 import json
 import uuid
-from typing import Any
+from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -17,6 +17,7 @@ from app.core.exceptions import (
     ImageNotFoundError,
     NodeNotFoundError,
 )
+from app.core.types import ConnectionType
 from tests.docker_test_facade import DockerService
 from tests.unit.conftest import make_orm_node
 
@@ -105,7 +106,7 @@ class TestBuildDockerCmd:
                 name=node.name,
                 host=node.host,
                 port=node.port,
-                connection_type=node.connection_type,
+                connection_type=cast(ConnectionType, node.connection_type),
                 username=node.username,
                 password=node.password,
                 ssh_key=node.ssh_key,
