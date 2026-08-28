@@ -2,6 +2,7 @@
 
 import uuid
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
@@ -17,7 +18,7 @@ class TokenResponse(BaseModel):
     """Schema for token response."""
 
     access_token: str
-    token_type: str = "bearer"
+    token_type: Literal["bearer"] = "bearer"
 
 
 class UserCreate(BaseModel):

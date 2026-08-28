@@ -1,6 +1,7 @@
 """Authentication API endpoints."""
 
 import uuid
+from typing import Literal, cast
 
 import structlog
 from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
@@ -68,7 +69,7 @@ async def login(
 
     return TokenResponse(
         access_token=result["access_token"],
-        token_type=result["token_type"],
+        token_type=cast(Literal["bearer"], result["token_type"]),
     )
 
 
@@ -109,7 +110,7 @@ async def refresh_token(
 
     return TokenResponse(
         access_token=result["access_token"],
-        token_type=result["token_type"],
+        token_type=cast(Literal["bearer"], result["token_type"]),
     )
 
 
