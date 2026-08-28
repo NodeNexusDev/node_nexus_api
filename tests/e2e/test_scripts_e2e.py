@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import create_async_engine
 from app.adapters.runtime.apscheduler_runtime import ApschedulerRuntime
 from tests.e2e.helpers.polling import wait_for_condition
 from tests.e2e.helpers.resources import UniqueResourceFactory
+from tests.types import UnvalidatedJsonObject
 
 pytestmark = pytest.mark.docker
 
@@ -44,7 +45,9 @@ async def _wait_for_api_owns_lock(engine, *, timeout: float = 30.0) -> None:
     )
 
 
-def _create_command(e2e_client: httpx.Client, **overrides) -> dict:
+def _create_command(
+    e2e_client: httpx.Client, **overrides: object
+) -> UnvalidatedJsonObject:
     """Helper to create a command template."""
     data = {
         "name": "e2e-command",
@@ -57,7 +60,9 @@ def _create_command(e2e_client: httpx.Client, **overrides) -> dict:
     return resp.json()
 
 
-def _create_script(e2e_client: httpx.Client, **overrides) -> dict:
+def _create_script(
+    e2e_client: httpx.Client, **overrides: object
+) -> UnvalidatedJsonObject:
     """Helper to create a script."""
     steps = [
         {
@@ -675,7 +680,7 @@ def test_scheduler_executes_script_on_cron(e2e_client: httpx.Client) -> None:
             if data.get("total", 0) == 0:
                 return False
             exec_item = data["items"][0]
-            return exec_item["status"] == "success"
+            return bool(exec_item["status"] == "success")
 
         wait_for_condition(
             _execution_completed,
@@ -754,7 +759,7 @@ def test_scheduler_records_failed_execution(e2e_client: httpx.Client) -> None:
             resp = e2e_client.get(f"/api/v1/scripts/{script['id']}/executions")
             if resp.status_code != 200:
                 return False
-            return resp.json().get("total", 0) > 0
+            return bool(resp.json().get("total", 0) > 0)
 
         wait_for_condition(
             _execution_recorded,

@@ -2,6 +2,7 @@
 
 import uuid
 from datetime import UTC, datetime
+from typing import override
 
 import pytest
 
@@ -9,6 +10,7 @@ from app.application.dto.command_history import (
     BulkCommandHistoryQueryDTO,
     CommandHistoryDTO,
     CommandHistoryPageDTO,
+    CommandHistoryQueryDTO,
 )
 from app.application.ports.command_history import CommandHistoryReader
 from app.application.services.execution_history_service import ExecutionHistoryService
@@ -19,10 +21,16 @@ class FakeReader(CommandHistoryReader):
         self._items = items
         self.last_query: BulkCommandHistoryQueryDTO | None = None
 
-    async def list_by_node(self, query):  # noqa: ANN001
+    @override
+    async def list_by_node(
+        self, query: CommandHistoryQueryDTO
+    ) -> CommandHistoryPageDTO:
         raise NotImplementedError
 
-    async def list_by_batch(self, query: BulkCommandHistoryQueryDTO):  # noqa: ANN001
+    @override
+    async def list_by_batch(
+        self, query: BulkCommandHistoryQueryDTO
+    ) -> CommandHistoryPageDTO:
         self.last_query = query
         matched = [i for i in self._items if i.batch_id == query.batch_id]
         return CommandHistoryPageDTO(
@@ -30,7 +38,8 @@ class FakeReader(CommandHistoryReader):
             total=len(matched),
         )
 
-    async def get_by_id(self, execution_id):  # noqa: ANN001
+    @override
+    async def get_by_id(self, execution_id: uuid.UUID) -> CommandHistoryDTO | None:
         raise NotImplementedError
 
 

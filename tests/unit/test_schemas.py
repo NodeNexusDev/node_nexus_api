@@ -32,7 +32,9 @@ class TestNodeCreate:
 
     def test_invalid_connection_type(self) -> None:
         with pytest.raises(ValidationError):
-            NodeCreate(name="n", host="h", connection_type="invalid")
+            NodeCreate.model_validate(
+                {"name": "n", "host": "h", "connection_type": "invalid"}
+            )
 
     def test_empty_name_rejected(self) -> None:
         with pytest.raises(ValidationError):
@@ -67,11 +69,11 @@ class TestNodeUpdate:
 
     def test_invalid_connection_type(self) -> None:
         with pytest.raises(ValidationError):
-            NodeUpdate(connection_type="nope")
+            NodeUpdate.model_validate({"connection_type": "nope"})
 
     def test_invalid_status(self) -> None:
         with pytest.raises(ValidationError):
-            NodeUpdate(status="invalid")
+            NodeUpdate.model_validate({"status": "invalid"})
 
     def test_valid_status(self) -> None:
         for s in ("active", "unreachable", "error"):
@@ -149,13 +151,15 @@ class TestScriptExecutionResponse:
     @pytest.mark.parametrize("legacy_status", ["completed", "failed"])
     def test_legacy_status_rejected(self, legacy_status: str) -> None:
         with pytest.raises(ValidationError):
-            ScriptExecutionResponse(
-                id=uuid.uuid4(),
-                script_id=uuid.uuid4(),
-                node_id=None,
-                params=None,
-                status=legacy_status,
-                steps=None,
-                started_at=datetime.now(UTC),
-                finished_at=datetime.now(UTC),
+            ScriptExecutionResponse.model_validate(
+                {
+                    "id": uuid.uuid4(),
+                    "script_id": uuid.uuid4(),
+                    "node_id": None,
+                    "params": None,
+                    "status": legacy_status,
+                    "steps": None,
+                    "started_at": datetime.now(UTC),
+                    "finished_at": datetime.now(UTC),
+                }
             )

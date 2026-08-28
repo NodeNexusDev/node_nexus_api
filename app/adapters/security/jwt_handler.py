@@ -1,11 +1,11 @@
 """JWT token handler adapter."""
 
 from datetime import UTC, datetime, timedelta
-from typing import Any
 from uuid import uuid4
 
 import jwt
 
+from app.application.ports.jwt_handler import JWTClaims
 from app.core.config import get_settings
 
 
@@ -42,7 +42,7 @@ class JWTHandlerAdapter:
         }
         return jwt.encode(payload, settings.SECRET_KEY, algorithm="HS256")
 
-    def decode_token(self, token: str, expected_type: str = "access") -> dict[str, Any]:
+    def decode_token(self, token: str, expected_type: str = "access") -> JWTClaims:
         """Decode and validate a JWT token.
 
         Raises:
@@ -51,12 +51,19 @@ class JWTHandlerAdapter:
             jwt.InvalidTokenError: General token validation error.
         """
         settings = get_settings()
-        payload = jwt.decode(
+        raw_payload = jwt.decode(
             token,
             settings.SECRET_KEY,
             algorithms=["HS256"],
             issuer="node-nexus-api",
         )
+        payload: JWTClaims = {}
+        for key, value in raw_payload.items():
+            if not isinstance(key, str) or not (
+                value is None or isinstance(value, str | int | float | bool)
+            ):
+                raise jwt.InvalidTokenError("JWT contains an unsupported claim value")
+            payload[key] = value
         if payload.get("type") != expected_type:
             msg = f"Expected token type '{expected_type}', got '{payload.get('type')}'"
             raise jwt.InvalidTokenError(msg)

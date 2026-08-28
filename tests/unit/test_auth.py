@@ -18,6 +18,7 @@ from app.core.exceptions import (
     AuthenticationError,
     DomainError,
 )
+from tests.typing import as_typed_mock
 
 
 def _mock_settings(master_key: str = "") -> MagicMock:
@@ -79,7 +80,7 @@ def _create_app_with_auth(
     class MockServiceProvider(Provider):
         @provide(scope=Scope.REQUEST)
         def get_service(self) -> APIKeyAuthenticationService:
-            return mock_service
+            return as_typed_mock(APIKeyAuthenticationService, mock_service)
 
     container = make_async_container(MockServiceProvider())
     setup_dishka(container, app)
@@ -197,7 +198,7 @@ def _create_app_with_write_scope(
     class MockServiceProvider(Provider):
         @provide(scope=Scope.REQUEST)
         def get_service(self) -> APIKeyAuthenticationService:
-            return mock_service
+            return as_typed_mock(APIKeyAuthenticationService, mock_service)
 
     container = make_async_container(MockServiceProvider())
     setup_dishka(container, app)

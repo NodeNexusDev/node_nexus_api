@@ -35,7 +35,7 @@ def test_script_view_is_immutable() -> None:
         updated_at=now,
     )
     with pytest.raises(AttributeError):
-        view.name = "changed"  # type: ignore[misc]
+        setattr(view, "name", "changed")
 
 
 def test_execution_target_contains_only_immutable_contracts() -> None:

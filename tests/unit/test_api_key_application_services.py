@@ -36,7 +36,14 @@ def _auth(**changes: object) -> APIKeyAuthDTO:
         "last_used_at": None,
         **changes,
     }
-    return APIKeyAuthDTO(**values)  # type: ignore[arg-type]
+    return APIKeyAuthDTO(
+        id=values["id"],
+        key_prefix=values["key_prefix"],
+        is_active=values["is_active"],
+        scope=values["scope"],
+        expires_at=values["expires_at"],
+        last_used_at=values["last_used_at"],
+    )
 
 
 def _view() -> APIKeyViewDTO:

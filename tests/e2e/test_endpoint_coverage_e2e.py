@@ -204,9 +204,10 @@ def _build_openapi_inventory(e2e_client: httpx.Client) -> set[str]:
     resp = e2e_client.get("/openapi.json")
     assert resp.status_code == 200, f"OpenAPI schema not available: {resp.status_code}"
     schema = resp.json()
-    paths: dict = schema.get("paths", {})
+    paths: dict[str, object] = schema.get("paths", {})
     inventory: set[str] = set()
     for path, methods in paths.items():
+        assert isinstance(methods, dict)
         for method in methods:
             if method in ("parameters", "servers", "description", "summary"):
                 continue

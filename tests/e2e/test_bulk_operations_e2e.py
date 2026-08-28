@@ -77,7 +77,7 @@ def test_docker_bulk_remove(
         if resp.status_code != 200:
             return False
         state = resp.json().get("State", {})
-        return state.get("status", "").lower() == "running"
+        return bool(state.get("status", "").lower() == "running")
 
     wait_for_condition(
         _container_running, timeout=10.0, description="container running"

@@ -6,12 +6,14 @@ from unittest.mock import AsyncMock, Mock
 import pytest
 
 from app.adapters.security import AesGcmCredentialCipher
+from app.application.dto.command_management import CommandParameterDTO
 from app.application.dto.command_template import CommandTemplateDTO
 from app.application.dto.node_connection import NodeConnectionDTO
 from app.application.dto.script_definition import ScriptDefinitionDTO
 from app.application.dto.script_execution import ScriptExecutionRequestDTO
 from app.application.services.script_execution_service import ScriptExecutionService
 from app.core.exceptions import NodeNotFoundError, ScriptNotFoundError
+from app.core.types import JsonObject
 
 
 def _node(node_id: uuid.UUID) -> NodeConnectionDTO:
@@ -114,7 +116,7 @@ async def test_command_templates_are_loaded_before_remote_execution() -> None:
         return CommandTemplateDTO(
             id=command_id,
             command="systemctl restart {service}",
-            parameters=({"name": "service", "required": True},),
+            parameters=(CommandParameterDTO(name="service", required=True),),
         )
 
     command_reader.get_template.side_effect = load_template
@@ -229,8 +231,9 @@ def _make_service_for_resolve(
 async def test_resolve_inline_step_without_command_returns_error() -> None:
     """Inline step missing the 'command' key produces a resolution_error."""
     service = _make_service_for_resolve()
-    raw_step = {"label": "bad", "type": "inline"}
+    raw_step: JsonObject = {"label": "bad", "type": "inline"}
     result = await service._resolve_step(raw_step, {})
+    assert result.resolution_error is not None
     assert "no command" in result.resolution_error.lower()
 
 
@@ -238,8 +241,9 @@ async def test_resolve_inline_step_without_command_returns_error() -> None:
 async def test_resolve_command_step_without_id_returns_error() -> None:
     """Command step missing 'command_id' produces a resolution_error."""
     service = _make_service_for_resolve()
-    raw_step = {"label": "bad", "type": "command"}
+    raw_step: JsonObject = {"label": "bad", "type": "command"}
     result = await service._resolve_step(raw_step, {})
+    assert result.resolution_error is not None
     assert "no command_id" in result.resolution_error.lower()
 
 
@@ -249,12 +253,13 @@ async def test_resolve_command_step_template_not_found() -> None:
     command_reader = AsyncMock()
     command_reader.get_template.return_value = None
     service = _make_service_for_resolve(command_reader=command_reader)
-    raw_step = {
+    raw_step: JsonObject = {
         "label": "bad",
         "type": "command",
         "command_id": str(uuid.uuid4()),
     }
     result = await service._resolve_step(raw_step, {})
+    assert result.resolution_error is not None
     assert "not found" in result.resolution_error.lower()
 
 
@@ -262,8 +267,9 @@ async def test_resolve_command_step_template_not_found() -> None:
 async def test_resolve_unknown_step_type_returns_error() -> None:
     """Unknown step type produces a resolution_error."""
     service = _make_service_for_resolve()
-    raw_step = {"label": "bad", "type": "unknown"}
+    raw_step: JsonObject = {"label": "bad", "type": "unknown"}
     result = await service._resolve_step(raw_step, {})
+    assert result.resolution_error is not None
     assert "unknown step type" in result.resolution_error.lower()
 
 
@@ -344,13 +350,6 @@ async def test_run_remote_connector_exception_marks_failed() -> None:
     from app.application.dto.script_execution import ScriptExecutionTargetDTO
 
     node_id = uuid.uuid4()
-    target = ScriptExecutionTargetDTO(
-        execution_id=uuid.uuid4(),
-        script_id=uuid.uuid4(),
-        node=_node(node_id),
-        steps=service._service_steps if hasattr(service, "_service_steps") else [],
-    )
-    # Fix: use a resolved step directly
     from app.application.dto.script_execution import ResolvedScriptStepDTO
 
     target = ScriptExecutionTargetDTO(

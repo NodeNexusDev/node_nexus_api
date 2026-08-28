@@ -5,6 +5,7 @@ They do NOT require a real Docker daemon - they test the API layer only.
 """
 
 import uuid
+from collections.abc import AsyncIterator
 
 import httpx2 as httpx
 import pytest
@@ -14,7 +15,7 @@ from tests.e2e.settings import DEFAULT_TIMEOUT, MASTER_API_KEY
 
 
 @pytest.fixture
-async def client(service_ports: ServicePorts) -> httpx.AsyncClient:
+async def client(service_ports: ServicePorts) -> AsyncIterator[httpx.AsyncClient]:
     async with httpx.AsyncClient(
         base_url=f"http://{service_ports.api_host}:{service_ports.api_port}",
         headers={"X-API-Key": MASTER_API_KEY},
@@ -197,7 +198,7 @@ class TestDockerAPIValidation:
             await client.delete(f"/api/v1/nodes/{node_id}")
 
 
-def _make_docker_node_data() -> dict:
+def _make_docker_node_data() -> dict[str, object]:
     return {
         "name": f"docker-test-{uuid.uuid4().hex[:8]}",
         "host": "localhost",
@@ -208,7 +209,7 @@ def _make_docker_node_data() -> dict:
     }
 
 
-def _make_ssh_node_data() -> dict:
+def _make_ssh_node_data() -> dict[str, object]:
     return {
         "name": f"ssh-test-{uuid.uuid4().hex[:8]}",
         "host": "localhost",
@@ -478,7 +479,7 @@ class TestDockerBulkByTags:
     """Bulk Docker operations resolved by node tags."""
 
     @staticmethod
-    def _make_docker_node_data(tags: list[str]) -> dict:
+    def _make_docker_node_data(tags: list[str]) -> dict[str, object]:
         unique = uuid.uuid4().hex[:8]
         return {
             "name": f"docker-bulk-tag-{unique}",

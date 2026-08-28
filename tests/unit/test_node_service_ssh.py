@@ -239,10 +239,19 @@ class TestBulkExecuteConnectionFailed:
             credential_cipher=AesGcmCredentialCipher(),
             connector_factory=mock_factory,
         )
-        result = await bulk_service._execute_on_single_node(
-            orm_node,
-            "echo hi",
+        node = NodeConnectionDTO(
+            id=orm_node.id,
+            name=orm_node.name,
+            host=orm_node.host,
+            port=orm_node.port,
+            connection_type=orm_node.connection_type,
+            username=orm_node.username,
+            password=orm_node.password,
+            ssh_key=orm_node.ssh_key,
+            passphrase=orm_node.passphrase,
+            docker_host=orm_node.docker_host,
         )
+        result = await bulk_service._execute_on_single_node(node, "echo hi")
 
         assert result.exit_code == 1
         assert result.stdout == ""

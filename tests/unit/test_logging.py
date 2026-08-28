@@ -4,7 +4,7 @@ from app.core.logging import REDACTED, redact_secrets
 
 
 def test_redact_secrets_handles_nested_values() -> None:
-    event = {
+    event: dict[str, object] = {
         "password": "canary-password",
         "context": {
             "api_key": "canary-key",
@@ -16,9 +16,15 @@ def test_redact_secrets_handles_nested_values() -> None:
     result = redact_secrets(None, "info", event)
 
     assert result["password"] == REDACTED
-    assert result["context"]["api_key"] == REDACTED
-    assert result["context"]["safe"] == "visible"
-    assert result["context"]["items"][0]["authorization"] == REDACTED
+    context = result["context"]
+    assert isinstance(context, dict)
+    assert context["api_key"] == REDACTED
+    assert context["safe"] == "visible"
+    items = context["items"]
+    assert isinstance(items, list)
+    first = items[0]
+    assert isinstance(first, dict)
+    assert first["authorization"] == REDACTED
 
 
 def test_redact_secrets_removes_url_credentials() -> None:
@@ -29,7 +35,9 @@ def test_redact_secrets_removes_url_credentials() -> None:
     )
 
     assert result["connection"] == "postgresql+asyncpg://[REDACTED]@db:5432/app"
-    assert "canary" not in result["connection"]
+    connection = result["connection"]
+    assert isinstance(connection, str)
+    assert "canary" not in connection
 
 
 def test_redact_secrets_removes_command_but_keeps_fingerprint() -> None:

@@ -4,6 +4,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from uuid import UUID
 
+from app.core.types import ConnectionType, NodeStatus
+
 
 @dataclass(frozen=True, slots=True)
 class NodeViewDTO:
@@ -13,8 +15,8 @@ class NodeViewDTO:
     name: str
     host: str
     port: int
-    connection_type: str
-    status: str
+    connection_type: ConnectionType
+    status: NodeStatus
     username: str | None
     docker_host: str | None
     tags: tuple[str, ...]

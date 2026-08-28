@@ -7,15 +7,23 @@ import pytest
 
 from app.adapters.security import AesGcmCredentialCipher
 from app.adapters.security.credential_cipher import decrypt, encrypt
-from app.application.dto.command_execution import BulkCommandRequestDTO
+from app.application.dto.command_execution import (
+    BulkCommandRequestDTO,
+    BulkCommandResultDTO,
+    CommandRequestDTO,
+    CommandResultDTO,
+)
 from app.application.dto.node_management import (
     NodeCreateDTO,
     NodePageDTO,
     NodeUpdateDTO,
 )
+from app.application.dto.node_view import NodeViewDTO
 from app.application.services.node_bulk_command_service import NodeBulkCommandService
 from app.application.services.node_command_service import NodeCommandService
-from app.application.services.node_management_service import NodeManagementService
+from app.application.services.node_management_service import (
+    NodeManagementService as _NodeManagementService,
+)
 from app.core.exceptions import NodeNameConflictError, NodeNotFoundError
 from tests.unit.conftest import make_node_view, make_orm_node
 
@@ -23,6 +31,31 @@ from tests.unit.conftest import make_node_view, make_orm_node
 @pytest.fixture
 def repo() -> AsyncMock:
     return AsyncMock()
+
+
+class NodeManagementService(_NodeManagementService):
+    """Test-only facade matching the legacy combined node API surface."""
+
+    def attach_command_services(
+        self,
+        command_service: NodeCommandService,
+        bulk_service: NodeBulkCommandService,
+    ) -> None:
+        self._command_service = command_service
+        self._bulk_command_service = bulk_service
+
+    async def check_connectivity(self, node_id: uuid.UUID) -> NodeViewDTO:
+        return await self._command_service.check_connectivity(node_id)
+
+    async def execute_command(
+        self, node_id: uuid.UUID, data: CommandRequestDTO
+    ) -> CommandResultDTO:
+        return await self._command_service.execute_command(node_id, data)
+
+    async def bulk_execute_command(
+        self, data: BulkCommandRequestDTO
+    ) -> BulkCommandResultDTO:
+        return await self._bulk_command_service.bulk_execute_command(data)
 
 
 @pytest.fixture
@@ -41,10 +74,7 @@ def service(repo: AsyncMock) -> NodeManagementService:
         credential_cipher=AesGcmCredentialCipher(),
         connector_factory=MagicMock(),
     )
-    service.check_connectivity = command_service.check_connectivity
-    service.execute_command = command_service.execute_command
-    service.bulk_execute_command = bulk_service.bulk_execute_command
-    service._bulk_command_service = bulk_service
+    service.attach_command_services(command_service, bulk_service)
     return service
 
 
@@ -245,9 +275,7 @@ class TestExecuteCommandEdgeCases:
     ) -> None:
         repo.get_connection.return_value = None
         with pytest.raises(NodeNotFoundError):
-            from app.schemas.node import CommandRequest
-
-            await service.execute_command(uuid.uuid4(), CommandRequest(command="ls"))
+            await service.execute_command(uuid.uuid4(), CommandRequestDTO(command="ls"))
 
 
 class TestGetAllNodesFiltering:
@@ -304,7 +332,7 @@ class TestBulkExecuteCommand:
         service._bulk_command_service._connector_factory = factory
 
         result = await service.bulk_execute_command(
-            BulkCommandRequestDTO(command="uptime", node_ids=[n1.id, n2.id])
+            BulkCommandRequestDTO(command="uptime", node_ids=(n1.id, n2.id))
         )
         assert result.total == 2
         assert result.succeeded == 2
@@ -339,7 +367,7 @@ class TestBulkExecuteCommand:
         service._bulk_command_service._connector_factory = factory
 
         result = await service.bulk_execute_command(
-            BulkCommandRequestDTO(command="uptime", node_ids=[n1.id, n2.id])
+            BulkCommandRequestDTO(command="uptime", node_ids=(n1.id, n2.id))
         )
         assert result.total == 2
         assert result.succeeded == 1
@@ -351,7 +379,7 @@ class TestBulkExecuteCommand:
         repo.get_connections_by_ids.return_value = []
         with pytest.raises(NodeNotFoundError):
             await service.bulk_execute_command(
-                BulkCommandRequestDTO(command="ls", node_ids=[uuid.uuid4()])
+                BulkCommandRequestDTO(command="ls", node_ids=(uuid.uuid4(),))
             )
 
     async def test_connection_error_returns_error_result(
@@ -372,7 +400,7 @@ class TestBulkExecuteCommand:
         service._bulk_command_service._connector_factory = factory
 
         result = await service.bulk_execute_command(
-            BulkCommandRequestDTO(command="uptime", node_ids=[n1.id])
+            BulkCommandRequestDTO(command="uptime", node_ids=(n1.id,))
         )
         assert result.total == 1
         assert result.failed == 1
@@ -396,7 +424,7 @@ class TestBulkExecuteCommand:
         service._bulk_command_service._connector_factory = factory
 
         result = await service.bulk_execute_command(
-            BulkCommandRequestDTO(command="uptime", tags=["prod"])
+            BulkCommandRequestDTO(command="uptime", tags=("prod",))
         )
         assert result.total == 1
         repo.get_connections_by_tags.assert_called_once_with(["prod"])
@@ -438,7 +466,7 @@ class TestBulkExecuteCommand:
         repo.get_connections_by_tags.return_value = []
         with pytest.raises(NodeNotFoundError):
             await service.bulk_execute_command(
-                BulkCommandRequestDTO(command="ls", tags=["nonexistent"])
+                BulkCommandRequestDTO(command="ls", tags=("nonexistent",))
             )
 
     async def test_resolve_by_both_empty_intersection(
@@ -451,7 +479,7 @@ class TestBulkExecuteCommand:
         repo.get_connections_by_tags.return_value = [n2]
         with pytest.raises(NodeNotFoundError):
             await service.bulk_execute_command(
-                BulkCommandRequestDTO(command="ls", node_ids=[n1.id], tags=["prod"])
+                BulkCommandRequestDTO(command="ls", node_ids=(n1.id,), tags=("prod",))
             )
 
 

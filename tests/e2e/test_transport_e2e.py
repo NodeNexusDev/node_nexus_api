@@ -196,11 +196,12 @@ def test_oversized_string_field_rejected(e2e_client: httpx.Client) -> None:
 def test_deeply_nested_json_not_500(e2e_client: httpx.Client) -> None:
     """POST with deeply nested JSON should return 4xx, not 500."""
     # Build a deeply nested dict: {"a": {"a": {"a": ...}}}
-    nested: dict = {}
+    nested: dict[str, object] = {}
     current = nested
     for _ in range(100):
-        current["a"] = {}
-        current = current["a"]
+        child: dict[str, object] = {}
+        current["a"] = child
+        current = child
     current["name"] = "deep"
     current["host"] = "10.0.0.103"
     current["port"] = 22

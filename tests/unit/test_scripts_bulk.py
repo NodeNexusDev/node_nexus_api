@@ -18,10 +18,11 @@ from app.application.services.schedule_management import ScheduleManagementServi
 from app.application.services.script_execution_service import ScriptExecutionService
 from app.application.services.script_history_service import ScriptHistoryService
 from app.application.services.script_management_service import ScriptManagementService
+from tests.typing import as_typed_mock
 from tests.unit.conftest import MockAuthServiceProvider, _mock_settings
 
 
-def _create_scripts_app(**services: AsyncMock) -> FastAPI:
+def _create_scripts_app(**services: object) -> FastAPI:
     app = FastAPI()
     app.include_router(scripts_router, prefix="/api/v1")
     app.include_router(scripts_bulk_router, prefix="/api/v1")
@@ -29,27 +30,42 @@ def _create_scripts_app(**services: AsyncMock) -> FastAPI:
     class MockServiceProvider(Provider):
         @provide(scope=Scope.REQUEST)
         def get_script_management(self) -> ScriptManagementService:
-            return services.get("script_management", AsyncMock())
+            return as_typed_mock(
+                ScriptManagementService,
+                services.get("script_management", AsyncMock()),
+            )
 
         @provide(scope=Scope.REQUEST)
         def get_script_execution(self) -> ScriptExecutionService:
-            return services.get("script_execution", AsyncMock())
+            return as_typed_mock(
+                ScriptExecutionService, services.get("script_execution", AsyncMock())
+            )
 
         @provide(scope=Scope.REQUEST)
         def get_script_history(self) -> ScriptHistoryService:
-            return services.get("script_history", AsyncMock())
+            return as_typed_mock(
+                ScriptHistoryService, services.get("script_history", AsyncMock())
+            )
 
         @provide(scope=Scope.REQUEST)
         def get_execution_lifecycle(self) -> ExecutionLifecycleService:
-            return services.get("execution_lifecycle", AsyncMock())
+            return as_typed_mock(
+                ExecutionLifecycleService,
+                services.get("execution_lifecycle", AsyncMock()),
+            )
 
         @provide(scope=Scope.REQUEST)
         def get_execution_stats(self) -> ExecutionStatsService:
-            return services.get("execution_stats", AsyncMock())
+            return as_typed_mock(
+                ExecutionStatsService, services.get("execution_stats", AsyncMock())
+            )
 
         @provide(scope=Scope.REQUEST)
         def get_schedule_management(self) -> ScheduleManagementService:
-            return services.get("schedule_management", AsyncMock())
+            return as_typed_mock(
+                ScheduleManagementService,
+                services.get("schedule_management", AsyncMock()),
+            )
 
     container = make_async_container(MockServiceProvider(), MockAuthServiceProvider())
     setup_dishka(container, app)

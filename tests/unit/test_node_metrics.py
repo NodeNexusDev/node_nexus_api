@@ -1,6 +1,7 @@
 """Unit tests for node metrics endpoint."""
 
 import uuid
+from collections.abc import AsyncIterator
 from datetime import UTC, datetime
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -25,6 +26,7 @@ from app.schemas.node import (
     NodeMetrics,
     NodeResponse,
 )
+from tests.typing import as_typed_mock
 from tests.unit.conftest import MockAuthServiceProvider, _mock_settings
 
 
@@ -74,11 +76,11 @@ def _create_test_app(service: NodeManagementService | AsyncMock) -> FastAPI:
     class MockServiceProvider(Provider):
         @provide(scope=Scope.REQUEST)
         def get_service(self) -> NodeManagementService:
-            return service
+            return as_typed_mock(NodeManagementService, service)
 
         @provide(scope=Scope.REQUEST)
         def get_metrics_service(self) -> NodeMetricsService:
-            return service
+            return as_typed_mock(NodeMetricsService, service)
 
     container = make_async_container(MockServiceProvider(), MockAuthServiceProvider())
     setup_dishka(container, app)
@@ -91,7 +93,7 @@ def mock_service() -> AsyncMock:
 
 
 @pytest.fixture
-async def client(mock_service: AsyncMock) -> AsyncClient:
+async def client(mock_service: AsyncMock) -> AsyncIterator[AsyncClient]:
     app = _create_test_app(mock_service)
     with patch("app.api.deps.get_settings", return_value=_mock_settings("test-master")):
         async with AsyncClient(
@@ -432,15 +434,15 @@ class TestNodeMetricsService:
 
         proc_stat_1 = "cpu  1000 200 300 8000 100 50 30 10 0 0"
         proc_stat_2 = "cpu  1200 250 350 8300 120 60 35 12 0 0"
+        call_count = 0
 
-        async def mock_execute(cmd):
+        async def mock_execute(cmd: str) -> tuple[str, str, int]:
+            nonlocal call_count
             if "vmstat" in cmd:
                 return ("", "", 1)
             if "head -1 /proc/stat" in cmd:
-                if not hasattr(mock_execute, "_call"):
-                    mock_execute._call = 0
-                mock_execute._call += 1
-                if mock_execute._call == 1:
+                call_count += 1
+                if call_count == 1:
                     return (proc_stat_1, "", 0)
                 return (proc_stat_2, "", 0)
             if "sleep" in cmd:

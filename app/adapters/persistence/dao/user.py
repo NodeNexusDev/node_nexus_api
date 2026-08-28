@@ -1,6 +1,6 @@
 """Internal SQLAlchemy DAO for users."""
 
-from typing import Any
+from collections.abc import Mapping
 from uuid import UUID
 
 from sqlalchemy import select
@@ -36,7 +36,7 @@ class UserRepository:
         )
         return list(result.scalars().all())
 
-    async def create(self, data: dict[str, Any]) -> UserModel:
+    async def create(self, data: Mapping[str, object]) -> UserModel:
         user = UserModel(**data)
         self._session.add(user)
         await self._session.flush()

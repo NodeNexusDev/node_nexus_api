@@ -15,6 +15,7 @@ from httpx2 import ASGITransport, AsyncClient
 from app.api.v1.audit import router as audit_router
 from app.application.dto.audit import AuditLogDTO, AuditLogPageDTO
 from app.application.services.audit_log_service import AuditLogService
+from tests.typing import as_typed_mock
 from tests.unit.conftest import MockAuthServiceProvider, _mock_settings
 
 
@@ -38,7 +39,7 @@ def _create_test_app(service: AuditLogService | AsyncMock) -> FastAPI:
     class MockServiceProvider(Provider):
         @provide(scope=Scope.REQUEST)
         def get_service(self) -> AuditLogService:
-            return service
+            return as_typed_mock(AuditLogService, service)
 
     container = make_async_container(MockServiceProvider(), MockAuthServiceProvider())
     setup_dishka(container, app)

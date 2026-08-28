@@ -1,6 +1,7 @@
 """Unit tests for bulk Docker operations."""
 
 import uuid
+from collections.abc import AsyncIterator
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -19,6 +20,7 @@ from app.application.dto.docker import (
 from app.application.services.docker.bulk_service import DockerBulkService
 from app.schemas.docker import BulkDockerNodeResult, BulkDockerResponse
 from tests.docker_test_facade import DockerService
+from tests.typing import as_typed_mock
 from tests.unit.conftest import MockAuthServiceProvider, _mock_settings
 
 _settings_patcher = patch(
@@ -34,7 +36,7 @@ def _create_test_app(service: DockerService | AsyncMock) -> FastAPI:
     class MockServiceProvider(Provider):
         @provide(scope=Scope.REQUEST)
         def get_service(self) -> DockerBulkService:
-            return service
+            return as_typed_mock(DockerBulkService, service)
 
     container = make_async_container(MockServiceProvider(), MockAuthServiceProvider())
     setup_dishka(container, app)
@@ -47,7 +49,7 @@ def mock_service() -> AsyncMock:
 
 
 @pytest.fixture
-async def client(mock_service: AsyncMock) -> AsyncClient:
+async def client(mock_service: AsyncMock) -> AsyncIterator[AsyncClient]:
     app = _create_test_app(mock_service)
     with patch("app.api.deps.get_settings", return_value=_mock_settings("test-master")):
         async with AsyncClient(
@@ -65,7 +67,7 @@ def full_service() -> AsyncMock:
 
 
 @pytest.fixture
-async def full_client(full_service: AsyncMock) -> AsyncClient:
+async def full_client(full_service: AsyncMock) -> AsyncIterator[AsyncClient]:
     app = _create_test_app(full_service)
     with patch("app.api.deps.get_settings", return_value=_mock_settings("test-master")):
         async with AsyncClient(

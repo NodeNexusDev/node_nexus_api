@@ -500,6 +500,7 @@ async def get_command_stats(
     date_to: datetime | None = Query(None),
     _key: Principal = Security(get_current_principal),
 ) -> ExecutionStatsResponse:
+    """Get aggregate execution statistics for a command."""
     audit.info("api.commands.stats", command_id=str(command_id))
     stats = await stats_service.get_command_stats(
         command_id=command_id, date_from=date_from, date_to=date_to
@@ -541,7 +542,7 @@ async def bulk_execute_command(
     command = await service.get_command(command_id)
     rendered = render_command(
         command.command,
-        [p.__dict__ for p in command.parameters] if command.parameters else [],
+        list(command.parameters),
         data.params or {},
     )
 

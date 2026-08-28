@@ -17,6 +17,7 @@ from tests.e2e.settings import (
     SSH_PORT,
     SSH_USERNAME,
 )
+from tests.types import UnvalidatedJsonObject
 
 _NODE_PAYLOAD = {
     "name": "e2e-node",
@@ -34,7 +35,7 @@ def _deprecation_warning(function_name: str) -> None:
     )
 
 
-def create_node(e2e_client: httpx.Client, **overrides: object) -> dict:
+def create_node(e2e_client: httpx.Client, **overrides: object) -> UnvalidatedJsonObject:
     """Create a basic node for tests."""
     _deprecation_warning("create_node")
     data = {**_NODE_PAYLOAD, **overrides}
@@ -51,7 +52,7 @@ def create_ssh_node(
     host: str = SSH_HOST,
     port: int = SSH_PORT,
     **overrides: object,
-) -> dict:
+) -> UnvalidatedJsonObject:
     """Create an SSH node connected to the test SSH server.
 
     Uses Docker compose service name "ssh-server" as host by default.
@@ -79,7 +80,7 @@ def create_docker_node(
     *,
     name: str | None = None,
     **overrides: object,
-) -> dict:
+) -> UnvalidatedJsonObject:
     """Create a Docker node pointing to the internal DinD service."""
     _deprecation_warning("create_docker_node")
     data: dict[str, object] = {
@@ -105,7 +106,7 @@ def wait_for_audit(
     node_id: str | None = None,
     minimum_total: int = 1,
     timeout: float = 10.0,
-) -> dict:
+) -> UnvalidatedJsonObject:
     """Poll the eventually-consistent transactional outbox.
 
     Never filters by *action* server-side — fetches all records (optionally

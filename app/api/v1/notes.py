@@ -28,6 +28,7 @@ async def list_notes(
     service: FromDishka[NoteService],
     _key: Principal = Security(get_current_principal),
 ) -> list[NoteResponse]:
+    """List notes attached to a target resource."""
     audit.info("api.notes.list", target=target_type + ":" + target_id)
     items = await service.list_notes(target_type, target_id)
     return [
@@ -56,6 +57,7 @@ async def create_note(
     service: FromDishka[NoteService],
     _key: Principal = Security(require_write_or_jwt_scope),
 ) -> NoteResponse:
+    """Create a note attached to a target resource."""
     audit.info("api.notes.create", target=target_type + ":" + target_id)
     result = await service.create_note(
         NoteCreateDTO(
@@ -82,6 +84,7 @@ async def update_note(
     service: FromDishka[NoteService],
     _key: Principal = Security(require_write_or_jwt_scope),
 ) -> NoteResponse:
+    """Update an existing note."""
     audit.info("api.notes.update", note_id=note_id)
     result = await service.update_note(note_id, NoteUpdateDTO(content=data.content))
     return NoteResponse(
@@ -101,5 +104,6 @@ async def delete_note(
     service: FromDishka[NoteService],
     _key: Principal = Security(require_write_or_jwt_scope),
 ) -> None:
+    """Delete an existing note."""
     audit.info("api.notes.delete", note_id=note_id)
     await service.delete_note(note_id)

@@ -5,6 +5,7 @@ from datetime import datetime
 from uuid import UUID
 
 from app.application.dto.node_view import NodeViewDTO
+from app.core.types import ConnectionType
 
 NodeUpdateValue = str | int | tuple[str, ...] | None
 
@@ -16,7 +17,7 @@ class NodeCreateDTO:
     name: str
     host: str
     port: int
-    connection_type: str
+    connection_type: ConnectionType
     username: str | None = None
     password: str | None = field(default=None, repr=False)
     ssh_key: str | None = field(default=None, repr=False)

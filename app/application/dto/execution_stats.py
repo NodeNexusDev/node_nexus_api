@@ -3,6 +3,19 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass
 from datetime import datetime
+from typing import TypedDict
+
+
+class ExecutionStatsRow(TypedDict):
+    """Validated aggregate row returned by an execution statistics store."""
+
+    total: int
+    successful: int
+    failed: int
+    avg_duration_ms: float | None
+    min_duration_ms: float | None
+    max_duration_ms: float | None
+    last_executed_at: datetime | None
 
 
 @dataclass(frozen=True, slots=True)
