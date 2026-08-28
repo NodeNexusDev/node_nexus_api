@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 from datetime import datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 from uuid import UUID
 
 if TYPE_CHECKING:
@@ -27,6 +27,7 @@ from app.application.dto.node_management import (
     NodeUpdateValue,
 )
 from app.application.dto.node_view import NodeViewDTO
+from app.application.dto.value_objects import NodeCredentials
 from app.application.types import JsonObject
 from app.core.exceptions import NodeNotFoundError
 
@@ -109,12 +110,22 @@ class NodeManagementService:
 
     async def create_node(self, data: NodeCreateDTO) -> NodeViewDTO:
         """Create a new node. Encrypts sensitive fields before storage."""
-        secured = replace(
-            data,
-            password=self._encrypt_value(data.password),
-            ssh_key=self._encrypt_value(data.ssh_key),
-            passphrase=self._encrypt_value(data.passphrase),
+        secured_credentials = NodeCredentials(
+            username=data.credentials.username,
+            password=cast(
+                str | None,
+                self._encrypt_value(cast(NodeUpdateValue, data.credentials.password)),
+            ),
+            ssh_key=cast(
+                str | None,
+                self._encrypt_value(cast(NodeUpdateValue, data.credentials.ssh_key)),
+            ),
+            passphrase=cast(
+                str | None,
+                self._encrypt_value(cast(NodeUpdateValue, data.credentials.passphrase)),
+            ),
         )
+        secured = replace(data, credentials=secured_credentials)
         node = await self._writer.create_node(secured)
         audit.info("node.create.ok", node_id=str(node.id), name=data.name)
         await self._log("create", node_id=node.id, details={"name": data.name})

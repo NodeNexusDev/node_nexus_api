@@ -3,8 +3,9 @@
 from dataclasses import dataclass
 from datetime import datetime
 
+from app.application.dto.value_objects import NodeCredentials, NodeEndpoint
 from app.application.types import JsonObject
-from app.core.types import ConnectionType
+from app.core.types import NodeName, TagList
 
 CONFIG_FORMAT_VERSION = "1.0"
 LEGACY_CONFIG_VERSION = "0.5.0"
@@ -12,30 +13,47 @@ LEGACY_CONFIG_VERSION = "0.5.0"
 
 @dataclass(frozen=True, slots=True)
 class NodeConfigDTO:
-    name: str
-    host: str
-    port: int
-    connection_type: ConnectionType
-    username: str | None = None
-    docker_host: str | None = None
-    tags: tuple[str, ...] = ()
+    name: NodeName
+    endpoint: NodeEndpoint
+    credentials: NodeCredentials = NodeCredentials()
+    tags: TagList = ()
+
+    @property
+    def host(self) -> str:
+        return self.endpoint.host
+
+    @property
+    def port(self) -> int:
+        return self.endpoint.port
+
+    @property
+    def connection_type(self) -> str:
+        return self.endpoint.connection_type
+
+    @property
+    def docker_host(self) -> str | None:
+        return self.endpoint.docker_host
+
+    @property
+    def username(self) -> str | None:
+        return self.credentials.username
 
 
 @dataclass(frozen=True, slots=True)
 class CommandConfigDTO:
-    name: str
+    name: NodeName
     command: str
     description: str | None = None
     parameters: tuple[JsonObject, ...] = ()
-    tags: tuple[str, ...] = ()
+    tags: TagList = ()
 
 
 @dataclass(frozen=True, slots=True)
 class ScriptConfigDTO:
-    name: str
+    name: NodeName
     description: str | None = None
     steps: tuple[JsonObject, ...] = ()
-    tags: tuple[str, ...] = ()
+    tags: TagList = ()
 
 
 @dataclass(frozen=True, slots=True)

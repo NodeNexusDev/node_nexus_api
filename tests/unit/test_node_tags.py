@@ -11,6 +11,7 @@ from app.application.dto.node_management import (
     NodePageDTO,
     NodeTagDTO,
 )
+from app.application.dto.value_objects import NodeEndpoint
 from app.application.services.node_management_service import NodeManagementService
 from app.core.exceptions import NodeNotFoundError
 from tests.unit.conftest import make_node_view
@@ -131,10 +132,8 @@ class TestTagsInCreate:
         repo.create_node.return_value = node
         data = NodeCreateDTO(
             name="test",
-            host="1.2.3.4",
-            port=22,
-            connection_type="ssh",
             tags=("prod", "web"),
+            endpoint=NodeEndpoint(host="1.2.3.4", port=22, connection_type="ssh"),
         )
         result = await service.create_node(data)
         assert result.tags == ("prod", "web")
@@ -147,7 +146,8 @@ class TestTagsInCreate:
         node = make_node_view(tags=[])
         repo.create_node.return_value = node
         data = NodeCreateDTO(
-            name="test", host="1.2.3.4", port=22, connection_type="ssh"
+            name="test",
+            endpoint=NodeEndpoint(host="1.2.3.4", port=22, connection_type="ssh"),
         )
         result = await service.create_node(data)
         assert result.tags == ()

@@ -24,6 +24,7 @@ from app.application.dto.node_connection import NodeConnectionDTO
 from app.application.dto.node_management import NodeCursorQueryDTO
 from app.application.dto.node_view import NodeViewDTO
 from app.application.dto.schedule import RuntimeJobViewDTO, RuntimeScheduleDTO
+from app.application.dto.value_objects import NodeCredentials, NodeEndpoint
 from app.application.services.node_management_service import NodeManagementService
 from app.application.services.streaming_command_service import StreamingCommandService
 from app.core.exceptions import NodeNotFoundError
@@ -622,10 +623,8 @@ class TestStreamingConnect:
         reader.get_connection.return_value = NodeConnectionDTO(
             id=node_id,
             name="n",
-            host="h",
-            port=22,
-            connection_type="ssh",
-            username="root",
+            endpoint=NodeEndpoint(host="h", port=22, connection_type="ssh"),
+            credentials=NodeCredentials(username="root"),
         )
         connector = AsyncMock()
         factory = MagicMock()
@@ -665,10 +664,8 @@ class TestStreamingConnect:
         reader.get_connection.return_value = NodeConnectionDTO(
             id=node_id,
             name="n",
-            host="h",
-            port=22,
-            connection_type="ssh",
-            username="root",
+            endpoint=NodeEndpoint(host="h", port=22, connection_type="ssh"),
+            credentials=NodeCredentials(username="root"),
         )
         connector = AsyncMock()
         factory = MagicMock()
@@ -690,13 +687,13 @@ class TestStreamingConnect:
         reader.get_connection.return_value = NodeConnectionDTO(
             id=node_id,
             name="n",
-            host="10.0.0.1",
-            port=2222,
-            connection_type="ssh",
-            username="admin",
-            password="enc_pw",
-            ssh_key="enc_key",
-            passphrase="enc_pass",
+            endpoint=NodeEndpoint(host="10.0.0.1", port=2222, connection_type="ssh"),
+            credentials=NodeCredentials(
+                username="admin",
+                password="enc_pw",
+                ssh_key="enc_key",
+                passphrase="enc_pass",
+            ),
         )
         connector = AsyncMock()
         factory = MagicMock()
@@ -737,15 +734,14 @@ class TestGetNodesCursor:
         node = NodeViewDTO(
             id=uuid.uuid4(),
             name="n",
-            host="h",
-            port=22,
-            connection_type="ssh",
             status="active",
             username="root",
-            docker_host=None,
             tags=(),
             created_at=datetime.now(UTC),
             updated_at=datetime.now(UTC),
+            endpoint=NodeEndpoint(
+                host="h", port=22, connection_type="ssh", docker_host=None
+            ),
         )
         next_cursor = (datetime(2026, 7, 1, tzinfo=UTC), uuid.uuid4())
         reader.list_nodes_cursor.return_value = SimpleNamespace(
@@ -806,15 +802,14 @@ class TestGetNodesCursor:
             NodeViewDTO(
                 id=uuid.uuid4(),
                 name=f"n{i}",
-                host="h",
-                port=22,
-                connection_type="ssh",
                 status="active",
                 username="root",
-                docker_host=None,
                 tags=(),
                 created_at=datetime.now(UTC),
                 updated_at=datetime.now(UTC),
+                endpoint=NodeEndpoint(
+                    host="h", port=22, connection_type="ssh", docker_host=None
+                ),
             )
             for i in range(3)
         ]

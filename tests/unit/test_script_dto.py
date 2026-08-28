@@ -16,6 +16,7 @@ from app.application.dto.script_management import (
     ScriptUpdateDTO,
     ScriptViewDTO,
 )
+from app.application.dto.value_objects import NodeCredentials, NodeEndpoint
 
 
 def test_script_update_preserves_explicit_null() -> None:
@@ -42,10 +43,8 @@ def test_execution_target_contains_only_immutable_contracts() -> None:
     node = NodeConnectionDTO(
         id=uuid.uuid4(),
         name="node",
-        host="127.0.0.1",
-        port=22,
-        connection_type="ssh",
-        username="root",
+        endpoint=NodeEndpoint(host="127.0.0.1", port=22, connection_type="ssh"),
+        credentials=NodeCredentials(username="root"),
     )
     request = ScriptExecutionRequestDTO(
         node_ids=(node.id,),

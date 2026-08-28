@@ -16,6 +16,7 @@ from app.application.dto.node_management import (
     NodeUpdateDTO,
 )
 from app.application.dto.node_view import NodeViewDTO
+from app.application.dto.value_objects import NodeEndpoint
 from app.core.exceptions import NodeNameConflictError
 from app.core.types import ConnectionType, NodeStatus
 from app.models.node import NodeModel
@@ -92,14 +93,14 @@ class SqlAlchemyNodeManagementGateway:
                 node = await NodeRepository(session).create(
                     {
                         "name": data.name,
-                        "host": data.host,
-                        "port": data.port,
-                        "connection_type": data.connection_type,
-                        "username": data.username,
-                        "password": data.password,
-                        "ssh_key": data.ssh_key,
-                        "passphrase": data.passphrase,
-                        "docker_host": data.docker_host,
+                        "host": data.endpoint.host,
+                        "port": data.endpoint.port,
+                        "connection_type": data.endpoint.connection_type,
+                        "username": data.credentials.username,
+                        "password": data.credentials.password,
+                        "ssh_key": data.credentials.ssh_key,
+                        "passphrase": data.credentials.passphrase,
+                        "docker_host": data.endpoint.docker_host,
                         "tags": list(data.tags),
                     }
                 )
@@ -149,12 +150,14 @@ class SqlAlchemyNodeManagementGateway:
         return NodeViewDTO(
             id=node.id,
             name=node.name,
-            host=node.host,
-            port=node.port,
-            connection_type=cast(ConnectionType, node.connection_type),
+            endpoint=NodeEndpoint(
+                host=node.host,
+                port=node.port,
+                connection_type=cast(ConnectionType, node.connection_type),
+                docker_host=node.docker_host,
+            ),
             status=cast(NodeStatus, node.status),
             username=node.username,
-            docker_host=node.docker_host,
             tags=tuple(node.tags or ()),
             created_at=node.created_at,
             updated_at=node.updated_at,

@@ -17,6 +17,7 @@ from app.application.dto.command_management import (
 )
 from app.application.dto.command_template import CommandTemplateDTO
 from app.application.dto.node_connection import NodeConnectionDTO
+from app.application.dto.value_objects import NodeCredentials, NodeEndpoint
 from app.application.services.command_execution_service import CommandExecutionService
 from app.application.services.command_management_service import CommandManagementService
 from app.core.exceptions import (
@@ -188,10 +189,8 @@ class TestExecuteCommand:
         node_reader.get_connection.return_value = NodeConnectionDTO(
             id=node_id,
             name="node",
-            host="127.0.0.1",
-            port=22,
-            connection_type="ssh",
-            username="root",
+            endpoint=NodeEndpoint(host="127.0.0.1", port=22, connection_type="ssh"),
+            credentials=NodeCredentials(username="root"),
         )
         connector = AsyncMock()
         connector.execute_command.return_value = ("ok", "", 0)
@@ -245,10 +244,8 @@ class TestExecuteCommand:
         node_reader.get_connection.return_value = NodeConnectionDTO(
             id=node_id,
             name="node",
-            host="127.0.0.1",
-            port=22,
-            connection_type="ssh",
-            username="root",
+            endpoint=NodeEndpoint(host="127.0.0.1", port=22, connection_type="ssh"),
+            credentials=NodeCredentials(username="root"),
         )
         connector = AsyncMock()
         connector.__aenter__.side_effect = RuntimeError("SSH error")
@@ -277,10 +274,8 @@ class TestHistory:
         node_reader.get_connection.return_value = NodeConnectionDTO(
             id=node_id,
             name="node",
-            host="127.0.0.1",
-            port=22,
-            connection_type="ssh",
-            username="root",
+            endpoint=NodeEndpoint(host="127.0.0.1", port=22, connection_type="ssh"),
+            credentials=NodeCredentials(username="root"),
         )
         connector = AsyncMock()
         connector.execute_command.return_value = ("hi", "", 0)

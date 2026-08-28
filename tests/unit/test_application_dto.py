@@ -26,6 +26,7 @@ from app.application.dto.node_metrics import (
     UsageMetricsDTO,
 )
 from app.application.dto.node_view import NodeViewDTO
+from app.application.dto.value_objects import NodeCredentials, NodeEndpoint
 from app.application.ports.node_reader import NodeConnectionReader
 from app.models.node import NodeModel
 
@@ -34,13 +35,13 @@ def test_node_connection_dto_hides_secrets_from_repr() -> None:
     dto = NodeConnectionDTO(
         id=uuid.uuid4(),
         name="node",
-        host="127.0.0.1",
-        port=22,
-        connection_type="ssh",
-        username="root",
-        password="plain-password",
-        ssh_key="private-key",
-        passphrase="key-passphrase",
+        endpoint=NodeEndpoint(host="127.0.0.1", port=22, connection_type="ssh"),
+        credentials=NodeCredentials(
+            username="root",
+            password="plain-password",
+            ssh_key="private-key",
+            passphrase="key-passphrase",
+        ),
     )
 
     representation = repr(dto)
@@ -53,12 +54,12 @@ def test_node_connection_dto_hides_secrets_from_repr() -> None:
 def test_node_create_dto_is_immutable_and_hides_secrets() -> None:
     dto = NodeCreateDTO(
         name="node",
-        host="127.0.0.1",
-        port=22,
-        connection_type="ssh",
-        password="plain-password",
-        ssh_key="private-key",
-        passphrase="key-passphrase",
+        endpoint=NodeEndpoint(host="127.0.0.1", port=22, connection_type="ssh"),
+        credentials=NodeCredentials(
+            password="plain-password",
+            ssh_key="private-key",
+            passphrase="key-passphrase",
+        ),
     )
 
     assert "plain-password" not in repr(dto)
@@ -146,15 +147,14 @@ def test_node_view_dto_excludes_credentials() -> None:
     node = NodeViewDTO(
         id=uuid.uuid4(),
         name="node",
-        host="127.0.0.1",
-        port=22,
-        connection_type="ssh",
         status="active",
         username="root",
-        docker_host=None,
         tags=("prod",),
         created_at=datetime.now(UTC),
         updated_at=datetime.now(UTC),
+        endpoint=NodeEndpoint(
+            host="127.0.0.1", port=22, connection_type="ssh", docker_host=None
+        ),
     )
 
     assert node.tags == ("prod",)

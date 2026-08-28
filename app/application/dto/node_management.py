@@ -5,25 +5,52 @@ from datetime import datetime
 from uuid import UUID
 
 from app.application.dto.node_view import NodeViewDTO
-from app.core.types import ConnectionType
+from app.application.dto.value_objects import NodeCredentials, NodeEndpoint
+from app.core.types import NodeName, Tag, TagList
 
-NodeUpdateValue = str | int | tuple[str, ...] | None
+NodeUpdateValue = str | int | TagList | None
 
 
 @dataclass(frozen=True, slots=True)
 class NodeCreateDTO:
     """Immutable data required to create a node."""
 
-    name: str
-    host: str
-    port: int
-    connection_type: ConnectionType
-    username: str | None = None
-    password: str | None = field(default=None, repr=False)
-    ssh_key: str | None = field(default=None, repr=False)
-    passphrase: str | None = field(default=None, repr=False)
-    docker_host: str | None = None
-    tags: tuple[str, ...] = ()
+    name: NodeName
+    endpoint: NodeEndpoint
+    credentials: NodeCredentials = field(default_factory=NodeCredentials)
+    tags: TagList = ()
+
+    @property
+    def host(self) -> str:
+        return self.endpoint.host
+
+    @property
+    def port(self) -> int:
+        return self.endpoint.port
+
+    @property
+    def connection_type(self) -> str:
+        return self.endpoint.connection_type
+
+    @property
+    def docker_host(self) -> str | None:
+        return self.endpoint.docker_host
+
+    @property
+    def username(self) -> str | None:
+        return self.credentials.username
+
+    @property
+    def password(self) -> str | None:
+        return self.credentials.password
+
+    @property
+    def ssh_key(self) -> str | None:
+        return self.credentials.ssh_key
+
+    @property
+    def passphrase(self) -> str | None:
+        return self.credentials.passphrase
 
 
 @dataclass(frozen=True, slots=True)
@@ -37,7 +64,7 @@ class NodeUpdateDTO:
 class NodeTagDTO:
     """Immutable tag mutation data."""
 
-    tag: str
+    tag: Tag
 
 
 @dataclass(frozen=True, slots=True)
@@ -46,7 +73,7 @@ class NodeListQueryDTO:
 
     offset: int
     limit: int
-    tags: tuple[str, ...] = ()
+    tags: TagList = ()
     search: str | None = None
 
 
@@ -56,7 +83,7 @@ class NodeCursorQueryDTO:
 
     cursor: tuple[datetime, UUID] | None
     limit: int
-    tags: tuple[str, ...] = ()
+    tags: TagList = ()
     search: str | None = None
 
 

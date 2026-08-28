@@ -20,6 +20,7 @@ from app.application.dto.config import (
     NodeConfigDTO,
     ScriptConfigDTO,
 )
+from app.application.dto.value_objects import NodeEndpoint
 from app.models.base import Base
 from app.models.node import NodeModel
 
@@ -114,8 +115,14 @@ async def test_import_uses_one_transaction_and_skips_duplicates() -> None:
     script_repository.get_all.return_value = []
     data = ConfigTransferDTO(
         nodes=(
-            NodeConfigDTO("existing", "10.0.0.1", 22, "ssh"),
-            NodeConfigDTO("new", "10.0.0.2", 22, "ssh"),
+            NodeConfigDTO(
+                name="existing",
+                endpoint=NodeEndpoint(host="10.0.0.1", port=22, connection_type="ssh"),
+            ),
+            NodeConfigDTO(
+                name="new",
+                endpoint=NodeEndpoint(host="10.0.0.2", port=22, connection_type="ssh"),
+            ),
         ),
         commands=(CommandConfigDTO("uptime", "uptime"),),
         scripts=(ScriptConfigDTO("deploy", steps=({"command": "uptime"},)),),
@@ -160,7 +167,12 @@ async def test_import_exception_leaves_transaction_context() -> None:
     command_repository.get_all.return_value = []
     command_repository.create.side_effect = RuntimeError("write failed")
     data = ConfigTransferDTO(
-        nodes=(NodeConfigDTO("node", "10.0.0.1", 22, "ssh"),),
+        nodes=(
+            NodeConfigDTO(
+                name="node",
+                endpoint=NodeEndpoint(host="10.0.0.1", port=22, connection_type="ssh"),
+            ),
+        ),
         commands=(CommandConfigDTO("uptime", "uptime"),),
     )
 
@@ -200,7 +212,12 @@ async def test_import_rolls_back_earlier_writes_on_later_failure(
     command_repository.get_all.return_value = []
     command_repository.create.side_effect = RuntimeError("command write failed")
     data = ConfigTransferDTO(
-        nodes=(NodeConfigDTO("rolled-back", "10.0.0.1", 22, "ssh"),),
+        nodes=(
+            NodeConfigDTO(
+                name="rolled-back",
+                endpoint=NodeEndpoint(host="10.0.0.1", port=22, connection_type="ssh"),
+            ),
+        ),
         commands=(CommandConfigDTO("failure", "false"),),
     )
 

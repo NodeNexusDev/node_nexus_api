@@ -11,6 +11,7 @@ from app.application.dto.command_template import CommandTemplateDTO
 from app.application.dto.node_connection import NodeConnectionDTO
 from app.application.dto.script_definition import ScriptDefinitionDTO
 from app.application.dto.script_execution import ScriptExecutionRequestDTO
+from app.application.dto.value_objects import NodeCredentials, NodeEndpoint
 from app.application.services.script_execution_service import ScriptExecutionService
 from app.core.exceptions import NodeNotFoundError, ScriptNotFoundError
 from app.core.types import JsonObject
@@ -20,10 +21,8 @@ def _node(node_id: uuid.UUID) -> NodeConnectionDTO:
     return NodeConnectionDTO(
         id=node_id,
         name="node",
-        host="127.0.0.1",
-        port=22,
-        connection_type="ssh",
-        username="root",
+        endpoint=NodeEndpoint(host="127.0.0.1", port=22, connection_type="ssh"),
+        credentials=NodeCredentials(username="root"),
     )
 
 

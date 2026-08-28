@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.adapters.persistence.dao.base import escape_ilike
 from app.application.dto.node_connection import NodeConnectionDTO
+from app.application.dto.value_objects import NodeCredentials, NodeEndpoint
 from app.core.types import ConnectionType
 from app.models.node import NodeModel
 
@@ -31,14 +32,18 @@ class NodeRepository:
         return NodeConnectionDTO(
             id=node.id,
             name=node.name,
-            host=node.host,
-            port=node.port,
-            connection_type=cast(ConnectionType, node.connection_type),
-            username=node.username,
-            password=node.password,
-            ssh_key=node.ssh_key,
-            passphrase=node.passphrase,
-            docker_host=node.docker_host,
+            endpoint=NodeEndpoint(
+                host=node.host,
+                port=node.port,
+                connection_type=cast(ConnectionType, node.connection_type),
+                docker_host=node.docker_host,
+            ),
+            credentials=NodeCredentials(
+                username=node.username,
+                password=node.password,
+                ssh_key=node.ssh_key,
+                passphrase=node.passphrase,
+            ),
         )
 
     async def get_connection(self, node_id: UUID) -> NodeConnectionDTO | None:

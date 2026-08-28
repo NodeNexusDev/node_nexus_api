@@ -6,6 +6,7 @@ from uuid import uuid4
 import pytest
 
 from app.application.dto.node_connection import NodeConnectionDTO
+from app.application.dto.value_objects import NodeCredentials, NodeEndpoint
 from app.application.services.streaming_command_service import StreamingCommandService
 from app.core.exceptions import NodeNotFoundError
 
@@ -16,10 +17,8 @@ async def test_connect_resolves_dto_and_always_disconnects() -> None:
     reader.get_connection.return_value = NodeConnectionDTO(
         id=node_id,
         name="node",
-        host="host",
-        port=22,
-        connection_type="ssh",
-        username="root",
+        endpoint=NodeEndpoint(host="host", port=22, connection_type="ssh"),
+        credentials=NodeCredentials(username="root"),
     )
     connector = AsyncMock()
     factory = MagicMock()

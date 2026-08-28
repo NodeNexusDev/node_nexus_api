@@ -15,6 +15,7 @@ from app.application.dto.node_management import (
     NodeCursorPageDTO,
     NodeCursorQueryDTO,
 )
+from app.application.dto.value_objects import NodeCredentials, NodeEndpoint
 
 # ─── NodeManagementGateway ───
 
@@ -106,14 +107,13 @@ class TestNodeManagementGateway:
 
             data = NodeCreateDTO(
                 name="new-node",
-                host="10.0.0.2",
-                port=22,
-                connection_type="ssh",
-                username="root",
-                password=None,
-                ssh_key=None,
-                docker_host=None,
                 tags=(),
+                endpoint=NodeEndpoint(
+                    host="10.0.0.2", port=22, connection_type="ssh", docker_host=None
+                ),
+                credentials=NodeCredentials(
+                    username="root", password=None, ssh_key=None
+                ),
             )
             result = await gw.create_node(data)
             assert result.name == "new-node"

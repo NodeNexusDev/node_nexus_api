@@ -7,6 +7,7 @@ import pytest
 
 from app.adapters.runtime.docker import SshDockerRuntime
 from app.application.dto.node_connection import NodeConnectionDTO
+from app.application.dto.value_objects import NodeCredentials, NodeEndpoint
 from app.core.exceptions import ConnectionFailedError
 
 
@@ -14,11 +15,13 @@ def _target() -> NodeConnectionDTO:
     return NodeConnectionDTO(
         id=uuid.uuid4(),
         name="docker",
-        host="127.0.0.1",
-        port=22,
-        connection_type="docker",
-        username="root",
-        docker_host="unix:///var/run/docker.sock",
+        endpoint=NodeEndpoint(
+            host="127.0.0.1",
+            port=22,
+            connection_type="docker",
+            docker_host="unix:///var/run/docker.sock",
+        ),
+        credentials=NodeCredentials(username="root"),
     )
 
 

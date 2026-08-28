@@ -20,6 +20,7 @@ from app.application.dto.node_status_history import (
 )
 from app.application.dto.node_validation import NodeValidationRequestDTO
 from app.application.dto.node_view import NodeViewDTO
+from app.application.dto.value_objects import NodeCredentials, NodeEndpoint
 from app.application.services.node_command_service import NodeCommandService
 from app.application.services.node_management_service import NodeManagementService
 from app.application.services.node_metrics_service import NodeMetricsService
@@ -55,12 +56,12 @@ def _node_response(node: NodeViewDTO) -> NodeResponse:
     return NodeResponse(
         id=node.id,
         name=node.name,
-        host=node.host,
-        port=node.port,
-        connection_type=node.connection_type,
+        host=node.endpoint.host,
+        port=node.endpoint.port,
+        connection_type=node.endpoint.connection_type,
         status=node.status,
         username=node.username,
-        docker_host=node.docker_host,
+        docker_host=node.endpoint.docker_host,
         tags=list(node.tags),
         created_at=node.created_at,
         updated_at=node.updated_at,
@@ -155,14 +156,18 @@ async def create_node(
         await service.create_node(
             NodeCreateDTO(
                 name=data.name,
-                host=data.host,
-                port=data.port,
-                connection_type=data.connection_type,
-                username=data.username,
-                password=data.password,
-                ssh_key=data.ssh_key,
-                passphrase=data.passphrase,
-                docker_host=data.docker_host,
+                endpoint=NodeEndpoint(
+                    host=data.host,
+                    port=data.port,
+                    connection_type=data.connection_type,
+                    docker_host=data.docker_host,
+                ),
+                credentials=NodeCredentials(
+                    username=data.username,
+                    password=data.password,
+                    ssh_key=data.ssh_key,
+                    passphrase=data.passphrase,
+                ),
                 tags=tuple(data.tags),
             )
         )
@@ -218,12 +223,12 @@ async def check_node(
     return NodeResponse(
         id=result.id,
         name=result.name,
-        host=result.host,
-        port=result.port,
-        connection_type=result.connection_type,
+        host=result.endpoint.host,
+        port=result.endpoint.port,
+        connection_type=result.endpoint.connection_type,
         status=result.status,
         username=result.username,
-        docker_host=result.docker_host,
+        docker_host=result.endpoint.docker_host,
         tags=list(result.tags),
         created_at=result.created_at,
         updated_at=result.updated_at,
@@ -241,13 +246,17 @@ async def validate_credentials(
     audit.info("api.nodes.validate_credentials", host=data.host, port=data.port)
     result = await service.validate_credentials(
         NodeValidationRequestDTO(
-            host=data.host,
-            port=data.port,
-            connection_type=data.connection_type,
-            username=data.username,
-            password=data.password,
-            ssh_key=data.ssh_key,
-            passphrase=data.passphrase,
+            endpoint=NodeEndpoint(
+                host=data.host,
+                port=data.port,
+                connection_type=data.connection_type,
+            ),
+            credentials=NodeCredentials(
+                username=data.username,
+                password=data.password,
+                ssh_key=data.ssh_key,
+                passphrase=data.passphrase,
+            ),
         )
     )
     return NodeValidateResponse(
