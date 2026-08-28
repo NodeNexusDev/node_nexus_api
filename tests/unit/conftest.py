@@ -7,6 +7,7 @@ from unittest.mock import AsyncMock, MagicMock
 from dishka import Provider, Scope, provide
 
 from app.application.dto.node_view import NodeViewDTO
+from app.application.dto.value_objects import NodeEndpoint
 from app.application.ports.jwt_handler import JWTHandler
 from app.application.services.api_key_authentication import (
     APIKeyAuthenticationService,
@@ -74,15 +75,17 @@ def make_node_view(**overrides: object) -> NodeViewDTO:
     return NodeViewDTO(
         id=node.id,
         name=node.name,
-        host=node.host,
-        port=node.port,
-        connection_type=cast(ConnectionType, node.connection_type),
         status=cast(NodeStatus, node.status),
         username=node.username,
-        docker_host=node.docker_host,
         tags=tuple(node.tags or ()),
         created_at=node.created_at,
         updated_at=node.updated_at,
+        endpoint=NodeEndpoint(
+            host=node.host,
+            port=node.port,
+            connection_type=cast(ConnectionType, node.connection_type),
+            docker_host=node.docker_host,
+        ),
     )
 
 

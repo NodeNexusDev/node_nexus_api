@@ -19,6 +19,7 @@ from app.application.dto.node_management import (
     NodeUpdateDTO,
 )
 from app.application.dto.node_view import NodeViewDTO
+from app.application.dto.value_objects import NodeCredentials, NodeEndpoint
 from app.application.services.node_bulk_command_service import NodeBulkCommandService
 from app.application.services.node_command_service import NodeCommandService
 from app.application.services.node_management_service import (
@@ -117,7 +118,8 @@ class TestCreateNode:
         node = make_node_view()
         repo.create_node.return_value = node
         data = NodeCreateDTO(
-            name="test", host="1.2.3.4", port=22, connection_type="ssh"
+            name="test",
+            endpoint=NodeEndpoint(host="1.2.3.4", port=22, connection_type="ssh"),
         )
         result = await service.create_node(data)
         assert result.name == "server-1"
@@ -128,7 +130,8 @@ class TestCreateNode:
     ) -> None:
         repo.create_node.side_effect = NodeNameConflictError("duplicate")
         data = NodeCreateDTO(
-            name="duplicate", host="1.2.3.4", port=22, connection_type="ssh"
+            name="duplicate",
+            endpoint=NodeEndpoint(host="1.2.3.4", port=22, connection_type="ssh"),
         )
 
         with pytest.raises(NodeNameConflictError, match="duplicate"):
@@ -140,10 +143,8 @@ class TestCreateNode:
         repo.create_node.return_value = make_node_view()
         data = NodeCreateDTO(
             name="test",
-            host="1.2.3.4",
-            port=22,
-            connection_type="ssh",
-            password="secret123",
+            endpoint=NodeEndpoint(host="1.2.3.4", port=22, connection_type="ssh"),
+            credentials=NodeCredentials(password="secret123"),
         )
         await service.create_node(data)
         call_data = repo.create_node.call_args.args[0]
@@ -157,10 +158,8 @@ class TestCreateNode:
         key = "-----BEGIN RSA PRIVATE KEY-----\nfake\n-----END RSA PRIVATE KEY-----"
         data = NodeCreateDTO(
             name="test",
-            host="1.2.3.4",
-            port=22,
-            connection_type="ssh",
-            ssh_key=key,
+            endpoint=NodeEndpoint(host="1.2.3.4", port=22, connection_type="ssh"),
+            credentials=NodeCredentials(ssh_key=key),
         )
         await service.create_node(data)
         call_data = repo.create_node.call_args.args[0]
@@ -173,11 +172,8 @@ class TestCreateNode:
         repo.create_node.return_value = make_node_view()
         data = NodeCreateDTO(
             name="test",
-            host="1.2.3.4",
-            port=22,
-            connection_type="ssh",
-            ssh_key="fake-key",
-            passphrase="my-passphrase",
+            endpoint=NodeEndpoint(host="1.2.3.4", port=22, connection_type="ssh"),
+            credentials=NodeCredentials(ssh_key="fake-key", passphrase="my-passphrase"),
         )
         await service.create_node(data)
         call_data = repo.create_node.call_args.args[0]

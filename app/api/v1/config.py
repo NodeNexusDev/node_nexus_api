@@ -21,8 +21,9 @@ from app.application.dto.config import (
     NodeConfigDTO,
     ScriptConfigDTO,
 )
+from app.application.dto.value_objects import NodeCredentials, NodeEndpoint
 from app.application.services.config_service import ConfigService
-from app.core.types import JsonObject
+from app.core.types import ConnectionType, JsonObject
 from app.schemas.command import CommandParameter
 from app.schemas.config import (
     ConfigExport,
@@ -79,7 +80,18 @@ async def export_config(
         application_version=result.application_version or "unknown",
         version=result.legacy_version or "0.5.0",
         exported_at=cast(datetime, result.exported_at),
-        nodes=[asdict(item) for item in result.nodes],
+        nodes=[
+            {
+                "name": n.name,
+                "host": n.endpoint.host,
+                "port": n.endpoint.port,
+                "connection_type": n.endpoint.connection_type,
+                "username": n.credentials.username,
+                "docker_host": n.endpoint.docker_host,
+                "tags": list(n.tags),
+            }
+            for n in result.nodes
+        ],
         commands=[asdict(item) for item in result.commands],
         scripts=[asdict(item) for item in result.scripts],
     )
@@ -109,7 +121,20 @@ async def import_config(
             format_version=data.format_version,
             application_version=data.application_version,
             legacy_version=data.version,
-            nodes=tuple(NodeConfigDTO(**item.model_dump()) for item in data.nodes),
+            nodes=tuple(
+                NodeConfigDTO(
+                    name=item.name,
+                    endpoint=NodeEndpoint(
+                        host=item.host,
+                        port=item.port,
+                        connection_type=item.connection_type,
+                        docker_host=item.docker_host,
+                    ),
+                    credentials=NodeCredentials(username=item.username),
+                    tags=tuple(item.tags or ()),
+                )
+                for item in data.nodes
+            ),
             commands=tuple(
                 CommandConfigDTO(
                     **item.model_dump(exclude={"parameters", "tags"}),
@@ -155,7 +180,7 @@ def _dry_run_response(result: DryRunPreviewDTO) -> DryRunImportResult:
                     name=n.name,
                     host=n.host,
                     port=n.port,
-                    connection_type=n.connection_type,
+                    connection_type=cast(ConnectionType, n.connection_type),
                     username=n.username,
                     docker_host=n.docker_host,
                     tags=list(n.tags),

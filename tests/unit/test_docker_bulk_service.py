@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from app.application.dto.node_connection import NodeConnectionDTO
+from app.application.dto.value_objects import NodeCredentials, NodeEndpoint
 from app.application.services.docker.bulk_service import DockerBulkService
 from app.core.exceptions import DockerError
 from app.core.types import ConnectionType
@@ -19,13 +20,12 @@ def _make_node(
     return NodeConnectionDTO(
         id=node_id or uuid.uuid4(),
         name=name,
-        host="10.0.0.1",
-        port=22,
-        connection_type=connection_type,
-        username="root",
-        password="enc",
-        ssh_key="enc",
-        passphrase=None,
+        endpoint=NodeEndpoint(
+            host="10.0.0.1", port=22, connection_type=connection_type
+        ),
+        credentials=NodeCredentials(
+            username="root", password="enc", ssh_key="enc", passphrase=None
+        ),
     )
 
 

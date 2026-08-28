@@ -13,6 +13,7 @@ from app.application.dto.command_execution import (
     CommandRequestDTO,
 )
 from app.application.dto.node_connection import NodeConnectionDTO
+from app.application.dto.value_objects import NodeCredentials, NodeEndpoint
 from app.application.services.node_bulk_command_service import NodeBulkCommandService
 from app.application.services.node_command_service import NodeCommandService
 from app.core.exceptions import ConnectionFailedError, NodeNotFoundError
@@ -244,14 +245,18 @@ class TestBulkExecuteConnectionFailed:
         node = NodeConnectionDTO(
             id=orm_node.id,
             name=orm_node.name,
-            host=orm_node.host,
-            port=orm_node.port,
-            connection_type=cast(ConnectionType, orm_node.connection_type),
-            username=orm_node.username,
-            password=orm_node.password,
-            ssh_key=orm_node.ssh_key,
-            passphrase=orm_node.passphrase,
-            docker_host=orm_node.docker_host,
+            endpoint=NodeEndpoint(
+                host=orm_node.host,
+                port=orm_node.port,
+                connection_type=cast(ConnectionType, orm_node.connection_type),
+                docker_host=orm_node.docker_host,
+            ),
+            credentials=NodeCredentials(
+                username=orm_node.username,
+                password=orm_node.password,
+                ssh_key=orm_node.ssh_key,
+                passphrase=orm_node.passphrase,
+            ),
         )
         result = await bulk_service._execute_on_single_node(node, "echo hi")
 
@@ -268,10 +273,8 @@ class TestBulkCommandBoundaries:
         node = NodeConnectionDTO(
             id=uuid.uuid4(),
             name="node",
-            host="10.0.0.1",
-            port=22,
-            connection_type="ssh",
-            username="root",
+            endpoint=NodeEndpoint(host="10.0.0.1", port=22, connection_type="ssh"),
+            credentials=NodeCredentials(username="root"),
         )
         reader = AsyncMock()
         audit = AsyncMock()

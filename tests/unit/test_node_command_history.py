@@ -8,6 +8,7 @@ import pytest
 from app.adapters.security import AesGcmCredentialCipher
 from app.application.dto.command_execution import CommandRequestDTO
 from app.application.dto.node_connection import NodeConnectionDTO
+from app.application.dto.value_objects import NodeCredentials, NodeEndpoint
 from app.application.services.node_command_service import NodeCommandService
 
 
@@ -51,10 +52,8 @@ async def test_execute_command_saves_history(
     node_reader.get_connection.return_value = NodeConnectionDTO(
         id=node_id,
         name="node",
-        host="127.0.0.1",
-        port=22,
-        connection_type="ssh",
-        username="root",
+        endpoint=NodeEndpoint(host="127.0.0.1", port=22, connection_type="ssh"),
+        credentials=NodeCredentials(username="root"),
     )
     connector = AsyncMock()
     connector.execute_command.return_value = ("hello", "", 0)
@@ -83,10 +82,8 @@ async def test_execute_command_without_history_writer_does_not_fail(
     node_reader.get_connection.return_value = NodeConnectionDTO(
         id=node_id,
         name="node",
-        host="127.0.0.1",
-        port=22,
-        connection_type="ssh",
-        username="root",
+        endpoint=NodeEndpoint(host="127.0.0.1", port=22, connection_type="ssh"),
+        credentials=NodeCredentials(username="root"),
     )
     connector = AsyncMock()
     connector.execute_command.return_value = ("ok", "", 0)

@@ -5,6 +5,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, cast
 from uuid import UUID
 
+from app.application.dto.value_objects import NodeCredentials, NodeEndpoint
+
 if TYPE_CHECKING:
     from app.adapters.persistence.dao.node import NodeRepository
     from app.application.ports.audit_sink import AuditEventSink
@@ -323,14 +325,18 @@ class _RepositoryNodeReader:
         return NodeConnectionDTO(
             id=node.id,
             name=node.name,
-            host=node.host,
-            port=node.port,
-            connection_type=cast(ConnectionType, node.connection_type),
-            username=node.username,
-            password=node.password,
-            ssh_key=node.ssh_key,
-            passphrase=node.passphrase,
-            docker_host=node.docker_host,
+            endpoint=NodeEndpoint(
+                host=node.host,
+                port=node.port,
+                connection_type=cast(ConnectionType, node.connection_type),
+                docker_host=node.docker_host,
+            ),
+            credentials=NodeCredentials(
+                username=node.username,
+                password=node.password,
+                ssh_key=node.ssh_key,
+                passphrase=node.passphrase,
+            ),
         )
 
     async def get_connection(self, node_id: UUID) -> NodeConnectionDTO | None:

@@ -14,6 +14,7 @@ from app.application.dto.node_management import (
     NodeListQueryDTO,
     NodeUpdateDTO,
 )
+from app.application.dto.value_objects import NodeCredentials, NodeEndpoint
 from app.core.exceptions import NodeNameConflictError
 from tests.unit.conftest import make_orm_node
 
@@ -84,11 +85,9 @@ async def test_create_node_uses_short_transaction_and_maps_result() -> None:
     node = make_orm_node()
     data = NodeCreateDTO(
         name="node",
-        host="127.0.0.1",
-        port=22,
-        connection_type="ssh",
-        password="encrypted",
         tags=("prod",),
+        endpoint=NodeEndpoint(host="127.0.0.1", port=22, connection_type="ssh"),
+        credentials=NodeCredentials(password="encrypted"),
     )
 
     with patch(
@@ -109,9 +108,7 @@ async def test_create_node_maps_unique_violation_to_domain_error() -> None:
     factory, _ = _sessionmaker()
     data = NodeCreateDTO(
         name="duplicate",
-        host="127.0.0.1",
-        port=22,
-        connection_type="ssh",
+        endpoint=NodeEndpoint(host="127.0.0.1", port=22, connection_type="ssh"),
     )
 
     with patch(

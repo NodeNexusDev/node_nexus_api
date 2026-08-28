@@ -16,6 +16,7 @@ from app.application.dto.config import (
     NodeConfigDTO,
     ScriptConfigDTO,
 )
+from app.application.dto.value_objects import NodeCredentials, NodeEndpoint
 from app.core.types import ConnectionType
 
 RecordT = TypeVar("RecordT")
@@ -58,11 +59,13 @@ class SqlAlchemyConfigGateway:
             nodes=tuple(
                 NodeConfigDTO(
                     name=node.name,
-                    host=node.host,
-                    port=node.port,
-                    connection_type=cast(ConnectionType, node.connection_type),
-                    username=node.username,
-                    docker_host=node.docker_host,
+                    endpoint=NodeEndpoint(
+                        host=node.host,
+                        port=node.port,
+                        connection_type=cast(ConnectionType, node.connection_type),
+                        docker_host=node.docker_host,
+                    ),
+                    credentials=NodeCredentials(username=node.username),
                     tags=tuple(node.tags or ()),
                 )
                 for node in nodes
@@ -124,11 +127,11 @@ class SqlAlchemyConfigGateway:
                 await node_repository.create(
                     {
                         "name": node.name,
-                        "host": node.host,
-                        "port": node.port,
-                        "connection_type": node.connection_type,
-                        "username": node.username,
-                        "docker_host": node.docker_host,
+                        "host": node.endpoint.host,
+                        "port": node.endpoint.port,
+                        "connection_type": node.endpoint.connection_type,
+                        "username": node.credentials.username,
+                        "docker_host": node.endpoint.docker_host,
                         "tags": list(node.tags),
                     }
                 )

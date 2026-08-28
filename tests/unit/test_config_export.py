@@ -11,6 +11,7 @@ from app.application.dto.config import (
     ConfigTransferDTO,
     NodeConfigDTO,
 )
+from app.application.dto.value_objects import NodeEndpoint
 from app.application.services.config_service import ConfigService
 from app.core.exceptions import UnsupportedConfigFormatError
 from app.schemas.config import ConfigExport, ImportResult, NodeExport
@@ -24,9 +25,7 @@ async def test_export_enriches_adapter_snapshot_with_metadata() -> None:
         nodes=(
             NodeConfigDTO(
                 name="server-1",
-                host="10.0.0.1",
-                port=22,
-                connection_type="ssh",
+                endpoint=NodeEndpoint(host="10.0.0.1", port=22, connection_type="ssh"),
             ),
         )
     )

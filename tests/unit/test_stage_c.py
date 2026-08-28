@@ -22,6 +22,7 @@ from app.application.dto.node_validation import (
     NodeValidationRequestDTO,
     NodeValidationResultDTO,
 )
+from app.application.dto.value_objects import NodeCredentials, NodeEndpoint
 from app.application.services.config_service import ConfigService
 from app.application.services.node_validation_service import NodeValidationService
 from app.core.exceptions import ConnectionFailedError, UnsupportedConfigFormatError
@@ -57,7 +58,12 @@ async def test_preview_import_does_not_write() -> None:
     script_repository.get_all.return_value = []
 
     data = ConfigTransferDTO(
-        nodes=(NodeConfigDTO("new-node", "10.0.0.1", 22, "ssh"),),
+        nodes=(
+            NodeConfigDTO(
+                name="new-node",
+                endpoint=NodeEndpoint(host="10.0.0.1", port=22, connection_type="ssh"),
+            ),
+        ),
         commands=(CommandConfigDTO("uptime", "uptime"),),
         scripts=(ScriptConfigDTO("deploy", steps=({"cmd": "echo"},)),),
     )
@@ -110,8 +116,14 @@ async def test_preview_import_reports_duplicates() -> None:
 
     data = ConfigTransferDTO(
         nodes=(
-            NodeConfigDTO("existing-node", "10.0.0.1", 22, "ssh"),
-            NodeConfigDTO("new-node", "10.0.0.2", 22, "ssh"),
+            NodeConfigDTO(
+                name="existing-node",
+                endpoint=NodeEndpoint(host="10.0.0.1", port=22, connection_type="ssh"),
+            ),
+            NodeConfigDTO(
+                name="new-node",
+                endpoint=NodeEndpoint(host="10.0.0.2", port=22, connection_type="ssh"),
+            ),
         ),
     )
 
@@ -143,12 +155,24 @@ async def test_service_dry_run_delegates_to_preview() -> None:
     importer = AsyncMock()
     exporter = AsyncMock()
     expected = DryRunPreviewDTO(
-        would_create_nodes=(NodeConfigDTO("n", "10.0.0.1", 22, "ssh"),),
+        would_create_nodes=(
+            NodeConfigDTO(
+                name="n",
+                endpoint=NodeEndpoint(host="10.0.0.1", port=22, connection_type="ssh"),
+            ),
+        ),
     )
     importer.preview_import.return_value = expected
 
     service = ConfigService(exporter=exporter, importer=importer)
-    data = ConfigTransferDTO(nodes=(NodeConfigDTO("n", "10.0.0.1", 22, "ssh"),))
+    data = ConfigTransferDTO(
+        nodes=(
+            NodeConfigDTO(
+                name="n",
+                endpoint=NodeEndpoint(host="10.0.0.1", port=22, connection_type="ssh"),
+            ),
+        )
+    )
 
     result = await service.import_config(data, dry_run=True)
 
@@ -168,7 +192,14 @@ async def test_service_import_without_dry_run_calls_importer() -> None:
     importer.import_config.return_value = expected
 
     service = ConfigService(exporter=exporter, importer=importer)
-    data = ConfigTransferDTO(nodes=(NodeConfigDTO("n", "10.0.0.1", 22, "ssh"),))
+    data = ConfigTransferDTO(
+        nodes=(
+            NodeConfigDTO(
+                name="n",
+                endpoint=NodeEndpoint(host="10.0.0.1", port=22, connection_type="ssh"),
+            ),
+        )
+    )
 
     result = await service.import_config(data, dry_run=False)
 
@@ -184,7 +215,12 @@ async def test_service_rejects_unsupported_version_on_dry_run() -> None:
     exporter = AsyncMock()
     service = ConfigService(exporter=exporter, importer=importer)
     data = ConfigTransferDTO(
-        nodes=(NodeConfigDTO("n", "10.0.0.1", 22, "ssh"),),
+        nodes=(
+            NodeConfigDTO(
+                name="n",
+                endpoint=NodeEndpoint(host="10.0.0.1", port=22, connection_type="ssh"),
+            ),
+        ),
         format_version="99.0",
     )
 
@@ -208,7 +244,8 @@ async def test_node_validation_service_success() -> None:
 
     service = NodeValidationService(validator=validator)
     request = NodeValidationRequestDTO(
-        host="10.0.0.1", port=22, username="root", password="secret"
+        endpoint=NodeEndpoint(host="10.0.0.1", port=22),
+        credentials=NodeCredentials(username="root", password="secret"),
     )
 
     result = await service.validate_credentials(request)
@@ -227,7 +264,7 @@ async def test_node_validation_service_failure() -> None:
     validator.validate.return_value = expected
 
     service = NodeValidationService(validator=validator)
-    request = NodeValidationRequestDTO(host="10.0.0.1", port=22)
+    request = NodeValidationRequestDTO(endpoint=NodeEndpoint(host="10.0.0.1", port=22))
 
     result = await service.validate_credentials(request)
 
@@ -249,7 +286,8 @@ async def test_ssh_credential_validator_success() -> None:
 
     validator = SshCredentialValidator(factory)
     request = NodeValidationRequestDTO(
-        host="10.0.0.1", port=22, username="root", password="secret"
+        endpoint=NodeEndpoint(host="10.0.0.1", port=22),
+        credentials=NodeCredentials(username="root", password="secret"),
     )
 
     result = await validator.validate(request)
@@ -281,7 +319,7 @@ async def test_ssh_credential_validator_connection_failed() -> None:
     factory.create_ssh.return_value = connector
 
     validator = SshCredentialValidator(factory)
-    request = NodeValidationRequestDTO(host="10.0.0.1", port=22)
+    request = NodeValidationRequestDTO(endpoint=NodeEndpoint(host="10.0.0.1", port=22))
 
     result = await validator.validate(request)
 
@@ -302,7 +340,7 @@ async def test_ssh_credential_validator_unexpected_error() -> None:
     factory.create_ssh.return_value = connector
 
     validator = SshCredentialValidator(factory)
-    request = NodeValidationRequestDTO(host="10.0.0.1", port=22)
+    request = NodeValidationRequestDTO(endpoint=NodeEndpoint(host="10.0.0.1", port=22))
 
     result = await validator.validate(request)
 

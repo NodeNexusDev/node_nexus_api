@@ -17,6 +17,8 @@ from app.api.v1.commands import router as commands_router
 from app.api.v1.health import router as health_router
 from app.api.v1.nodes import router as nodes_router
 from app.api.v1.nodes_bulk import router as nodes_bulk_router
+from app.application.dto.node_view import NodeViewDTO
+from app.application.dto.value_objects import NodeEndpoint
 from app.application.services.node_bulk_command_service import NodeBulkCommandService
 from app.application.services.node_command_service import NodeCommandService
 from app.application.services.node_management_service import NodeManagementService
@@ -26,28 +28,43 @@ from app.schemas.command import CommandResult
 from app.schemas.node import (
     BulkCommandResult,
     BulkNodeResult,
-    NodeResponse,
 )
 from tests.typing import as_typed_mock
 from tests.unit.conftest import MockAuthServiceProvider, _mock_settings
 
 
-def _make_node(**overrides: Any) -> NodeResponse:
+def _make_node(**overrides: Any) -> NodeViewDTO:
     defaults: dict[str, Any] = {
         "id": uuid.uuid4(),
         "name": "test-node",
-        "host": "192.168.1.100",
-        "port": 22,
-        "connection_type": "ssh",
+        "endpoint": NodeEndpoint(
+            host="192.168.1.100", port=22, connection_type="ssh", docker_host=None
+        ),
         "status": "active",
         "username": "root",
-        "docker_host": None,
         "tags": [],
         "created_at": datetime.now(UTC),
         "updated_at": datetime.now(UTC),
     }
     defaults.update(overrides)
-    return NodeResponse(**defaults)
+    # Allow flat overrides for backward-compat in tests
+    if (
+        "host" in defaults
+        or "port" in defaults
+        or "connection_type" in defaults
+        or "docker_host" in defaults
+    ):
+        host = defaults.pop("host", "192.168.1.100")
+        port = defaults.pop("port", 22)
+        connection_type = defaults.pop("connection_type", "ssh")
+        docker_host = defaults.pop("docker_host", None)
+        defaults["endpoint"] = NodeEndpoint(
+            host=host,
+            port=port,
+            connection_type=connection_type,
+            docker_host=docker_host,
+        )
+    return NodeViewDTO(**defaults)
 
 
 def _create_test_app(service: NodeManagementService | AsyncMock) -> FastAPI:
