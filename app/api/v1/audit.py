@@ -14,6 +14,7 @@ from app.api.deps import (
     require_write_or_jwt_scope,
 )
 from app.application.dto.audit import AuditLogDTO
+from app.application.dto.export import AuditExportFormat, AuditExportQueryDTO
 from app.application.export_utils import rows_to_csv, rows_to_json
 from app.application.ports.export import AuditExporter
 from app.application.services.audit_log_service import AuditLogService
@@ -128,12 +129,10 @@ async def export_audit(
     to_date: datetime | None = Query(None),
     action: str | None = Query(None),
     node_id: uuid.UUID | None = Query(None),
-    fmt: str = Query("csv", pattern="^(csv|json)$"),
+    fmt: AuditExportFormat = Query("csv"),
     _key: Principal = Security(get_current_principal),
 ) -> Response:
     """Export audit logs as CSV or JSON."""
-    from app.application.dto.export import AuditExportQueryDTO
-
     audit.info("api.audit.export", format=fmt)
     query = AuditExportQueryDTO(
         date_from=from_date,

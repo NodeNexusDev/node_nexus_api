@@ -1,6 +1,7 @@
 """Internal SQLAlchemy DAO for scripts."""
 
-from typing import Any
+from collections.abc import Mapping
+from typing import TypeVar
 from uuid import UUID
 
 from sqlalchemy import func, or_, select
@@ -9,6 +10,8 @@ from sqlalchemy.sql import Select
 
 from app.adapters.persistence.dao.base import escape_ilike
 from app.models.script import ScriptModel
+
+_SelectRow = TypeVar("_SelectRow", bound=tuple[object, ...])
 
 
 class ScriptRepository:
@@ -25,10 +28,10 @@ class ScriptRepository:
 
     def _apply_filters(
         self,
-        query: Select[Any],
+        query: Select[_SelectRow],
         tags: list[str] | None = None,
         search: str | None = None,
-    ) -> Select[Any]:
+    ) -> Select[_SelectRow]:
         if tags:
             for tag in tags:
                 query = query.where(ScriptModel.tags.op("@>")([tag]))
@@ -75,13 +78,13 @@ class ScriptRepository:
         )
         return sorted(row[0] for row in result.all() if row[0])
 
-    async def create(self, data: dict[str, Any]) -> ScriptModel:
+    async def create(self, data: Mapping[str, object]) -> ScriptModel:
         script = ScriptModel(**data)
         self._session.add(script)
         await self._session.flush()
         return script
 
-    async def update(self, id: UUID, data: dict[str, Any]) -> ScriptModel | None:
+    async def update(self, id: UUID, data: Mapping[str, object]) -> ScriptModel | None:
         script = await self.get_by_id(id)
         if script is None:
             return None

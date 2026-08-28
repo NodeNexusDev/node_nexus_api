@@ -65,9 +65,16 @@ exclude = ["alembic/versions/"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "W", "UP"]
+extend-select = ["ANN"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["ANN"]
 
 [tool.ty.environment]
 python-version = "3.13"
+
+[tool.ty.rules]
+all = "error"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

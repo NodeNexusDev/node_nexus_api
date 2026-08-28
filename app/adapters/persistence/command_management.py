@@ -1,6 +1,6 @@
 """Short-scope SQLAlchemy command management adapter."""
 
-from typing import Any, cast
+from typing import cast
 from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -15,6 +15,7 @@ from app.application.dto.command_management import (
     CommandViewDTO,
 )
 from app.application.dto.command_template import CommandTemplateDTO
+from app.core.types import JsonObject, JsonValue
 from app.models.command import CommandModel
 
 
@@ -101,7 +102,10 @@ class SqlAlchemyCommandGateway:
             return CommandTemplateDTO(
                 id=command.id,
                 command=command.command,
-                parameters=tuple(command.parameters or ()),
+                parameters=tuple(
+                    self.parameter_from_json(parameter)
+                    for parameter in (command.parameters or ())
+                ),
             )
 
     @staticmethod
@@ -112,7 +116,7 @@ class SqlAlchemyCommandGateway:
             description=command.description,
             command=command.command,
             parameters=tuple(
-                CommandParameterDTO(**parameter)
+                SqlAlchemyCommandGateway.parameter_from_json(parameter)
                 for parameter in (command.parameters or ())
             ),
             tags=tuple(command.tags or ()),
@@ -121,7 +125,38 @@ class SqlAlchemyCommandGateway:
         )
 
     @staticmethod
-    def _parameter_to_dict(parameter: CommandParameterDTO) -> dict[str, Any]:
+    def parameter_from_json(parameter: JsonObject | str) -> CommandParameterDTO:
+        """Validate and map one persisted command parameter."""
+        # Accept the legacy representation where parameters were stored as names.
+        if isinstance(parameter, str):
+            return CommandParameterDTO(name=parameter)
+        name = parameter.get("name")
+        parameter_type = parameter.get("type", "string")
+        required = parameter.get("required", True)
+        description = parameter.get("description")
+        if not isinstance(name, str):
+            raise ValueError("Stored command parameter name must be a string")
+        if not isinstance(parameter_type, str) or parameter_type not in (
+            "string",
+            "integer",
+            "boolean",
+        ):
+            raise ValueError("Stored command parameter type is invalid")
+        if not isinstance(required, bool):
+            raise ValueError("Stored command parameter required flag must be boolean")
+        if description is not None and not isinstance(description, str):
+            raise ValueError("Stored command parameter description must be a string")
+        default: JsonValue = parameter.get("default")
+        return CommandParameterDTO(
+            name=name,
+            type=parameter_type,
+            required=required,
+            default=default,
+            description=description,
+        )
+
+    @staticmethod
+    def _parameter_to_dict(parameter: CommandParameterDTO) -> JsonObject:
         return {
             "name": parameter.name,
             "type": parameter.type,

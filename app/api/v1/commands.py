@@ -541,7 +541,7 @@ async def bulk_execute_command(
     command = await service.get_command(command_id)
     rendered = render_command(
         command.command,
-        [p.__dict__ for p in command.parameters] if command.parameters else [],
+        list(command.parameters),
         data.params or {},
     )
 

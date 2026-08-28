@@ -1,7 +1,8 @@
 """Internal SQLAlchemy DAO for nodes."""
 
+from collections.abc import Mapping
 from datetime import datetime
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, TypeVar
 
 if TYPE_CHECKING:
     from sqlalchemy.sql import Select
@@ -14,11 +15,13 @@ from app.adapters.persistence.dao.base import escape_ilike
 from app.application.dto.node_connection import NodeConnectionDTO
 from app.models.node import NodeModel
 
+_SelectRow = TypeVar("_SelectRow", bound=tuple[object, ...])
+
 
 class NodeRepository:
     """Node repository for database operations."""
 
-    def __init__(self, session: AsyncSession):
+    def __init__(self, session: AsyncSession) -> None:
         self._session = session
 
     @staticmethod
@@ -121,10 +124,10 @@ class NodeRepository:
 
     def _apply_filters(
         self,
-        query: "Select[Any]",
+        query: "Select[_SelectRow]",
         tags: list[str] | None = None,
         search: str | None = None,
-    ) -> "Select[Any]":
+    ) -> "Select[_SelectRow]":
         """Apply tag and search filters to a query.
 
         Tag filtering uses PostgreSQL @> operator — not testable with SQLite.
@@ -207,14 +210,14 @@ class NodeRepository:
         result = await self._session.execute(query)
         return list(result.scalars().all())
 
-    async def create(self, data: dict[str, Any]) -> NodeModel:
+    async def create(self, data: Mapping[str, object]) -> NodeModel:
         """Create a new node."""
         node = NodeModel(**data)
         self._session.add(node)
         await self._session.flush()
         return node
 
-    async def update(self, id: UUID, data: dict[str, Any]) -> NodeModel | None:
+    async def update(self, id: UUID, data: Mapping[str, object]) -> NodeModel | None:
         """Update an existing node."""
         node = await self.get_by_id(id)
         if node is None:

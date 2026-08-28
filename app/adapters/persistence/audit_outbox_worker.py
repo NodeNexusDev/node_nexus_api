@@ -2,7 +2,6 @@
 
 import asyncio
 from datetime import UTC, datetime, timedelta
-from typing import Any
 from uuid import UUID
 
 import structlog
@@ -16,6 +15,7 @@ from app.core.metrics import (
     AUDIT_PENDING,
     AUDIT_RETRIES,
 )
+from app.core.types import JsonObject
 from app.models.audit_log import AuditLogModel
 from app.models.audit_outbox import AuditOutboxModel
 from app.models.node import NodeModel
@@ -124,20 +124,31 @@ class AuditOutboxWorker:
 
     @staticmethod
     async def _to_audit_log(
-        session: AsyncSession, event_id: UUID, payload: dict[str, Any]
+        session: AsyncSession, event_id: UUID, payload: JsonObject
     ) -> AuditLogModel:
         node_id = payload.get("node_id")
+        if node_id is not None and not isinstance(node_id, str):
+            raise ValueError("Audit outbox node_id must be a string or null")
         parsed_node_id = UUID(node_id) if node_id else None
         if parsed_node_id is not None:
             node_exists = await session.get(NodeModel, parsed_node_id)
             if node_exists is None:
                 parsed_node_id = None
+        action = payload.get("action")
+        user = payload.get("user")
+        details = payload.get("details")
+        if not isinstance(action, str):
+            raise ValueError("Audit outbox action must be a string")
+        if user is not None and not isinstance(user, str):
+            raise ValueError("Audit outbox user must be a string or null")
+        if details is not None and not isinstance(details, str):
+            raise ValueError("Audit outbox details must be a string or null")
         return AuditLogModel(
             id=event_id,
             node_id=parsed_node_id,
-            action=payload["action"],
-            user=payload.get("user"),
-            details=payload.get("details"),
+            action=action,
+            user=user,
+            details=details,
         )
 
     @staticmethod

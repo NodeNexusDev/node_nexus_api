@@ -8,8 +8,7 @@ from typing import Literal
 import structlog
 from dishka.integrations.fastapi import FromDishka, inject
 from fastapi import HTTPException, Security
-from fastapi.security import APIKeyHeader
-from starlette.requests import Request
+from fastapi.security import APIKeyHeader, HTTPAuthorizationCredentials, HTTPBearer
 
 from app.application.ports.jwt_handler import JWTHandler
 from app.application.services.api_key_authentication import (
@@ -20,14 +19,7 @@ from app.core.config import get_settings
 audit = structlog.get_logger("audit")
 
 API_KEY_HEADER = APIKeyHeader(name="X-API-Key", auto_error=False)
-
-
-def _extract_bearer_token(request: Request) -> str | None:
-    """Extract Bearer token from Authorization header."""
-    auth_header = request.headers.get("Authorization", "")
-    if auth_header.startswith("Bearer "):
-        return auth_header[7:]
-    return None
+BEARER_SCHEME = HTTPBearer(auto_error=False)
 
 
 # ── Unified Principal ────────────────────────────────────────────────────────
@@ -50,9 +42,9 @@ class Principal:
 
 @inject
 async def get_current_principal(
-    request: Request,
     api_key_service: FromDishka[APIKeyAuthenticationService],
     jwt_handler: FromDishka[JWTHandler],
+    bearer: HTTPAuthorizationCredentials | None = Security(BEARER_SCHEME),
     api_key: str | None = Security(API_KEY_HEADER),
 ) -> Principal:
     """Resolve a principal using an unambiguous, fail-closed credential order.
@@ -67,9 +59,8 @@ async def get_current_principal(
         Principal with ``source == "jwt"`` or ``"api_key"``.
         For master keys the identifier is ``"master"`` and source is ``"jwt"``.
     """
-    token = _extract_bearer_token(request)
-    if token:
-        user_id, claims = _decode_access_token(jwt_handler, token)
+    if bearer:
+        user_id, claims = _decode_access_token(jwt_handler, bearer.credentials)
         settings = get_settings()
         x_api_key_claim = claims.get("x-api-key")
         if (
@@ -103,9 +94,9 @@ async def get_current_principal(
 
 @inject
 async def require_write_or_jwt_scope(
-    request: Request,
     api_key_service: FromDishka[APIKeyAuthenticationService],
     jwt_handler: FromDishka[JWTHandler],
+    bearer: HTTPAuthorizationCredentials | None = Security(BEARER_SCHEME),
     api_key: str | None = Security(API_KEY_HEADER),
 ) -> Principal:
     """Require write authorization for both JWT and API key flows.
@@ -120,9 +111,8 @@ async def require_write_or_jwt_scope(
     Returns:
         The resolved :class:`Principal`.
     """
-    token = _extract_bearer_token(request)
-    if token:
-        user_id, claims = _decode_access_token(jwt_handler, token)
+    if bearer:
+        user_id, claims = _decode_access_token(jwt_handler, bearer.credentials)
         if not claims.get("is_superuser"):
             audit.warning("auth.write_denied_jwt_user", user_id=str(user_id))
             raise HTTPException(status_code=403, detail="Superuser privileges required")
@@ -217,63 +207,27 @@ async def require_write_scope(
 
 @inject
 async def get_current_user_id(
-    request: Request,
-    api_key_service: FromDishka[APIKeyAuthenticationService],
     jwt_handler: FromDishka[JWTHandler],
-    api_key: str | None = Security(APIKeyHeader(name="X-API-Key", auto_error=False)),
+    bearer: HTTPAuthorizationCredentials | None = Security(BEARER_SCHEME),
 ) -> uuid.UUID:
     """Extract user ID from JWT token in Authorization header."""
-    token = _extract_bearer_token(request)
-    if token:
-        user_id, _claims = _decode_access_token(jwt_handler, token)
+    if bearer:
+        user_id, _claims = _decode_access_token(jwt_handler, bearer.credentials)
         return user_id
-
-    if api_key:
-        settings = get_settings()
-        if settings.MASTER_API_KEY and hmac.compare_digest(
-            api_key, settings.MASTER_API_KEY
-        ):
-            raise HTTPException(
-                status_code=401,
-                detail="Master key cannot be used for user authentication",
-            )
-        await api_key_service.authenticate(api_key)
-        raise HTTPException(
-            status_code=401,
-            detail="API key authentication not supported for this endpoint. Use JWT.",
-        )
 
     raise HTTPException(status_code=401, detail="Not authenticated")
 
 
 @inject
 async def require_superuser(
-    request: Request,
-    api_key_service: FromDishka[APIKeyAuthenticationService],
     jwt_handler: FromDishka[JWTHandler],
-    api_key: str | None = Security(APIKeyHeader(name="X-API-Key", auto_error=False)),
+    bearer: HTTPAuthorizationCredentials | None = Security(BEARER_SCHEME),
 ) -> uuid.UUID:
     """Require JWT authentication with superuser role."""
-    token = _extract_bearer_token(request)
-    if token:
-        user_id, claims = _decode_access_token(jwt_handler, token)
+    if bearer:
+        user_id, claims = _decode_access_token(jwt_handler, bearer.credentials)
         if not claims.get("is_superuser"):
             raise HTTPException(status_code=403, detail="Superuser privileges required")
         return user_id
-
-    if api_key:
-        settings = get_settings()
-        if settings.MASTER_API_KEY and hmac.compare_digest(
-            api_key, settings.MASTER_API_KEY
-        ):
-            raise HTTPException(
-                status_code=401,
-                detail="Master key cannot be used for user authentication",
-            )
-        await api_key_service.authenticate(api_key)
-        raise HTTPException(
-            status_code=401,
-            detail="API key authentication not supported for this endpoint. Use JWT.",
-        )
 
     raise HTTPException(status_code=401, detail="Not authenticated")

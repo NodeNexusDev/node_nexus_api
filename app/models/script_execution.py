@@ -2,12 +2,12 @@
 
 import uuid
 from datetime import datetime
-from typing import Any
 
 from sqlalchemy import JSON, CheckConstraint, DateTime, ForeignKey, Index, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, _utcnow
+from app.models.types import JsonObject
 
 
 def _default_status() -> str:
@@ -36,13 +36,13 @@ class ScriptExecutionModel(Base):
     node_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("nodes.id", ondelete="SET NULL"), nullable=True
     )
-    params: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    params: Mapped[JsonObject | None] = mapped_column(JSON, nullable=True)
     status: Mapped[str] = mapped_column(String(50), default=_default_status)
     trigger: Mapped[str] = mapped_column(String(20), default="manual")
     schedule_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("script_schedules.id", ondelete="SET NULL"), nullable=True
     )
-    steps: Mapped[list[dict[str, Any]] | None] = mapped_column(JSON, nullable=True)
+    steps: Mapped[list[JsonObject] | None] = mapped_column(JSON, nullable=True)
     started_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_utcnow
     )

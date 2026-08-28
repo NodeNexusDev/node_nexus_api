@@ -2,17 +2,19 @@
 
 import re
 import shlex
-from typing import Any
+from collections.abc import Mapping, Sequence
 
+from app.application.dto.command_management import CommandParameterDTO
 from app.core.exceptions import TemplateRenderError
+from app.core.types import JsonValue
 
 PLACEHOLDER_RE = re.compile(r"\{(\w+)\}")
 
 
 def render_command(
     template: str,
-    parameters: list[dict[str, Any]],
-    params: dict[str, Any],
+    parameters: Sequence[CommandParameterDTO],
+    params: Mapping[str, JsonValue],
 ) -> str:
     """Render a command template by substituting {placeholder} values.
 
@@ -28,7 +30,7 @@ def render_command(
         TemplateRenderError: If placeholders are undeclared, required params are
             missing, or a value cannot be converted to string.
     """
-    declared = {p["name"] for p in parameters}
+    declared = {parameter.name for parameter in parameters}
     found = set(PLACEHOLDER_RE.findall(template))
 
     undeclared = found - declared
@@ -37,12 +39,12 @@ def render_command(
             f"Undeclared placeholders in command: {', '.join(sorted(undeclared))}"
         )
 
-    defaults = {p["name"]: p.get("default") for p in parameters}
+    defaults = {parameter.name: parameter.default for parameter in parameters}
 
     missing = []
-    for p in parameters:
-        name = p["name"]
-        is_required = p.get("required", True)
+    for parameter in parameters:
+        name = parameter.name
+        is_required = parameter.required
         has_default = defaults.get(name) is not None
         if name in found and name not in params and not has_default and is_required:
             missing.append(name)

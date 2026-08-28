@@ -91,6 +91,16 @@ class Settings(BaseSettings):
                 raise ValueError(
                     "MASTER_API_KEY must contain at least 32 characters when configured"
                 )
+            if self.DEBUG:
+                raise ValueError("DEBUG must be disabled in production")
+            if self.E2E_ENABLED:
+                raise ValueError("E2E_ENABLED must be disabled in production")
+            if not self.SSH_STRICT_HOST_KEY_CHECKING:
+                raise ValueError(
+                    "SSH_STRICT_HOST_KEY_CHECKING must be enabled in production"
+                )
+            if "*" in self.CORS_ORIGINS:
+                raise ValueError("CORS_ORIGINS wildcard is not allowed in production")
         if (
             self.INITIAL_SUPERUSER_PASSWORD
             and len(self.INITIAL_SUPERUSER_PASSWORD) < 12

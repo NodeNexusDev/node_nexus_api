@@ -14,6 +14,8 @@ from fastapi.responses import JSONResponse
 from fastapi.routing import APIRoute
 from prometheus_fastapi_instrumentator import Instrumentator
 from starlette.exceptions import HTTPException as StarletteHTTPException
+from starlette.middleware.base import RequestResponseEndpoint
+from starlette.responses import Response
 
 from app.adapters.lifecycle.application_startup import ApplicationStartup
 from app.adapters.telemetry import init_telemetry
@@ -142,7 +144,9 @@ def create_app() -> FastAPI:
     app.add_middleware(CommitOnResponseMiddleware)
 
     @app.middleware("http")
-    async def _security_headers(request: Request, call_next):  # noqa: ANN001
+    async def _security_headers(
+        request: Request, call_next: RequestResponseEndpoint
+    ) -> Response:
         """Add security headers to every response."""
         response = await call_next(request)
         response.headers["X-Content-Type-Options"] = "nosniff"
@@ -154,7 +158,9 @@ def create_app() -> FastAPI:
         return response
 
     @app.exception_handler(HTTPException)
-    async def _http_exception_handler(request: Request, exc: HTTPException):
+    async def _http_exception_handler(
+        request: Request, exc: HTTPException
+    ) -> JSONResponse:
         """Return HTTPException detail together with the request id."""
         request_id = getattr(request.state, "request_id", None)
         content: dict[str, object] = {"detail": exc.detail}
@@ -169,7 +175,7 @@ def create_app() -> FastAPI:
     @app.exception_handler(RequestValidationError)
     async def _validation_exception_handler(
         request: Request, exc: RequestValidationError
-    ):
+    ) -> JSONResponse:
         """Return validation errors together with the request id."""
         request_id = getattr(request.state, "request_id", None)
         content: dict[str, object] = {"detail": jsonable_encoder(exc.errors())}
@@ -183,7 +189,7 @@ def create_app() -> FastAPI:
     @app.exception_handler(StarletteHTTPException)
     async def _starlette_http_exception_handler(
         request: Request, exc: StarletteHTTPException
-    ):
+    ) -> JSONResponse:
         """Return Starlette HTTPException detail together with the request id."""
         request_id = getattr(request.state, "request_id", None)
         content: dict[str, object] = {"detail": exc.detail}

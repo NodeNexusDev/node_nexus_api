@@ -2,12 +2,12 @@
 
 import uuid
 from datetime import datetime
-from typing import Any
 
 from sqlalchemy import JSON, DateTime, Index, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, _utcnow
+from app.models.types import JsonObject
 
 
 class AuditOutboxModel(Base):
@@ -24,7 +24,7 @@ class AuditOutboxModel(Base):
     )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
-    payload: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    payload: Mapped[JsonObject] = mapped_column(JSON, nullable=False)
     status: Mapped[str] = mapped_column(String(20), default="pending")
     attempts: Mapped[int] = mapped_column(Integer, default=0)
     last_error_type: Mapped[str | None] = mapped_column(String(255), nullable=True)

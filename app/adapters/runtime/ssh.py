@@ -3,10 +3,10 @@
 import asyncio
 import shlex
 import tempfile
-from collections.abc import AsyncGenerator, AsyncIterator
+from collections.abc import AsyncGenerator, AsyncIterable, AsyncIterator
 from pathlib import Path
 from types import TracebackType
-from typing import Any, Literal, Self
+from typing import Literal, Self
 from uuid import uuid4
 
 import asyncssh
@@ -25,7 +25,7 @@ _MAX_CAPTURED_OUTPUT_BYTES = 1_048_576
 _OUTPUT_TRUNCATED_MARKER = "\n...[remote output truncated]"
 
 
-async def _read_bounded_stream(stream: Any, max_bytes: int) -> str:
+async def _read_bounded_stream(stream: AsyncIterable[str], max_bytes: int) -> str:
     """Drain an SSH stream while retaining at most ``max_bytes`` in memory."""
     captured = bytearray()
     truncated = False
@@ -38,6 +38,15 @@ async def _read_bounded_stream(stream: Any, max_bytes: int) -> str:
             truncated = True
     value = captured.decode("utf-8", errors="replace")
     return value + _OUTPUT_TRUNCATED_MARKER if truncated else value
+
+
+def _exit_status(process: asyncssh.SSHClientProcess[str]) -> int:
+    """Return a failure code when AsyncSSH has no normal exit status."""
+    status = process.exit_status
+    if status is not None:
+        return status
+    logger.warning("ssh.command.missing_exit_status", exit_signal=process.exit_signal)
+    return 255
 
 
 class SSHConnector:
@@ -54,7 +63,7 @@ class SSHConnector:
         timeout: int = 30,
         known_hosts: str | None = None,
         strict_host_key_checking: bool = True,
-    ):
+    ) -> None:
         self._host = host
         self._port = port
         self._username = username
@@ -65,7 +74,7 @@ class SSHConnector:
         self._known_hosts = known_hosts
         self._strict_host_key_checking = strict_host_key_checking
         self._connection: asyncssh.SSHClientConnection | None = None
-        self._active_process: Any | None = None
+        self._active_process: asyncssh.SSHClientProcess[str] | None = None
         self._active_process_group_file: str | None = None
 
     async def connect(self) -> None:
@@ -168,7 +177,7 @@ class SSHConnector:
                         await process.wait()
                     stdout = stdout_task.result()
                     stderr = stderr_task.result()
-                    exit_code = process.exit_status or 0
+                    exit_code = _exit_status(process)
             audit.info(
                 "ssh.command.ok",
                 host=self._host,
@@ -210,7 +219,7 @@ class SSHConnector:
                     yield str(line)
                 # Wait for process to finish
                 await process.wait()
-                exit_code = process.exit_status or 0
+                exit_code = _exit_status(process)
                 audit.info(
                     "ssh.stream.ok",
                     host=self._host,
@@ -240,11 +249,15 @@ class SSHConnector:
         remote_command = (
             f'setsid sh -c {shlex.quote(grouped_command)}; status=$?; exit "$status"'
         )
-        process = await self._connection.create_process(remote_command)
+        process: asyncssh.SSHClientProcess[str] = await self._connection.create_process(
+            remote_command
+        )
         self._active_process = process
         self._active_process_group_file = group_file
 
-        async def pump(stream: Any, event_type: Literal["stdout", "stderr"]) -> None:
+        async def pump(
+            stream: AsyncIterable[str], event_type: Literal["stdout", "stderr"]
+        ) -> None:
             async for chunk in stream:
                 await queue.put(RemoteStreamEventDTO(type=event_type, data=str(chunk)))
 
@@ -253,7 +266,7 @@ class SSHConnector:
             await queue.put(
                 RemoteStreamEventDTO(
                     type="exit",
-                    exit_code=process.exit_status or 0,
+                    exit_code=_exit_status(process),
                 )
             )
 
@@ -274,7 +287,7 @@ class SSHConnector:
                     task.cancel()
             await asyncio.gather(*pump_tasks, return_exceptions=True)
             try:
-                if getattr(process, "exit_status", None) is None:
+                if process.exit_status is None:
                     await self._signal_active_process_group("TERM")
                 try:
                     await asyncio.wait_for(
