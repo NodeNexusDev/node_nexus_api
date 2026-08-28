@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 from uuid import UUID
 
 if TYPE_CHECKING:
@@ -44,7 +44,7 @@ from app.application.services.docker.error_mapper import raise_for_docker_error
 from app.application.services.docker.image_service import DockerImageService
 from app.application.services.docker.parsers import parse_json_array, parse_json_lines
 from app.application.services.docker.resource_service import DockerResourceService
-from app.core.types import JsonObject
+from app.core.types import ConnectionType, JsonObject
 from app.models.node import NodeModel
 
 
@@ -325,7 +325,7 @@ class _RepositoryNodeReader:
             name=node.name,
             host=node.host,
             port=node.port,
-            connection_type=node.connection_type,
+            connection_type=cast(ConnectionType, node.connection_type),
             username=node.username,
             password=node.password,
             ssh_key=node.ssh_key,

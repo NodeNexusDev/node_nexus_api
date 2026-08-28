@@ -1,6 +1,7 @@
 """Shared test fixtures for unit tests."""
 
 import uuid
+from typing import cast
 from unittest.mock import AsyncMock, MagicMock
 
 from dishka import Provider, Scope, provide
@@ -11,6 +12,7 @@ from app.application.services.api_key_authentication import (
     APIKeyAuthenticationService,
     AuthenticatedPrincipal,
 )
+from app.core.types import ConnectionType, NodeStatus
 from app.models.command import CommandModel
 from app.models.node import NodeModel
 from app.schemas.node import NodeResponse
@@ -74,8 +76,8 @@ def make_node_view(**overrides: object) -> NodeViewDTO:
         name=node.name,
         host=node.host,
         port=node.port,
-        connection_type=node.connection_type,
-        status=node.status,
+        connection_type=cast(ConnectionType, node.connection_type),
+        status=cast(NodeStatus, node.status),
         username=node.username,
         docker_host=node.docker_host,
         tags=tuple(node.tags or ()),

@@ -8,12 +8,13 @@ import pytest
 from app.application.dto.node_connection import NodeConnectionDTO
 from app.application.services.docker.bulk_service import DockerBulkService
 from app.core.exceptions import DockerError
+from app.core.types import ConnectionType
 
 
 def _make_node(
     node_id: uuid.UUID | None = None,
     name: str = "server1",
-    connection_type: str = "docker",
+    connection_type: ConnectionType = "docker",
 ) -> NodeConnectionDTO:
     return NodeConnectionDTO(
         id=node_id or uuid.uuid4(),
