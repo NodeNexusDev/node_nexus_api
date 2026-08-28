@@ -6,11 +6,8 @@ from typing import Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from app.core.types import JsonObject
+from app.core.types import ConnectionType, JsonObject, NodeStatus
 from app.schemas.common import CursorPage, PaginatedResponse
-
-ConnectionType = Literal["ssh", "docker", "proxmox"]
-NodeStatus = Literal["active", "unreachable", "error"]
 
 
 class NodeCreate(BaseModel):
@@ -53,8 +50,8 @@ class NodeResponse(BaseModel):
     name: str
     host: str
     port: int
-    connection_type: str
-    status: str
+    connection_type: ConnectionType
+    status: NodeStatus
     username: str | None
     docker_host: str | None
     tags: list[str]

@@ -12,6 +12,7 @@ from app.application.ports.jwt_handler import JWTHandler
 from app.application.services.auth_service import AuthService
 from app.core.config import get_settings
 from app.schemas.auth import LoginRequest, TokenResponse, UserResponse
+from app.schemas.common import AUTHENTICATED_ERROR_RESPONSES
 
 audit = structlog.get_logger("audit")
 
@@ -112,7 +113,11 @@ async def refresh_token(
     )
 
 
-@router.get("/me", response_model=UserResponse)
+@router.get(
+    "/me",
+    response_model=UserResponse,
+    responses=AUTHENTICATED_ERROR_RESPONSES,
+)
 @inject
 async def get_me(
     service: FromDishka[AuthService],

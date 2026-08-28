@@ -21,6 +21,7 @@ async def global_search(
     limit: int = Query(20, ge=1, le=100),
     _key: Principal = Security(get_current_principal),
 ) -> GlobalSearchResponse:
+    """Search nodes, commands, scripts, and tags visible to the user."""
     audit.info("api.search", query=q, limit=limit)
     result = await service.search(q=q, limit=limit)
     return GlobalSearchResponse(

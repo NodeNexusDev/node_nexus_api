@@ -3,6 +3,8 @@
 from dataclasses import dataclass, field
 from typing import Literal
 
+from app.core.types import ConnectionType
+
 
 @dataclass(frozen=True, slots=True)
 class NodeValidationRequestDTO:
@@ -10,7 +12,7 @@ class NodeValidationRequestDTO:
 
     host: str
     port: int = 22
-    connection_type: str = "ssh"
+    connection_type: ConnectionType = "ssh"
     username: str | None = None
     password: str | None = field(default=None, repr=False)
     ssh_key: str | None = field(default=None, repr=False)

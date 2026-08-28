@@ -2,7 +2,7 @@
 
 from collections.abc import Mapping
 from datetime import datetime
-from typing import TYPE_CHECKING, TypeVar
+from typing import TYPE_CHECKING, TypeVar, cast
 
 if TYPE_CHECKING:
     from sqlalchemy.sql import Select
@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.adapters.persistence.dao.base import escape_ilike
 from app.application.dto.node_connection import NodeConnectionDTO
+from app.core.types import ConnectionType
 from app.models.node import NodeModel
 
 _SelectRow = TypeVar("_SelectRow", bound=tuple[object, ...])
@@ -32,7 +33,7 @@ class NodeRepository:
             name=node.name,
             host=node.host,
             port=node.port,
-            connection_type=node.connection_type,
+            connection_type=cast(ConnectionType, node.connection_type),
             username=node.username,
             password=node.password,
             ssh_key=node.ssh_key,

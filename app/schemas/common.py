@@ -3,9 +3,12 @@
 import base64
 import json
 from datetime import UTC, datetime
+from typing import Any
 from uuid import UUID
 
 from pydantic import BaseModel
+
+from app.core.types import JsonValue
 
 
 class PaginatedResponse[T](BaseModel):
@@ -32,6 +35,39 @@ class ErrorResponse(BaseModel):
     code: str
     message: str
     request_id: str | None = None
+    detail: JsonValue = None
+
+
+AUTHENTICATED_ERROR_RESPONSES: dict[int | str, dict[str, Any]] = {
+    401: {
+        "model": ErrorResponse,
+        "description": "Authentication credentials are missing or invalid.",
+    },
+    403: {
+        "model": ErrorResponse,
+        "description": "The authenticated principal lacks the required permission.",
+    },
+    429: {
+        "model": ErrorResponse,
+        "description": "The configured request rate limit was exceeded.",
+    },
+    404: {
+        "model": ErrorResponse,
+        "description": "The requested resource was not found.",
+    },
+    409: {
+        "model": ErrorResponse,
+        "description": "The request conflicts with the current resource state.",
+    },
+    422: {
+        "model": ErrorResponse,
+        "description": "The request or a domain value failed validation.",
+    },
+    503: {
+        "model": ErrorResponse,
+        "description": "A required backend or remote service is unavailable.",
+    },
+}
 
 
 def encode_cursor(created_at: datetime, id: UUID) -> str:
