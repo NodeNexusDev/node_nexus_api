@@ -10,7 +10,7 @@ source_revision: "2026-07-29"
 ```bash
 uv run ruff check app/ tests/ scripts/
 uv run ruff format --check app/ tests/ scripts/
-uv run ty check app/
+uv run ty check .
 uv run python scripts/docs/check_docs.py
 uv run mkdocs build --strict -f mkdocs.en.yml
 uv run mkdocs build --strict -f mkdocs.ru.yml

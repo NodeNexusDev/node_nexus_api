@@ -61,7 +61,7 @@ UPDATE_OPENAPI_HASH=1 uv run pytest tests/unit/test_openapi_contract.py::test_op
 
 - [ ] Все тесты проходят: `uv run pytest tests/unit/ tests/integration/ -q`
 - [ ] Линтер и форматтер: `uv run ruff check app/ tests/`
-- [ ] Проверка типов: `uv run ty check app/`
+- [ ] Строгая проверка типов всего проекта: `uv run ty check .`
 - [ ] Миграция проверена (если изменились модели)
 - [ ] Обе языковые версии обновлены (если изменилось поведение)
 - [ ] Сборка MkDocs: `uv run mkdocs build --strict -f mkdocs.en.yml`
