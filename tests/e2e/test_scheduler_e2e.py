@@ -12,6 +12,7 @@ from app.adapters.runtime.apscheduler_runtime import _SCHEDULER_LOCK_ID
 from tests.e2e.helpers.polling import wait_for_condition
 from tests.e2e.helpers.resources import UniqueResourceFactory
 from tests.e2e.helpers.service_controller import DockerServiceController
+from tests.types import UnvalidatedJsonObject
 
 pytestmark = [pytest.mark.docker, pytest.mark.e2e_scheduler]
 
@@ -34,10 +35,10 @@ def _wait_for_execution(
     script_id: str,
     *,
     timeout: float = 10.0,
-) -> list[dict]:
+) -> list[UnvalidatedJsonObject]:
     def _has_execution() -> bool:
         response = client.get(f"/api/v1/scripts/{script_id}/executions")
-        return response.status_code == 200 and response.json()["total"] > 0
+        return bool(response.status_code == 200 and response.json()["total"] > 0)
 
     wait_for_condition(
         _has_execution,
@@ -53,7 +54,7 @@ def _wait_for_completed_execution(
     script_id: str,
     *,
     timeout: float = 10.0,
-) -> list[dict]:
+) -> list[UnvalidatedJsonObject]:
     def _is_completed() -> bool:
         response = client.get(f"/api/v1/scripts/{script_id}/executions")
         if response.status_code != 200 or response.json()["total"] == 0:

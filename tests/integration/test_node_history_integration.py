@@ -35,6 +35,8 @@ from app.models.base import Base
 from app.models.command import CommandModel  # noqa: F401 — registers with Base
 from app.models.command_execution import CommandExecutionModel  # noqa: F401
 from app.models.node import NodeModel  # noqa: F401
+from tests.types import UnvalidatedJsonObject
+from tests.typing import as_typed_mock
 
 MASTER_KEY = "test-master-key"
 
@@ -80,7 +82,7 @@ class IntegrationDbProvider(Provider):
 
     @provide(scope=Scope.APP)
     def get_jwt_handler(self) -> JWTHandler:
-        return MagicMock(spec=JWTHandler)
+        return as_typed_mock(JWTHandler, MagicMock(spec=JWTHandler))
 
     @provide(scope=Scope.REQUEST)
     def get_node_management_service(
@@ -139,7 +141,9 @@ async def integration_client(
     await container.close()
 
 
-async def _create_node(client: AsyncClient, **overrides) -> dict:
+async def _create_node(
+    client: AsyncClient, **overrides: object
+) -> UnvalidatedJsonObject:
     data = {
         "name": "test-node",
         "host": "10.0.0.1",

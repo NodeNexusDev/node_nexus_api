@@ -1,7 +1,7 @@
 """SQLAlchemy adapter for coordinated configuration transfer."""
 
 from collections.abc import Sequence
-from typing import Protocol, TypeVar
+from typing import Protocol, TypeVar, cast
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -16,6 +16,7 @@ from app.application.dto.config import (
     NodeConfigDTO,
     ScriptConfigDTO,
 )
+from app.core.types import ConnectionType
 
 RecordT = TypeVar("RecordT")
 
@@ -59,7 +60,7 @@ class SqlAlchemyConfigGateway:
                     name=node.name,
                     host=node.host,
                     port=node.port,
-                    connection_type=node.connection_type,
+                    connection_type=cast(ConnectionType, node.connection_type),
                     username=node.username,
                     docker_host=node.docker_host,
                     tags=tuple(node.tags or ()),

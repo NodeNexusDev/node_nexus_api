@@ -1,7 +1,8 @@
 """Internal SQLAlchemy DAO for nodes."""
 
+from collections.abc import Mapping
 from datetime import datetime
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, TypeVar, cast
 
 if TYPE_CHECKING:
     from sqlalchemy.sql import Select
@@ -12,13 +13,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.adapters.persistence.dao.base import escape_ilike
 from app.application.dto.node_connection import NodeConnectionDTO
+from app.core.types import ConnectionType
 from app.models.node import NodeModel
+
+_SelectRow = TypeVar("_SelectRow", bound=tuple[object, ...])
 
 
 class NodeRepository:
     """Node repository for database operations."""
 
-    def __init__(self, session: AsyncSession):
+    def __init__(self, session: AsyncSession) -> None:
         self._session = session
 
     @staticmethod
@@ -29,7 +33,7 @@ class NodeRepository:
             name=node.name,
             host=node.host,
             port=node.port,
-            connection_type=node.connection_type,
+            connection_type=cast(ConnectionType, node.connection_type),
             username=node.username,
             password=node.password,
             ssh_key=node.ssh_key,
@@ -121,10 +125,10 @@ class NodeRepository:
 
     def _apply_filters(
         self,
-        query: "Select[Any]",
+        query: "Select[_SelectRow]",
         tags: list[str] | None = None,
         search: str | None = None,
-    ) -> "Select[Any]":
+    ) -> "Select[_SelectRow]":
         """Apply tag and search filters to a query.
 
         Tag filtering uses PostgreSQL @> operator — not testable with SQLite.
@@ -207,14 +211,14 @@ class NodeRepository:
         result = await self._session.execute(query)
         return list(result.scalars().all())
 
-    async def create(self, data: dict[str, Any]) -> NodeModel:
+    async def create(self, data: Mapping[str, object]) -> NodeModel:
         """Create a new node."""
         node = NodeModel(**data)
         self._session.add(node)
         await self._session.flush()
         return node
 
-    async def update(self, id: UUID, data: dict[str, Any]) -> NodeModel | None:
+    async def update(self, id: UUID, data: Mapping[str, object]) -> NodeModel | None:
         """Update an existing node."""
         node = await self.get_by_id(id)
         if node is None:

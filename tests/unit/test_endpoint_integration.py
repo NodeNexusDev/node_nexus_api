@@ -390,4 +390,7 @@ class TestEventsEndpoint:
         """Verify the event_stream endpoint module loads and router exists."""
         from app.api.v1.events import router as events_router
 
-        assert any(r.path == "/events/stream" for r in events_router.routes)
+        assert any(
+            getattr(route, "path", None) == "/events/stream"
+            for route in events_router.routes
+        )

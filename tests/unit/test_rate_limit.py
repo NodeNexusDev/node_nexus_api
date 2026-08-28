@@ -35,7 +35,7 @@ def _create_middleware(
 def _make_scope(
     path: str = "/api/test",
     client_ip: str = "127.0.0.1",
-) -> dict:
+) -> dict[str, object]:
     """Create a ASGI scope dict."""
     return {
         "type": "http",

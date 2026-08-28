@@ -20,6 +20,8 @@ from app.core.exceptions import (
     UserAlreadyExistsError,
     UserNotFoundError,
 )
+from tests.types import UnvalidatedHttpOption, UnvalidatedJsonObject
+from tests.typing import as_typed_mock
 
 
 def _user_view(**overrides) -> UserViewDTO:
@@ -86,23 +88,25 @@ def _create_app(
     class MockProvider(Provider):
         @provide(scope=Scope.REQUEST)
         def get_user_service(self) -> UserService:
-            return mock_service
+            return as_typed_mock(UserService, mock_service)
 
         @provide(scope=Scope.APP)
         def get_jwt_handler(self) -> JWTHandler:
-            return mock_jwt
+            return as_typed_mock(JWTHandler, mock_jwt)
 
         @provide(scope=Scope.APP)
         def get_api_key_service(self) -> APIKeyAuthenticationService:
             mock = AsyncMock(spec=APIKeyAuthenticationService)
-            return mock
+            return as_typed_mock(APIKeyAuthenticationService, mock)
 
     container = make_async_container(MockProvider())
     setup_dishka(container, app)
     return app
 
 
-async def _get(app: FastAPI, path: str, **kwargs) -> dict:
+async def _get(
+    app: FastAPI, path: str, **kwargs: UnvalidatedHttpOption
+) -> UnvalidatedJsonObject:
     async with AsyncClient(
         transport=ASGITransport(app=app, raise_app_exceptions=False),
         base_url="http://test",
@@ -117,7 +121,9 @@ async def _get(app: FastAPI, path: str, **kwargs) -> dict:
         return {"status": resp.status_code, "json": body}
 
 
-async def _post(app: FastAPI, path: str, **kwargs) -> dict:
+async def _post(
+    app: FastAPI, path: str, **kwargs: UnvalidatedHttpOption
+) -> UnvalidatedJsonObject:
     async with AsyncClient(
         transport=ASGITransport(app=app, raise_app_exceptions=False),
         base_url="http://test",
@@ -132,7 +138,9 @@ async def _post(app: FastAPI, path: str, **kwargs) -> dict:
         return {"status": resp.status_code, "json": body}
 
 
-async def _delete(app: FastAPI, path: str, **kwargs) -> dict:
+async def _delete(
+    app: FastAPI, path: str, **kwargs: UnvalidatedHttpOption
+) -> UnvalidatedJsonObject:
     async with AsyncClient(
         transport=ASGITransport(app=app, raise_app_exceptions=False),
         base_url="http://test",

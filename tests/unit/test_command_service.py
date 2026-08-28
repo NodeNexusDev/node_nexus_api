@@ -11,6 +11,7 @@ from app.application.dto.command_management import (
     CommandCreateDTO,
     CommandExecuteRequestDTO,
     CommandPageDTO,
+    CommandParameterDTO,
     CommandUpdateDTO,
     CommandViewDTO,
 )
@@ -38,7 +39,16 @@ def make_command_view(**overrides: object) -> CommandViewDTO:
         "updated_at": now,
     }
     values.update(overrides)
-    return CommandViewDTO(**values)  # type: ignore[arg-type]
+    return CommandViewDTO(
+        id=values["id"],
+        name=values["name"],
+        description=values["description"],
+        command=values["command"],
+        parameters=values["parameters"],
+        tags=values["tags"],
+        created_at=values["created_at"],
+        updated_at=values["updated_at"],
+    )
 
 
 @pytest.fixture
@@ -171,7 +181,9 @@ class TestExecuteCommand:
         command_gateway.get_template.return_value = CommandTemplateDTO(
             id=command_id,
             command="systemctl restart {service}",
-            parameters=({"name": "service", "type": "string", "required": True},),
+            parameters=(
+                CommandParameterDTO(name="service", type="string", required=True),
+            ),
         )
         node_reader.get_connection.return_value = NodeConnectionDTO(
             id=node_id,
@@ -260,7 +272,7 @@ class TestHistory:
         command_gateway.get_template.return_value = CommandTemplateDTO(
             id=command_id,
             command="echo {msg}",
-            parameters=({"name": "msg", "type": "string", "required": True},),
+            parameters=(CommandParameterDTO(name="msg", type="string", required=True),),
         )
         node_reader.get_connection.return_value = NodeConnectionDTO(
             id=node_id,

@@ -95,6 +95,7 @@ class TestCommandExecutionRepository:
         mock_result.scalars.return_value.all.return_value = [model]
         session.execute.return_value = mock_result
 
+        assert model.node_id is not None
         result = await repo.list_by_node(model.node_id)
         assert len(result) == 1
 
@@ -118,6 +119,7 @@ class TestCommandExecutionRepository:
         mock_result.scalars.return_value.all.return_value = [model]
         session.execute.return_value = mock_result
 
+        assert model.batch_id is not None
         result = await repo.list_by_batch(model.batch_id)
         assert len(result) == 1
 

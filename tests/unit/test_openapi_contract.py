@@ -8,10 +8,12 @@ from pathlib import Path
 from fastapi import FastAPI
 from httpx2 import ASGITransport, AsyncClient
 
+from app.core.config import get_settings
 from app.main import app
+from tests.types import UnvalidatedJsonObject
 
 OPENAPI_CONTRACT_SHA256 = (
-    "024fd1a4cdcf60e5f555015c4ce30164fc56ec415d57d31d3c204e2a4e7eb17d"
+    "9fe912b65275648413266ce509792894a942a2b7066a80594793bbf996acdc3f"
 )
 
 _CANONICAL_ENV = {
@@ -23,7 +25,6 @@ _CANONICAL_ENV = {
 
 def _build_canonical_app() -> FastAPI:
     """Build the app with pinned settings so the schema never depends on local .env."""
-    from app.core.config import get_settings
     from app.main import create_app
 
     get_settings.cache_clear()
@@ -40,7 +41,7 @@ def _build_canonical_app() -> FastAPI:
         get_settings.cache_clear()
 
 
-def _canonical_schema() -> dict:
+def _canonical_schema() -> UnvalidatedJsonObject:
     schema = _build_canonical_app().openapi()
     schema["info"].pop("version", None)
     return schema
@@ -97,6 +98,61 @@ def test_openapi_exposes_api_key_security_scheme() -> None:
 
     scheme = schema["components"]["securitySchemes"]["APIKeyHeader"]
     assert scheme == {"type": "apiKey", "in": "header", "name": "X-API-Key"}
+
+
+def test_openapi_auth_and_sse_contracts_are_explicit() -> None:
+    """Keep auth alternatives and the streaming media type visible in OpenAPI."""
+    schema = app.openapi()
+
+    events_get = schema["paths"]["/api/v1/events/stream"]["get"]
+    assert events_get["security"] == [{"HTTPBearer": []}, {"APIKeyHeader": []}]
+    assert set(events_get["responses"]["200"]["content"]) == {"text/event-stream"}
+
+    auth_me_get = schema["paths"]["/api/v1/auth/me"]["get"]
+    assert auth_me_get["security"] == [{"HTTPBearer": []}]
+
+
+def test_protected_operations_document_standard_auth_errors() -> None:
+    """Require the shared error contract on every secured HTTP operation."""
+    schema = app.openapi()
+    methods = {"get", "post", "put", "patch", "delete"}
+
+    for path_item in schema["paths"].values():
+        for method, operation in path_item.items():
+            if method not in methods or not operation.get("security"):
+                continue
+            responses = operation["responses"]
+            expected_statuses = {"401", "403", "404", "409", "422", "429", "503"}
+            assert expected_statuses <= responses.keys()
+            for status_code in expected_statuses:
+                response_schema = responses[status_code]["content"]["application/json"][
+                    "schema"
+                ]
+                assert response_schema == {"$ref": "#/components/schemas/ErrorResponse"}
+
+
+def test_public_response_schemas_never_expose_credentials() -> None:
+    """Guard public entity responses against accidental credential leakage."""
+    schema = app.openapi()
+    public_responses = {
+        "APIKeyResponse",
+        "CommandResponse",
+        "NodeResponse",
+        "ScriptResponse",
+        "UserResponse",
+    }
+    forbidden_fields = {
+        "password",
+        "passphrase",
+        "secret",
+        "secret_key",
+        "ssh_key",
+        "token",
+    }
+
+    for schema_name in public_responses:
+        properties = schema["components"]["schemas"][schema_name]["properties"]
+        assert forbidden_fields.isdisjoint(properties), schema_name
 
 
 async def test_runtime_api_documentation_endpoints() -> None:

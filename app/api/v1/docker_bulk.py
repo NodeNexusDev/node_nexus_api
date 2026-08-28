@@ -8,6 +8,7 @@ from app.api.deps import (
     Principal,
     require_write_or_jwt_scope,
 )
+from app.application.dto.docker import BulkDockerResultDTO
 from app.application.services.docker.bulk_service import DockerBulkService
 from app.schemas.docker import (
     BulkDockerImageBuildRequest,
@@ -28,7 +29,7 @@ audit = structlog.get_logger("audit")
 router = APIRouter(prefix="/docker", tags=["docker"], route_class=DishkaRoute)
 
 
-def _bulk_response(result: object) -> BulkDockerResponse:
+def _bulk_response(result: BulkDockerResultDTO) -> BulkDockerResponse:
     return BulkDockerResponse.model_validate(result, from_attributes=True)
 
 

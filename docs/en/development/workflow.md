@@ -61,7 +61,7 @@ UPDATE_OPENAPI_HASH=1 uv run pytest tests/unit/test_openapi_contract.py::test_op
 
 - [ ] All tests pass: `uv run pytest tests/unit/ tests/integration/ -q`
 - [ ] Lint and format pass: `uv run ruff check app/ tests/`
-- [ ] Types pass: `uv run ty check app/`
+- [ ] Strict project-wide types pass: `uv run ty check .`
 - [ ] Migration reviewed (if models changed)
 - [ ] Both locale trees updated (if behavior changed)
 - [ ] MkDocs builds pass: `uv run mkdocs build --strict -f mkdocs.en.yml`

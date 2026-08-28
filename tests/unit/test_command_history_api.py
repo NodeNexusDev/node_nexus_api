@@ -20,6 +20,7 @@ from app.application.dto.command_history import (
     CommandHistoryPageDTO,
 )
 from app.application.services.execution_history_service import ExecutionHistoryService
+from tests.typing import as_typed_mock
 from tests.unit.conftest import MockAuthServiceProvider, _mock_settings
 
 
@@ -55,7 +56,7 @@ def _create_test_app(service: AsyncMock) -> FastAPI:
     class MockServiceProvider(Provider):
         @provide(scope=Scope.APP)
         def get_history_service(self) -> ExecutionHistoryService:
-            return service
+            return as_typed_mock(ExecutionHistoryService, service)
 
     container = make_async_container(MockServiceProvider(), MockAuthServiceProvider())
     setup_dishka(container, app)

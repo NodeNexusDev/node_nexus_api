@@ -41,7 +41,7 @@ def repo(session: AsyncSession) -> CommandRepository:
     return CommandRepository(session)
 
 
-def _command_data(**overrides) -> dict:
+def _command_data(**overrides: object) -> dict[str, object]:
     defaults = {
         "name": "check_disk",
         "command": "df -h",

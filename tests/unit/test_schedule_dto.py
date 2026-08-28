@@ -38,7 +38,7 @@ def test_runtime_schedule_is_immutable() -> None:
         misfire_grace_seconds=60,
     )
     with pytest.raises(AttributeError):
-        runtime.cron = "* * * * *"  # type: ignore[misc]
+        setattr(runtime, "cron", "* * * * *")
 
 
 def test_scheduler_contracts_are_exposed_without_infrastructure_types() -> None:

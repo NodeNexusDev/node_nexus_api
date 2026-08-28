@@ -57,7 +57,7 @@ def assert_json_schema(
     )
     body = response.json()
 
-    items: list[dict] = body if is_list else [body]
+    items: list[dict[str, object]] = body if is_list else [body]
     forbidden = forbidden_fields or []
 
     for idx, item in enumerate(items):

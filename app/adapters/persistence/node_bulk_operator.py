@@ -1,8 +1,10 @@
 """Short-scope SQLAlchemy adapter for bulk node operations."""
 
 import uuid
+from typing import cast
 
 from sqlalchemy import delete, select, update
+from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.application.dto.bulk_node_operation import (
@@ -24,8 +26,9 @@ class SqlAlchemyNodeBulkOperator:
         """Delete multiple nodes by IDs."""
         async with self._sessionmaker.begin() as session:
             stmt = delete(NodeModel).where(NodeModel.id.in_(data.node_ids))
-            result = await session.execute(stmt)
-            deleted_ids = list(data.node_ids[: result.rowcount or 0])  # ty: ignore[unresolved-attribute]
+            result = cast(CursorResult[tuple[object, ...]], await session.execute(stmt))
+            rowcount = result.rowcount
+            deleted_ids = list(data.node_ids[: max(0, rowcount or 0)])
         return BulkNodeOperationResultDTO(
             affected=len(deleted_ids),
             node_ids=tuple(deleted_ids),

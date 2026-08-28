@@ -14,6 +14,8 @@ from fastapi.responses import JSONResponse
 from fastapi.routing import APIRoute
 from prometheus_fastapi_instrumentator import Instrumentator
 from starlette.exceptions import HTTPException as StarletteHTTPException
+from starlette.middleware.base import RequestResponseEndpoint
+from starlette.responses import Response
 
 from app.adapters.lifecycle.application_startup import ApplicationStartup
 from app.adapters.telemetry import init_telemetry
@@ -49,6 +51,7 @@ from app.api.v1.websocket import router as ws_router
 from app.core.config import get_settings
 from app.core.exceptions import DomainError
 from app.di.container import container
+from app.schemas.common import AUTHENTICATED_ERROR_RESPONSES
 
 
 def stable_operation_id(route: APIRoute) -> str:
@@ -142,7 +145,9 @@ def create_app() -> FastAPI:
     app.add_middleware(CommitOnResponseMiddleware)
 
     @app.middleware("http")
-    async def _security_headers(request: Request, call_next):  # noqa: ANN001
+    async def _security_headers(
+        request: Request, call_next: RequestResponseEndpoint
+    ) -> Response:
         """Add security headers to every response."""
         response = await call_next(request)
         response.headers["X-Content-Type-Options"] = "nosniff"
@@ -154,10 +159,17 @@ def create_app() -> FastAPI:
         return response
 
     @app.exception_handler(HTTPException)
-    async def _http_exception_handler(request: Request, exc: HTTPException):
+    async def _http_exception_handler(
+        request: Request, exc: HTTPException
+    ) -> JSONResponse:
         """Return HTTPException detail together with the request id."""
         request_id = getattr(request.state, "request_id", None)
-        content: dict[str, object] = {"detail": exc.detail}
+        message = exc.detail if isinstance(exc.detail, str) else "HTTP request failed"
+        content: dict[str, object] = {
+            "code": f"HTTP_{exc.status_code}",
+            "message": message,
+            "detail": exc.detail,
+        }
         if request_id:
             content["request_id"] = request_id
         return JSONResponse(
@@ -169,10 +181,14 @@ def create_app() -> FastAPI:
     @app.exception_handler(RequestValidationError)
     async def _validation_exception_handler(
         request: Request, exc: RequestValidationError
-    ):
+    ) -> JSONResponse:
         """Return validation errors together with the request id."""
         request_id = getattr(request.state, "request_id", None)
-        content: dict[str, object] = {"detail": jsonable_encoder(exc.errors())}
+        content: dict[str, object] = {
+            "code": "RequestValidationError",
+            "message": "Request validation failed",
+            "detail": jsonable_encoder(exc.errors()),
+        }
         if request_id:
             content["request_id"] = request_id
         return JSONResponse(
@@ -183,10 +199,15 @@ def create_app() -> FastAPI:
     @app.exception_handler(StarletteHTTPException)
     async def _starlette_http_exception_handler(
         request: Request, exc: StarletteHTTPException
-    ):
+    ) -> JSONResponse:
         """Return Starlette HTTPException detail together with the request id."""
         request_id = getattr(request.state, "request_id", None)
-        content: dict[str, object] = {"detail": exc.detail}
+        message = exc.detail if isinstance(exc.detail, str) else "HTTP request failed"
+        content: dict[str, object] = {
+            "code": f"HTTP_{exc.status_code}",
+            "message": message,
+            "detail": exc.detail,
+        }
         if request_id:
             content["request_id"] = request_id
         return JSONResponse(
@@ -199,24 +220,32 @@ def create_app() -> FastAPI:
 
     setup_dishka(container, app)
     app.include_router(health_router)
-    app.include_router(nodes_bulk_router, prefix="/api/v1")
-    app.include_router(nodes_router, prefix="/api/v1")
-    app.include_router(commands_router, prefix="/api/v1")
-    app.include_router(scripts_router, prefix="/api/v1")
-    app.include_router(scripts_bulk_router, prefix="/api/v1")
-    app.include_router(audit_router, prefix="/api/v1")
-    app.include_router(dashboard_router, prefix="/api/v1")
-    app.include_router(api_keys_router, prefix="/api/v1")
-    app.include_router(config_router, prefix="/api/v1")
-    app.include_router(docker_router, prefix="/api/v1")
-    app.include_router(docker_bulk_router, prefix="/api/v1")
-    app.include_router(events_router, prefix="/api/v1")
-    app.include_router(ws_router, prefix="/api/v1")
-    app.include_router(search_router, prefix="/api/v1")
-    app.include_router(favorites_router, prefix="/api/v1")
-    app.include_router(notes_router, prefix="/api/v1")
+    protected_routers = (
+        nodes_bulk_router,
+        nodes_router,
+        commands_router,
+        scripts_router,
+        scripts_bulk_router,
+        audit_router,
+        dashboard_router,
+        api_keys_router,
+        config_router,
+        docker_router,
+        docker_bulk_router,
+        events_router,
+        ws_router,
+        search_router,
+        favorites_router,
+        notes_router,
+        users_router,
+    )
+    for protected_router in protected_routers:
+        app.include_router(
+            protected_router,
+            prefix="/api/v1",
+            responses=AUTHENTICATED_ERROR_RESPONSES,
+        )
     app.include_router(auth_router, prefix="/api/v1")
-    app.include_router(users_router, prefix="/api/v1")
     if settings.E2E_ENABLED:
         app.include_router(internal_router, prefix="/api/v1")
 

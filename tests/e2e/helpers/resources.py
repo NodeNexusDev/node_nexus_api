@@ -17,6 +17,7 @@ from tests.e2e.settings import (
     SSH_PORT,
     SSH_USERNAME,
 )
+from tests.types import UnvalidatedJsonObject
 
 
 @dataclass
@@ -54,13 +55,13 @@ class UniqueResourceFactory:
         """Return a short unique resource name."""
         return f"{prefix}-{uuid4().hex[:10]}"
 
-    def _assert_created(self, response: httpx.Response) -> dict:
+    def _assert_created(self, response: httpx.Response) -> UnvalidatedJsonObject:
         assert response.status_code == 201, (
             f"Expected 201, got {response.status_code}: {response.text}"
         )
         return response.json()
 
-    def create_node(self, **overrides: object) -> dict:
+    def create_node(self, **overrides: object) -> UnvalidatedJsonObject:
         """Create a generic SSH node (legacy shape) with deterministic cleanup."""
         payload: dict[str, object] = {
             "name": self.unique_name("e2e-node"),
@@ -75,7 +76,7 @@ class UniqueResourceFactory:
         self._cleanup.add(lambda: self._client.delete(f"/api/v1/nodes/{node['id']}"))
         return node
 
-    def create_ssh_node(self, **overrides: object) -> dict:
+    def create_ssh_node(self, **overrides: object) -> UnvalidatedJsonObject:
         """Create an SSH node connected to the E2E SSH service."""
         payload: dict[str, object] = {
             "name": self.unique_name("e2e-ssh"),
@@ -95,7 +96,7 @@ class UniqueResourceFactory:
         *,
         encrypted: bool = False,
         **overrides: object,
-    ) -> dict:
+    ) -> UnvalidatedJsonObject:
         """Create an SSH node with key-based authentication.
 
         Args:
@@ -119,7 +120,7 @@ class UniqueResourceFactory:
         self._cleanup.add(lambda: self._client.delete(f"/api/v1/nodes/{node['id']}"))
         return node
 
-    def create_docker_node(self, **overrides: object) -> dict:
+    def create_docker_node(self, **overrides: object) -> UnvalidatedJsonObject:
         """Create a Docker-capable SSH node connected to DinD."""
         payload: dict[str, object] = {
             "name": self.unique_name("e2e-docker"),
@@ -141,7 +142,7 @@ class UniqueResourceFactory:
         image: str = DEFAULT_DOCKER_IMAGE,
         command: str = "sleep 300",
         **overrides: object,
-    ) -> dict:
+    ) -> UnvalidatedJsonObject:
         """Create a Docker container via the API and register its cleanup.
 
         The container is created but not started; callers can start/stop/remove
@@ -169,7 +170,9 @@ class UniqueResourceFactory:
         )
         return container
 
-    def create_command(self, command: str = "echo e2e", **overrides: object) -> dict:
+    def create_command(
+        self, command: str = "echo e2e", **overrides: object
+    ) -> UnvalidatedJsonObject:
         """Create a reusable command."""
         payload: dict[str, object] = {
             "name": self.unique_name("e2e-command"),
@@ -182,7 +185,7 @@ class UniqueResourceFactory:
         self._cleanup.add(lambda: self._client.delete(f"/api/v1/commands/{item['id']}"))
         return item
 
-    def create_script(self, **overrides: object) -> dict:
+    def create_script(self, **overrides: object) -> UnvalidatedJsonObject:
         """Create a one-step script."""
         payload: dict[str, object] = {
             "name": self.unique_name("e2e-script"),
@@ -199,7 +202,7 @@ class UniqueResourceFactory:
         self._cleanup.add(lambda: self._client.delete(f"/api/v1/scripts/{item['id']}"))
         return item
 
-    def create_api_key(self, **overrides: object) -> dict:
+    def create_api_key(self, **overrides: object) -> UnvalidatedJsonObject:
         """Create a managed API key."""
         payload: dict[str, object] = {
             "name": self.unique_name("e2e-key"),
@@ -217,7 +220,7 @@ class UniqueResourceFactory:
         script_id: str,
         node_ids: list[str],
         cron: str = "* * * * *",
-    ) -> dict:
+    ) -> UnvalidatedJsonObject:
         """Create or replace a script schedule."""
         response = self._client.post(
             f"/api/v1/scripts/{script_id}/schedule",

@@ -1,6 +1,6 @@
 """Immutable DTOs for user management use cases."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from uuid import UUID
 
@@ -21,7 +21,7 @@ class UserCreateDTO:
     """Application input for creating a user."""
 
     email: str
-    password: str
+    password: str = field(repr=False)
     is_superuser: bool = False
 
 

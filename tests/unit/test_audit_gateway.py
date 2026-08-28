@@ -14,6 +14,7 @@ from app.adapters.persistence.audit import (
 )
 from app.application.dto.audit import AuditEventDTO, AuditLogQueryDTO
 from app.models.audit_log import AuditLogModel
+from tests.typing import as_typed
 
 
 class _Context:
@@ -78,7 +79,9 @@ def test_maps_safe_event_to_outbox_payload() -> None:
 
     assert model.payload["node_id"] == str(node_id)
     assert model.payload["action"] == "execute"
-    assert "result" in model.payload["details"]
+    details = model.payload["details"]
+    assert isinstance(details, str)
+    assert "result" in details
 
 
 def test_maps_empty_optional_event_fields() -> None:
@@ -96,7 +99,7 @@ async def test_lists_filtered_audit_logs() -> None:
     rows.scalars.return_value = [model]
     session = AsyncMock()
     session.execute.side_effect = [count_result, rows]
-    gateway = SqlAlchemyAuditLogGateway(_Sessionmaker(session))  # type: ignore[arg-type]
+    gateway = SqlAlchemyAuditLogGateway(as_typed(_Sessionmaker(session)))
 
     page = await gateway.list_logs(
         AuditLogQueryDTO(
@@ -119,7 +122,7 @@ async def test_lists_audit_logs_with_all_filters() -> None:
     rows.scalars.return_value = [model]
     session = AsyncMock()
     session.execute.side_effect = [count_result, rows]
-    gateway = SqlAlchemyAuditLogGateway(_Sessionmaker(session))  # type: ignore[arg-type]
+    gateway = SqlAlchemyAuditLogGateway(as_typed(_Sessionmaker(session)))
 
     page = await gateway.list_logs(
         AuditLogQueryDTO(
@@ -140,7 +143,7 @@ async def test_lists_audit_logs_with_all_filters() -> None:
     rows.scalars.return_value = []
     session = AsyncMock()
     session.execute.side_effect = [count_result, rows]
-    gateway = SqlAlchemyAuditLogGateway(_Sessionmaker(session))  # type: ignore[arg-type]
+    gateway = SqlAlchemyAuditLogGateway(as_typed(_Sessionmaker(session)))
 
     page = await gateway.list_logs(AuditLogQueryDTO(offset=5, limit=10))
 
@@ -153,7 +156,7 @@ async def test_delete_before_returns_rowcount_or_zero() -> None:
     cursor.rowcount = 3
     session = AsyncMock()
     session.execute.side_effect = [cursor, MagicMock()]
-    gateway = SqlAlchemyAuditLogGateway(_Sessionmaker(session))  # type: ignore[arg-type]
+    gateway = SqlAlchemyAuditLogGateway(as_typed(_Sessionmaker(session)))
     cutoff = datetime.now(UTC)
 
     assert await gateway.delete_before(cutoff) == 3
@@ -168,9 +171,7 @@ async def test_request_and_required_outboxes_flush_events() -> None:
     required_session.add = MagicMock()
 
     await RequestAuditOutbox(request_session).enqueue(event)
-    await RequiredAuditOutbox(
-        _Sessionmaker(required_session)  # type: ignore[arg-type]
-    ).enqueue(event)
+    await RequiredAuditOutbox(as_typed(_Sessionmaker(required_session))).enqueue(event)
 
     request_session.add.assert_called_once()
     request_session.flush.assert_awaited_once()

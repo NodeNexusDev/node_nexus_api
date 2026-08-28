@@ -28,6 +28,7 @@ from app.application.services.api_key_authentication import APIKeyAuthentication
 from app.application.services.api_key_management import APIKeyManagementService
 from app.application.services.node_management_service import NodeManagementService
 from app.models.base import Base
+from tests.typing import as_typed_mock
 
 MASTER_KEY = "test-master-key-123"
 
@@ -65,7 +66,7 @@ class IntegrationAuthProvider(Provider):
 
     @provide(scope=Scope.APP)
     def get_jwt_handler(self) -> JWTHandler:
-        return MagicMock(spec=JWTHandler)
+        return as_typed_mock(JWTHandler, MagicMock(spec=JWTHandler))
 
     @provide(scope=Scope.REQUEST)
     def get_node_repo(self, session: AsyncSession) -> NodeRepository:

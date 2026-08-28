@@ -209,6 +209,7 @@ async def get_script_stats(
     date_to: datetime | None = Query(None),
     _key: Principal = Security(get_current_principal),
 ) -> ExecutionStatsResponse:
+    """Get aggregate execution statistics for a script."""
     audit.info("api.scripts.stats", script_id=str(script_id))
     stats = await stats_service.get_script_stats(
         script_id=script_id, date_from=date_from, date_to=date_to
@@ -333,7 +334,10 @@ async def execute_script(
     return _execution_batch_response(result)
 
 
-@router.get("/{script_id}/executions")
+@router.get(
+    "/{script_id}/executions",
+    response_model=PaginatedResponse[ScriptExecutionResponse],
+)
 @inject
 async def get_executions(
     script_id: uuid.UUID,
@@ -453,7 +457,10 @@ async def cancel_script(
     )
 
 
-@router.get("/{script_id}/schedule/history")
+@router.get(
+    "/{script_id}/schedule/history",
+    response_model=PaginatedResponse[ScriptExecutionResponse],
+)
 @inject
 async def get_scheduled_execution_history(
     script_id: uuid.UUID,

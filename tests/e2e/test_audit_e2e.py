@@ -246,7 +246,11 @@ async def test_worker_continues_after_malformed_event(
             "SELECT status, attempts FROM audit_outbox WHERE id = $1", malformed_id
         )
         assert row is not None
-        return row["status"], row["attempts"]
+        status = row["status"]
+        attempts = row["attempts"]
+        assert isinstance(status, str)
+        assert isinstance(attempts, int)
+        return status, attempts
 
     deadline = time.monotonic() + 60.0
     status = "pending"

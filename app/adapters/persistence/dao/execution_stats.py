@@ -1,13 +1,17 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Mapping
 from datetime import datetime
-from typing import Any
+from decimal import Decimal
 
 from sqlalchemy import text
+from sqlalchemy.engine import RowMapping
 from sqlalchemy.ext.asyncio import AsyncSession
 
-_DEFAULT_STATS: dict[str, Any] = {
+from app.application.dto.execution_stats import ExecutionStatsRow
+
+_DEFAULT_STATS: ExecutionStatsRow = {
     "total": 0,
     "successful": 0,
     "failed": 0,
@@ -16,6 +20,19 @@ _DEFAULT_STATS: dict[str, Any] = {
     "max_duration_ms": None,
     "last_executed_at": None,
 }
+
+
+def _empty_stats() -> ExecutionStatsRow:
+    return ExecutionStatsRow(
+        total=0,
+        successful=0,
+        failed=0,
+        avg_duration_ms=None,
+        min_duration_ms=None,
+        max_duration_ms=None,
+        last_executed_at=None,
+    )
+
 
 _SCRIPT_TERMINAL_STATUSES = "('success', 'error', 'completed', 'failed')"
 _SCRIPT_SUCCESS_STATUSES = "('success', 'completed')"
@@ -32,8 +49,8 @@ class ExecutionStatsRepository:
         node_id: uuid.UUID | None = None,
         date_from: datetime | None = None,
         date_to: datetime | None = None,
-    ) -> dict[str, Any]:
-        params: dict[str, Any] = {}
+    ) -> ExecutionStatsRow:
+        params: dict[str, object] = {}
         where_clauses: list[str] = []
         if command_id is not None:
             where_clauses.append("ce.command_id = :command_id")
@@ -63,7 +80,7 @@ class ExecutionStatsRepository:
             f"WHERE {where_sql}"  # nosec B608
         )
         row = (await self._session.execute(sql, params)).one_or_none()
-        return dict(row._mapping) if row else dict(_DEFAULT_STATS)
+        return self._validated_row(row._mapping) if row else _empty_stats()
 
     async def script_stats(
         self,
@@ -71,8 +88,8 @@ class ExecutionStatsRepository:
         node_id: uuid.UUID | None = None,
         date_from: datetime | None = None,
         date_to: datetime | None = None,
-    ) -> dict[str, Any]:
-        params: dict[str, Any] = {}
+    ) -> ExecutionStatsRow:
+        params: dict[str, object] = {}
         where_clauses: list[str] = []
         if script_id is not None:
             where_clauses.append("se.script_id = :script_id")
@@ -102,4 +119,36 @@ class ExecutionStatsRepository:
             f"WHERE {where_sql}"  # nosec B608
         )
         row = (await self._session.execute(sql, params)).one_or_none()
-        return dict(row._mapping) if row else dict(_DEFAULT_STATS)
+        return self._validated_row(row._mapping) if row else _empty_stats()
+
+    @staticmethod
+    def _validated_row(row: Mapping[object, object] | RowMapping) -> ExecutionStatsRow:
+        """Validate the untyped SQL driver boundary before returning it."""
+
+        def required_int(name: str) -> int:
+            value = row.get(name)
+            if not isinstance(value, int) or isinstance(value, bool):
+                raise TypeError(f"Statistics field {name!r} must be an integer")
+            return value
+
+        def optional_float(name: str) -> float | None:
+            value = row.get(name)
+            if value is None:
+                return None
+            if not isinstance(value, int | float | Decimal) or isinstance(value, bool):
+                raise TypeError(f"Statistics field {name!r} must be numeric or null")
+            return float(value)
+
+        last_executed_at = row.get("last_executed_at")
+        if last_executed_at is not None and not isinstance(last_executed_at, datetime):
+            raise TypeError("Statistics last_executed_at must be a datetime or null")
+
+        return ExecutionStatsRow(
+            total=required_int("total"),
+            successful=required_int("successful"),
+            failed=required_int("failed"),
+            avg_duration_ms=optional_float("avg_duration_ms"),
+            min_duration_ms=optional_float("min_duration_ms"),
+            max_duration_ms=optional_float("max_duration_ms"),
+            last_executed_at=last_executed_at,
+        )

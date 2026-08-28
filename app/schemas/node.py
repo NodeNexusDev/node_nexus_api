@@ -2,14 +2,12 @@
 
 import uuid
 from datetime import datetime
-from typing import Any, Literal, Self
+from typing import Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from app.core.types import ConnectionType, JsonObject, NodeStatus
 from app.schemas.common import CursorPage, PaginatedResponse
-
-ConnectionType = Literal["ssh", "docker", "proxmox"]
-NodeStatus = Literal["active", "unreachable", "error"]
 
 
 class NodeCreate(BaseModel):
@@ -20,15 +18,11 @@ class NodeCreate(BaseModel):
     port: int = Field(default=22, ge=1, le=65535)
     connection_type: ConnectionType = "ssh"
     username: str | None = None
-    password: str | None = None
-    ssh_key: str | None = None
-    passphrase: str | None = None
+    password: str | None = Field(default=None, repr=False)
+    ssh_key: str | None = Field(default=None, repr=False)
+    passphrase: str | None = Field(default=None, repr=False)
     docker_host: str | None = None
     tags: list[str] = Field(default_factory=list)
-
-    @model_validator(mode="after")
-    def check_docker_host(self) -> Self:
-        return self
 
 
 class NodeUpdate(BaseModel):
@@ -40,9 +34,9 @@ class NodeUpdate(BaseModel):
     connection_type: ConnectionType | None = None
     status: NodeStatus | None = None
     username: str | None = None
-    password: str | None = None
-    ssh_key: str | None = None
-    passphrase: str | None = None
+    password: str | None = Field(default=None, repr=False)
+    ssh_key: str | None = Field(default=None, repr=False)
+    passphrase: str | None = Field(default=None, repr=False)
     docker_host: str | None = None
     tags: list[str] | None = None
 
@@ -56,8 +50,8 @@ class NodeResponse(BaseModel):
     name: str
     host: str
     port: int
-    connection_type: str
-    status: str
+    connection_type: ConnectionType
+    status: NodeStatus
     username: str | None
     docker_host: str | None
     tags: list[str]
@@ -94,7 +88,7 @@ class BulkCommandRequest(BaseModel):
     command: str = Field(min_length=1, max_length=4096)
     node_ids: list[uuid.UUID] | None = Field(default=None, min_length=1)
     tags: list[str] | None = Field(default=None, min_length=1)
-    params: dict[str, Any] | None = Field(default=None)
+    params: JsonObject | None = Field(default=None)
 
     @model_validator(mode="after")
     def check_targets(self) -> Self:
@@ -215,9 +209,9 @@ class NodeValidateRequest(BaseModel):
     port: int = Field(default=22, ge=1, le=65535)
     connection_type: ConnectionType = "ssh"
     username: str | None = None
-    password: str | None = None
-    ssh_key: str | None = None
-    passphrase: str | None = None
+    password: str | None = Field(default=None, repr=False)
+    ssh_key: str | None = Field(default=None, repr=False)
+    passphrase: str | None = Field(default=None, repr=False)
 
 
 class NodeValidateResponse(BaseModel):

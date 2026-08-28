@@ -9,17 +9,18 @@ import structlog
 if TYPE_CHECKING:
     from fastapi import FastAPI
 
+    from app.core.config import Settings
+
 logger = structlog.get_logger()
 
 
-def init_telemetry(app: FastAPI, settings: object) -> None:
+def init_telemetry(app: FastAPI, settings: Settings) -> None:
     """Initialize OpenTelemetry tracing.
 
     Configures TracerProvider with OTLP exporter and instruments
     FastAPI and SQLAlchemy.
     """
-    enabled = getattr(settings, "OTEL_ENABLED", False)
-    if not enabled:
+    if not settings.OTEL_ENABLED:
         logger.debug("telemetry.disabled")
         return
 
@@ -30,12 +31,12 @@ def init_telemetry(app: FastAPI, settings: object) -> None:
         )
         from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
         from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
-        from opentelemetry.resources import Resource  # type: ignore
+        from opentelemetry.sdk.resources import Resource
         from opentelemetry.sdk.trace import TracerProvider
         from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
-        endpoint = getattr(settings, "OTEL_ENDPOINT", "http://localhost:4317")
-        service_name = getattr(settings, "OTEL_SERVICE_NAME", "node-nexus-api")
+        endpoint = settings.OTEL_ENDPOINT
+        service_name = settings.OTEL_SERVICE_NAME
 
         resource = Resource.create({"service.name": service_name})
         provider = TracerProvider(resource=resource)

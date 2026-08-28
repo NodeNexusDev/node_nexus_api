@@ -2,7 +2,8 @@
 
 from typing import Protocol
 
-JWTClaims = dict[str, str | int | bool | float | None]
+type JWTClaimValue = str | int | bool | float | None
+type JWTClaims = dict[str, JWTClaimValue]
 
 
 class JWTHandler(Protocol):

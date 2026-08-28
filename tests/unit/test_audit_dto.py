@@ -26,7 +26,7 @@ def test_audit_log_page_uses_immutable_items() -> None:
 
     assert page.items == (item,)
     with pytest.raises(AttributeError):
-        page.total = 2  # type: ignore[misc]
+        setattr(page, "total", 2)
 
 
 def test_audit_ports_are_application_contracts() -> None:

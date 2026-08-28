@@ -4,6 +4,7 @@ from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from app.adapters.persistence.command_management import SqlAlchemyCommandGateway
 from app.adapters.persistence.dao.command import CommandRepository
 from app.application.dto.command_template import CommandTemplateDTO
 
@@ -22,5 +23,8 @@ class ScopedCommandTemplateReader:
             return CommandTemplateDTO(
                 id=command.id,
                 command=command.command,
-                parameters=tuple(command.parameters or []),
+                parameters=tuple(
+                    SqlAlchemyCommandGateway.parameter_from_json(parameter)
+                    for parameter in (command.parameters or ())
+                ),
             )

@@ -37,7 +37,7 @@ class ApiVersionMiddleware(BaseHTTPMiddleware):
 
     def __init__(
         self,
-        app,  # noqa: ANN001
+        app: ASGIApp,
         supported_versions: list[str] | None = None,
     ) -> None:
         super().__init__(app)
@@ -111,7 +111,7 @@ class TimeoutMiddleware(BaseHTTPMiddleware):
 
     EXCLUDED_PATHS = frozenset({"/health", "/ready", "/metrics"})
 
-    def __init__(self, app, timeout: int = 300) -> None:  # noqa: ANN001
+    def __init__(self, app: ASGIApp, timeout: float = 300.0) -> None:
         super().__init__(app)
         self._timeout = timeout
 
@@ -149,9 +149,9 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
     def __init__(
         self,
-        app,
+        app: ASGIApp,
         requests: int = 100,
-        window: int = 60,  # noqa: ANN001
+        window: int = 60,
         max_clients: int = 10_000,
     ) -> None:
         super().__init__(app)

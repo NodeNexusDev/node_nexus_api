@@ -1,5 +1,6 @@
 """Unit tests for the API-key persistence adapter mappings."""
 
+from collections.abc import Sequence
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
@@ -7,6 +8,7 @@ from uuid import uuid4
 from app.adapters.persistence.api_key import SqlAlchemyAPIKeyGateway
 from app.application.dto.api_key import APIKeyPersistenceDTO, APIKeyUpdateDTO
 from app.models.api_key import APIKeyModel
+from tests.typing import as_typed
 
 
 class _Context:
@@ -34,7 +36,7 @@ class _Sessionmaker:
 def _result(
     *,
     scalar: object = None,
-    scalars: list[object] | None = None,
+    scalars: Sequence[object] | None = None,
     count: int = 0,
 ) -> MagicMock:
     result = MagicMock()
@@ -95,7 +97,7 @@ async def test_reads_auth_and_management_views() -> None:
     model = _model()
     session = AsyncMock()
     session.execute.side_effect = [_result(scalar=model), _result(scalar=model)]
-    gateway = SqlAlchemyAPIKeyGateway(_Sessionmaker(session))  # type: ignore[arg-type]
+    gateway = SqlAlchemyAPIKeyGateway(as_typed(_Sessionmaker(session)))
 
     auth = await gateway.get_auth_by_hash(model.key_hash)
     view = await gateway.get_api_key(model.id)
@@ -107,7 +109,7 @@ async def test_reads_auth_and_management_views() -> None:
 async def test_reads_return_none_for_missing_keys() -> None:
     session = AsyncMock()
     session.execute.return_value = _result()
-    gateway = SqlAlchemyAPIKeyGateway(_Sessionmaker(session))  # type: ignore[arg-type]
+    gateway = SqlAlchemyAPIKeyGateway(as_typed(_Sessionmaker(session)))
 
     assert await gateway.get_auth_by_hash("missing") is None
     assert await gateway.get_api_key(uuid4()) is None
@@ -117,7 +119,7 @@ async def test_lists_api_keys_with_total() -> None:
     models = [_model(), _model()]
     session = AsyncMock()
     session.execute.side_effect = [_result(count=2), _result(scalars=models)]
-    gateway = SqlAlchemyAPIKeyGateway(_Sessionmaker(session))  # type: ignore[arg-type]
+    gateway = SqlAlchemyAPIKeyGateway(as_typed(_Sessionmaker(session)))
 
     page = await gateway.list_api_keys(offset=5, limit=10)
 
@@ -140,7 +142,7 @@ async def test_creates_updates_and_revokes_key() -> None:
         _result(scalar=existing),
         _result(scalar=existing),
     ]
-    gateway = SqlAlchemyAPIKeyGateway(_Sessionmaker(session))  # type: ignore[arg-type]
+    gateway = SqlAlchemyAPIKeyGateway(as_typed(_Sessionmaker(session)))
 
     created = await gateway.create_api_key(
         APIKeyPersistenceDTO(
@@ -165,7 +167,7 @@ async def test_creates_updates_and_revokes_key() -> None:
 async def test_update_and_revoke_return_missing() -> None:
     session = AsyncMock()
     session.execute.return_value = _result()
-    gateway = SqlAlchemyAPIKeyGateway(_Sessionmaker(session))  # type: ignore[arg-type]
+    gateway = SqlAlchemyAPIKeyGateway(as_typed(_Sessionmaker(session)))
 
     assert await gateway.update_api_key(uuid4(), APIKeyUpdateDTO(changes=())) is None
     assert await gateway.revoke_api_key(uuid4()) is False
@@ -173,7 +175,7 @@ async def test_update_and_revoke_return_missing() -> None:
 
 async def test_touch_last_used_executes_short_update() -> None:
     session = AsyncMock()
-    gateway = SqlAlchemyAPIKeyGateway(_Sessionmaker(session))  # type: ignore[arg-type]
+    gateway = SqlAlchemyAPIKeyGateway(as_typed(_Sessionmaker(session)))
 
     await gateway.touch_last_used(uuid4(), datetime.now(UTC))
 

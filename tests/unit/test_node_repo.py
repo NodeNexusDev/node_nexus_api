@@ -39,7 +39,7 @@ def repo(session: AsyncSession) -> NodeRepository:
     return NodeRepository(session)
 
 
-def _node_data(**overrides) -> dict:
+def _node_data(**overrides: object) -> dict[str, object]:
     defaults = {
         "name": "test-node",
         "host": "10.0.0.1",

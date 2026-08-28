@@ -2,6 +2,7 @@
 
 import uuid
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
@@ -10,21 +11,21 @@ class LoginRequest(BaseModel):
     """Schema for login request."""
 
     email: EmailStr
-    password: str = Field(..., min_length=1, max_length=1024)
+    password: str = Field(..., min_length=1, max_length=1024, repr=False)
 
 
 class TokenResponse(BaseModel):
     """Schema for token response."""
 
     access_token: str
-    token_type: str = "bearer"
+    token_type: Literal["bearer"] = "bearer"
 
 
 class UserCreate(BaseModel):
     """Schema for creating a user."""
 
     email: EmailStr
-    password: str = Field(..., min_length=12, max_length=1024)
+    password: str = Field(..., min_length=12, max_length=1024, repr=False)
     is_superuser: bool = False
 
 

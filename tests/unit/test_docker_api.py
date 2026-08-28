@@ -45,6 +45,7 @@ from app.schemas.docker import (
     DockerVolume,
 )
 from tests.docker_test_facade import DockerService
+from tests.typing import as_typed_mock
 from tests.unit.conftest import MockAuthServiceProvider, _mock_settings
 
 NODE_ID = uuid.uuid4()
@@ -163,19 +164,19 @@ def _create_test_app(service: DockerService | AsyncMock) -> FastAPI:
     class MockServiceProvider(Provider):
         @provide(scope=Scope.REQUEST)
         def get_container_service(self) -> DockerContainerService:
-            return service
+            return as_typed_mock(DockerContainerService, service)
 
         @provide(scope=Scope.REQUEST)
         def get_image_service(self) -> DockerImageService:
-            return service
+            return as_typed_mock(DockerImageService, service)
 
         @provide(scope=Scope.REQUEST)
         def get_resource_service(self) -> DockerResourceService:
-            return service
+            return as_typed_mock(DockerResourceService, service)
 
         @provide(scope=Scope.REQUEST)
         def get_system_service(self) -> DockerSystemService:
-            return service
+            return as_typed_mock(DockerSystemService, service)
 
     container = make_async_container(MockServiceProvider(), MockAuthServiceProvider())
     setup_dishka(container, app)

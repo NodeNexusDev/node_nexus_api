@@ -3,9 +3,10 @@
 from datetime import datetime
 from uuid import UUID
 
-type JsonScalar = str | int | float | bool | None
-type JsonValue = JsonScalar | list[JsonValue] | dict[str, JsonValue]
-type JsonObject = dict[str, JsonValue]
+from app.core.types import JsonObject, JsonScalar, JsonValue
+
+__all__ = ["JsonObject", "JsonScalar", "JsonValue", "PersistenceObject"]
+
 type PersistenceScalar = JsonScalar | UUID | datetime
 type PersistenceValue = (
     PersistenceScalar | list[PersistenceValue] | dict[str, PersistenceValue]

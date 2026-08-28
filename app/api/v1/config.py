@@ -22,6 +22,8 @@ from app.application.dto.config import (
     ScriptConfigDTO,
 )
 from app.application.services.config_service import ConfigService
+from app.core.types import JsonObject
+from app.schemas.command import CommandParameter
 from app.schemas.config import (
     ConfigExport,
     ConfigImport,
@@ -32,10 +34,32 @@ from app.schemas.config import (
     DryRunWouldCreate,
     ImportResult,
 )
+from app.schemas.script import ScriptStep
 
 audit = structlog.get_logger("audit")
 
 router = APIRouter(prefix="/config", tags=["config"], route_class=DishkaRoute)
+
+
+def _command_parameter_object(parameter: CommandParameter) -> JsonObject:
+    return {
+        "name": parameter.name,
+        "type": parameter.type,
+        "required": parameter.required,
+        "default": parameter.default,
+        "description": parameter.description,
+    }
+
+
+def _script_step_object(step: ScriptStep) -> JsonObject:
+    return {
+        "label": step.label,
+        "type": step.type,
+        "command": step.command,
+        "command_id": str(step.command_id) if step.command_id else None,
+        "params": step.params,
+        "on_failure": step.on_failure,
+    }
 
 
 @router.get("/export", response_model=ConfigExport)
@@ -89,7 +113,10 @@ async def import_config(
             commands=tuple(
                 CommandConfigDTO(
                     **item.model_dump(exclude={"parameters", "tags"}),
-                    parameters=tuple(item.parameters or ()),
+                    parameters=tuple(
+                        _command_parameter_object(parameter)
+                        for parameter in (item.parameters or ())
+                    ),
                     tags=tuple(item.tags),
                 )
                 for item in data.commands
@@ -97,7 +124,7 @@ async def import_config(
             scripts=tuple(
                 ScriptConfigDTO(
                     **item.model_dump(exclude={"steps", "tags"}),
-                    steps=tuple(item.steps),
+                    steps=tuple(_script_step_object(step) for step in item.steps),
                     tags=tuple(item.tags),
                 )
                 for item in data.scripts

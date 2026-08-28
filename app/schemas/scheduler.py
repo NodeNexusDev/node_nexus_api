@@ -1,10 +1,11 @@
 """Schemas for script scheduling."""
 
 from datetime import datetime
-from typing import Any
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
+
+from app.core.types import JsonObject
 
 
 class ScheduleRequest(BaseModel):
@@ -16,7 +17,7 @@ class ScheduleRequest(BaseModel):
         description="Cron expression (e.g., '0 9 * * *')",
     )
     node_ids: list[UUID] = Field(min_length=1, description="Target node IDs")
-    params: dict[str, Any] = Field(default_factory=dict)
+    params: JsonObject = Field(default_factory=dict)
     timezone: str = Field(default="UTC", min_length=1, max_length=100)
     misfire_grace_seconds: int = Field(default=60, ge=1, le=86400)
 
@@ -40,7 +41,7 @@ class ScheduledJob(BaseModel):
     cron: str
     timezone: str
     node_ids: list[UUID] = Field(default_factory=list)
-    params: dict[str, Any] = Field(default_factory=dict)
+    params: JsonObject = Field(default_factory=dict)
     enabled: bool
     misfire_grace_seconds: int
     operational_state: str

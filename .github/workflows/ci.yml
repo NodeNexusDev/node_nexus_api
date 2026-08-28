@@ -99,11 +99,14 @@ jobs:
       - name: Ruff check
         run: uv run ruff check app/ tests/ scripts/
 
+      - name: Check static-analysis suppressions
+        run: uv run python scripts/check_suppressions.py
+
       - name: Ruff format check
         run: uv run ruff format --check app/ tests/ scripts/
 
       - name: Type check
-        run: uv run ty check app/
+        run: uv run ty check .
 
   test:
     if: github.head_ref == 'dev'

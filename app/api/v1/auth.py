@@ -1,6 +1,7 @@
 """Authentication API endpoints."""
 
 import uuid
+from typing import Literal, cast
 
 import structlog
 from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
@@ -12,6 +13,7 @@ from app.application.ports.jwt_handler import JWTHandler
 from app.application.services.auth_service import AuthService
 from app.core.config import get_settings
 from app.schemas.auth import LoginRequest, TokenResponse, UserResponse
+from app.schemas.common import AUTHENTICATED_ERROR_RESPONSES
 
 audit = structlog.get_logger("audit")
 
@@ -67,7 +69,7 @@ async def login(
 
     return TokenResponse(
         access_token=result["access_token"],
-        token_type=result["token_type"],
+        token_type=cast(Literal["bearer"], result["token_type"]),
     )
 
 
@@ -108,11 +110,15 @@ async def refresh_token(
 
     return TokenResponse(
         access_token=result["access_token"],
-        token_type=result["token_type"],
+        token_type=cast(Literal["bearer"], result["token_type"]),
     )
 
 
-@router.get("/me", response_model=UserResponse)
+@router.get(
+    "/me",
+    response_model=UserResponse,
+    responses=AUTHENTICATED_ERROR_RESPONSES,
+)
 @inject
 async def get_me(
     service: FromDishka[AuthService],

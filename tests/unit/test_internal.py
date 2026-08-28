@@ -14,33 +14,44 @@ from app.application.ports.audit_outbox_controller import AuditOutboxController
 from app.application.ports.schedule import JobSchedulerPort, ScheduleReader
 from app.application.services.scheduled_script_executor import ScheduledScriptExecutor
 from app.core.config import Settings
+from tests.typing import as_typed_mock
 from tests.unit.conftest import MockAuthServiceProvider, _mock_settings
 
 
-def _create_internal_app(**services: AsyncMock) -> FastAPI:
+def _create_internal_app(**services: object) -> FastAPI:
     app = FastAPI()
     app.include_router(internal_router, prefix="/api/v1")
 
     class MockServiceProvider(Provider):
         @provide(scope=Scope.REQUEST)
         def get_audit_controller(self) -> AuditOutboxController:
-            return services.get("audit_controller", AsyncMock())
+            return as_typed_mock(
+                AuditOutboxController, services.get("audit_controller", AsyncMock())
+            )
 
         @provide(scope=Scope.REQUEST)
         def get_job_scheduler(self) -> JobSchedulerPort:
-            return services.get("job_scheduler", AsyncMock())
+            return as_typed_mock(
+                JobSchedulerPort, services.get("job_scheduler", AsyncMock())
+            )
 
         @provide(scope=Scope.REQUEST)
         def get_schedule_reader(self) -> ScheduleReader:
-            return services.get("schedule_reader", AsyncMock())
+            return as_typed_mock(
+                ScheduleReader, services.get("schedule_reader", AsyncMock())
+            )
 
         @provide(scope=Scope.REQUEST)
         def get_executor(self) -> ScheduledScriptExecutor:
-            return services.get("executor", AsyncMock())
+            return as_typed_mock(
+                ScheduledScriptExecutor, services.get("executor", AsyncMock())
+            )
 
         @provide(scope=Scope.REQUEST)
         def get_settings(self) -> Settings:
-            return services.get("settings", _mock_settings("test-master"))
+            return as_typed_mock(
+                Settings, services.get("settings", _mock_settings("test-master"))
+            )
 
     container = make_async_container(MockServiceProvider(), MockAuthServiceProvider())
     setup_dishka(container, app)

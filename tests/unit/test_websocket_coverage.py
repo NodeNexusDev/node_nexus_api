@@ -6,8 +6,10 @@ and exec_stream to push coverage from 43% to 80%+.
 
 import asyncio
 import json
+from collections.abc import AsyncGenerator, AsyncIterator
 from contextlib import asynccontextmanager
 from types import SimpleNamespace
+from typing import Literal
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
@@ -21,8 +23,9 @@ from app.api.v1.websocket import (
 )
 from app.application.dto.remote_stream import RemoteStreamEventDTO
 from app.core.exceptions import ConnectionFailedError, NodeNotFoundError
+from tests.typing import as_unvalidated
 
-_exec = exec_stream.__dishka_orig_func__  # type: ignore[attr-defined]
+_exec = getattr(exec_stream, "__dishka_orig_func__")
 
 _NODE_ID = uuid4()
 
@@ -50,7 +53,7 @@ def _api_key_service() -> AsyncMock:
 class _TrackableAsyncIterator:
     """Async iterator that records whether aclose() was called."""
 
-    def __init__(self, items: list) -> None:
+    def __init__(self, items: list[RemoteStreamEventDTO]) -> None:
         self._items = items
         self._index = 0
         self.aclose_called = False
@@ -77,7 +80,9 @@ class _SlowStreamingSession:
         self._done = asyncio.Event()
         self.aborted = False
 
-    async def execute_events(self, command: str):  # type: ignore[override]
+    async def execute_events(
+        self, command: str
+    ) -> AsyncGenerator[RemoteStreamEventDTO]:
         self._started.set()
         yield RemoteStreamEventDTO(type="stdout", data="running\n")
         await self._done.wait()
@@ -98,7 +103,7 @@ class _SlowStreamingService:
         self._session = session or _SlowStreamingSession()
 
     @asynccontextmanager
-    async def connect(self, node_id):
+    async def connect(self, node_id: object) -> AsyncIterator[_SlowStreamingSession]:
         yield self._session
 
 
@@ -109,9 +114,10 @@ class _FailingStreamingService:
         self._error = error
 
     @asynccontextmanager
-    async def connect(self, node_id):
+    async def connect(self, node_id: object) -> AsyncIterator[object]:
         raise self._error
-        yield  # type: ignore[misc]  # pragma: no cover
+        if False:
+            yield object()  # pragma: no cover
 
 
 class _FakeStreamingSession:
@@ -119,7 +125,9 @@ class _FakeStreamingSession:
         self._error = error
         self._sent_signals: list[str] = []
 
-    async def execute_events(self, command: str):  # type: ignore[override]
+    async def execute_events(
+        self, command: str
+    ) -> AsyncGenerator[RemoteStreamEventDTO]:
         if self._error:
             raise self._error
         yield RemoteStreamEventDTO(type="stdout", data="ok\n")
@@ -140,7 +148,7 @@ class _FakeStreamingService:
         self.closed = False
 
     @asynccontextmanager
-    async def connect(self, node_id):
+    async def connect(self, node_id: object) -> AsyncIterator[_FakeStreamingSession]:
         if isinstance(self._error, (NodeNotFoundError, ConnectionFailedError)):
             raise self._error
         try:
@@ -218,8 +226,6 @@ class TestSendCommandEvents:
     async def test_connection_failed_error_sends_remote_error(self) -> None:
         """ConnectionFailedError → 'Remote execution failed' message."""
         ws = _make_ws()
-        events = _TrackableAsyncIterator([])
-        events._error_to_raise = ConnectionFailedError("ssh down")
 
         class _ErrorIterator:
             def __init__(self):
@@ -280,7 +286,10 @@ class TestSendCommandEvents:
         ws = _make_ws()
         events = _TrackableAsyncIterator(
             [
-                RemoteStreamEventDTO(type="done", exit_code=0),
+                RemoteStreamEventDTO(
+                    type=as_unvalidated(Literal["stdout", "stderr", "exit"], "done"),
+                    exit_code=0,
+                ),
             ]
         )
         session = MagicMock()
@@ -343,7 +352,9 @@ class TestSendCommandEvents:
         ws = _make_ws()
         events = _TrackableAsyncIterator(
             [
-                RemoteStreamEventDTO(type="started"),
+                RemoteStreamEventDTO(
+                    type=as_unvalidated(Literal["stdout", "stderr", "exit"], "started")
+                ),
             ]
         )
         session = MagicMock()
@@ -366,7 +377,7 @@ class TestExecStreamHeaderParsing:
     async def test_non_mapping_headers_yields_token_none(self) -> None:
         """When websocket.headers is not a Mapping, token defaults to None."""
         ws = _make_ws("dummy")
-        ws.headers = "not-a-mapping"  # type: ignore[assignment]
+        setattr(ws, "headers", "not-a-mapping")
 
         await _exec(ws, uuid4(), MagicMock(), _api_key_service())
 

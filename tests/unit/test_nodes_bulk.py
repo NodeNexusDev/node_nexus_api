@@ -38,10 +38,11 @@ from app.application.services.node_status_history_service import (
     NodeStatusHistoryService,
 )
 from app.application.services.node_validation_service import NodeValidationService
+from tests.typing import as_typed_mock
 from tests.unit.conftest import MockAuthServiceProvider, _mock_settings
 
 
-def _create_nodes_app(**services: AsyncMock) -> FastAPI:
+def _create_nodes_app(**services: object) -> FastAPI:
     app = FastAPI()
     app.include_router(commands_router, prefix="/api/v1")
     app.include_router(nodes_bulk_router, prefix="/api/v1")
@@ -50,39 +51,60 @@ def _create_nodes_app(**services: AsyncMock) -> FastAPI:
     class MockServiceProvider(Provider):
         @provide(scope=Scope.REQUEST)
         def get_node_management(self) -> NodeManagementService:
-            return services.get("node_management", AsyncMock())
+            return as_typed_mock(
+                NodeManagementService, services.get("node_management", AsyncMock())
+            )
 
         @provide(scope=Scope.REQUEST)
         def get_node_bulk_op(self) -> NodeBulkOperationService:
-            return services.get("node_bulk_op", AsyncMock())
+            return as_typed_mock(
+                NodeBulkOperationService, services.get("node_bulk_op", AsyncMock())
+            )
 
         @provide(scope=Scope.REQUEST)
         def get_node_bulk_cmd(self) -> NodeBulkCommandService:
-            return services.get("node_bulk_cmd", AsyncMock())
+            return as_typed_mock(
+                NodeBulkCommandService, services.get("node_bulk_cmd", AsyncMock())
+            )
 
         @provide(scope=Scope.REQUEST)
         def get_node_metrics(self) -> NodeMetricsService:
-            return services.get("node_metrics", AsyncMock())
+            return as_typed_mock(
+                NodeMetricsService, services.get("node_metrics", AsyncMock())
+            )
 
         @provide(scope=Scope.REQUEST)
         def get_node_validation(self) -> NodeValidationService:
-            return services.get("node_validation", AsyncMock())
+            return as_typed_mock(
+                NodeValidationService, services.get("node_validation", AsyncMock())
+            )
 
         @provide(scope=Scope.REQUEST)
         def get_execution_lifecycle(self) -> ExecutionLifecycleService:
-            return services.get("execution_lifecycle", AsyncMock())
+            return as_typed_mock(
+                ExecutionLifecycleService,
+                services.get("execution_lifecycle", AsyncMock()),
+            )
 
         @provide(scope=Scope.REQUEST)
         def get_execution_stats(self) -> ExecutionStatsService:
-            return services.get("execution_stats", AsyncMock())
+            return as_typed_mock(
+                ExecutionStatsService, services.get("execution_stats", AsyncMock())
+            )
 
         @provide(scope=Scope.REQUEST)
         def get_execution_history(self) -> ExecutionHistoryService:
-            return services.get("execution_history", AsyncMock())
+            return as_typed_mock(
+                ExecutionHistoryService,
+                services.get("execution_history", AsyncMock()),
+            )
 
         @provide(scope=Scope.REQUEST)
         def get_node_status_history(self) -> NodeStatusHistoryService:
-            return services.get("node_status_history", AsyncMock())
+            return as_typed_mock(
+                NodeStatusHistoryService,
+                services.get("node_status_history", AsyncMock()),
+            )
 
     container = make_async_container(MockServiceProvider(), MockAuthServiceProvider())
     setup_dishka(container, app)

@@ -2,11 +2,13 @@
 
 from datetime import datetime
 from importlib.metadata import PackageNotFoundError, version
-from typing import Any
 
 from pydantic import BaseModel, Field
 
 from app.application.dto.config import CONFIG_FORMAT_VERSION, LEGACY_CONFIG_VERSION
+from app.core.types import ConnectionType
+from app.schemas.command import CommandParameter
+from app.schemas.script import ScriptStep
 
 
 def application_version() -> str:
@@ -23,7 +25,7 @@ class NodeExport(BaseModel):
     name: str
     host: str
     port: int
-    connection_type: str
+    connection_type: ConnectionType
     username: str | None = None
     docker_host: str | None = None
     tags: list[str] = Field(default_factory=list)
@@ -35,7 +37,7 @@ class CommandExport(BaseModel):
     name: str
     description: str | None = None
     command: str
-    parameters: list[dict[str, Any]] | None = None
+    parameters: list[CommandParameter] | None = None
     tags: list[str] = Field(default_factory=list)
 
 
@@ -44,7 +46,7 @@ class ScriptExport(BaseModel):
 
     name: str
     description: str | None = None
-    steps: list[dict[str, Any]] = Field(default_factory=list)
+    steps: list[ScriptStep] = Field(default_factory=list)
     tags: list[str] = Field(default_factory=list)
 
 
@@ -87,7 +89,7 @@ class DryRunNodePreview(BaseModel):
     name: str
     host: str
     port: int
-    connection_type: str
+    connection_type: ConnectionType
     username: str | None = None
     docker_host: str | None = None
     tags: list[str] = Field(default_factory=list)

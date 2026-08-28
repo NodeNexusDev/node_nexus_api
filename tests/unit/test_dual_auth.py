@@ -21,6 +21,7 @@ from app.core.exceptions import (
     AuthenticationError,
     DomainError,
 )
+from tests.typing import as_typed_mock
 
 
 def _mock_settings(master_key: str = "") -> MagicMock:
@@ -96,11 +97,11 @@ def _create_app_principal(
     class MockProvider(Provider):
         @provide(scope=Scope.REQUEST)
         def get_api_key_service(self) -> APIKeyAuthenticationService:
-            return mock_api_key_service
+            return as_typed_mock(APIKeyAuthenticationService, mock_api_key_service)
 
         @provide(scope=Scope.APP)
         def get_jwt_handler(self) -> JWTHandler:
-            return mock_jwt
+            return as_typed_mock(JWTHandler, mock_jwt)
 
     container = make_async_container(MockProvider())
     setup_dishka(container, app)
@@ -240,11 +241,11 @@ def _create_app_write_scope(
     class MockProvider(Provider):
         @provide(scope=Scope.REQUEST)
         def get_api_key_service(self) -> APIKeyAuthenticationService:
-            return mock_api_key_service
+            return as_typed_mock(APIKeyAuthenticationService, mock_api_key_service)
 
         @provide(scope=Scope.APP)
         def get_jwt_handler(self) -> JWTHandler:
-            return mock_jwt
+            return as_typed_mock(JWTHandler, mock_jwt)
 
     container = make_async_container(MockProvider())
     setup_dishka(container, app)

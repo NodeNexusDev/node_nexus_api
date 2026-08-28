@@ -17,6 +17,7 @@ from app.application.dto.command_history import (
     CommandHistoryQueryDTO,
 )
 from tests.helpers import TransactionSpy
+from tests.typing import as_typed
 
 
 def context_factory(session: object, *, begin: bool = False) -> MagicMock:
@@ -47,7 +48,8 @@ async def test_command_reader_found_and_missing() -> None:
         missing = await reader.get_template(uuid4())
     assert found is not None
     assert found.command == "echo ok"
-    assert found.parameters == ("name",)
+    assert len(found.parameters) == 1
+    assert found.parameters[0].name == "name"
     assert missing is None
 
 
@@ -61,7 +63,9 @@ async def test_command_reader_closes_session_before_returning() -> None:
         "app.adapters.persistence.command_reader.CommandRepository",
         return_value=repository,
     ):
-        result = await ScopedCommandTemplateReader(boundary).get_template(uuid4())
+        result = await ScopedCommandTemplateReader(as_typed(boundary)).get_template(
+            uuid4()
+        )
 
     assert result is not None
     assert boundary.session_entries == 1
@@ -116,7 +120,7 @@ async def test_execution_writer_commits_short_transactions() -> None:
         "app.adapters.persistence.script_gateway.ScriptExecutionRepository",
         return_value=repository,
     ):
-        writer = ScopedScriptExecutionWriter(boundary)
+        writer = ScopedScriptExecutionWriter(as_typed(boundary))
         assert await writer.create_execution({"script_id": uuid4()}) == execution_id
         await writer.update_execution(execution_id, {"status": "success"})
     repository.update.assert_awaited_once()

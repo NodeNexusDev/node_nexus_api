@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 if TYPE_CHECKING:
@@ -36,6 +36,7 @@ from app.application.dto.docker import (
     NetworkDisconnectRequestDTO,
     VolumeCreateRequestDTO,
 )
+from app.application.dto.node_connection import NodeConnectionDTO
 from app.application.services.docker.bulk_service import DockerBulkService
 from app.application.services.docker.command_runner import DockerCommandRunner
 from app.application.services.docker.container_service import DockerContainerService
@@ -43,6 +44,8 @@ from app.application.services.docker.error_mapper import raise_for_docker_error
 from app.application.services.docker.image_service import DockerImageService
 from app.application.services.docker.parsers import parse_json_array, parse_json_lines
 from app.application.services.docker.resource_service import DockerResourceService
+from app.core.types import JsonObject
+from app.models.node import NodeModel
 
 
 class DockerService:
@@ -57,7 +60,11 @@ class DockerService:
         runtime: DockerRuntime | None = None,
     ) -> None:
         self._audit = audit_service
-        resolved_reader = node_reader or _RepositoryNodeReader(repository)
+        resolved_reader: NodeConnectionReader = (
+            node_reader
+            if node_reader is not None
+            else _RepositoryNodeReader(repository)
+        )
         resolved_runtime = runtime
         if resolved_runtime is None:
             if connector_factory is None:
@@ -79,30 +86,30 @@ class DockerService:
         self,
         action: str,
         node_id: UUID | None = None,
-        details: dict[str, Any] | None = None,
+        details: JsonObject | None = None,
     ) -> None:
         """Compatibility audit hook for internal callers."""
         if self._audit:
             await self._audit.log(action=action, node_id=node_id, details=details)
 
     # Private compatibility methods retained for existing internal callers/tests.
-    async def _get_docker_node(self, node_id: UUID) -> Any:
+    async def _get_docker_node(self, node_id: UUID) -> NodeConnectionDTO:
         return await self._runner.get_target(node_id)
 
     async def _execute_docker_cmd(
-        self, node: Any, command: str, timeout: int = 30
+        self, node: NodeConnectionDTO, command: str, timeout: int = 30
     ) -> tuple[str, str, int]:
         return await self._runner.execute(node, command, timeout)
 
-    def _build_docker_cmd(self, node: Any, docker_args: str) -> str:
+    def _build_docker_cmd(self, node: NodeConnectionDTO, docker_args: str) -> str:
         return self._runner.build_command(node, docker_args)
 
     @staticmethod
-    def _parse_json_lines(stdout: str) -> list[dict[str, Any]]:
+    def _parse_json_lines(stdout: str) -> list[dict[str, object]]:
         return parse_json_lines(stdout)
 
     @staticmethod
-    def _parse_json_array(stdout: str) -> list[dict[str, Any]]:
+    def _parse_json_array(stdout: str) -> list[dict[str, object]]:
         return parse_json_array(stdout)
 
     @staticmethod
@@ -309,11 +316,39 @@ class _RepositoryNodeReader:
     def __init__(self, repository: NodeRepository) -> None:
         self._repository = repository
 
-    async def get_connection(self, node_id: UUID) -> Any:
-        return await self._repository.get_by_id(node_id)
+    @staticmethod
+    def _to_connection(node: NodeModel | NodeConnectionDTO) -> NodeConnectionDTO:
+        if isinstance(node, NodeConnectionDTO):
+            return node
+        return NodeConnectionDTO(
+            id=node.id,
+            name=node.name,
+            host=node.host,
+            port=node.port,
+            connection_type=node.connection_type,
+            username=node.username,
+            password=node.password,
+            ssh_key=node.ssh_key,
+            passphrase=node.passphrase,
+            docker_host=node.docker_host,
+        )
 
-    async def get_connections_by_ids(self, node_ids: list[UUID]) -> list[Any]:
-        return await self._repository.get_connections_by_ids(node_ids)
+    async def get_connection(self, node_id: UUID) -> NodeConnectionDTO | None:
+        node = await self._repository.get_by_id(node_id)
+        return self._to_connection(node) if node is not None else None
 
-    async def get_connections_by_tags(self, tags: list[str]) -> list[Any]:
-        return await self._repository.get_connections_by_tags(tags)
+    async def get_connections_by_ids(
+        self, node_ids: list[UUID]
+    ) -> list[NodeConnectionDTO]:
+        nodes = await self._repository.get_by_ids(node_ids)
+        return [self._to_connection(node) for node in nodes]
+
+    async def get_connections_by_tags(self, tags: list[str]) -> list[NodeConnectionDTO]:
+        nodes = await self._repository.get_by_tags(tags)
+        return [self._to_connection(node) for node in nodes]
+
+    async def get_connections_by_type(
+        self, connection_type: str
+    ) -> list[NodeConnectionDTO]:
+        nodes = await self._repository.get_connections_by_type(connection_type)
+        return [self._to_connection(node) for node in nodes]

@@ -1,6 +1,7 @@
 """Internal SQLAlchemy DAO for command templates."""
 
-from typing import Any
+from collections.abc import Mapping
+from typing import TypeVar
 from uuid import UUID
 
 from sqlalchemy import func, or_, select
@@ -9,6 +10,8 @@ from sqlalchemy.sql import Select
 
 from app.adapters.persistence.dao.base import escape_ilike
 from app.models.command import CommandModel
+
+_SelectRow = TypeVar("_SelectRow", bound=tuple[object, ...])
 
 
 class CommandRepository:
@@ -25,10 +28,10 @@ class CommandRepository:
 
     def _apply_filters(
         self,
-        query: Select[Any],
+        query: Select[_SelectRow],
         tags: list[str] | None = None,
         search: str | None = None,
-    ) -> Select[Any]:
+    ) -> Select[_SelectRow]:
         if tags:
             for tag in tags:
                 query = query.where(CommandModel.tags.op("@>")([tag]))
@@ -75,13 +78,13 @@ class CommandRepository:
         )
         return sorted(row[0] for row in result.all() if row[0])
 
-    async def create(self, data: dict[str, Any]) -> CommandModel:
+    async def create(self, data: Mapping[str, object]) -> CommandModel:
         command = CommandModel(**data)
         self._session.add(command)
         await self._session.flush()
         return command
 
-    async def update(self, id: UUID, data: dict[str, Any]) -> CommandModel | None:
+    async def update(self, id: UUID, data: Mapping[str, object]) -> CommandModel | None:
         command = await self.get_by_id(id)
         if command is None:
             return None

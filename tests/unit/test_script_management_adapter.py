@@ -128,6 +128,7 @@ async def test_create_script_normalizes_steps_and_tags() -> None:
         repository.create = AsyncMock(return_value=script)
         await SqlAlchemyScriptGateway(factory).create_script(data)
 
+    assert repository.create.await_args is not None
     persisted = repository.create.await_args.args[0]
     assert persisted["steps"][0]["command_id"] == str(data.steps[0].command_id)
     assert persisted["steps"][0]["params"] == {"environment": "prod"}
@@ -150,6 +151,7 @@ async def test_update_script_normalizes_immutable_values() -> None:
         repository.update = AsyncMock(return_value=script)
         await SqlAlchemyScriptGateway(factory).update_script(script_id, data)
 
+    assert repository.update.await_args is not None
     persisted = repository.update.await_args.args[1]
     assert persisted["steps"][0]["label"] == "run"
     assert persisted["tags"] == ["ops"]

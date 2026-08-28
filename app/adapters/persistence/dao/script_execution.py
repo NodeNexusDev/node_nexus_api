@@ -1,6 +1,6 @@
 """Internal SQLAlchemy DAO for script executions."""
 
-from typing import Any
+from collections.abc import Mapping
 from uuid import UUID
 
 from sqlalchemy import func, select
@@ -49,14 +49,14 @@ class ScriptExecutionRepository:
         result = await self._session.execute(query)
         return result.scalar_one()
 
-    async def create(self, data: dict[str, Any]) -> ScriptExecutionModel:
+    async def create(self, data: Mapping[str, object]) -> ScriptExecutionModel:
         execution = ScriptExecutionModel(**data)
         self._session.add(execution)
         await self._session.flush()
         return execution
 
     async def update(
-        self, id: UUID, data: dict[str, Any]
+        self, id: UUID, data: Mapping[str, object]
     ) -> ScriptExecutionModel | None:
         execution = await self.get_by_id(id)
         if execution is None:

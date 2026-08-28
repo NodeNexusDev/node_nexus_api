@@ -30,6 +30,7 @@ async def list_favorites(
     size: int = Query(20, ge=1, le=100),
     _key: Principal = Security(get_current_principal),
 ) -> PaginatedResponse[FavoriteResponse]:
+    """List the authenticated user's favorites with pagination."""
     audit.info("api.favorites.list", target_type=target_type)
     items, total = await service.list_favorites(
         target_type=target_type,
@@ -61,6 +62,7 @@ async def add_favorite(
     service: FromDishka[FavoriteService],
     _key: Principal = Security(require_write_or_jwt_scope),
 ) -> FavoriteResponse:
+    """Add a node, command, or script to the authenticated user's favorites."""
     audit.info("api.favorites.add", target=data.target_type + ":" + data.target_id)
     result = await service.add_favorite(
         FavoriteCreateDTO(
@@ -88,5 +90,6 @@ async def remove_favorite(
     service: FromDishka[FavoriteService],
     _key: Principal = Security(require_write_or_jwt_scope),
 ) -> None:
+    """Remove a favorite by target type and target identifier."""
     audit.info("api.favorites.remove", target=target_type + ":" + target_id)
     await service.remove_favorite(target_type, target_id)
