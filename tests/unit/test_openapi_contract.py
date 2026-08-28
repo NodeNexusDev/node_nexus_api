@@ -128,9 +128,7 @@ def test_protected_operations_document_standard_auth_errors() -> None:
                 response_schema = responses[status_code]["content"]["application/json"][
                     "schema"
                 ]
-                assert response_schema == {
-                    "$ref": "#/components/schemas/ErrorResponse"
-                }
+                assert response_schema == {"$ref": "#/components/schemas/ErrorResponse"}
 
 
 def test_public_response_schemas_never_expose_credentials() -> None:
