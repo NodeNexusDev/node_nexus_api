@@ -198,7 +198,7 @@ class TestSSHConnector:
         )
         connect_path = "app.adapters.runtime.ssh.asyncssh.connect"
         with patch(connect_path, new_callable=AsyncMock) as mock_connect:
-            mock_connect.side_effect = asyncssh.Error("Connection refused", "")
+            mock_connect.side_effect = asyncssh.Error(1, "Connection refused")
             with pytest.raises(ConnectionFailedError):
                 await connector.connect()
 
@@ -207,20 +207,20 @@ class TestSSHConnector:
 
         connector = SSHConnector(host="127.0.0.1")
         mock_conn = MagicMock()
-        mock_conn.create_process.side_effect = asyncssh.Error("Channel closed", "")
+        mock_conn.create_process.side_effect = asyncssh.Error(1, "Channel closed")
         connector._connection = mock_conn
 
         with pytest.raises(ConnectionFailedError):
             await connector.execute_command("echo hi")
 
-    async def test_execute_command_exit_status_none(self) -> None:
+    async def test_execute_command_missing_exit_status_fails_closed(self) -> None:
         connector = SSHConnector(host="127.0.0.1")
         mock_conn = MagicMock()
         mock_conn.create_process.return_value = _command_context(("output",), (), None)
         connector._connection = mock_conn
 
         stdout, stderr, exit_code = await connector.execute_command("echo hi")
-        assert exit_code == 0
+        assert exit_code == 255
 
     async def test_execute_command_bounds_each_output_stream(self) -> None:
         connector = SSHConnector(host="127.0.0.1")
@@ -264,7 +264,7 @@ class TestSSHConnector:
 
         connector = SSHConnector(host="127.0.0.1")
         context = AsyncMock()
-        context.__aenter__.side_effect = asyncssh.Error("closed", "")
+        context.__aenter__.side_effect = asyncssh.Error(1, "closed")
         connection = MagicMock()
         connection.create_process.return_value = context
         connector._connection = connection

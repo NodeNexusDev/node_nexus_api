@@ -100,5 +100,5 @@ class TestWebSocketStreaming:
         from app.api.v1.websocket import router
 
         assert router is not None
-        routes = [r.path for r in router.routes]
+        routes = [getattr(route, "path", None) for route in router.routes]
         assert "/nodes/{node_id}/exec-stream" in routes

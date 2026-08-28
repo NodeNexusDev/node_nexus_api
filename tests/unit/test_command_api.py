@@ -26,6 +26,7 @@ from app.core.exceptions import (
     TemplateRenderError,
 )
 from app.schemas.command import CommandResult
+from tests.typing import as_typed_mock
 from tests.unit.conftest import MockAuthServiceProvider, _mock_settings
 
 
@@ -53,11 +54,11 @@ def _create_test_app(service: AsyncMock) -> FastAPI:
     class MockServiceProvider(Provider):
         @provide(scope=Scope.REQUEST)
         def get_management_service(self) -> CommandManagementService:
-            return service
+            return as_typed_mock(CommandManagementService, service)
 
         @provide(scope=Scope.REQUEST)
         def get_execution_service(self) -> CommandExecutionService:
-            return service
+            return as_typed_mock(CommandExecutionService, service)
 
     container = make_async_container(MockServiceProvider(), MockAuthServiceProvider())
     setup_dishka(container, app)

@@ -51,6 +51,7 @@ from app.application.services.script_management_service import ScriptManagementS
 from app.core.exceptions import DomainError
 from app.models.audit_log import AuditLogModel
 from app.models.base import Base
+from tests.typing import as_typed_mock
 
 MASTER_KEY = "test-master-key"
 
@@ -88,7 +89,7 @@ class IntegrationDbProvider(Provider):
 
     @provide(scope=Scope.APP)
     def get_jwt_handler(self) -> JWTHandler:
-        return MagicMock(spec=JWTHandler)
+        return as_typed_mock(JWTHandler, MagicMock(spec=JWTHandler))
 
     @provide(scope=Scope.APP)
     def get_node_management_gateway(self) -> SqlAlchemyNodeManagementGateway:

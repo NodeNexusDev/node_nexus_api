@@ -4,6 +4,7 @@ Covers: telemetry, config service, scheduler advanced,
 SSH streaming, middleware edge cases.
 """
 
+from collections import deque
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -86,6 +87,7 @@ class TestTelemetryEnabled:
             "opentelemetry.instrumentation.sqlalchemy": mock_sqlalchemy_mod,
             "opentelemetry.resources": mock_resources_mod,
             "opentelemetry.sdk": MagicMock(),
+            "opentelemetry.sdk.resources": mock_resources_mod,
             "opentelemetry.sdk.trace": mock_sdk_trace,
             "opentelemetry.sdk.trace.export": mock_sdk_export,
         }
@@ -233,7 +235,7 @@ class TestSSHStreaming:
         connector = SSHConnector(host="10.0.0.1")
         mock_conn = MagicMock()
 
-        mock_conn.create_process.side_effect = asyncssh.Error("host", "reason")
+        mock_conn.create_process.side_effect = asyncssh.Error(1, "reason")
 
         connector._connection = mock_conn
 
@@ -273,7 +275,9 @@ class TestMiddlewareEdgeCases:
         from app.api.middleware import RateLimitMiddleware
 
         middleware = RateLimitMiddleware(MagicMock(), requests=5, window=1)
-        middleware._ip_counts["1.2.3.4"] = [100.0, 100.5, 101.0]
+        middleware._ip_counts.setdefault("1.2.3.4", deque()).extend(
+            [100.0, 100.5, 101.0]
+        )
 
         middleware._cleanup_old_entries("1.2.3.4", 200.0)
         assert len(middleware._ip_counts["1.2.3.4"]) == 0
@@ -284,7 +288,9 @@ class TestMiddlewareEdgeCases:
 
         middleware = RateLimitMiddleware(MagicMock(), requests=5, window=60)
         now = 1000.0
-        middleware._ip_counts["1.2.3.4"] = [now - 10, now - 5, now]
+        middleware._ip_counts.setdefault("1.2.3.4", deque()).extend(
+            [now - 10, now - 5, now]
+        )
 
         middleware._cleanup_old_entries("1.2.3.4", now)
         assert len(middleware._ip_counts["1.2.3.4"]) == 3
@@ -294,7 +300,7 @@ class TestMiddlewareEdgeCases:
         from app.api.middleware import RateLimitMiddleware
 
         middleware = RateLimitMiddleware(MagicMock(), requests=5, window=60)
-        middleware._ip_counts["1.2.3.4"] = [1.0, 2.0]
+        middleware._ip_counts.setdefault("1.2.3.4", deque()).extend([1.0, 2.0])
         middleware.clear()
         assert len(middleware._ip_counts) == 0
 

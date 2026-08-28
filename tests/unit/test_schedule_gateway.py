@@ -7,6 +7,7 @@ from uuid import uuid4
 from app.adapters.persistence.schedule import SqlAlchemyScheduleGateway
 from app.application.dto.schedule import ScheduleRequestDTO
 from app.models.script_schedule import ScriptScheduleModel
+from tests.typing import as_typed
 
 
 class _TransactionContext:
@@ -82,7 +83,7 @@ def test_maps_orm_model_to_immutable_application_view() -> None:
 async def test_operational_update_owns_a_short_transaction() -> None:
     session = AsyncMock()
     sessionmaker = _Sessionmaker(session)
-    gateway = SqlAlchemyScheduleGateway(sessionmaker)  # type: ignore[arg-type]
+    gateway = SqlAlchemyScheduleGateway(as_typed(sessionmaker))
     script_id = uuid4()
     occurred_at = datetime.now(UTC)
 
@@ -98,7 +99,7 @@ async def test_get_and_list_schedules_map_query_results() -> None:
         _result(scalar=model),
         _result(scalars=[model]),
     ]
-    gateway = SqlAlchemyScheduleGateway(_Sessionmaker(session))  # type: ignore[arg-type]
+    gateway = SqlAlchemyScheduleGateway(as_typed(_Sessionmaker(session)))
 
     found = await gateway.get_schedule(model.script_id)
     enabled = await gateway.list_enabled_schedules()
@@ -111,7 +112,7 @@ async def test_get_and_list_schedules_map_query_results() -> None:
 async def test_get_schedule_returns_none() -> None:
     session = AsyncMock()
     session.execute.return_value = _result()
-    gateway = SqlAlchemyScheduleGateway(_Sessionmaker(session))  # type: ignore[arg-type]
+    gateway = SqlAlchemyScheduleGateway(as_typed(_Sessionmaker(session)))
 
     assert await gateway.get_schedule(uuid4()) is None
 
@@ -128,7 +129,7 @@ async def test_upsert_creates_and_updates_schedule() -> None:
     session = AsyncMock()
     session.add = MagicMock()
     session.execute.side_effect = [_result(), _result(scalar=_schedule())]
-    gateway = SqlAlchemyScheduleGateway(_Sessionmaker(session))  # type: ignore[arg-type]
+    gateway = SqlAlchemyScheduleGateway(as_typed(_Sessionmaker(session)))
 
     created = await gateway.upsert_schedule(uuid4(), data)
     updated = await gateway.upsert_schedule(uuid4(), data)
@@ -144,7 +145,7 @@ async def test_delete_schedule_handles_missing_and_existing() -> None:
     model = _schedule()
     session = AsyncMock()
     session.execute.side_effect = [_result(), _result(scalar=model)]
-    gateway = SqlAlchemyScheduleGateway(_Sessionmaker(session))  # type: ignore[arg-type]
+    gateway = SqlAlchemyScheduleGateway(as_typed(_Sessionmaker(session)))
 
     assert await gateway.delete_schedule(uuid4()) is False
     assert await gateway.delete_schedule(model.script_id) is True
@@ -154,7 +155,7 @@ async def test_delete_schedule_handles_missing_and_existing() -> None:
 
 async def test_schedule_state_helpers_delegate_updates() -> None:
     session = AsyncMock()
-    gateway = SqlAlchemyScheduleGateway(_Sessionmaker(session))  # type: ignore[arg-type]
+    gateway = SqlAlchemyScheduleGateway(as_typed(_Sessionmaker(session)))
     script_id = uuid4()
     occurred_at = datetime.now(UTC)
 

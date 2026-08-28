@@ -13,6 +13,7 @@ from app.api.middleware import TimeoutMiddleware
 from app.api.v1.health import router as health_router
 from app.api.v1.nodes import router as nodes_router
 from app.application.services.node_management_service import NodeManagementService
+from tests.typing import as_typed_mock
 from tests.unit.conftest import MockAuthServiceProvider, _mock_settings
 
 
@@ -26,7 +27,7 @@ def _create_test_app(node_service: NodeManagementService | AsyncMock) -> FastAPI
     class MockNodeManagementServiceProvider(Provider):
         @provide(scope=Scope.REQUEST)
         def get_service(self) -> NodeManagementService:
-            return node_service
+            return as_typed_mock(NodeManagementService, node_service)
 
     container = make_async_container(
         MockNodeManagementServiceProvider(), MockAuthServiceProvider()
@@ -78,7 +79,7 @@ async def test_ready_endpoint_no_timeout(client: AsyncClient) -> None:
     class MockHealthServiceProvider(Provider):
         @provide(scope=Scope.REQUEST)
         def get_service(self) -> HealthService:
-            return mock_health
+            return as_typed_mock(HealthService, mock_health)
 
     container = make_async_container(MockHealthServiceProvider())
     setup_dishka(container, app)
@@ -115,7 +116,7 @@ async def test_timeout_middleware_excludes_ready(
     class MockHealthServiceProvider(Provider):
         @provide(scope=Scope.REQUEST)
         def get_service(self) -> HealthService:
-            return mock_health
+            return as_typed_mock(HealthService, mock_health)
 
     container = make_async_container(MockHealthServiceProvider())
     setup_dishka(container, app)

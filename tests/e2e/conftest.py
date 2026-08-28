@@ -15,6 +15,7 @@ from tests.e2e.helpers.service_controller import DockerServiceController
 from tests.e2e.helpers.websocket import WebSocketClientFactory
 from tests.e2e.settings import MASTER_API_KEY
 from tests.helpers import is_port_open
+from tests.typing import as_typed_mock
 
 _MASTER_API_KEY = MASTER_API_KEY
 
@@ -236,12 +237,15 @@ async def postgres_connection(
     service_ports: ServicePorts,
 ) -> AsyncGenerator[asyncpg.Connection]:
     """Yield a direct PostgreSQL connection for durable-state assertions."""
-    connection = await asyncpg.connect(
-        host=service_ports.db_host,
-        port=service_ports.db_port,
-        user="postgres",
-        password="postgres",
-        database="node_nexus_e2e",
+    connection = as_typed_mock(
+        asyncpg.Connection,
+        await asyncpg.connect(
+            host=service_ports.db_host,
+            port=service_ports.db_port,
+            user="postgres",
+            password="postgres",
+            database="node_nexus_e2e",
+        ),
     )
     try:
         yield connection
@@ -314,7 +318,7 @@ def e2e_resources(e2e_client: httpx.Client) -> Generator[UniqueResourceFactory]:
 
 
 @pytest.hookimpl(hookwrapper=True)
-def pytest_runtest_makereport(item: pytest.Item, call: pytest.CallInfo):
+def pytest_runtest_makereport(item: pytest.Item, call: pytest.CallInfo[object]):
     """Attach full-stack service logs to failed E2E test reports."""
     outcome = yield
     report = outcome.get_result()

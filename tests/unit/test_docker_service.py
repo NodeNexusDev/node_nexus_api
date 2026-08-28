@@ -97,7 +97,23 @@ class TestBuildDockerCmd:
             connection_type="docker",
             docker_host="tcp://192.168.1.100:2376",
         )
-        cmd = service._build_docker_cmd(node, "ps")
+        from app.application.dto.node_connection import NodeConnectionDTO
+
+        cmd = service._build_docker_cmd(
+            NodeConnectionDTO(
+                id=node.id,
+                name=node.name,
+                host=node.host,
+                port=node.port,
+                connection_type=node.connection_type,
+                username=node.username,
+                password=node.password,
+                ssh_key=node.ssh_key,
+                passphrase=node.passphrase,
+                docker_host=node.docker_host,
+            ),
+            "ps",
+        )
         assert "DOCKER_HOST=" in cmd
         assert "tcp://192.168.1.100:2376" in cmd
 

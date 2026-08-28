@@ -65,7 +65,7 @@ def test_node_create_dto_is_immutable_and_hides_secrets() -> None:
     assert "private-key" not in repr(dto)
     assert "key-passphrase" not in repr(dto)
     with pytest.raises(AttributeError):
-        dto.name = "changed"  # type: ignore[misc]
+        setattr(dto, "name", "changed")
 
 
 def test_node_update_dto_preserves_explicit_null() -> None:
@@ -87,7 +87,7 @@ def test_command_boundary_dtos_are_immutable() -> None:
     assert request.command == "uptime"
     assert result.exit_code == 0
     with pytest.raises(AttributeError):
-        request.command = "whoami"  # type: ignore[misc]
+        setattr(request, "command", "whoami")
 
 
 def test_command_management_dtos_are_immutable_and_preserve_null() -> None:
@@ -97,7 +97,7 @@ def test_command_management_dtos_are_immutable_and_preserve_null() -> None:
     assert create.tags == ("ops",)
     assert dict(update.changes) == {"description": None}
     with pytest.raises(AttributeError):
-        create.name = "changed"  # type: ignore[misc]
+        setattr(create, "name", "changed")
 
 
 def test_bulk_command_dtos_use_immutable_collections() -> None:
@@ -139,7 +139,7 @@ def test_node_metrics_dto_is_immutable() -> None:
     assert metrics.cpu.cores == 4
     assert metrics.load_average.one_min == 0.5
     with pytest.raises(AttributeError):
-        metrics.uptime_since = "changed"  # type: ignore[misc]
+        setattr(metrics, "uptime_since", "changed")
 
 
 def test_node_view_dto_excludes_credentials() -> None:

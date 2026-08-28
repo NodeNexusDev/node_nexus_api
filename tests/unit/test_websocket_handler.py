@@ -14,7 +14,7 @@ from app.api.v1.websocket import _send_command_events, _validate_ws_token, exec_
 from app.application.dto.remote_stream import RemoteStreamEventDTO
 from app.core.exceptions import ConnectionFailedError, NodeNotFoundError
 
-_exec = exec_stream.__dishka_orig_func__  # type: ignore[attr-defined]
+_exec = getattr(exec_stream, "__dishka_orig_func__")
 
 
 def _make_ws(token: str | None = "test-key") -> AsyncMock:

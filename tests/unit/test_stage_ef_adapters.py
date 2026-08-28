@@ -30,6 +30,7 @@ from app.adapters.persistence.note import SqlAlchemyNoteGateway
 from app.application.dto.execution_stats import (
     CommandStatsQueryDTO,
     ExecutionStatsDTO,
+    ExecutionStatsRow,
     ScriptStatsQueryDTO,
 )
 from app.application.dto.export import AuditExportQueryDTO, AuditExportRowDTO
@@ -306,7 +307,7 @@ class TestNoteGateway:
 class TestExecutionStatsGateway:
     @pytest.mark.asyncio
     async def test_to_stats_dto_with_data(self) -> None:
-        row = {
+        row: ExecutionStatsRow = {
             "total": 10,
             "successful": 8,
             "failed": 2,
@@ -324,7 +325,7 @@ class TestExecutionStatsGateway:
 
     @pytest.mark.asyncio
     async def test_to_stats_dto_empty(self) -> None:
-        row = {
+        row: ExecutionStatsRow = {
             "total": 0,
             "successful": 0,
             "failed": 0,
@@ -664,6 +665,7 @@ class TestNodeStatusHistoryDAO:
         mock_result.scalars.return_value.all.return_value = [model]
         session.execute.return_value = mock_result
 
+        assert model.node_id is not None
         result = await repo.list_by_node(model.node_id)
         assert len(result) == 1
 
@@ -728,6 +730,7 @@ class TestNodeStatusHistoryGateway:
         list_result.scalars.return_value.all.return_value = [model]
         session.execute.side_effect = [list_result, count_result]
 
+        assert model.node_id is not None
         query = NodeStatusHistoryQueryDTO(node_id=model.node_id, offset=0, limit=10)
         result = await gw.list_by_node(query)
         assert isinstance(result, NodeStatusHistoryPageDTO)

@@ -17,7 +17,14 @@ def _row(**changes: object) -> AuditExportRowDTO:
         "created_at": "2026-01-15T10:30:00Z",
         **changes,
     }
-    return AuditExportRowDTO(**values)  # type: ignore[arg-type]
+    return AuditExportRowDTO(
+        id=values["id"],
+        action=values["action"],
+        node_id=values["node_id"],
+        user=values["user"],
+        details=values["details"],
+        created_at=values["created_at"],
+    )
 
 
 class TestRowsToCsv:

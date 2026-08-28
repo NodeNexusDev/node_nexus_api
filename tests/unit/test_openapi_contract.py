@@ -8,10 +8,12 @@ from pathlib import Path
 from fastapi import FastAPI
 from httpx2 import ASGITransport, AsyncClient
 
+from app.core.config import get_settings
 from app.main import app
+from tests.types import UnvalidatedJsonObject
 
 OPENAPI_CONTRACT_SHA256 = (
-    "024fd1a4cdcf60e5f555015c4ce30164fc56ec415d57d31d3c204e2a4e7eb17d"
+    "b209ab45075bbb4d0fe12b81bc76973004a29b266302f1367d04c203d0625c47"
 )
 
 _CANONICAL_ENV = {
@@ -23,7 +25,6 @@ _CANONICAL_ENV = {
 
 def _build_canonical_app() -> FastAPI:
     """Build the app with pinned settings so the schema never depends on local .env."""
-    from app.core.config import get_settings
     from app.main import create_app
 
     get_settings.cache_clear()
@@ -40,7 +41,7 @@ def _build_canonical_app() -> FastAPI:
         get_settings.cache_clear()
 
 
-def _canonical_schema() -> dict:
+def _canonical_schema() -> UnvalidatedJsonObject:
     schema = _build_canonical_app().openapi()
     schema["info"].pop("version", None)
     return schema
@@ -97,6 +98,18 @@ def test_openapi_exposes_api_key_security_scheme() -> None:
 
     scheme = schema["components"]["securitySchemes"]["APIKeyHeader"]
     assert scheme == {"type": "apiKey", "in": "header", "name": "X-API-Key"}
+
+
+def test_openapi_auth_and_sse_contracts_are_explicit() -> None:
+    """Keep auth alternatives and the streaming media type visible in OpenAPI."""
+    schema = app.openapi()
+
+    events_get = schema["paths"]["/api/v1/events/stream"]["get"]
+    assert events_get["security"] == [{"HTTPBearer": []}, {"APIKeyHeader": []}]
+    assert set(events_get["responses"]["200"]["content"]) == {"text/event-stream"}
+
+    auth_me_get = schema["paths"]["/api/v1/auth/me"]["get"]
+    assert auth_me_get["security"] == [{"HTTPBearer": []}]
 
 
 async def test_runtime_api_documentation_endpoints() -> None:

@@ -40,7 +40,7 @@ class TestHealthRepositoryPing:
 
         mock_session = AsyncMock()
         mock_session.execute.side_effect = OperationalError(
-            "connection refused", {}, None
+            "connection refused", {}, OSError("connection refused")
         )
 
         repo = HealthRepository(session=mock_session)

@@ -24,7 +24,7 @@ def test_container_view_is_immutable() -> None:
         status="Up",
     )
     with pytest.raises(AttributeError):
-        container.state = "stopped"  # type: ignore[misc]
+        setattr(container, "state", "stopped")
 
 
 def test_exec_request_keeps_typed_node_identifier() -> None:
@@ -41,7 +41,7 @@ def test_exec_request_keeps_typed_node_identifier() -> None:
 def test_bulk_contracts_use_immutable_collections() -> None:
     node_id = uuid.uuid4()
     request = BulkDockerRequestDTO(
-        node_ids=(str(node_id),),
+        node_ids=(node_id,),
         container_id="web",
         action="restart",
     )
@@ -58,5 +58,5 @@ def test_bulk_contracts_use_immutable_collections() -> None:
         succeeded=1,
         failed=0,
     )
-    assert request.node_ids == (str(node_id),)
+    assert request.node_ids == (node_id,)
     assert result.results[0].node_id == str(node_id)

@@ -68,7 +68,7 @@ def test_status_change_dto_is_frozen() -> None:
         source="connectivity_check",
     )
     with pytest.raises(AttributeError):
-        dto.new_status = "active"  # type: ignore[misc]
+        setattr(dto, "new_status", "active")
 
 
 def test_status_history_record_dto_fields() -> None:
@@ -142,13 +142,13 @@ def bulk_service(bulk_operator: AsyncMock) -> NodeBulkOperationService:
 def test_bulk_delete_dto_is_frozen() -> None:
     dto = BulkNodeDeleteDTO(node_ids=(uuid.uuid4(),))
     with pytest.raises(AttributeError):
-        dto.node_ids = ()  # type: ignore[misc]
+        setattr(dto, "node_ids", ())
 
 
 def test_bulk_tag_operation_dto_is_frozen() -> None:
     dto = BulkNodeTagOperationDTO(node_ids=(uuid.uuid4(),), tags=("web",))
     with pytest.raises(AttributeError):
-        dto.tags = ()  # type: ignore[misc]
+        setattr(dto, "tags", ())
 
 
 def test_bulk_operation_result_dto() -> None:
@@ -225,19 +225,19 @@ def lifecycle_service(
 def test_retry_command_dto_is_frozen() -> None:
     dto = RetryCommandDTO(execution_id=uuid.uuid4())
     with pytest.raises(AttributeError):
-        dto.execution_id = uuid.uuid4()  # type: ignore[misc]
+        setattr(dto, "execution_id", uuid.uuid4())
 
 
 def test_retry_script_dto_is_frozen() -> None:
     dto = RetryScriptDTO(execution_id=uuid.uuid4())
     with pytest.raises(AttributeError):
-        dto.execution_id = uuid.uuid4()  # type: ignore[misc]
+        setattr(dto, "execution_id", uuid.uuid4())
 
 
 def test_cancel_execution_dto_is_frozen() -> None:
     dto = CancelExecutionDTO(execution_id=uuid.uuid4())
     with pytest.raises(AttributeError):
-        dto.execution_id = uuid.uuid4()  # type: ignore[misc]
+        setattr(dto, "execution_id", uuid.uuid4())
 
 
 @pytest.mark.asyncio()
