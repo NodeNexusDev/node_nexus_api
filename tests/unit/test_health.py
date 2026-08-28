@@ -11,6 +11,7 @@ from httpx2 import ASGITransport, AsyncClient
 
 from app.api.v1.health import router as health_router
 from app.application.services.health_service import HealthService
+from tests.typing import as_typed_mock
 from tests.unit.conftest import MockAuthServiceProvider, _mock_settings
 
 
@@ -22,7 +23,7 @@ def _create_test_app(health_service: HealthService | AsyncMock) -> FastAPI:
     class MockHealthServiceProvider(Provider):
         @provide(scope=Scope.REQUEST)
         def get_service(self) -> HealthService:
-            return health_service
+            return as_typed_mock(HealthService, health_service)
 
     container = make_async_container(
         MockHealthServiceProvider(), MockAuthServiceProvider()

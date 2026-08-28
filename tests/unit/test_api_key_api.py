@@ -24,6 +24,7 @@ from app.application.services.api_key_authentication import (
 )
 from app.application.services.api_key_management import APIKeyManagementService
 from app.core.exceptions import APIKeyNotFoundError, DomainError
+from tests.typing import as_typed_mock
 
 
 def _make_api_key_response(**overrides: Any) -> APIKeyViewDTO:
@@ -61,15 +62,18 @@ def _create_test_app(service: APIKeyManagementService | AsyncMock) -> FastAPI:
     class MockServiceProvider(Provider):
         @provide(scope=Scope.REQUEST)
         def get_service(self) -> APIKeyManagementService:
-            return service
+            return as_typed_mock(APIKeyManagementService, service)
 
         @provide(scope=Scope.REQUEST)
         def get_auth_service(self) -> APIKeyAuthenticationService:
-            return AsyncMock(spec=APIKeyAuthenticationService)
+            return as_typed_mock(
+                APIKeyAuthenticationService,
+                AsyncMock(spec=APIKeyAuthenticationService),
+            )
 
         @provide(scope=Scope.APP)
         def get_jwt_handler(self) -> JWTHandler:
-            return MagicMock(spec=JWTHandler)
+            return as_typed_mock(JWTHandler, MagicMock(spec=JWTHandler))
 
     container = make_async_container(MockServiceProvider())
     setup_dishka(container, app)

@@ -28,6 +28,7 @@ from app.schemas.node import (
     BulkNodeResult,
     NodeResponse,
 )
+from tests.typing import as_typed_mock
 from tests.unit.conftest import MockAuthServiceProvider, _mock_settings
 
 
@@ -60,19 +61,19 @@ def _create_test_app(service: NodeManagementService | AsyncMock) -> FastAPI:
     class MockServiceProvider(Provider):
         @provide(scope=Scope.REQUEST)
         def get_service(self) -> NodeManagementService:
-            return service
+            return as_typed_mock(NodeManagementService, service)
 
         @provide(scope=Scope.REQUEST)
         def get_command_service(self) -> NodeCommandService:
-            return service
+            return as_typed_mock(NodeCommandService, service)
 
         @provide(scope=Scope.REQUEST)
         def get_bulk_command_service(self) -> NodeBulkCommandService:
-            return service
+            return as_typed_mock(NodeBulkCommandService, service)
 
         @provide(scope=Scope.REQUEST)
         def get_metrics_service(self) -> NodeMetricsService:
-            return service
+            return as_typed_mock(NodeMetricsService, service)
 
     container = make_async_container(MockServiceProvider(), MockAuthServiceProvider())
     setup_dishka(container, app)

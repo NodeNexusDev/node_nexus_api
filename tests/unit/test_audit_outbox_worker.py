@@ -2,7 +2,6 @@
 
 import asyncio
 from datetime import UTC, datetime, timedelta
-from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
@@ -10,7 +9,9 @@ import pytest
 
 from app.adapters.persistence.audit_outbox_worker import AuditOutboxWorker
 from app.models.audit_log import AuditLogModel
+from app.models.audit_outbox import AuditOutboxModel
 from app.models.node import NodeModel
+from tests.typing import as_typed
 
 
 async def test_worker_lifecycle_and_background_error(
@@ -48,8 +49,8 @@ def _session() -> MagicMock:
     return session
 
 
-def _event(*, attempts: int = 0) -> SimpleNamespace:
-    return SimpleNamespace(
+def _event(*, attempts: int = 0) -> AuditOutboxModel:
+    return AuditOutboxModel(
         id=uuid4(),
         payload={
             "node_id": None,
@@ -145,7 +146,7 @@ async def test_run_once_delivers_due_batch_and_updates_metrics(
     result = MagicMock()
     result.scalars.return_value = events
     session.execute = AsyncMock(return_value=result)
-    worker = AuditOutboxWorker(_Sessionmaker(session))  # type: ignore[arg-type]
+    worker = AuditOutboxWorker(as_typed(_Sessionmaker(session)))
     deliver = AsyncMock(side_effect=[True, False])
     update_metrics = AsyncMock()
     monkeypatch.setattr(worker, "_deliver", deliver)

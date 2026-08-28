@@ -5,6 +5,7 @@ failure recovery against dedicated and default Docker Compose stacks.
 """
 
 import time
+from collections.abc import Iterator
 
 import httpx2 as httpx
 import pytest
@@ -29,7 +30,7 @@ _MASTER_API_KEY = MASTER_API_KEY
 
 
 @pytest.fixture(scope="module")
-def rate_limit_stack() -> MiddlewareStackPorts:
+def rate_limit_stack() -> Iterator[MiddlewareStackPorts]:
     """Start a Docker stack with a very low rate limit (5 req / 10s window)."""
     mgr = MiddlewareStackManager(
         compose_file=__import__("pathlib")
@@ -59,7 +60,7 @@ def rate_limit_client(rate_limit_stack: MiddlewareStackPorts) -> httpx.Client:
 
 
 @pytest.fixture(scope="module")
-def timeout_stack() -> MiddlewareStackPorts:
+def timeout_stack() -> Iterator[MiddlewareStackPorts]:
     """Start a Docker stack with a short request timeout (2 seconds)."""
     mgr = MiddlewareStackManager(
         compose_file=__import__("pathlib")

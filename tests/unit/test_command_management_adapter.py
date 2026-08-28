@@ -113,6 +113,7 @@ async def test_create_command_normalizes_immutable_values() -> None:
 
     assert result.id == command.id
     factory.begin.assert_called_once_with()
+    assert repository.create.await_args is not None
     persisted = repository.create.await_args.args[0]
     assert persisted["parameters"][0]["name"] == "path"
     assert persisted["tags"] == ["ops"]
@@ -135,6 +136,7 @@ async def test_update_command_normalizes_immutable_values() -> None:
         repository.update = AsyncMock(return_value=command)
         await SqlAlchemyCommandGateway(factory).update_command(command_id, data)
 
+    assert repository.update.await_args is not None
     persisted = repository.update.await_args.args[1]
     assert persisted["parameters"][0]["name"] == "path"
     assert persisted["tags"] == ["ops"]

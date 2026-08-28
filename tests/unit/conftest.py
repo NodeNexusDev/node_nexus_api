@@ -1,16 +1,20 @@
 """Shared test fixtures for unit tests."""
 
 import uuid
-from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 from dishka import Provider, Scope, provide
 
+from app.application.dto.node_view import NodeViewDTO
 from app.application.ports.jwt_handler import JWTHandler
 from app.application.services.api_key_authentication import (
     APIKeyAuthenticationService,
     AuthenticatedPrincipal,
 )
+from app.models.command import CommandModel
+from app.models.node import NodeModel
+from app.schemas.node import NodeResponse
+from tests.typing import as_typed_mock
 
 
 def _mock_settings(master_key: str = "") -> MagicMock:
@@ -30,21 +34,19 @@ class MockAuthServiceProvider(Provider):
             key_prefix="nnk_test",
             scope="read-write",
         )
-        return mock
+        return as_typed_mock(APIKeyAuthenticationService, mock)
 
     @provide(scope=Scope.APP)
     def get_jwt_handler(self) -> JWTHandler:
-        return MagicMock(spec=JWTHandler)
+        return as_typed_mock(JWTHandler, MagicMock(spec=JWTHandler))
 
 
-def make_orm_node(**overrides: Any) -> Any:
+def make_orm_node(**overrides: object) -> NodeModel:
     """Create a NodeModel with defaults for testing."""
     import uuid
     from datetime import UTC, datetime
 
-    from app.models.node import NodeModel
-
-    defaults: dict[str, Any] = {
+    defaults: dict[str, object] = {
         "id": uuid.uuid4(),
         "name": "server-1",
         "host": "10.0.0.1",
@@ -64,10 +66,8 @@ def make_orm_node(**overrides: Any) -> Any:
     return NodeModel(**defaults)
 
 
-def make_node_view(**overrides: Any) -> Any:
+def make_node_view(**overrides: object) -> NodeViewDTO:
     """Create a public-safe node DTO with defaults for testing."""
-    from app.application.dto.node_view import NodeViewDTO
-
     node = make_orm_node(**overrides)
     return NodeViewDTO(
         id=node.id,
@@ -84,14 +84,12 @@ def make_node_view(**overrides: Any) -> Any:
     )
 
 
-def make_orm_command(**overrides: Any) -> Any:
+def make_orm_command(**overrides: object) -> CommandModel:
     """Create a CommandModel with defaults for testing."""
     import uuid
     from datetime import UTC, datetime
 
-    from app.models.command import CommandModel
-
-    defaults: dict[str, Any] = {
+    defaults: dict[str, object] = {
         "id": uuid.uuid4(),
         "name": "check_disk",
         "description": "Check disk usage",
@@ -104,14 +102,12 @@ def make_orm_command(**overrides: Any) -> Any:
     return CommandModel(**defaults)
 
 
-def make_response(**overrides: Any) -> Any:
+def make_response(**overrides: object) -> NodeResponse:
     """Create a NodeResponse with defaults for testing."""
     import uuid
     from datetime import UTC, datetime
 
-    from app.schemas.node import NodeResponse
-
-    defaults: dict[str, Any] = {
+    defaults: dict[str, object] = {
         "id": uuid.uuid4(),
         "name": "server-1",
         "host": "10.0.0.1",
@@ -125,4 +121,4 @@ def make_response(**overrides: Any) -> Any:
         "updated_at": datetime.now(UTC),
     }
     defaults.update(overrides)
-    return NodeResponse(**defaults)
+    return NodeResponse.model_validate(defaults)

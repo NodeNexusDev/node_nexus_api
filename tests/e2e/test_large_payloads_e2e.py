@@ -285,11 +285,12 @@ def test_many_nodes_search(e2e_client: httpx.Client) -> None:
 def test_deeply_nested_json_boundary(e2e_client: httpx.Client) -> None:
     """Script with nested structure at reasonable depth works."""
     # 20 levels of nested structure in extra_fields
-    nested: dict = {}
+    nested: dict[str, object] = {}
     current = nested
     for _ in range(20):
-        current["nested"] = {}
-        current = current["nested"]
+        child: dict[str, object] = {}
+        current["nested"] = child
+        current = child
     current["value"] = "deep"
 
     resp = e2e_client.post(

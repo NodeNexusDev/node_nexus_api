@@ -14,9 +14,14 @@ def _settings(**overrides: object) -> Settings:
         "ENVIRONMENT": "production",
         "ENCRYPTION_SALT": "e" * 16,
         "MASTER_API_KEY": "",
+        "DEBUG": False,
+        "E2E_ENABLED": False,
+        "SSH_STRICT_HOST_KEY_CHECKING": True,
+        "CORS_ORIGINS": ["http://localhost:3000"],
+        "INITIAL_SUPERUSER_PASSWORD": "strong-initial-password",
     }
     values.update(overrides)
-    return Settings(**values)  # type: ignore[arg-type]
+    return Settings.model_validate(values)
 
 
 @pytest.mark.parametrize(
@@ -49,6 +54,22 @@ def test_non_production_allows_explicit_test_credentials() -> None:
 def test_rate_limit_client_capacity_must_be_positive() -> None:
     with pytest.raises(ValidationError):
         _settings(ENVIRONMENT="test", RATE_LIMIT_MAX_CLIENTS=0)
+
+
+@pytest.mark.parametrize(
+    ("override", "message"),
+    (
+        ({"DEBUG": True}, "DEBUG"),
+        ({"E2E_ENABLED": True}, "E2E_ENABLED"),
+        ({"SSH_STRICT_HOST_KEY_CHECKING": False}, "SSH_STRICT_HOST_KEY_CHECKING"),
+        ({"CORS_ORIGINS": ["*"]}, "CORS_ORIGINS"),
+    ),
+)
+def test_production_rejects_unsafe_runtime_flags(
+    override: dict[str, object], message: str
+) -> None:
+    with pytest.raises(ValidationError, match=message):
+        _settings(**override)
 
 
 def test_user_creation_requires_strong_password_but_login_remains_compatible() -> None:

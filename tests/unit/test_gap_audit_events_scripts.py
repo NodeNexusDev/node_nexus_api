@@ -24,6 +24,7 @@ from app.application.services.execution_lifecycle_service import (
 from app.application.services.execution_stats_service import ExecutionStatsService
 from app.application.services.script_history_service import ScriptHistoryService
 from app.application.services.sse_broadcaster import SseBroadcaster
+from tests.typing import as_typed_mock
 from tests.unit.conftest import MockAuthServiceProvider
 
 # ---------------------------------------------------------------------------
@@ -458,7 +459,7 @@ def _create_audit_app(service: AsyncMock) -> FastAPI:
     class P(Provider):
         @provide(scope=Scope.REQUEST)
         def get_service(self) -> AuditLogService:
-            return service
+            return as_typed_mock(AuditLogService, service)
 
     container = make_async_container(P(), MockAuthServiceProvider())
     setup_dishka(container, app)
@@ -472,7 +473,7 @@ def _create_export_app(exporter: AsyncMock) -> FastAPI:
     class P(Provider):
         @provide(scope=Scope.REQUEST)
         def get_service(self) -> AuditLogService:
-            return AsyncMock(spec=AuditLogService)
+            return as_typed_mock(AuditLogService, AsyncMock(spec=AuditLogService))
 
         @provide(scope=Scope.REQUEST)
         def get_exporter(self) -> AuditExporter:
@@ -495,15 +496,28 @@ def _create_scripts_app(
     class P(Provider):
         @provide(scope=Scope.REQUEST)
         def get_lifecycle(self) -> ExecutionLifecycleService:
-            return lifecycle or AsyncMock(spec=ExecutionLifecycleService)
+            return as_typed_mock(
+                ExecutionLifecycleService,
+                lifecycle
+                if lifecycle is not None
+                else AsyncMock(spec=ExecutionLifecycleService),
+            )
 
         @provide(scope=Scope.REQUEST)
         def get_stats(self) -> ExecutionStatsService:
-            return stats or AsyncMock(spec=ExecutionStatsService)
+            return as_typed_mock(
+                ExecutionStatsService,
+                stats if stats is not None else AsyncMock(spec=ExecutionStatsService),
+            )
 
         @provide(scope=Scope.REQUEST)
         def get_history(self) -> ScriptHistoryService:
-            return history or AsyncMock(spec=ScriptHistoryService)
+            return as_typed_mock(
+                ScriptHistoryService,
+                history
+                if history is not None
+                else AsyncMock(spec=ScriptHistoryService),
+            )
 
     container = make_async_container(P(), MockAuthServiceProvider())
     setup_dishka(container, app)

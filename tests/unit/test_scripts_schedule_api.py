@@ -20,6 +20,7 @@ from app.application.services.script_execution_service import ScriptExecutionSer
 from app.application.services.script_history_service import ScriptHistoryService
 from app.application.services.script_management_service import ScriptManagementService
 from app.core.exceptions import DomainError, ScheduleNotFoundError, ScriptNotFoundError
+from tests.typing import as_typed_mock
 from tests.unit.conftest import MockAuthServiceProvider, _mock_settings
 
 
@@ -33,15 +34,15 @@ def _create_test_app(
     class MockServiceProvider(Provider):
         @provide(scope=Scope.REQUEST)
         def get_management_service(self) -> ScriptManagementService:
-            return service
+            return as_typed_mock(ScriptManagementService, service)
 
         @provide(scope=Scope.REQUEST)
         def get_history_service(self) -> ScriptHistoryService:
-            return service
+            return as_typed_mock(ScriptHistoryService, service)
 
         @provide(scope=Scope.REQUEST)
         def get_execution_service(self) -> ScriptExecutionService:
-            return service
+            return as_typed_mock(ScriptExecutionService, service)
 
         @provide(scope=Scope.REQUEST)
         def get_schedule_service(self) -> ScheduleManagementService:

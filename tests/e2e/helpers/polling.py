@@ -5,6 +5,8 @@ from collections.abc import Callable
 
 import httpx2 as httpx
 
+from tests.types import UnvalidatedJsonObject
+
 
 def wait_for_condition(
     condition: Callable[[], bool],
@@ -49,7 +51,7 @@ def wait_for_container_status(
         if resp.status_code != 200:
             return False
         state = resp.json().get("State", {})
-        return state.get("status", "").lower() == expected_status.lower()
+        return bool(state.get("status", "").lower() == expected_status.lower())
 
     wait_for_condition(_check, timeout=timeout, description=description)
 
@@ -86,7 +88,7 @@ def wait_for_audit_record(
     action: str | None = None,
     minimum_total: int = 1,
     timeout: float = 10.0,
-) -> dict:
+) -> UnvalidatedJsonObject:
     """Poll the eventually-consistent audit log until expected records appear.
 
     Returns the parsed JSON response.

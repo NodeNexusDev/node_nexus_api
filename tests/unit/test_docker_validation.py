@@ -21,6 +21,7 @@ from app.core.docker_validation import (
     validate_volume_name,
 )
 from app.core.exceptions import DockerValidationError
+from tests.typing import as_unvalidated
 
 
 class TestValidateContainerId:
@@ -193,7 +194,7 @@ class TestValidatePortMappings:
 
     def test_invalid_host_port_type_raises(self) -> None:
         with pytest.raises(DockerValidationError, match="Invalid host port"):
-            validate_port_mappings({"80/tcp": 8080})
+            validate_port_mappings(as_unvalidated(dict[str, str], {"80/tcp": 8080}))
 
     def test_invalid_host_port_value_raises(self) -> None:
         with pytest.raises(DockerValidationError, match="Invalid host port"):
@@ -227,7 +228,7 @@ class TestValidateLabels:
 
     def test_invalid_value_type_raises(self) -> None:
         with pytest.raises(DockerValidationError, match="Invalid label value"):
-            validate_labels({"key": 123})
+            validate_labels(as_unvalidated(dict[str, str], {"key": 123}))
 
 
 class TestValidateVolumeMounts:
@@ -246,11 +247,15 @@ class TestValidateVolumeMounts:
 
     def test_invalid_host_path_type_raises(self) -> None:
         with pytest.raises(DockerValidationError, match="Invalid volume host path"):
-            validate_volume_mounts({123: {"bind": "/container"}})
+            validate_volume_mounts(
+                as_unvalidated(dict[str, dict[str, str]], {123: {"bind": "/container"}})
+            )
 
     def test_invalid_spec_type_raises(self) -> None:
         with pytest.raises(DockerValidationError, match="Invalid volume spec"):
-            validate_volume_mounts({"/host": "/container"})
+            validate_volume_mounts(
+                as_unvalidated(dict[str, dict[str, str]], {"/host": "/container"})
+            )
 
     def test_invalid_bind_path_raises(self) -> None:
         with pytest.raises(DockerValidationError, match="Invalid volume bind path"):

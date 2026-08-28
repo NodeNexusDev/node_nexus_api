@@ -40,7 +40,7 @@ def repo(session: AsyncSession) -> ScriptRepository:
     return ScriptRepository(session)
 
 
-def _default_steps() -> list[dict]:
+def _default_steps() -> list[dict[str, object]]:
     return [
         {
             "label": "Check disk",
@@ -51,7 +51,7 @@ def _default_steps() -> list[dict]:
     ]
 
 
-def _script_data(**overrides) -> dict:
+def _script_data(**overrides: object) -> dict[str, object]:
     defaults = {
         "name": "deploy_check",
         "description": "Pre-deploy check",

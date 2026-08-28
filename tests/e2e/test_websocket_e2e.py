@@ -22,6 +22,7 @@ from websockets.asyncio.client import ClientConnection
 from tests.e2e.conftest import ServicePorts
 from tests.e2e.helpers.resources import UniqueResourceFactory
 from tests.e2e.helpers.websocket import WebSocketClientFactory
+from tests.types import UnvalidatedJsonObject
 
 pytestmark = [pytest.mark.docker, pytest.mark.e2e_smoke]
 
@@ -77,7 +78,7 @@ async def _receive_until_type(
     ws: ClientConnection,
     expected_type: str,
     timeout: float = 10.0,
-) -> dict:
+) -> UnvalidatedJsonObject:
     """Receive messages until one with the expected type appears."""
     deadline = asyncio.get_event_loop().time() + timeout
     while True:
@@ -580,7 +581,9 @@ async def test_ws_multiple_connections(
         ) as ws:
             await _send_command(ws, f"echo {marker}")
             msg = await _receive_until_type(ws, "stdout", timeout=10)
-            return msg.get("data", "")
+            data = msg.get("data", "")
+            assert isinstance(data, str)
+            return data
 
     results = await asyncio.gather(
         run_command(node_a["id"], "node-a"),

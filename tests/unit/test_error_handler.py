@@ -1,5 +1,7 @@
 """Tests for domain error handler status code mapping."""
 
+from collections.abc import Awaitable, Callable
+
 import pytest
 from fastapi import FastAPI
 from httpx2 import ASGITransport, AsyncClient
@@ -71,11 +73,16 @@ _ROUTES: dict[str, type[DomainError]] = {
     "/test-note-not-found": NoteNotFoundError,
 }
 
-for _path, _exc_cls in _ROUTES.items():
 
-    @app.get(_path)
-    async def _raise(exc_cls: type[DomainError] = _exc_cls) -> None:  # type: ignore[misc]
+def _make_error_handler(exc_cls: type[DomainError]) -> Callable[[], Awaitable[None]]:
+    async def _raise() -> None:
         raise exc_cls("test error")
+
+    return _raise
+
+
+for _path, _exc_cls in _ROUTES.items():
+    app.get(_path)(_make_error_handler(_exc_cls))
 
 
 @app.get("/test-unknown")

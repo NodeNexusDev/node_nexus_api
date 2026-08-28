@@ -6,11 +6,14 @@ import httpx2 as httpx
 import pytest
 
 from tests.e2e.helpers.resources import UniqueResourceFactory
+from tests.types import UnvalidatedJsonObject
 
 pytestmark = pytest.mark.docker
 
 
-def _create_command(e2e_client: httpx.Client, **overrides) -> dict:
+def _create_command(
+    e2e_client: httpx.Client, **overrides: object
+) -> UnvalidatedJsonObject:
     """Helper to create a command template."""
     data = {
         "name": "e2e-command",
