@@ -156,6 +156,11 @@ activemq-data/
 
 # Environments
 .env
+.env.*
+!.env.example
+!.env.e2e
+!.env.e2e-ratelimit
+!.env.e2e-timeout
 .envrc
 .venv
 env/
@@ -215,6 +220,11 @@ tempCodeRunnerFile.py
 
 # PyPI configuration file
 .pypirc
+
+# local plans (private)
+/docs/plans/
+**/plans/
+.plans/
 
 # Marimo
 marimo/_static/
