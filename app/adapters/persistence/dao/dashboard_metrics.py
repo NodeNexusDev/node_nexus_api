@@ -15,10 +15,11 @@ _GROUP_MAP = {
     "month": "month",
 }
 
-_DUR = "EXTRACT(EPOCH FROM ({t}.finished_at - {t}.started_at)) * 1000"
+_DUR = "GREATEST(0, EXTRACT(EPOCH FROM ({t}.finished_at - {t}.started_at)) * 1000)"
 _SCRIPT_TERMINAL_STATUSES = "('success', 'error', 'completed', 'failed')"
 _SCRIPT_SUCCESS_STATUSES = "('success', 'completed')"
 _SCRIPT_FAILURE_STATUSES = "('error', 'failed')"
+_SCRIPT_CANCELLED_STATUSES = "('cancelled')"
 
 
 class DashboardMetricsRepository:
@@ -36,7 +37,7 @@ class DashboardMetricsRepository:
             where_clauses.append("ce.started_at >= :date_from")
             params["date_from"] = query.date_from
         if query.date_to is not None:
-            where_clauses.append("ce.started_at <= :date_to")
+            where_clauses.append("ce.started_at < :date_to")
             params["date_to"] = query.date_to
 
         where_sql = " AND ".join(where_clauses) if where_clauses else "TRUE"
@@ -47,7 +48,8 @@ class DashboardMetricsRepository:
             "  COUNT(*)::int AS total, "
             "  COUNT(*) FILTER (WHERE ce.exit_code = 0)::int AS successful, "  # noqa: E501
             "  COUNT(*) FILTER (WHERE ce.exit_code != 0)::int AS failed, "  # noqa: E501
-            f"  AVG({dur}) AS avg_duration_ms "  # nosec B608
+            "  0::int AS cancelled, "
+            f"  AVG({dur}) FILTER (WHERE ce.finished_at IS NOT NULL) AS avg_duration_ms "  # noqa: E501  # nosec B608
             "FROM command_executions ce "
             f"WHERE {where_sql} "  # nosec B608
             f"GROUP BY date_trunc(:grp, ce.started_at) "  # nosec B608
@@ -60,6 +62,7 @@ class DashboardMetricsRepository:
                 total=row.total,
                 successful=row.successful,
                 failed=row.failed,
+                cancelled=row.cancelled,
                 avg_duration_ms=row.avg_duration_ms,
             )
             for row in rows
@@ -76,7 +79,7 @@ class DashboardMetricsRepository:
             where_clauses.append("se.started_at >= :date_from")
             params["date_from"] = query.date_from
         if query.date_to is not None:
-            where_clauses.append("se.started_at <= :date_to")
+            where_clauses.append("se.started_at < :date_to")
             params["date_to"] = query.date_to
 
         where_sql = " AND ".join(where_clauses) if where_clauses else "TRUE"
@@ -87,6 +90,7 @@ class DashboardMetricsRepository:
             f"  COUNT(*) FILTER (WHERE se.status IN {_SCRIPT_TERMINAL_STATUSES})::int AS total, "  # nosec B608  # noqa: E501
             f"  COUNT(*) FILTER (WHERE se.status IN {_SCRIPT_SUCCESS_STATUSES})::int AS successful, "  # nosec B608  # noqa: E501
             f"  COUNT(*) FILTER (WHERE se.status IN {_SCRIPT_FAILURE_STATUSES})::int AS failed, "  # nosec B608  # noqa: E501
+            f"  COUNT(*) FILTER (WHERE se.status IN {_SCRIPT_CANCELLED_STATUSES})::int AS cancelled, "  # nosec B608  # noqa: E501
             f"  AVG({dur}) FILTER (WHERE se.status IN {_SCRIPT_TERMINAL_STATUSES}) AS avg_duration_ms "  # nosec B608  # noqa: E501
             "FROM script_executions se "
             f"WHERE {where_sql} "  # nosec B608
@@ -100,6 +104,7 @@ class DashboardMetricsRepository:
                 total=row.total,
                 successful=row.successful,
                 failed=row.failed,
+                cancelled=row.cancelled,
                 avg_duration_ms=row.avg_duration_ms,
             )
             for row in rows

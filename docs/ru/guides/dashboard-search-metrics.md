@@ -38,7 +38,9 @@ curl --fail-with-body \
 | `date_to` | — | Конец диапазона (ISO 8601) |
 
 Ответ содержит массивы `command_metrics` и `script_metrics`. Каждый бакет
-содержит `period`, `total`, `successful`, `failed` и `avg_duration_ms`.
+содержит `period`, `total`, `successful`, `failed`, `cancelled` и `avg_duration_ms`.
+`date_from` включительно, `date_to` — исключительно (`[date_from, date_to)`).
+`avg_duration_ms` — `GREATEST(0, finished_at - started_at)` с `FILTER (WHERE finished_at IS NOT NULL)`.
 
 ## Глобальный поиск
 
@@ -77,10 +79,8 @@ curl --fail-with-body \
   "${NODE_NEXUS_URL}/api/v1/commands/stats?node_id=<node-id>"
 ```
 
-Каждый эндпоинт возвращает `total`, `successful`, `failed`, `success_rate`,
-`avg_duration_ms`, `min_duration_ms`, `max_duration_ms` и `last_executed_at`.
-Для скриптов в `total` входят только завершённые состояния `success` и `error`;
-`pending`, `running` и `cancelled` исключаются.
+Каждый эндпоинт возвращает `total`, `successful`, `failed`, `cancelled`, `success_rate` (`0..1`, `0.8 = 80%`, `cancelled` не в `total`), `avg_duration_ms`, `min_duration_ms`, `max_duration_ms` и `last_executed_at`.
+Для скриптов в `total` входят только терминальные `success|error` (legacy `completed|failed`); `cancelled` отдельно, `pending`/`running` исключены. `date_to` — исключительно.
 
 ## SSE поток событий
 

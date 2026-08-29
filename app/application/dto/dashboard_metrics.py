@@ -18,6 +18,7 @@ class MetricsBucketDTO:
     total: int
     successful: int
     failed: int
+    cancelled: int
     avg_duration_ms: float | None
 
 

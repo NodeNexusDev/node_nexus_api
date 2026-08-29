@@ -15,6 +15,7 @@ _DEFAULT_STATS: ExecutionStatsRow = {
     "total": 0,
     "successful": 0,
     "failed": 0,
+    "cancelled": 0,
     "avg_duration_ms": None,
     "min_duration_ms": None,
     "max_duration_ms": None,
@@ -27,6 +28,7 @@ def _empty_stats() -> ExecutionStatsRow:
         total=0,
         successful=0,
         failed=0,
+        cancelled=0,
         avg_duration_ms=None,
         min_duration_ms=None,
         max_duration_ms=None,
@@ -37,6 +39,7 @@ def _empty_stats() -> ExecutionStatsRow:
 _SCRIPT_TERMINAL_STATUSES = "('success', 'error', 'completed', 'failed')"
 _SCRIPT_SUCCESS_STATUSES = "('success', 'completed')"
 _SCRIPT_FAILURE_STATUSES = "('error', 'failed')"
+_SCRIPT_CANCELLED_STATUSES = "('cancelled')"
 
 
 class ExecutionStatsRepository:
@@ -62,19 +65,20 @@ class ExecutionStatsRepository:
             where_clauses.append("ce.started_at >= :date_from")
             params["date_from"] = date_from
         if date_to is not None:
-            where_clauses.append("ce.started_at <= :date_to")
+            where_clauses.append("ce.started_at < :date_to")
             params["date_to"] = date_to
 
         where_sql = " AND ".join(where_clauses) if where_clauses else "TRUE"
-        dur = "EXTRACT(EPOCH FROM (ce.finished_at - ce.started_at)) * 1000"
+        dur = "GREATEST(0, EXTRACT(EPOCH FROM (ce.finished_at - ce.started_at)) * 1000)"
         sql = text(  # nosec B608: false positive – dur/where_sql built from whitelisted constants
             "SELECT "
             "  COUNT(*)::int AS total, "
             "  COUNT(*) FILTER (WHERE ce.exit_code = 0)::int AS successful, "  # noqa: E501
             "  COUNT(*) FILTER (WHERE ce.exit_code != 0)::int AS failed, "  # noqa: E501
-            f"  AVG({dur}) AS avg_duration_ms, "  # nosec B608
-            f"  MIN({dur}) AS min_duration_ms, "  # nosec B608
-            f"  MAX({dur}) AS max_duration_ms, "  # nosec B608
+            "  0::int AS cancelled, "
+            f"  AVG({dur}) FILTER (WHERE ce.finished_at IS NOT NULL) AS avg_duration_ms, "  # noqa: E501  # nosec B608
+            f"  MIN({dur}) FILTER (WHERE ce.finished_at IS NOT NULL) AS min_duration_ms, "  # noqa: E501  # nosec B608
+            f"  MAX({dur}) FILTER (WHERE ce.finished_at IS NOT NULL) AS max_duration_ms, "  # noqa: E501  # nosec B608
             "  MAX(ce.finished_at) AS last_executed_at "
             "FROM command_executions ce "
             f"WHERE {where_sql}"  # nosec B608
@@ -101,16 +105,17 @@ class ExecutionStatsRepository:
             where_clauses.append("se.started_at >= :date_from")
             params["date_from"] = date_from
         if date_to is not None:
-            where_clauses.append("se.started_at <= :date_to")
+            where_clauses.append("se.started_at < :date_to")
             params["date_to"] = date_to
 
         where_sql = " AND ".join(where_clauses) if where_clauses else "TRUE"
-        dur = "EXTRACT(EPOCH FROM (se.finished_at - se.started_at)) * 1000"
+        dur = "GREATEST(0, EXTRACT(EPOCH FROM (se.finished_at - se.started_at)) * 1000)"
         sql = text(  # nosec B608: false positive – dur/where_sql built from whitelisted constants
             "SELECT "
             f"  COUNT(*) FILTER (WHERE se.status IN {_SCRIPT_TERMINAL_STATUSES})::int AS total, "  # nosec B608  # noqa: E501
             f"  COUNT(*) FILTER (WHERE se.status IN {_SCRIPT_SUCCESS_STATUSES})::int AS successful, "  # nosec B608  # noqa: E501
             f"  COUNT(*) FILTER (WHERE se.status IN {_SCRIPT_FAILURE_STATUSES})::int AS failed, "  # nosec B608  # noqa: E501
+            f"  COUNT(*) FILTER (WHERE se.status IN {_SCRIPT_CANCELLED_STATUSES})::int AS cancelled, "  # nosec B608  # noqa: E501
             f"  AVG({dur}) FILTER (WHERE se.status IN {_SCRIPT_TERMINAL_STATUSES}) AS avg_duration_ms, "  # nosec B608  # noqa: E501
             f"  MIN({dur}) FILTER (WHERE se.status IN {_SCRIPT_TERMINAL_STATUSES}) AS min_duration_ms, "  # nosec B608  # noqa: E501
             f"  MAX({dur}) FILTER (WHERE se.status IN {_SCRIPT_TERMINAL_STATUSES}) AS max_duration_ms, "  # nosec B608  # noqa: E501
@@ -147,6 +152,7 @@ class ExecutionStatsRepository:
             total=required_int("total"),
             successful=required_int("successful"),
             failed=required_int("failed"),
+            cancelled=required_int("cancelled"),
             avg_duration_ms=optional_float("avg_duration_ms"),
             min_duration_ms=optional_float("min_duration_ms"),
             max_duration_ms=optional_float("max_duration_ms"),

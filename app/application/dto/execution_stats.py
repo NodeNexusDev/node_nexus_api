@@ -12,6 +12,7 @@ class ExecutionStatsRow(TypedDict):
     total: int
     successful: int
     failed: int
+    cancelled: int
     avg_duration_ms: float | None
     min_duration_ms: float | None
     max_duration_ms: float | None
@@ -23,6 +24,7 @@ class ExecutionStatsDTO:
     total: int
     successful: int
     failed: int
+    cancelled: int
     success_rate: float
     avg_duration_ms: float | None
     min_duration_ms: float | None

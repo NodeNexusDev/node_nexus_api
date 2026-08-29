@@ -69,17 +69,20 @@ class NodeMetricsService:
                 uptime_stdout, _, _ = await connector.execute_command("uptime -s")
 
             audit.info("node.metrics.collected", node_id=str(node_id))
+            # Clamp percents to 0..100 to satisfy schemas/node.py:176,184 le=100
+            mem_percent_clamped = max(0.0, min(100.0, mem_percent))
+            disk_percent_clamped = max(0.0, min(100.0, disk_percent))
             return NodeMetricsDTO(
                 cpu=CpuMetricsDTO(usage_percent=cpu_usage, cores=cores),
                 memory=UsageMetricsDTO(
                     total_bytes=mem_total,
                     used_bytes=mem_used,
-                    percent=round(mem_percent, 2),
+                    percent=round(mem_percent_clamped, 2),
                 ),
                 disk=UsageMetricsDTO(
                     total_bytes=disk_total,
                     used_bytes=disk_used,
-                    percent=round(disk_percent, 2),
+                    percent=round(disk_percent_clamped, 2),
                 ),
                 load_average=load_average,
                 uptime_since=uptime_stdout.strip() or "unknown",
@@ -128,7 +131,12 @@ class NodeMetricsService:
         cpu_usage = max(0.0, min(100.0, cpu_usage))
 
         cores_stdout, _, _ = await connector.execute_command("nproc")
-        cores = int(cores_stdout.strip()) if cores_stdout.strip() else 1
+        try:
+            cores = int(cores_stdout.strip()) if cores_stdout.strip() else 1
+            if cores < 1:
+                cores = 1
+        except ValueError:
+            cores = 1
         return cpu_usage, cores
 
     @staticmethod
@@ -146,6 +154,9 @@ class NodeMetricsService:
             vals1 = [int(v) for v in s1.strip().split()[1:]]
             vals2 = [int(v) for v in s2.strip().split()[1:]]
 
+            # iowait (vals[4]) is counted as busy to match vmstat's wa;
+            # standard `top` would use idle+iowait, but we keep vmstat
+            # semantics and document it.
             idle1, idle2 = vals1[3], vals2[3]
             total1, total2 = sum(vals1), sum(vals2)
 
