@@ -37,6 +37,7 @@ COVERED_ENDPOINTS: set[str] = {
     "DELETE /api/v1/nodes/{node_id}",
     "POST /api/v1/commands/execute",
     "POST /api/v1/nodes/{node_id}/check",
+    "POST /api/v1/nodes/{node_id}/refresh-host-key",
     "GET /api/v1/nodes/{node_id}/metrics",
     "GET /api/v1/commands/history",
     "POST /api/v1/commands/bulk/execute",

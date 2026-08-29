@@ -36,3 +36,7 @@ class NodeViewDTO:
     @property
     def docker_host(self) -> str | None:
         return self.endpoint.docker_host
+
+    @property
+    def has_docker(self) -> bool:
+        return self.endpoint.has_docker

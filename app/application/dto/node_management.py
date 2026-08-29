@@ -8,7 +8,7 @@ from app.application.dto.node_view import NodeViewDTO
 from app.application.dto.value_objects import NodeCredentials, NodeEndpoint
 from app.core.types import NodeName, Tag, TagList
 
-NodeUpdateValue = str | int | TagList | None
+NodeUpdateValue = str | int | bool | TagList | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -35,6 +35,10 @@ class NodeCreateDTO:
     @property
     def docker_host(self) -> str | None:
         return self.endpoint.docker_host
+
+    @property
+    def has_docker(self) -> bool:
+        return self.endpoint.has_docker
 
     @property
     def username(self) -> str | None:

@@ -79,7 +79,7 @@ class SqlAlchemyDashboardGateway:
             return DashboardDockerStatsDTO(total=0, running=0, stopped=0)
 
         try:
-            docker_nodes = await self._node_reader.get_connections_by_type("docker")
+            docker_nodes = await self._get_docker_nodes()
         except Exception:
             log.warning("dashboard.docker_nodes_query_failed")
             return DashboardDockerStatsDTO(total=0, running=0, stopped=0)
@@ -102,6 +102,35 @@ class SqlAlchemyDashboardGateway:
                 )
 
         return DashboardDockerStatsDTO(total=total, running=running, stopped=stopped)
+
+    async def _get_docker_nodes(self) -> list[NodeConnectionDTO]:
+        """Fetch nodes with docker capability."""
+        try:
+            async with self._sessionmaker() as session:
+                result = await session.execute(
+                    select(NodeModel).where(NodeModel.has_docker.is_(True))
+                )
+                models = list(result.scalars().all())
+                if models:
+                    from app.adapters.persistence.dao.node import NodeRepository
+
+                    return [NodeRepository._to_connection_dto(m) for m in models]
+        except Exception:
+            log.warning("dashboard.docker_has_docker_query_failed")
+        # Fallback for tests / legacy mocks
+        if self._node_reader is not None:
+            try:
+                legacy = await self._node_reader.get_connections_by_type("docker")
+                if legacy:
+                    return legacy
+            except Exception:
+                pass
+            try:
+                all_ssh = await self._node_reader.get_connections_by_type("ssh")
+                return [n for n in all_ssh if getattr(n, "is_docker_available", False)]
+            except Exception:
+                pass
+        return []
 
     async def _query_node_containers(self, node: NodeConnectionDTO) -> dict[str, int]:
         """Query container stats from a single Docker node."""

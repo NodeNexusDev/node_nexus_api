@@ -168,7 +168,8 @@ def test_node_repository_maps_connection_dto() -> None:
         name="node",
         host="10.0.0.1",
         port=2222,
-        connection_type="docker",
+        connection_type="ssh",
+        has_docker=True,
         username="operator",
         password="encrypted-password",
         ssh_key="encrypted-key",
@@ -183,7 +184,8 @@ def test_node_repository_maps_connection_dto() -> None:
     assert dto.name == "node"
     assert dto.host == "10.0.0.1"
     assert dto.port == 2222
-    assert dto.connection_type == "docker"
+    assert dto.connection_type == "ssh"
+    assert dto.has_docker is True
     assert dto.username == "operator"
     assert dto.password == "encrypted-password"
     assert dto.ssh_key == "encrypted-key"

@@ -30,8 +30,8 @@ class DockerCommandRunner:
         node = await self._node_reader.get_connection(node_id)
         if node is None:
             raise NodeNotFoundError(f"Node {node_id} not found")
-        if node.connection_type != "docker":
-            raise DockerError(f"Node {node_id} is not a Docker node")
+        if not node.is_docker_available:
+            raise DockerError(f"Node {node_id} is not a Docker node (has_docker=false)")
         return node
 
     async def get_targets_by_tags(self, tags: list[str]) -> list[NodeConnectionDTO]:

@@ -40,7 +40,8 @@ def _make_node(node_id: str = str(NODE)) -> MagicMock:
     mock_node = MagicMock()
     mock_node.id = uuid.UUID(node_id)
     mock_node.name = "docker-node"
-    mock_node.connection_type = "docker"
+    mock_node.connection_type = "ssh"
+    mock_node.has_docker = True
     mock_node.docker_host = None
     return mock_node
 
@@ -412,7 +413,8 @@ def _make_tag_node(node_id: str, name: str = "tag-node") -> MagicMock:
     node = MagicMock()
     node.id = uuid.UUID(node_id)
     node.name = name
-    node.connection_type = "docker"
+    node.connection_type = "ssh"
+    node.has_docker = True
     node.docker_host = None
     return node
 

@@ -33,6 +33,8 @@ class Settings(BaseSettings):
     # SSH host verification
     SSH_STRICT_HOST_KEY_CHECKING: bool = True
     SSH_KNOWN_HOSTS_PATH: str = "/app/.ssh/known_hosts"
+    SSH_KNOWN_HOSTS_AUTO_ADD: bool = False
+    SSH_KNOWN_HOSTS_FETCH_TIMEOUT: int = 10
 
     # Persistent scheduler
     SCHEDULER_ENABLED: bool = True

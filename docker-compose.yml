@@ -4,6 +4,8 @@ services:
     ports:
       - "${HOST_PORT:-8000}:${PORT:-8000}"
     env_file: .env
+    volumes:
+      - known_hosts:/app/.ssh
     depends_on:
       db:
         condition: service_healthy
@@ -38,4 +40,5 @@ services:
         max-file: "3"
 
 volumes:
+  known_hosts:
   postgres_data:

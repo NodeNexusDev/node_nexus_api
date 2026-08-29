@@ -47,7 +47,8 @@ def service(repo: AsyncMock, mock_factory: MagicMock) -> DockerService:
 @pytest.fixture
 def docker_node(repo: AsyncMock) -> Any:
     node = make_orm_node(
-        connection_type="docker",
+        connection_type="ssh",
+        has_docker=True,
         docker_host="unix:///var/run/docker.sock",
     )
     repo.get_by_id.return_value = node
@@ -66,7 +67,8 @@ class TestGetDockerNode:
         self, service: DockerService, repo: AsyncMock, docker_node: Any
     ) -> None:
         result = await service._get_docker_node(docker_node.id)
-        assert result.connection_type == "docker"
+        assert result.connection_type == "ssh"
+        assert result.has_docker is True
 
     async def test_raises_for_ssh_node(
         self, service: DockerService, repo: AsyncMock, ssh_node: Any
@@ -96,7 +98,8 @@ class TestBuildDockerCmd:
         self, service: DockerService, repo: AsyncMock
     ) -> None:
         node = make_orm_node(
-            connection_type="docker",
+            connection_type="ssh",
+            has_docker=True,
             docker_host="tcp://192.168.1.100:2376",
         )
         from app.application.dto.node_connection import NodeConnectionDTO
@@ -110,6 +113,7 @@ class TestBuildDockerCmd:
                     port=node.port,
                     connection_type=cast(ConnectionType, node.connection_type),
                     docker_host=node.docker_host,
+                    has_docker=True,
                 ),
                 credentials=NodeCredentials(
                     username=node.username,

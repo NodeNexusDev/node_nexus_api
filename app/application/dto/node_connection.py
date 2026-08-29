@@ -33,6 +33,15 @@ class NodeConnectionDTO:
         return self.endpoint.docker_host
 
     @property
+    def has_docker(self) -> bool:
+        return self.endpoint.has_docker
+
+    @property
+    def is_docker_available(self) -> bool:
+        """Logical docker capability."""
+        return self.endpoint.has_docker
+
+    @property
     def username(self) -> str | None:
         return self.credentials.username
 

@@ -22,6 +22,10 @@ from app.core.types import ConnectionType
 RecordT = TypeVar("RecordT")
 
 
+def _has_docker_value(node: object) -> bool:
+    return bool(getattr(node, "has_docker", False))
+
+
 class _PagedReader(Protocol[RecordT]):
     async def get_all(self, skip: int = 0, limit: int = 100) -> Sequence[RecordT]: ...
 
@@ -64,6 +68,7 @@ class SqlAlchemyConfigGateway:
                         port=node.port,
                         connection_type=cast(ConnectionType, node.connection_type),
                         docker_host=node.docker_host,
+                        has_docker=_has_docker_value(node),
                     ),
                     credentials=NodeCredentials(username=node.username),
                     tags=tuple(node.tags or ()),
@@ -124,6 +129,7 @@ class SqlAlchemyConfigGateway:
                 if node.name in existing_node_names:
                     errors.append(f"Node '{node.name}' already exists, skipped")
                     continue
+                has_docker = bool(node.endpoint.has_docker)
                 await node_repository.create(
                     {
                         "name": node.name,
@@ -132,6 +138,7 @@ class SqlAlchemyConfigGateway:
                         "connection_type": node.endpoint.connection_type,
                         "username": node.credentials.username,
                         "docker_host": node.endpoint.docker_host,
+                        "has_docker": has_docker,
                         "tags": list(node.tags),
                     }
                 )

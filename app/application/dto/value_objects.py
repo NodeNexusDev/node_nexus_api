@@ -23,3 +23,4 @@ class NodeEndpoint:
     port: int = 22
     connection_type: ConnectionType = "ssh"
     docker_host: DockerHost | None = None
+    has_docker: bool = False

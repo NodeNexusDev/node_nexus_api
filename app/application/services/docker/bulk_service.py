@@ -82,7 +82,7 @@ class DockerBulkService:
                 error_type=type(exc).__name__,
             )
             tag_nodes = []
-        tag_ids = [node.id for node in tag_nodes if node.connection_type == "docker"]
+        tag_ids = [node.id for node in tag_nodes if node.is_docker_available]
         merged = [*node_ids, *tag_ids]
         seen: set[uuid.UUID] = set()
         deduped: list[uuid.UUID] = []

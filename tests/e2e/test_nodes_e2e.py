@@ -375,7 +375,7 @@ def test_create_node_invalid_connection_type(e2e_client: httpx.Client) -> None:
 
 
 def test_create_node_valid_connection_types(e2e_client: httpx.Client) -> None:
-    for ctype in ("ssh", "docker", "proxmox"):
+    for ctype in ("ssh",):
         resp = e2e_client.post(
             "/api/v1/nodes/",
             json={

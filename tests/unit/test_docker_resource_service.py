@@ -25,7 +25,8 @@ def _make_node() -> MagicMock:
     mock = MagicMock()
     mock.id = NODE
     mock.name = "docker-node"
-    mock.connection_type = "docker"
+    mock.connection_type = "ssh"
+    mock.has_docker = True
     mock.docker_host = None
     return mock
 

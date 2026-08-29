@@ -22,6 +22,8 @@ source_revision: "2026-08-26"
 | `ENCRYPTION_SALT` | empty | Encryption derivation salt; minimum 16 characters in production |
 | `SSH_STRICT_HOST_KEY_CHECKING` | `true` | Require SSH server host key verification |
 | `SSH_KNOWN_HOSTS_PATH` | `/app/.ssh/known_hosts` | Path to the OpenSSH known-hosts file |
+| `SSH_KNOWN_HOSTS_AUTO_ADD` | `false` | Auto-fetch host keys via `ssh-keyscan` on node create/update/validate and refresh endpoint |
+| `SSH_KNOWN_HOSTS_FETCH_TIMEOUT` | `10` | Timeout in seconds for `ssh-keyscan` |
 | `SCHEDULER_ENABLED` | `true` | Enable persistent schedule execution on this deployment |
 | `SCHEDULER_OWNERSHIP_POLL_SECONDS` | `5.0` | Seconds between scheduler ownership polls |
 | `SCHEDULER_RECONCILIATION_INTERVAL_SECONDS` | `10.0` | Seconds between schedule reconciliation passes |

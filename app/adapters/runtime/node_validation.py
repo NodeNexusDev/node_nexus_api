@@ -13,6 +13,7 @@ from app.application.dto.node_validation import (
 from app.core.exceptions import ConnectionFailedError
 
 if TYPE_CHECKING:
+    from app.application.ports.known_hosts import KnownHostsManager
     from app.application.ports.remote_command import RemoteConnectorFactory
 
 audit = structlog.get_logger("audit")
@@ -21,13 +22,28 @@ audit = structlog.get_logger("audit")
 class SshCredentialValidator:
     """Validate SSH connectivity using the remote connector factory."""
 
-    def __init__(self, connector_factory: RemoteConnectorFactory) -> None:
+    def __init__(
+        self,
+        connector_factory: RemoteConnectorFactory,
+        known_hosts: KnownHostsManager | None = None,
+    ) -> None:
         self._connector_factory = connector_factory
+        self._known_hosts = known_hosts
 
     async def validate(
         self, request: NodeValidationRequestDTO
     ) -> NodeValidationResultDTO:
         """Attempt an SSH connection with the provided credentials."""
+        if self._known_hosts is not None:
+            try:
+                await self._known_hosts.ensure_host(request.host, request.port)
+            except Exception as exc:  # noqa: BLE001 - host key fetch is best-effort here
+                audit.warning(
+                    "node.validation.host_key_fetch_failed",
+                    host=request.host,
+                    port=request.port,
+                    error=str(exc),
+                )
         connector = self._connector_factory.create_ssh(
             host=request.host,
             port=request.port,

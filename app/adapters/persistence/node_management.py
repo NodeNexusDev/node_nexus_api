@@ -101,6 +101,7 @@ class SqlAlchemyNodeManagementGateway:
                         "ssh_key": data.credentials.ssh_key,
                         "passphrase": data.credentials.passphrase,
                         "docker_host": data.endpoint.docker_host,
+                        "has_docker": bool(data.endpoint.has_docker),
                         "tags": list(data.tags),
                     }
                 )
@@ -147,6 +148,7 @@ class SqlAlchemyNodeManagementGateway:
     @staticmethod
     def _to_view(node: NodeModel) -> NodeViewDTO:
         """Map an ORM node to public-safe application data."""
+        has_docker = bool(getattr(node, "has_docker", False))
         return NodeViewDTO(
             id=node.id,
             name=node.name,
@@ -155,6 +157,7 @@ class SqlAlchemyNodeManagementGateway:
                 port=node.port,
                 connection_type=cast(ConnectionType, node.connection_type),
                 docker_host=node.docker_host,
+                has_docker=has_docker,
             ),
             status=cast(NodeStatus, node.status),
             username=node.username,

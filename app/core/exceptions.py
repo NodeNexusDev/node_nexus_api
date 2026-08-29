@@ -147,3 +147,7 @@ class InvalidTokenError(DomainError):
 
 class InsufficientPermissionsError(DomainError):
     """Raised when the user lacks required permissions."""
+
+
+class HostKeyFetchError(DomainError):
+    """Raised when SSH host key cannot be fetched or verified."""

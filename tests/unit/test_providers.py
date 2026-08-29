@@ -205,6 +205,7 @@ def test_service_provider_resolves() -> None:
         credential_cipher,
         audit_svc,
         MagicMock(),
+        MagicMock(),
     )
     assert isinstance(node_svc, NodeManagementService)
 

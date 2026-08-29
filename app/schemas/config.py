@@ -2,10 +2,12 @@
 
 from datetime import datetime
 from importlib.metadata import PackageNotFoundError, version
+from typing import Self
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from app.application.dto.config import CONFIG_FORMAT_VERSION, LEGACY_CONFIG_VERSION
+from app.core.docker_validation import validate_docker_host
 from app.core.types import ConnectionType
 from app.schemas.command import CommandParameter
 from app.schemas.script import ScriptStep
@@ -28,7 +30,19 @@ class NodeExport(BaseModel):
     connection_type: ConnectionType
     username: str | None = None
     docker_host: str | None = None
+    has_docker: bool = False
     tags: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def check_docker_fields(self) -> Self:
+        if self.docker_host is not None and not self.has_docker:
+            raise ValueError("docker_host requires has_docker=true")
+        if self.docker_host is not None:
+            try:
+                validate_docker_host(self.docker_host)
+            except Exception as exc:
+                raise ValueError(str(exc)) from exc
+        return self
 
 
 class CommandExport(BaseModel):
@@ -92,6 +106,7 @@ class DryRunNodePreview(BaseModel):
     connection_type: ConnectionType
     username: str | None = None
     docker_host: str | None = None
+    has_docker: bool = False
     tags: list[str] = Field(default_factory=list)
 
 
