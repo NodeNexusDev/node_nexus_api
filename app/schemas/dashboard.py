@@ -55,6 +55,7 @@ class MetricsBucket(BaseModel):
     total: int
     successful: int
     failed: int
+    cancelled: int = 0
     avg_duration_ms: float | None = None
 
 

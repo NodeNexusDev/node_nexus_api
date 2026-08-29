@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ExecutionStatsResponse(BaseModel):
@@ -11,7 +11,12 @@ class ExecutionStatsResponse(BaseModel):
     total: int
     successful: int
     failed: int
-    success_rate: float
+    cancelled: int = 0
+    success_rate: float = Field(
+        ge=0,
+        le=1,
+        description="Доля успешных 0..1 (0.8=80%), cancelled excluded",
+    )
     avg_duration_ms: float | None = None
     min_duration_ms: float | None = None
     max_duration_ms: float | None = None

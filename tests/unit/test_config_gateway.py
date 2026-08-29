@@ -22,7 +22,14 @@ from app.application.dto.config import (
 )
 from app.application.dto.value_objects import NodeEndpoint
 from app.models.base import Base
+from app.models.command import (
+    CommandModel,  # noqa: F401  ensure Base.metadata populated
+)
+from app.models.command_execution import CommandExecutionModel  # noqa: F401
 from app.models.node import NodeModel
+from app.models.script import ScriptModel  # noqa: F401
+from app.models.script_execution import ScriptExecutionModel  # noqa: F401
+from app.models.script_schedule import ScriptScheduleModel  # noqa: F401
 
 
 @pytest_asyncio.fixture

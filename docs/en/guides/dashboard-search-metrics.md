@@ -61,12 +61,15 @@ Returns time-bucketed execution metrics for charts. Parameters:
       "total": 42,
       "successful": 38,
       "failed": 4,
+      "cancelled": 0,
       "avg_duration_ms": 1250.5
     }
   ],
   "script_metrics": [...]
 }
 ```
+
+`date_from` is inclusive, `date_to` is exclusive (`[date_from, date_to)`). `avg_duration_ms` uses `GREATEST(0, finished_at - started_at)` and is `FILTER (WHERE finished_at IS NOT NULL)` for commands.
 
 ## Global search
 
@@ -106,10 +109,7 @@ curl --fail-with-body \
   "${NODE_NEXUS_URL}/api/v1/commands/stats?node_id=<node-id>"
 ```
 
-Each stats endpoint returns `total`, `successful`, `failed`, `success_rate`,
-`avg_duration_ms`, `min_duration_ms`, `max_duration_ms`, and
-`last_executed_at`. Script totals include terminal `success` and `error`
-executions; `pending`, `running`, and `cancelled` executions are excluded.
+Each stats endpoint returns `total`, `successful`, `failed`, `cancelled`, `success_rate` (`0..1`, `0.8 = 80%`, cancelled excluded), `avg_duration_ms`, `min_duration_ms`, `max_duration_ms`, and `last_executed_at`. Script `total` is terminal `success|error` (legacy `completed|failed`) only; `cancelled` is separate and not in `total`/`success_rate`; `pending`/`running` are excluded. `date_to` is exclusive.
 
 ## SSE event stream
 

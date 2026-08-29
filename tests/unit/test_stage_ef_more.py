@@ -390,6 +390,7 @@ class TestDashboardMetricsGateway:
                         total=10,
                         successful=8,
                         failed=2,
+                        cancelled=0,
                         avg_duration_ms=100,
                     )
                 ]

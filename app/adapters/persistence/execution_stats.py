@@ -63,10 +63,12 @@ class SqlAlchemyExecutionStatsGateway:
         total = row["total"]
         successful = row["successful"]
         failed = row["failed"]
+        cancelled = row["cancelled"]
         return ExecutionStatsDTO(
             total=total,
             successful=successful,
             failed=failed,
+            cancelled=cancelled,
             success_rate=successful / total if total > 0 else 0.0,
             avg_duration_ms=row["avg_duration_ms"],
             min_duration_ms=row["min_duration_ms"],

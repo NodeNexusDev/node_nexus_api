@@ -57,6 +57,7 @@ class TestCommandStats:
             total=5,
             successful=4,
             failed=1,
+            cancelled=0,
             avg_duration_ms=120.5,
             min_duration_ms=80.0,
             max_duration_ms=200.0,
@@ -85,7 +86,7 @@ class TestCommandStats:
         assert "ce.command_id = :command_id" in str(sql)
         assert "ce.node_id = :node_id" in str(sql)
         assert "ce.started_at >= :date_from" in str(sql)
-        assert "ce.started_at <= :date_to" in str(sql)
+        assert "ce.started_at < :date_to" in str(sql)
         assert params["command_id"] == cmd_id
         assert params["node_id"] == node_id
         assert params["date_from"] == dt_from
@@ -98,6 +99,7 @@ class TestCommandStats:
             total=10,
             successful=8,
             failed=2,
+            cancelled=0,
             avg_duration_ms=99.0,
             min_duration_ms=10.0,
             max_duration_ms=500.0,
@@ -149,6 +151,7 @@ class TestScriptStats:
             total=3,
             successful=2,
             failed=1,
+            cancelled=0,
             avg_duration_ms=250.0,
             min_duration_ms=100.0,
             max_duration_ms=400.0,
@@ -177,7 +180,7 @@ class TestScriptStats:
         assert "se.script_id = :script_id" in sql
         assert "se.node_id = :node_id" in sql
         assert "se.started_at >= :date_from" in sql
-        assert "se.started_at <= :date_to" in sql
+        assert "se.started_at < :date_to" in sql
         assert params["script_id"] == script_id
         assert params["node_id"] == node_id
         assert params["date_from"] == dt_from
@@ -192,6 +195,7 @@ class TestScriptStats:
             total=7,
             successful=6,
             failed=1,
+            cancelled=0,
             avg_duration_ms=150.0,
             min_duration_ms=30.0,
             max_duration_ms=300.0,
@@ -234,6 +238,7 @@ class TestCommandMetrics:
             total=50,
             successful=45,
             failed=5,
+            cancelled=0,
             avg_duration_ms=200.0,
         )
         execute_result = MagicMock()
@@ -251,7 +256,7 @@ class TestCommandMetrics:
         params = call_args[0][1]
 
         assert "ce.started_at >= :date_from" in sql
-        assert "ce.started_at <= :date_to" in sql
+        assert "ce.started_at < :date_to" in sql
         assert params["date_from"] == dt_from
         assert params["date_to"] == dt_to
         assert params["grp"] == "day"
@@ -306,6 +311,7 @@ class TestScriptMetrics:
             total=30,
             successful=28,
             failed=2,
+            cancelled=0,
             avg_duration_ms=180.0,
         )
         execute_result = MagicMock()
@@ -323,7 +329,7 @@ class TestScriptMetrics:
         params = call_args[0][1]
 
         assert "se.started_at >= :date_from" in sql
-        assert "se.started_at <= :date_to" in sql
+        assert "se.started_at < :date_to" in sql
         assert params["date_from"] == dt_from
         assert params["date_to"] == dt_to
         assert len(result) == 1
@@ -360,7 +366,7 @@ class TestScriptMetrics:
         sql = str(call_args[0][0])
         params = call_args[0][1]
         assert "se.started_at >= :date_from" in sql
-        assert "se.started_at <= :date_to" not in sql
+        assert "se.started_at < :date_to" not in sql
         assert "date_to" not in params
 
 

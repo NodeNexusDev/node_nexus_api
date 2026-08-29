@@ -302,6 +302,7 @@ class TestCommandEndpoints:
             total=10,
             successful=8,
             failed=2,
+            cancelled=0,
             success_rate=0.8,
             avg_duration_ms=100,
             min_duration_ms=50,
