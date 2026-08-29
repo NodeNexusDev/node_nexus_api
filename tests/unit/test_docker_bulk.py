@@ -582,7 +582,8 @@ class TestDockerServiceBulk:
         mock_node = MagicMock()
         mock_node.id = uuid.UUID("00000000-0000-0000-0000-000000000001")
         mock_node.name = "server1"
-        mock_node.connection_type = "docker"
+        mock_node.connection_type = "ssh"
+        mock_node.has_docker = True
         mock_node.host = "10.0.0.1"
         mock_node.port = 22
         mock_node.username = "root"
@@ -627,7 +628,8 @@ class TestDockerServiceBulk:
         mock_node = MagicMock()
         mock_node.id = uuid.UUID("00000000-0000-0000-0000-000000000001")
         mock_node.name = "server1"
-        mock_node.connection_type = "docker"
+        mock_node.connection_type = "ssh"
+        mock_node.has_docker = True
 
         mock_repo.get_by_id.return_value = mock_node
 
@@ -658,7 +660,8 @@ class TestDockerServiceBulk:
         mock_node = MagicMock()
         mock_node.id = uuid.UUID("00000000-0000-0000-0000-000000000001")
         mock_node.name = "server1"
-        mock_node.connection_type = "docker"
+        mock_node.connection_type = "ssh"
+        mock_node.has_docker = True
         mock_node.host = "10.0.0.1"
         mock_node.port = 22
         mock_node.username = "root"
@@ -701,7 +704,8 @@ def _make_node(node_id: str = "00000000-0000-0000-0000-000000000001") -> MagicMo
     mock_node = MagicMock()
     mock_node.id = uuid.UUID(node_id)
     mock_node.name = "server1"
-    mock_node.connection_type = "docker"
+    mock_node.connection_type = "ssh"
+    mock_node.has_docker = True
     mock_node.host = "10.0.0.1"
     mock_node.port = 22
     mock_node.username = "root"

@@ -1,5 +1,7 @@
 """Application startup orchestration at the infrastructure boundary."""
 
+from pathlib import Path
+
 import structlog
 
 from app.adapters.lifecycle.migration_runner import MigrationRunner
@@ -50,12 +52,30 @@ class ApplicationStartup:
             debug=self._settings.DEBUG,
         )
         logger.info("app.startup")
+        await self._ensure_known_hosts()
         await self._run_migrations()
         await self._ensure_initial_superuser()
         self._audit_worker.start()
         self._scheduler.configure_executor(self._scheduled_executor.execute)
         await self._restore_schedules()
         await self._cleanup_audit()
+
+    async def _ensure_known_hosts(self) -> None:
+        """Create known_hosts directory/file so strict mode has a file to check."""
+        path = Path(self._settings.SSH_KNOWN_HOSTS_PATH)
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+            if not path.exists():
+                path.touch(mode=0o644, exist_ok=True)
+                path.chmod(0o644)
+                logger.info("startup.known_hosts.created", path=str(path))
+            else:
+                try:
+                    path.chmod(0o644)
+                except OSError:
+                    pass
+        except OSError as exc:
+            logger.warning("startup.known_hosts.failed", path=str(path), error=str(exc))
 
     async def _run_migrations(self) -> None:
         if not self._settings.AUTO_MIGRATE:

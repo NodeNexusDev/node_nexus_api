@@ -18,7 +18,8 @@ def _target() -> NodeConnectionDTO:
         endpoint=NodeEndpoint(
             host="127.0.0.1",
             port=22,
-            connection_type="docker",
+            connection_type="ssh",
+            has_docker=True,
             docker_host="unix:///var/run/docker.sock",
         ),
         credentials=NodeCredentials(username="root"),

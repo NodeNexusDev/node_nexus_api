@@ -1,5 +1,7 @@
 """Node API endpoints."""
 
+from __future__ import annotations
+
 import uuid
 
 import structlog
@@ -22,6 +24,7 @@ from app.application.dto.node_validation import NodeValidationRequestDTO
 from app.application.dto.node_view import NodeViewDTO
 from app.application.dto.value_objects import NodeCredentials, NodeEndpoint
 from app.application.services.node_command_service import NodeCommandService
+from app.application.services.node_host_key_service import NodeHostKeyService
 from app.application.services.node_management_service import NodeManagementService
 from app.application.services.node_metrics_service import NodeMetricsService
 from app.application.services.node_status_history_service import (
@@ -62,6 +65,7 @@ def _node_response(node: NodeViewDTO) -> NodeResponse:
         status=node.status,
         username=node.username,
         docker_host=node.endpoint.docker_host,
+        has_docker=node.endpoint.has_docker,
         tags=list(node.tags),
         created_at=node.created_at,
         updated_at=node.updated_at,
@@ -161,6 +165,7 @@ async def create_node(
                     port=data.port,
                     connection_type=data.connection_type,
                     docker_host=data.docker_host,
+                    has_docker=data.has_docker,
                 ),
                 credentials=NodeCredentials(
                     username=data.username,
@@ -229,10 +234,24 @@ async def check_node(
         status=result.status,
         username=result.username,
         docker_host=result.endpoint.docker_host,
+        has_docker=result.endpoint.has_docker,
         tags=list(result.tags),
         created_at=result.created_at,
         updated_at=result.updated_at,
     )
+
+
+@router.post("/{node_id}/refresh-host-key", response_model=NodeResponse)
+@inject
+async def refresh_host_key(
+    node_id: uuid.UUID,
+    service: FromDishka[NodeHostKeyService],
+    _key: Principal = Security(require_write_or_jwt_scope),
+) -> NodeResponse:
+    """Refresh SSH host key for a node (re-fetch via ssh-keyscan)."""
+    audit.info("api.nodes.refresh_host_key", node_id=str(node_id))
+    result = await service.refresh_host_key(node_id)
+    return _node_response(result)
 
 
 @router.post("/validate-credentials", response_model=NodeValidateResponse)

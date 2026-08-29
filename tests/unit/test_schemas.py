@@ -26,7 +26,7 @@ class TestNodeCreate:
         assert node.port == 22
 
     def test_valid_connection_types(self) -> None:
-        for ct in ("ssh", "docker", "proxmox"):
+        for ct in ("ssh",):
             node = NodeCreate(name="n", host="h", connection_type=ct)
             assert node.connection_type == ct
 

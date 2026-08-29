@@ -322,6 +322,7 @@ class _RepositoryNodeReader:
     def _to_connection(node: NodeModel | NodeConnectionDTO) -> NodeConnectionDTO:
         if isinstance(node, NodeConnectionDTO):
             return node
+        has_docker = bool(getattr(node, "has_docker", False))
         return NodeConnectionDTO(
             id=node.id,
             name=node.name,
@@ -330,6 +331,7 @@ class _RepositoryNodeReader:
                 port=node.port,
                 connection_type=cast(ConnectionType, node.connection_type),
                 docker_host=node.docker_host,
+                has_docker=has_docker,
             ),
             credentials=NodeCredentials(
                 username=node.username,

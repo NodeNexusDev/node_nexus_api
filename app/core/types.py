@@ -2,7 +2,7 @@
 
 from typing import Literal
 
-type ConnectionType = Literal["ssh", "docker", "proxmox"]
+type ConnectionType = Literal["ssh"]
 type NodeStatus = Literal["active", "unreachable", "error"]
 
 type Tag = str

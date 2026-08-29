@@ -20,6 +20,7 @@ from app.core.exceptions import (
     DomainError,
     ExecutionNotFoundError,
     FavoriteNotFoundError,
+    HostKeyFetchError,
     ImageNotFoundError,
     InsufficientPermissionsError,
     InvalidCredentialsError,
@@ -57,6 +58,7 @@ DOMAIN_ERROR_STATUS: dict[type[DomainError], int] = {
     AuthenticationError: 401,
     TagNotFoundError: 404,
     ConnectionFailedError: 503,
+    HostKeyFetchError: 503,
     CredentialDecryptionError: 503,
     TemplateRenderError: 422,
     ContainerNotFoundError: 404,
@@ -88,6 +90,7 @@ DOMAIN_ERROR_STATUS: dict[type[DomainError], int] = {
 
 PUBLIC_ERROR_MESSAGES: dict[type[DomainError], str] = {
     ConnectionFailedError: "Remote connection failed",
+    HostKeyFetchError: "SSH host key verification failed",
     CredentialDecryptionError: "Credential processing failed",
     ContainerNotFoundError: "Docker container not found",
     NetworkNotFoundError: "Docker network not found",

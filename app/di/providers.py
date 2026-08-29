@@ -1,6 +1,9 @@
 """DI providers for the application."""
 
+from __future__ import annotations
+
 from collections.abc import AsyncIterable
+from typing import cast
 
 from dishka import Provider, Scope, provide
 from sqlalchemy.ext.asyncio import (
@@ -60,6 +63,7 @@ from app.adapters.persistence.user import (
 )
 from app.adapters.runtime.apscheduler_runtime import ApschedulerRuntime
 from app.adapters.runtime.docker import SshDockerRuntime
+from app.adapters.runtime.known_hosts import FileKnownHostsManager
 from app.adapters.runtime.node_validation import SshCredentialValidator
 from app.adapters.runtime.scheduler import ApschedulerJobScheduler
 from app.adapters.runtime.ssh import SSHConnectorFactory
@@ -92,6 +96,7 @@ from app.application.ports.favorite import FavoriteReader, FavoriteWriter
 from app.application.ports.global_search import GlobalSearchReader
 from app.application.ports.health import DatabaseHealthProbe
 from app.application.ports.jwt_handler import JWTHandler
+from app.application.ports.known_hosts import KnownHostsManager
 from app.application.ports.node_bulk_operator import NodeBulkOperator
 from app.application.ports.node_management import (
     NodeManagementReader,
@@ -158,6 +163,7 @@ from app.application.services.node_bulk_operation_service import (
     NodeBulkOperationService,
 )
 from app.application.services.node_command_service import NodeCommandService
+from app.application.services.node_host_key_service import NodeHostKeyService
 from app.application.services.node_management_service import NodeManagementService
 from app.application.services.node_metrics_service import NodeMetricsService
 from app.application.services.node_status_history_service import (
@@ -663,6 +669,11 @@ class ConnectorProvider(Provider):
             strict_host_key_checking=settings.SSH_STRICT_HOST_KEY_CHECKING,
         )
 
+    @provide(scope=Scope.APP, provides=KnownHostsManager)
+    def get_known_hosts_manager(self, settings: Settings) -> KnownHostsManager:
+        """Get file-based known_hosts manager."""
+        return cast(KnownHostsManager, FileKnownHostsManager(settings))
+
     @provide(scope=Scope.APP, provides=RemoteConnectorFactory)
     def get_remote_connector_factory(
         self, factory: SSHConnectorFactory
@@ -710,9 +721,10 @@ class ConnectorProvider(Provider):
     def get_node_credential_validator(
         self,
         connector_factory: RemoteConnectorFactory,
+        known_hosts: KnownHostsManager,
     ) -> NodeCredentialValidator:
         """Bind credential validation to the SSH adapter."""
-        return SshCredentialValidator(connector_factory)
+        return SshCredentialValidator(connector_factory, known_hosts)
 
 
 class ServiceProvider(Provider):
@@ -858,6 +870,7 @@ class ServiceProvider(Provider):
         credential_cipher: CredentialCipher,
         audit_service: AuditEventSink,
         status_history_writer: NodeStatusHistoryWriter,
+        known_hosts: KnownHostsManager,
     ) -> NodeManagementService:
         """Get the node management service."""
         return NodeManagementService(
@@ -866,6 +879,7 @@ class ServiceProvider(Provider):
             credential_cipher=credential_cipher,
             audit_service=audit_service,
             status_history_writer=status_history_writer,
+            known_hosts=known_hosts,
         )
 
     @provide(scope=Scope.REQUEST)
@@ -1084,6 +1098,15 @@ class ServiceProvider(Provider):
     ) -> NodeValidationService:
         """Get node credential validation service."""
         return NodeValidationService(validator=validator)
+
+    @provide(scope=Scope.REQUEST)
+    def get_node_host_key_service(
+        self,
+        reader: NodeManagementReader,
+        known_hosts: KnownHostsManager,
+    ) -> NodeHostKeyService:
+        """Get host-key refresh service."""
+        return NodeHostKeyService(reader=reader, known_hosts=known_hosts)
 
     @provide(scope=Scope.REQUEST)
     def get_execution_stats_service(

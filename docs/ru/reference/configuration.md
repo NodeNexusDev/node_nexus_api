@@ -22,6 +22,8 @@ source_revision: "2026-08-26"
 | `ENCRYPTION_SALT` | пусто | Salt derivation шифрования; минимум 16 символов в production |
 | `SSH_STRICT_HOST_KEY_CHECKING` | `true` | Обязательная проверка host key SSH-сервера |
 | `SSH_KNOWN_HOSTS_PATH` | `/app/.ssh/known_hosts` | Путь к файлу OpenSSH `known_hosts` |
+| `SSH_KNOWN_HOSTS_AUTO_ADD` | `false` | Авто-добавление host keys через `ssh-keyscan` при создании/обновлении/валидации ноды и эндпоинте refresh |
+| `SSH_KNOWN_HOSTS_FETCH_TIMEOUT` | `10` | Таймаут `ssh-keyscan` в секундах |
 | `SCHEDULER_ENABLED` | `true` | Включить выполнение персистентных расписаний |
 | `SCHEDULER_OWNERSHIP_POLL_SECONDS` | `5.0` | Интервал опроса владельца планировщика (сек) |
 | `SCHEDULER_RECONCILIATION_INTERVAL_SECONDS` | `10.0` | Интервалconciliation расписаний (сек) |

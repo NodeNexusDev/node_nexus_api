@@ -1,6 +1,6 @@
 services:
   api:
-    image: ghcr.io/nodenexusdev/node_nexus_api:${IMAGE_TAG:-latest}
+    build: .
     ports:
       - "${HOST_PORT:-8000}:${PORT:-8000}"
     env_file: .env

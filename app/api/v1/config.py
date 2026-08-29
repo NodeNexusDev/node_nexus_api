@@ -88,6 +88,7 @@ async def export_config(
                 "connection_type": n.endpoint.connection_type,
                 "username": n.credentials.username,
                 "docker_host": n.endpoint.docker_host,
+                "has_docker": n.endpoint.has_docker,
                 "tags": list(n.tags),
             }
             for n in result.nodes
@@ -129,6 +130,7 @@ async def import_config(
                         port=item.port,
                         connection_type=item.connection_type,
                         docker_host=item.docker_host,
+                        has_docker=item.has_docker,
                     ),
                     credentials=NodeCredentials(username=item.username),
                     tags=tuple(item.tags or ()),
@@ -183,6 +185,7 @@ def _dry_run_response(result: DryRunPreviewDTO) -> DryRunImportResult:
                     connection_type=cast(ConnectionType, n.connection_type),
                     username=n.username,
                     docker_host=n.docker_host,
+                    has_docker=n.endpoint.has_docker,
                     tags=list(n.tags),
                 )
                 for n in result.would_create_nodes

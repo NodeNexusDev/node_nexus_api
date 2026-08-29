@@ -34,14 +34,16 @@ class TestDockerAPIValidation:
             "name": f"docker-test-{uuid.uuid4().hex[:8]}",
             "host": "localhost",
             "port": 22,
-            "connection_type": "docker",
+            "connection_type": "ssh",
+            "has_docker": True,
             "username": "testuser",
             "password": "testpass",
         }
         response = await client.post("/api/v1/nodes/", json=node_data)
         assert response.status_code == 201
         data = response.json()
-        assert data["connection_type"] == "docker"
+        assert data["connection_type"] == "ssh"
+        assert data["has_docker"] is True
         assert data["name"] == node_data["name"]
         node_id = data["id"]
 
@@ -57,7 +59,8 @@ class TestDockerAPIValidation:
             "name": f"docker-test-{uuid.uuid4().hex[:8]}",
             "host": "localhost",
             "port": 22,
-            "connection_type": "docker",
+            "connection_type": "ssh",
+            "has_docker": True,
         }
         create_response = await client.post("/api/v1/nodes/", json=node_data)
         node_id = create_response.json()["id"]
@@ -78,7 +81,8 @@ class TestDockerAPIValidation:
             "name": f"docker-test-{uuid.uuid4().hex[:8]}",
             "host": "localhost",
             "port": 22,
-            "connection_type": "docker",
+            "connection_type": "ssh",
+            "has_docker": True,
         }
         create_response = await client.post("/api/v1/nodes/", json=node_data)
         node_id = create_response.json()["id"]
@@ -129,7 +133,8 @@ class TestDockerAPIValidation:
             "name": f"docker-test-{uuid.uuid4().hex[:8]}",
             "host": "localhost",
             "port": 22,
-            "connection_type": "docker",
+            "connection_type": "ssh",
+            "has_docker": True,
         }
         create_response = await client.post("/api/v1/nodes/", json=node_data)
         node_id = create_response.json()["id"]
@@ -159,7 +164,8 @@ class TestDockerAPIValidation:
             "name": f"docker-test-{uuid.uuid4().hex[:8]}",
             "host": "localhost",
             "port": 22,
-            "connection_type": "docker",
+            "connection_type": "ssh",
+            "has_docker": True,
         }
         create_response = await client.post("/api/v1/nodes/", json=node_data)
         node_id = create_response.json()["id"]
@@ -181,7 +187,8 @@ class TestDockerAPIValidation:
             "name": f"docker-test-{uuid.uuid4().hex[:8]}",
             "host": "localhost",
             "port": 22,
-            "connection_type": "docker",
+            "connection_type": "ssh",
+            "has_docker": True,
         }
         create_response = await client.post("/api/v1/nodes/", json=node_data)
         node_id = create_response.json()["id"]
@@ -203,7 +210,8 @@ def _make_docker_node_data() -> dict[str, object]:
         "name": f"docker-test-{uuid.uuid4().hex[:8]}",
         "host": "localhost",
         "port": 22,
-        "connection_type": "docker",
+        "connection_type": "ssh",
+        "has_docker": True,
         "username": "testuser",
         "password": "testpass",
     }
@@ -485,7 +493,8 @@ class TestDockerBulkByTags:
             "name": f"docker-bulk-tag-{unique}",
             "host": "ssh-server",
             "port": 2222,
-            "connection_type": "docker",
+            "connection_type": "ssh",
+            "has_docker": True,
             "username": "testuser",
             "password": "testpass",
             "docker_host": "tcp://dind:2375",

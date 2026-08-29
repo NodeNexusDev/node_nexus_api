@@ -6,6 +6,7 @@ from typing import Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from app.core.docker_validation import validate_docker_host
 from app.core.types import ConnectionType, JsonObject, NodeStatus
 from app.schemas.common import CursorPage, PaginatedResponse
 
@@ -22,7 +23,21 @@ class NodeCreate(BaseModel):
     ssh_key: str | None = Field(default=None, repr=False)
     passphrase: str | None = Field(default=None, repr=False)
     docker_host: str | None = None
+    has_docker: bool = Field(
+        default=False, description="Logical docker capability toggle"
+    )
     tags: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def check_docker_fields(self) -> Self:
+        if self.docker_host is not None and not self.has_docker:
+            raise ValueError("docker_host requires has_docker=true")
+        if self.docker_host is not None:
+            try:
+                validate_docker_host(self.docker_host)
+            except Exception as exc:
+                raise ValueError(str(exc)) from exc
+        return self
 
 
 class NodeUpdate(BaseModel):
@@ -38,7 +53,21 @@ class NodeUpdate(BaseModel):
     ssh_key: str | None = Field(default=None, repr=False)
     passphrase: str | None = Field(default=None, repr=False)
     docker_host: str | None = None
+    has_docker: bool | None = Field(
+        default=None, description="Logical docker capability toggle"
+    )
     tags: list[str] | None = None
+
+    @model_validator(mode="after")
+    def check_docker_fields_update(self) -> Self:
+        if self.docker_host is not None and self.has_docker is False:
+            raise ValueError("docker_host requires has_docker=true")
+        if self.docker_host is not None:
+            try:
+                validate_docker_host(self.docker_host)
+            except Exception as exc:
+                raise ValueError(str(exc)) from exc
+        return self
 
 
 class NodeResponse(BaseModel):
@@ -54,6 +83,7 @@ class NodeResponse(BaseModel):
     status: NodeStatus
     username: str | None
     docker_host: str | None
+    has_docker: bool
     tags: list[str]
     created_at: datetime
     updated_at: datetime

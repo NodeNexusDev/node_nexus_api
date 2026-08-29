@@ -61,6 +61,7 @@ def make_orm_node(**overrides: object) -> NodeModel:
         "ssh_key": None,
         "passphrase": None,
         "docker_host": None,
+        "has_docker": False,
         "tags": [],
         "created_at": datetime.now(UTC),
         "updated_at": datetime.now(UTC),
@@ -72,6 +73,7 @@ def make_orm_node(**overrides: object) -> NodeModel:
 def make_node_view(**overrides: object) -> NodeViewDTO:
     """Create a public-safe node DTO with defaults for testing."""
     node = make_orm_node(**overrides)
+    has_docker = bool(getattr(node, "has_docker", False))
     return NodeViewDTO(
         id=node.id,
         name=node.name,
@@ -85,6 +87,7 @@ def make_node_view(**overrides: object) -> NodeViewDTO:
             port=node.port,
             connection_type=cast(ConnectionType, node.connection_type),
             docker_host=node.docker_host,
+            has_docker=has_docker,
         ),
     )
 
@@ -121,6 +124,7 @@ def make_response(**overrides: object) -> NodeResponse:
         "status": "active",
         "username": "root",
         "docker_host": None,
+        "has_docker": False,
         "tags": [],
         "created_at": datetime.now(UTC),
         "updated_at": datetime.now(UTC),

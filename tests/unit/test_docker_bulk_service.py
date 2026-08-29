@@ -15,7 +15,7 @@ from app.core.types import ConnectionType
 def _make_node(
     node_id: uuid.UUID | None = None,
     name: str = "server1",
-    connection_type: ConnectionType = "docker",
+    connection_type: ConnectionType = "ssh",
 ) -> NodeConnectionDTO:
     return NodeConnectionDTO(
         id=node_id or uuid.uuid4(),

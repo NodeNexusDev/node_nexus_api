@@ -20,7 +20,10 @@ FROM python:3.13-slim@sha256:7e3a6aca9d74f93cca21a91d86a8dad8c34749afd5b4a98ee48
 
 WORKDIR /app
 
-RUN groupadd -r appuser && useradd -r -g appuser appuser
+RUN apt-get update && apt-get install -y --no-install-recommends openssh-client \
+    && rm -rf /var/lib/apt/lists/* \
+    && groupadd -r appuser && useradd -r -g appuser appuser \
+    && mkdir -p /app/.ssh && chown appuser:appuser /app/.ssh && chmod 700 /app/.ssh
 
 COPY --from=builder /app/.venv /app/.venv
 COPY --from=builder /app/app /app/app

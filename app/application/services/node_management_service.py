@@ -10,6 +10,7 @@ from uuid import UUID
 if TYPE_CHECKING:
     from app.application.ports.audit_sink import AuditEventSink
     from app.application.ports.credential_cipher import CredentialCipher
+    from app.application.ports.known_hosts import KnownHostsManager
     from app.application.ports.node_management import (
         NodeManagementReader,
         NodeManagementWriter,
@@ -46,12 +47,14 @@ class NodeManagementService:
         credential_cipher: CredentialCipher,
         audit_service: AuditEventSink | None = None,
         status_history_writer: NodeStatusHistoryWriter | None = None,
+        known_hosts: KnownHostsManager | None = None,
     ) -> None:
         self._reader = reader
         self._writer = writer
         self._credential_cipher = credential_cipher
         self._audit = audit_service
         self._status_history_writer = status_history_writer
+        self._known_hosts = known_hosts
 
     async def _log(
         self,
@@ -110,6 +113,18 @@ class NodeManagementService:
 
     async def create_node(self, data: NodeCreateDTO) -> NodeViewDTO:
         """Create a new node. Encrypts sensitive fields before storage."""
+        if self._known_hosts is not None:
+            try:
+                await self._known_hosts.ensure_host(
+                    data.endpoint.host, data.endpoint.port
+                )
+            except Exception as exc:  # noqa: BLE001 - best-effort
+                audit.warning(
+                    "node.create.host_key_fetch_failed",
+                    host=data.endpoint.host,
+                    port=data.endpoint.port,
+                    error=str(exc),
+                )
         secured_credentials = NodeCredentials(
             username=data.credentials.username,
             password=cast(
@@ -133,13 +148,45 @@ class NodeManagementService:
 
     async def update_node(self, node_id: UUID, data: NodeUpdateDTO) -> NodeViewDTO:
         """Update an existing node. Encrypts sensitive fields before storage."""
+        if self._known_hosts is not None:
+            changes_dict = dict(data.changes)
+            host = changes_dict.get("host")
+            port = changes_dict.get("port")
+            if host is not None or port is not None:
+                # Need current host/port if only one changed
+                current = await self._reader.get_node(node_id)
+                if isinstance(host, str):
+                    target_host = str(host)
+                else:
+                    target_host = current.endpoint.host if current else None
+                if isinstance(port, int):
+                    raw_port: int | None = port
+                else:
+                    raw_port = current.endpoint.port if current else None
+                target_port = int(raw_port) if raw_port is not None else None
+                if target_host is not None and target_port is not None:
+                    try:
+                        await self._known_hosts.ensure_host(target_host, target_port)
+                    except Exception as exc:  # noqa: BLE001
+                        audit.warning(
+                            "node.update.host_key_fetch_failed",
+                            node_id=str(node_id),
+                            host=target_host,
+                            port=target_port,
+                            error=str(exc),
+                        )
+        raw_changes = dict(data.changes)
+        # If docker is disabled, clear docker_host unless explicitly set
+        if raw_changes.get("has_docker") is False and "docker_host" not in raw_changes:
+            raw_changes["docker_host"] = None
+
         secured = NodeUpdateDTO(
             changes=tuple(
                 (
                     field,
                     self._encrypt_value(value) if field in _SENSITIVE_FIELDS else value,
                 )
-                for field, value in data.changes
+                for field, value in raw_changes.items()
             )
         )
 

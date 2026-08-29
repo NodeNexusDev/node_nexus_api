@@ -29,6 +29,7 @@ class NodeRepository:
     @staticmethod
     def _to_connection_dto(node: NodeModel) -> NodeConnectionDTO:
         """Map a persistence model to immutable connection data."""
+        has_docker = bool(getattr(node, "has_docker", False))
         return NodeConnectionDTO(
             id=node.id,
             name=node.name,
@@ -37,6 +38,7 @@ class NodeRepository:
                 port=node.port,
                 connection_type=cast(ConnectionType, node.connection_type),
                 docker_host=node.docker_host,
+                has_docker=has_docker,
             ),
             credentials=NodeCredentials(
                 username=node.username,

@@ -395,6 +395,7 @@ def test_config_export_includes_docker_host(e2e_client: httpx.Client) -> None:
             "host": "10.0.0.99",
             "port": 22,
             "connection_type": "ssh",
+            "has_docker": True,
             "docker_host": "tcp://192.168.1.100:2375",
         },
     )
@@ -423,6 +424,7 @@ def test_config_round_trip_preserves_docker_host(
             "host": "10.0.0.99",
             "port": 22,
             "connection_type": "ssh",
+            "has_docker": True,
             "docker_host": "tcp://dind:2375",
         },
     )
