@@ -14,9 +14,11 @@ git clone https://github.com/NodeNexusDev/node_nexus_api.git
 cd node_nexus_api
 cp .env.example .env
 docker compose pull && docker compose up -d
-# pin версию: IMAGE_TAG=1.7.1 docker compose up -d
-# сборка из исходников: docker compose -f docker-compose.build.yml up -d --build
 ```
+
+Pin версию: `IMAGE_TAG=1.7.1 docker compose up -d`
+
+Сборка из исходников: `docker compose -f docker-compose.build.yml up -d --build`
 
 Перед тем как открыть доступ к сервису, задайте секреты из раздела
 [конфигурации](configuration.md). Убедитесь, что запрос
