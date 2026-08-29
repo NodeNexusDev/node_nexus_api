@@ -249,10 +249,7 @@ async def refresh_host_key(
     _key: Principal = Security(require_write_or_jwt_scope),
 ) -> NodeResponse:
     """Refresh SSH host key for a node (re-fetch via ssh-keyscan)."""
-    from app.application.services.node_host_key_service import NodeHostKeyService
-
     audit.info("api.nodes.refresh_host_key", node_id=str(node_id))
-    assert isinstance(service, NodeHostKeyService)
     result = await service.refresh_host_key(node_id)
     return _node_response(result)
 

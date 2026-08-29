@@ -123,13 +123,13 @@ class SqlAlchemyDashboardGateway:
                 legacy = await self._node_reader.get_connections_by_type("docker")
                 if legacy:
                     return legacy
-            except Exception:
-                pass
+            except Exception as exc:  # noqa: BLE001
+                log.warning("dashboard.legacy_fallback_failed", error=str(exc))
             try:
                 all_ssh = await self._node_reader.get_connections_by_type("ssh")
                 return [n for n in all_ssh if getattr(n, "is_docker_available", False)]
-            except Exception:
-                pass
+            except Exception as exc:  # noqa: BLE001
+                log.warning("dashboard.ssh_fallback_failed", error=str(exc))
         return []
 
     async def _query_node_containers(self, node: NodeConnectionDTO) -> dict[str, int]:
