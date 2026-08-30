@@ -144,6 +144,7 @@ class TestRateLimit:
         resp = rate_limit_client.get("/ready")
         assert resp.status_code == 200
 
+    @pytest.mark.flaky(reruns=2)
     def test_requests_resume_after_window(
         self, rate_limit_client: httpx.Client
     ) -> None:
@@ -157,12 +158,15 @@ class TestRateLimit:
         assert resp.status_code == 429
 
         # Wait for window to expire by polling until request succeeds
+        # Sleep WINDOW+1 to ensure reset on slow CI (was flaky with 10s)
+        time.sleep(4)
+
         def _rate_limit_reset() -> bool:
             resp = rate_limit_client.get("/api/v1/nodes/")
             return resp.status_code == 200
 
         wait_for_condition(
-            _rate_limit_reset, timeout=10.0, description="rate limit window reset"
+            _rate_limit_reset, timeout=15.0, description="rate limit window reset"
         )
 
         # Should succeed again

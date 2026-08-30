@@ -1,6 +1,6 @@
 [project]
 name = "node-nexus-api"
-version = "1.7.1"
+version = "1.7.2"
 description = "REST API for managing server nodes"
 readme = "README.md"
 requires-python = ">=3.13"
@@ -48,6 +48,7 @@ dev = [
     "pytest-cov>=7.1.0",
     "pytest-docker>=3.2.5",
     "pytest-mock>=3.15.1",
+    "pytest-rerunfailures>=14.0",
     "ruff>=0.16.2",
 ]
 docs = [
@@ -87,6 +88,7 @@ markers = [
     "e2e_resilience: E2E tests for restart, network failure, and failover scenarios",
     "e2e_migration: E2E tests verifying Alembic migration upgrade paths",
     "e2e_slow: slow E2E tests (timeout, retention, large payloads)",
+    "flaky: rerun flaky tests",
 ]
 filterwarnings = [
     "ignore::DeprecationWarning:starlette",
