@@ -164,12 +164,14 @@ class TestNodeBulkOperator:
         from app.application.dto.bulk_node_operation import BulkNodeDeleteDTO
 
         node_id1, node_id2 = uuid.uuid4(), uuid.uuid4()
-        mock_result = MagicMock()
-        mock_result.rowcount = 2
-        session.execute = AsyncMock(return_value=mock_result)
+        mock_select = MagicMock()
+        mock_select.all.return_value = [(node_id1,), (node_id2,)]
+        mock_delete = MagicMock()
+        session.execute = AsyncMock(side_effect=[mock_select, mock_delete])
 
         result = await gw.bulk_delete(BulkNodeDeleteDTO(node_ids=(node_id1, node_id2)))
         assert result.affected == 2
+        assert set(result.node_ids) == {node_id1, node_id2}
 
     @pytest.mark.asyncio
     async def test_bulk_add_tags(self) -> None:
@@ -191,10 +193,7 @@ class TestNodeBulkOperator:
 
         mock_select_result = MagicMock()
         mock_select_result.scalars.return_value.all.return_value = [node]
-        mock_update_result = MagicMock()
-        session.execute = AsyncMock(
-            side_effect=[mock_select_result, mock_update_result]
-        )
+        session.execute = AsyncMock(return_value=mock_select_result)
 
         result = await gw.bulk_add_tags(
             BulkNodeTagOperationDTO(node_ids=(node_id,), tags=("new",))
@@ -248,10 +247,7 @@ class TestNodeBulkOperator:
 
         mock_select_result = MagicMock()
         mock_select_result.scalars.return_value.all.return_value = [node]
-        mock_update_result = MagicMock()
-        session.execute = AsyncMock(
-            side_effect=[mock_select_result, mock_update_result]
-        )
+        session.execute = AsyncMock(return_value=mock_select_result)
 
         result = await gw.bulk_remove_tags(
             BulkNodeTagOperationDTO(node_ids=(node_id,), tags=("remove",))
