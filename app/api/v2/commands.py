@@ -357,7 +357,7 @@ async def get_commands_stats(
     date_to: datetime | None = Query(None),
     group_by: Literal["hour", "day", "week", "month"] | None = Query(None),
     _principal: Principal = Security(get_current_principal),
-) -> Any:
+) -> Any:  # noqa: ANN401
     """Get aggregated command execution stats.
 
     Without group_by returns ExecutionStatsResponse snapshot.
@@ -800,7 +800,7 @@ async def get_command_stats(
     date_to: datetime | None = Query(None),
     group_by: Literal["hour", "day", "week", "month"] | None = Query(None),
     _principal: Principal = Security(get_current_principal),
-) -> Any:
+) -> Any:  # noqa: ANN401
     """Get aggregate execution statistics for a command.
 
     Without group_by returns snapshot; with group_by returns buckets.
