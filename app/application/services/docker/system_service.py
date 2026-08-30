@@ -14,10 +14,15 @@ from app.application.dto.docker import (
     DockerPruneResultDTO,
     DockerSystemDfDTO,
     DockerSystemInfoDTO,
+    DockerSystemVersionDTO,
 )
 from app.application.services.docker.command_runner import DockerCommandRunner
 from app.application.services.docker.error_mapper import raise_for_docker_error
-from app.application.services.docker.parsers import json_string, parse_json_array
+from app.application.services.docker.parsers import (
+    json_string,
+    parse_json_array,
+    parse_json_lines,
+)
 
 audit = structlog.get_logger("audit")
 
@@ -71,12 +76,12 @@ class DockerSystemService:
         stdout, stderr, exit_code = await self._runner.execute(node, cmd)
         raise_for_docker_error(stderr, exit_code)
         lines = [line for line in stdout.strip().splitlines() if line.strip()]
-        import json as _json
+        import json as _json_local
 
         results: list[DockerSystemDfDTO] = []
         for line in lines:
             try:
-                item = _json.loads(line)
+                item = _json_local.loads(line)
                 results.append(
                     DockerSystemDfDTO(
                         type=json_string(item, "Type"),
@@ -88,7 +93,7 @@ class DockerSystemService:
                         reclaimable_percent=json_string(item, "ReclaimablePercent"),
                     )
                 )
-            except (_json.JSONDecodeError, KeyError):
+            except (_json_local.JSONDecodeError, KeyError):
                 continue
         audit.info("docker.system.df", node_id=str(node_id), count=len(results))
         return results
@@ -147,6 +152,73 @@ class DockerSystemService:
                 details={"deleted": len(deleted), "space_reclaimed": space},
             )
         return DockerPruneResultDTO(
+            images_deleted=deleted,
+            space_reclaimed=space,
+        )
+
+    async def version(self, node_id: UUID) -> DockerSystemVersionDTO:
+        """Return ``docker version`` parsed into a DTO."""
+        node = await self._runner.get_target(node_id)
+        cmd = self._runner.build_command(node, "version --format '{{json .}}'")
+        stdout, stderr, exit_code = await self._runner.execute(node, cmd)
+        raise_for_docker_error(stderr, exit_code)
+        items = parse_json_array(stdout)
+        if not items:
+            # fallback try lines
+            items = parse_json_lines(stdout)
+        if not items:
+            raise_for_docker_error("docker version returned empty output", 1)
+        info = items[0]
+        # docker version JSON may be nested under Server/Client
+        server = (
+            info.get("Server", info) if isinstance(info.get("Server"), dict) else info
+        )
+        if not isinstance(server, dict):
+            server = info
+        audit.info("docker.system.version", node_id=str(node_id))
+        return DockerSystemVersionDTO(
+            server_version=json_string(server, "Version")
+            or json_string(info, "ServerVersion")
+            or json_string(info, "Version"),
+            api_version=json_string(server, "ApiVersion")
+            or json_string(info, "APIVersion"),
+            go_version=json_string(server, "GoVersion")
+            or json_string(info, "GoVersion"),
+            git_commit=json_string(server, "GitCommit"),
+            build_time=json_string(server, "BuildTime"),
+            os=json_string(server, "Os"),
+            arch=json_string(server, "Arch"),
+        )
+
+    async def system_prune(
+        self, node_id: UUID, *, volumes: bool = False
+    ) -> DockerPruneResultDTO:
+        """Prune system via ``docker system prune``."""
+        node = await self._runner.get_target(node_id)
+        flag = " --volumes" if volumes else ""
+        cmd = self._runner.build_command(node, f"system prune -f{flag}")
+        stdout, stderr, exit_code = await self._runner.execute(node, cmd)
+        raise_for_docker_error(stderr, exit_code)
+        output = stdout.strip()
+        deleted: tuple[str, ...] = ()
+        space = ""
+        for line in output.splitlines():
+            if "reclaimed" in line.lower():
+                space = line.split(":", 1)[-1].strip() if ":" in line else line.strip()
+            if line.strip().startswith("Deleted"):
+                parts = line.split(":", 1)
+                if len(parts) == 2:
+                    ids = [x.strip() for x in parts[1].split(",") if x.strip()]
+                    deleted = tuple(ids)
+        audit.info("docker.system.prune", node_id=str(node_id), volumes=volumes)
+        if self._audit:
+            await self._audit.log(
+                action="docker.system.prune",
+                node_id=node_id,
+                details={"volumes": volumes, "space_reclaimed": space},
+            )
+        return DockerPruneResultDTO(
+            containers_deleted=deleted,
             images_deleted=deleted,
             space_reclaimed=space,
         )

@@ -21,7 +21,6 @@ from app.adapters.lifecycle.application_startup import ApplicationStartup
 from app.adapters.telemetry import init_telemetry
 from app.api.error_mapping import domain_error_handler
 from app.api.middleware import (
-    ApiVersionMiddleware,
     CommitOnResponseMiddleware,
     RateLimitMiddleware,
     RequestIdMiddleware,
@@ -29,25 +28,33 @@ from app.api.middleware import (
     TimeoutMiddleware,
 )
 from app.api.v1.api_keys import router as api_keys_router
-from app.api.v1.audit import router as audit_router
+from app.api.v1.audit import router as audit_router_v1
 from app.api.v1.auth import router as auth_router
-from app.api.v1.commands import router as commands_router
+from app.api.v1.commands import router as commands_router_v1
 from app.api.v1.config import router as config_router
 from app.api.v1.dashboard import router as dashboard_router
-from app.api.v1.docker import router as docker_router
+from app.api.v1.docker import router as docker_router_v1
 from app.api.v1.docker_bulk import router as docker_bulk_router
 from app.api.v1.events import router as events_router
-from app.api.v1.favorites import router as favorites_router
+from app.api.v1.favorites import router as favorites_router_v1
 from app.api.v1.health import router as health_router
 from app.api.v1.internal import router as internal_router
-from app.api.v1.nodes import router as nodes_router
+from app.api.v1.nodes import router as nodes_router_v1
 from app.api.v1.nodes_bulk import router as nodes_bulk_router
 from app.api.v1.notes import router as notes_router
-from app.api.v1.scripts import router as scripts_router
+from app.api.v1.scripts import router as scripts_router_v1
 from app.api.v1.scripts_bulk import router as scripts_bulk_router
 from app.api.v1.search import router as search_router
 from app.api.v1.users import router as users_router
 from app.api.v1.websocket import router as ws_router
+from app.api.v2.audit import router as audit_router
+from app.api.v2.commands import router as commands_router
+from app.api.v2.compose import router as compose_router
+from app.api.v2.docker import router as docker_router
+from app.api.v2.favorites import router as favorites_router
+from app.api.v2.nodes import router as nodes_router
+from app.api.v2.scripts import router as scripts_router
+from app.api.v2.templates import router as templates_router
 from app.core.config import get_settings
 from app.core.exceptions import DomainError
 from app.di.container import container
@@ -111,12 +118,15 @@ def create_app() -> FastAPI:
                 "name": "docker",
                 "description": "Управление Docker контейнерами на нодах",
             },
+            {
+                "name": "docker-compose",
+                "description": "Управление Docker Compose проектами",
+            },
+            {"name": "templates", "description": "Шаблоны команд и скриптов из GitHub"},
             {"name": "api-keys", "description": "API key lifecycle and scopes"},
             {"name": "config", "description": "Configuration backup and restore"},
             {"name": "health", "description": "Liveness and readiness probes"},
-            {"name": "dashboard", "description": "Dashboard overview and metrics"},
             {"name": "favorites", "description": "Favorite nodes/scripts/commands"},
-            {"name": "notes", "description": "Notes for nodes"},
             {"name": "search", "description": "Global search across entities"},
             {"name": "events", "description": "Real-time event streaming"},
         ],
@@ -126,14 +136,10 @@ def create_app() -> FastAPI:
         CORSMiddleware,
         allow_origins=settings.CORS_ORIGINS,
         allow_credentials=True,
-        allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH"],
-        allow_headers=["Authorization", "Content-Type", "X-API-Key", "X-API-Version"],
+        allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"],
+        allow_headers=["Authorization", "Content-Type", "X-API-Key"],
     )
     app.add_middleware(RequestLoggingMiddleware)
-    app.add_middleware(
-        ApiVersionMiddleware,
-        supported_versions=settings.SUPPORTED_API_VERSIONS,
-    )
     app.add_middleware(RequestIdMiddleware)
     app.add_middleware(TimeoutMiddleware, timeout=settings.REQUEST_TIMEOUT)
     app.add_middleware(
@@ -169,9 +175,8 @@ def create_app() -> FastAPI:
             "code": f"HTTP_{exc.status_code}",
             "message": message,
             "detail": exc.detail,
+            "request_id": request_id,
         }
-        if request_id:
-            content["request_id"] = request_id
         return JSONResponse(
             status_code=exc.status_code,
             content=content,
@@ -188,9 +193,8 @@ def create_app() -> FastAPI:
             "code": "RequestValidationError",
             "message": "Request validation failed",
             "detail": jsonable_encoder(exc.errors()),
+            "request_id": request_id,
         }
-        if request_id:
-            content["request_id"] = request_id
         return JSONResponse(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             content=content,
@@ -207,47 +211,91 @@ def create_app() -> FastAPI:
             "code": f"HTTP_{exc.status_code}",
             "message": message,
             "detail": exc.detail,
+            "request_id": request_id,
         }
-        if request_id:
-            content["request_id"] = request_id
         return JSONResponse(
             status_code=exc.status_code,
             content=content,
             headers=exc.headers or {},
         )
 
+    @app.exception_handler(Exception)
+    async def _unhandled_exception_handler(
+        request: Request, exc: Exception
+    ) -> JSONResponse:
+        """Return 500 for unhandled exceptions with unified envelope."""
+        request_id = getattr(request.state, "request_id", None)
+        content: dict[str, object] = {
+            "code": "InternalError",
+            "message": "Internal server error",
+            "detail": None,
+            "request_id": request_id,
+        }
+        return JSONResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content=content,
+        )
+
     app.add_exception_handler(DomainError, domain_error_handler)
 
     setup_dishka(container, app)
     app.include_router(health_router)
-    protected_routers = (
+    # v1 (legacy, kept for migration period)
+    v1_protected = (
         nodes_bulk_router,
-        nodes_router,
-        commands_router,
-        scripts_router,
+        nodes_router_v1,
+        commands_router_v1,
+        scripts_router_v1,
         scripts_bulk_router,
-        audit_router,
+        audit_router_v1,
         dashboard_router,
         api_keys_router,
         config_router,
-        docker_router,
+        docker_router_v1,
         docker_bulk_router,
         events_router,
         ws_router,
         search_router,
-        favorites_router,
+        favorites_router_v1,
         notes_router,
         users_router,
     )
-    for protected_router in protected_routers:
+    for router in v1_protected:
         app.include_router(
-            protected_router,
+            router,
             prefix="/api/v1",
             responses=AUTHENTICATED_ERROR_RESPONSES,
         )
     app.include_router(auth_router, prefix="/api/v1")
     if settings.E2E_ENABLED:
         app.include_router(internal_router, prefix="/api/v1")
+
+    # v2 (bulk-first, cursor, 207)
+    v2_protected = (
+        nodes_router,
+        commands_router,
+        scripts_router,
+        docker_router,
+        compose_router,
+        templates_router,
+        favorites_router,
+        audit_router,
+        api_keys_router,
+        config_router,
+        search_router,
+        users_router,
+        events_router,
+        ws_router,
+    )
+    for router in v2_protected:
+        app.include_router(
+            router,
+            prefix="/api/v2",
+            responses=AUTHENTICATED_ERROR_RESPONSES,
+        )
+    app.include_router(auth_router, prefix="/api/v2")
+    if settings.E2E_ENABLED:
+        app.include_router(internal_router, prefix="/api/v2")
 
     # Prometheus metrics (sits inside all custom middleware)
     if settings.PROMETHEUS_ENABLED:

@@ -185,6 +185,8 @@ from app.application.services.script_execution_service import ScriptExecutionSer
 from app.application.services.script_history_service import ScriptHistoryService
 from app.application.services.script_management_service import ScriptManagementService
 from app.application.services.streaming_command_service import StreamingCommandService
+from app.application.services.template_pack_service import TemplatePackService
+from app.application.services.template_registry_service import TemplateRegistryService
 from app.application.services.user_service import UserService
 from app.core.config import Settings, get_settings
 
@@ -1178,6 +1180,16 @@ class ServiceProvider(Provider):
     ) -> UserService:
         """Get user management service."""
         return UserService(reader=reader, writer=writer)
+
+    @provide(scope=Scope.REQUEST)
+    def get_template_registry_service(self) -> TemplateRegistryService:
+        """Get template registry service (in-memory stub)."""
+        return TemplateRegistryService()
+
+    @provide(scope=Scope.REQUEST)
+    def get_template_pack_service(self) -> TemplatePackService:
+        """Get template pack service (in-memory stub with assets)."""
+        return TemplatePackService()
 
 
 class ConfigProvider(Provider):

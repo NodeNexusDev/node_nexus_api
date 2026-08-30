@@ -303,3 +303,56 @@ class DockerImageService:
         return DockerImageBuildResultDTO(
             image_id=image_id, tag=validated_tag, output=output
         )
+
+    async def push_image(
+        self, node_id: UUID, image: str, timeout: int = 600
+    ) -> DockerPullResultDTO:
+        """Push an image via ``docker push``."""
+        validated = validate_image_name(image)
+        node = await self._runner.get_target(node_id)
+        cmd = self._runner.build_command(node, f"push {shlex.quote(validated)}")
+        if self._audit:
+            await self._audit.log_required(
+                action="docker.image.push.requested",
+                node_id=node_id,
+                details={"image": validated},
+            )
+        stdout, stderr, exit_code = await self._runner.execute(
+            node, cmd, timeout=timeout
+        )
+        raise_for_docker_error(stderr, exit_code)
+        success = exit_code == 0
+        output = stdout if success else stderr
+        audit.info(
+            "docker.image.push.ok" if success else "docker.image.push.failed",
+            node_id=str(node_id),
+            image=validated,
+        )
+        if self._audit:
+            await self._audit.log(
+                action="docker.image.push",
+                node_id=node_id,
+                details={"image": validated, "success": success},
+            )
+        return DockerPullResultDTO(image=validated, output=output, success=success)
+
+    async def image_history(
+        self, node_id: UUID, image_id: str
+    ) -> list[dict[str, object]]:
+        """Return ``docker history`` parsed as JSON lines."""
+        validated = validate_image_tag(image_id)
+        node = await self._runner.get_target(node_id)
+        cmd = self._runner.build_command(
+            node, f"history --format '{{{{json .}}}}' {shlex.quote(validated)}"
+        )
+        stdout, stderr, exit_code = await self._runner.execute(node, cmd)
+        raise_for_docker_error(stderr, exit_code)
+        items = parse_json_lines(stdout)
+        audit.info("docker.image.history", node_id=str(node_id), image_id=validated)
+        if self._audit:
+            await self._audit.log(
+                action="docker.image.history",
+                node_id=node_id,
+                details={"image_id": validated, "count": len(items)},
+            )
+        return items

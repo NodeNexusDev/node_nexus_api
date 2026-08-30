@@ -353,3 +353,43 @@ class BulkDockerPullResultsDTO:
     total: int
     succeeded: int
     failed: int
+
+
+@dataclass(frozen=True, slots=True)
+class DockerSystemVersionDTO:
+    """Parsed ``docker version`` output."""
+
+    server_version: str
+    api_version: str
+    go_version: str
+    git_commit: str = ""
+    build_time: str = ""
+    os: str = ""
+    arch: str = ""
+
+
+@dataclass(frozen=True, slots=True)
+class DockerPortDTO:
+    """Parsed ``docker port`` output."""
+
+    container_id: str
+    output: str
+    bindings: tuple[tuple[str, str], ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class DockerWaitDTO:
+    """Result of ``docker wait``."""
+
+    exit_code: int
+
+
+@dataclass(frozen=True, slots=True)
+class DockerImageHistoryItemDTO:
+    """Single row from ``docker history``."""
+
+    id: str
+    created: str
+    created_by: str
+    size: str
+    comment: str = ""
