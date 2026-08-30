@@ -13,7 +13,7 @@ from app.main import app
 from tests.types import UnvalidatedJsonObject
 
 OPENAPI_CONTRACT_SHA256 = (
-    "d8f7ccf9846a4958f4dd82282c83df6d4992d4bf94e110b2714783cad28d5825"
+    "a931ae31ac21a2c94be73fefc43b8df584ce80e49955a5ab74cd6d76a611a4f4"
 )
 
 _CANONICAL_ENV = {

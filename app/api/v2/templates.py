@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import base64
+import io
 import json
 import uuid
 from datetime import datetime
@@ -11,6 +12,7 @@ from typing import Annotated, Any, Literal, cast
 import structlog
 from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
 from fastapi import APIRouter, HTTPException, Query, Response, Security
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from app.api.deps import Principal, get_current_principal, require_write_or_jwt_scope
@@ -142,6 +144,14 @@ class PackInstallResponse(BaseModel):
     succeeded: int
     failed: int
     results: list[PackInstallResult]
+
+
+class PackInstallQuery(BaseModel):
+    """Query for pack installation with conflict handling."""
+
+    on_conflict: Literal["fail", "rename"] = Field(
+        default="fail", description="Conflict handling: fail (409) or rename (_1,_2)"
+    )
 
 
 class PackInstallationResponse(BaseModel):
@@ -548,6 +558,55 @@ async def get_pack(
 
 
 # ---------------------------------------------------------------------------
+# Packs — GET /packs/{id}/archive -> tar streaming (assets)
+# ---------------------------------------------------------------------------
+
+
+@router.get("/packs/{pack_id}/archive")
+@inject
+async def get_pack_archive(
+    pack_id: uuid.UUID,
+    service: FromDishka[TemplatePackService],
+    _principal: Principal = Security(get_current_principal),
+) -> Any:  # noqa: ANN401
+    """Stream pack assets as tar archive.
+
+    Returns ``application/x-tar`` with ``Content-Disposition`` attachment.
+    Empty tar if pack has no assets. Persisted via ``TemplateAssetWriter``
+    (base64 decode, size/sha) and returned in ``GET /packs/{id}``.
+    """
+    audit.info("api.v2.templates.packs.archive", pack_id=str(pack_id))
+    try:
+        data = await service.get_assets_tar(pack_id)
+    except PackNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return StreamingResponse(
+        io.BytesIO(data),
+        media_type="application/x-tar",
+        headers={"Content-Disposition": f'attachment; filename="{pack_id}.tar"'},
+    )
+
+
+@router.get("/packs/{pack_id}/assets/archive", include_in_schema=False)
+@inject
+async def get_pack_assets_archive_alias(
+    pack_id: uuid.UUID,
+    service: FromDishka[TemplatePackService],
+    _principal: Principal = Security(get_current_principal),
+) -> Any:  # noqa: ANN401
+    """Alias for asset tar streaming (compat)."""
+    try:
+        data = await service.get_assets_tar(pack_id)
+    except PackNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return StreamingResponse(
+        io.BytesIO(data),
+        media_type="application/x-tar",
+        headers={"Content-Disposition": f'attachment; filename="{pack_id}.tar"'},
+    )
+
+
+# ---------------------------------------------------------------------------
 # Packs — POST /packs/{id}/installations -> 201|207|409 (bulk with template_pack_id)
 # ---------------------------------------------------------------------------
 
@@ -562,15 +621,24 @@ async def install_pack(
     pack_id: uuid.UUID,
     service: FromDishka[TemplatePackService],
     response: Response,
+    on_conflict: Literal["fail", "rename"] = Query("fail"),
     _principal: Principal = Security(require_write_or_jwt_scope),
 ) -> BulkResult[PackInstallResult]:
     """Install a pack — bulk create commands/scripts with template_pack_id.
 
-    Returns 201 when all succeed, 207 when partially, 409 when already installed.
+    Query ``on_conflict`` controls name collisions:
+    - ``fail`` (default) raises 409 on existing command/script name.
+    - ``rename`` generates unique name by appending ``_1``, ``_2`` etc.
+
+    Returns 201 when all succeed, 207 when partially, 409 when conflict.
     """
-    audit.info("api.v2.templates.packs.install", pack_id=str(pack_id))
+    audit.info(
+        "api.v2.templates.packs.install",
+        pack_id=str(pack_id),
+        on_conflict=on_conflict,
+    )
     try:
-        result = await service.install_pack(pack_id)
+        result = await service.install_pack(pack_id, on_conflict=on_conflict)
     except PackNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except PackConflictError as exc:
@@ -630,14 +698,19 @@ async def update_pack(
     pack_id: uuid.UUID,
     service: FromDishka[TemplatePackService],
     response: Response,
+    on_conflict: Literal["fail", "rename"] = Query("fail"),
     _principal: Principal = Security(require_write_or_jwt_scope),
 ) -> BulkResult[PackInstallResult]:
-    """Update a pack via uninstall+install with 207 handling."""
-    audit.info("api.v2.templates.packs.update", pack_id=str(pack_id))
+    """Update a pack via uninstall+install with 207 handling and on_conflict."""
+    audit.info(
+        "api.v2.templates.packs.update", pack_id=str(pack_id), on_conflict=on_conflict
+    )
     try:
-        result = await service.update_pack(pack_id)
+        result = await service.update_pack(pack_id, on_conflict=on_conflict)
     except PackNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except PackConflictError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     items = [
         PackInstallResult(
             entity_type=cast(Literal["command", "script"], item.entity_type),

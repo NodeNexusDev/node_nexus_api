@@ -27,6 +27,9 @@ class DockerContainerStateDTO:
     started_at: str | None = None
     finished_at: str | None = None
     oom_killed: bool | None = None
+    health: str | None = None
+    health_failing_streak: int | None = None
+    health_log: tuple[object, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)

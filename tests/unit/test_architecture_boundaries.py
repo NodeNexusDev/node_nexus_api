@@ -88,8 +88,6 @@ def test_api_does_not_access_persistence_or_concrete_connectors() -> None:
                 "app.repositories",
             )
         )
-        # 2.0 compose v2 currently accesses persistence directly — TODO: move to ports
-        and not (path.name == "compose.py" and path.parent.name == "v2")
     ]
     assert not violations, "Forbidden architecture dependencies:\n" + "\n".join(
         violations

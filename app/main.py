@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 from importlib.metadata import PackageNotFoundError
 from importlib.metadata import version as pkg_version
 
+import structlog
 from dishka.integrations.fastapi import setup_dishka
 from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.encoders import jsonable_encoder
@@ -59,6 +60,8 @@ from app.core.config import get_settings
 from app.core.exceptions import DomainError
 from app.di.container import container
 from app.schemas.common import AUTHENTICATED_ERROR_RESPONSES
+
+logger = structlog.get_logger()
 
 
 def stable_operation_id(route: APIRoute) -> str:
@@ -224,6 +227,14 @@ def create_app() -> FastAPI:
         request: Request, exc: Exception
     ) -> JSONResponse:
         """Return 500 for unhandled exceptions with unified envelope."""
+
+        logger.error(
+            "http.internal_error",
+            path=request.url.path,
+            error_type=type(exc).__name__,
+            status_code=500,
+            exc_info=exc,
+        )
         request_id = getattr(request.state, "request_id", None)
         content: dict[str, object] = {
             "code": "InternalError",

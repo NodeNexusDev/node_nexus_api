@@ -2,11 +2,9 @@
 
 from __future__ import annotations
 
-import asyncio
 import base64
 import json
 import re
-import shlex
 import uuid
 from typing import Literal
 
@@ -14,15 +12,14 @@ import structlog
 from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
 from fastapi import APIRouter, HTTPException, Query, Response, Security, status
 from pydantic import BaseModel, Field
-from sqlalchemy import select
-from sqlalchemy.exc import IntegrityError
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import Principal, get_current_principal, require_write_or_jwt_scope
 from app.application.dto.compose import ComposeCreateDTO, ComposeUpdateDTO
-from app.application.services.docker.command_runner import DockerCommandRunner
-from app.application.services.docker.error_mapper import raise_for_docker_error
-from app.models.compose_project import ComposeProjectModel
+from app.application.services.compose_service import ComposeService
+from app.core.exceptions import (
+    ComposeProjectAlreadyExistsError,
+    ComposeProjectNotFoundError,
+)
 from app.schemas.common import BulkResult, CursorPage
 from app.schemas.compose import ComposeCreate, ComposeResponse, ComposeUpdate
 
@@ -80,59 +77,22 @@ def _validate_project_name(name: str) -> str:
     return name
 
 
-def _compose_file_path(project_name: str) -> str:
-    """Safe temp compose file path for a project."""
-    safe = "".join(c if c.isalnum() else "_" for c in project_name)
-    return f"/tmp/nn-compose-{safe}.yml"
+def _to_response(dto: object) -> ComposeResponse:
+    """Map DTO to response schema."""
+    # dto is ComposeViewDTO
+    from app.application.dto.compose import ComposeViewDTO as _Dto  # noqa: N814
 
-
-def _env_prefix(env: dict[str, str] | None) -> str:
-    """Build env var prefix for docker compose commands."""
-    if not env:
-        return ""
-    parts = [f"{shlex.quote(k)}={shlex.quote(v)}" for k, v in env.items()]
-    return " ".join(parts) + " "
-
-
-async def _get_project(
-    session: AsyncSession, node_id: uuid.UUID, project_name: str
-) -> ComposeProjectModel:
-    """Fetch a compose project or raise 404."""
-    validated = _validate_project_name(project_name)
-    result = await session.execute(
-        select(ComposeProjectModel).where(
-            ComposeProjectModel.node_id == node_id,
-            ComposeProjectModel.project_name == validated,
-        )
+    assert isinstance(dto, _Dto)
+    return ComposeResponse(
+        id=dto.id,
+        node_id=dto.node_id,
+        project_name=dto.project_name,
+        compose=dto.compose,
+        env=dto.env,
+        template_pack_id=dto.template_pack_id,
+        created_at=dto.created_at,
+        updated_at=dto.updated_at,
     )
-    project = result.scalar_one_or_none()
-    if project is None:
-        raise HTTPException(status_code=404, detail="Compose project not found")
-    return project
-
-
-async def _run_compose(
-    runner: DockerCommandRunner,
-    node_id: uuid.UUID,
-    project: ComposeProjectModel,
-    compose_args: str,
-    timeout: int = 60,
-) -> str:
-    """Write compose file and run ``docker compose``."""
-    node = await runner.get_target(node_id)
-    file_path = _compose_file_path(project.project_name)
-    env_str = _env_prefix(project.env)  # type: ignore[arg-type]
-    quoted = shlex.quote(project.compose)
-    write_cmd = f"printf %s {quoted} > {shlex.quote(file_path)}"
-    docker_args = (
-        f"compose -p {shlex.quote(project.project_name)} "
-        f"-f {shlex.quote(file_path)} {compose_args}"
-    )
-    docker_cmd = runner.build_command(node, docker_args)
-    full = f"{write_cmd} && {env_str}{docker_cmd}"
-    stdout, stderr, exit_code = await runner.execute(node, full, timeout=timeout)
-    raise_for_docker_error(stderr, exit_code)
-    return stdout.strip()
 
 
 # ---------------------------------------------------------------------------
@@ -271,6 +231,31 @@ class ComposeActionResponse(BaseModel):
     output: str = ""
 
 
+def _bulk_to_response(
+    bulk: object,
+) -> BulkResult[ComposeServiceBulkResult]:
+    """Map ComposeBulkResultDTO to BulkResult schema."""
+    from typing import cast
+
+    from app.application.dto.compose import (
+        ComposeBulkResultDTO as _BulkDto,  # noqa: N814
+    )
+
+    assert isinstance(bulk, _BulkDto)
+    results = [
+        ComposeServiceBulkResult(
+            service=r.service,
+            status=cast(Literal["success", "error"], r.status),
+            error=r.error,
+            output=r.output,
+        )
+        for r in bulk.results
+    ]
+    return BulkResult[ComposeServiceBulkResult](
+        total=bulk.total, succeeded=bulk.succeeded, failed=bulk.failed, results=results
+    )
+
+
 # ---------------------------------------------------------------------------
 # Pure DB — CRUD (projects)
 # ---------------------------------------------------------------------------
@@ -283,7 +268,7 @@ class ComposeActionResponse(BaseModel):
 async def create_project(
     node_id: uuid.UUID,
     data: ComposeCreate,
-    session: FromDishka[AsyncSession],
+    service: FromDishka[ComposeService],
     _principal: Principal = Security(require_write_or_jwt_scope),
 ) -> ComposeResponse:
     """Create a compose project (pure DB)."""
@@ -293,7 +278,6 @@ async def create_project(
         project_name=data.project_name,
     )
     _validate_project_name(data.project_name)
-    # map schema -> DTO (application layer)
     dto = ComposeCreateDTO(
         node_id=node_id,
         project_name=data.project_name,
@@ -301,53 +285,29 @@ async def create_project(
         env=tuple(data.env.items()) if data.env else (),
         template_pack_id=data.template_pack_id,
     )
-    # check duplicates
-    existing = await session.execute(
-        select(ComposeProjectModel).where(
-            ComposeProjectModel.node_id == node_id,
-            ComposeProjectModel.project_name == dto.project_name,
-        )
-    )
-    if existing.scalar_one_or_none() is not None:
-        raise HTTPException(status_code=409, detail="Project already exists")
-    model = ComposeProjectModel(
-        id=uuid.uuid4(),
-        node_id=dto.node_id,
-        project_name=dto.project_name,
-        compose=dto.compose,
-        env=dict(dto.env) if dto.env else None,
-        template_pack_id=dto.template_pack_id,
-    )
-    session.add(model)
     try:
-        await session.flush()
-    except IntegrityError as exc:
+        created = await service.create_project(dto)
+    except ComposeProjectAlreadyExistsError as exc:
         raise HTTPException(status_code=409, detail="Project already exists") from exc
-    return ComposeResponse.model_validate(model, from_attributes=True)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return _to_response(created)
 
 
 @router.get("/projects", response_model=CursorPage[ComposeResponse])
 @inject
 async def list_projects(
     node_id: uuid.UUID,
-    session: FromDishka[AsyncSession],
+    service: FromDishka[ComposeService],
     cursor: str | None = Query(None, description="Opaque cursor for pagination"),
     limit: int = Query(20, ge=1, le=100, description="Page size for cursor pagination"),
     _principal: Principal = Security(get_current_principal),
 ) -> CursorPage[ComposeResponse]:
     """List compose projects with cursor pagination."""
     audit.info("api.v2.compose.projects.list", node_id=str(node_id), limit=limit)
-    result = await session.execute(
-        select(ComposeProjectModel)
-        .where(ComposeProjectModel.node_id == node_id)
-        .order_by(ComposeProjectModel.created_at.desc(), ComposeProjectModel.id.desc())
-    )
-    all_items = list(result.scalars().all())
-    paged, next_cursor, has_more = _paginate_offset(
-        [ComposeResponse.model_validate(m, from_attributes=True) for m in all_items],
-        cursor,
-        limit,
-    )
+    all_items = await service.list_all_projects(node_id)
+    mapped = [_to_response(m) for m in all_items]
+    paged, next_cursor, has_more = _paginate_offset(mapped, cursor, limit)
     return CursorPage[ComposeResponse](
         items=paged, next_cursor=next_cursor, has_more=has_more, limit=limit
     )
@@ -358,15 +318,23 @@ async def list_projects(
 async def get_project(
     node_id: uuid.UUID,
     project_name: str,
-    session: FromDishka[AsyncSession],
+    service: FromDishka[ComposeService],
     _principal: Principal = Security(get_current_principal),
 ) -> ComposeResponse:
     """Get a compose project by name."""
     audit.info(
         "api.v2.compose.projects.get", node_id=str(node_id), project_name=project_name
     )
-    project = await _get_project(session, node_id, project_name)
-    return ComposeResponse.model_validate(project, from_attributes=True)
+    _validate_project_name(project_name)
+    try:
+        project = await service.get_project(node_id, project_name)
+    except ComposeProjectNotFoundError as exc:
+        raise HTTPException(
+            status_code=404, detail="Compose project not found"
+        ) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return _to_response(project)
 
 
 @router.patch("/projects/{project_name}", response_model=ComposeResponse)
@@ -375,7 +343,7 @@ async def update_project(
     node_id: uuid.UUID,
     project_name: str,
     data: ComposeUpdate,
-    session: FromDishka[AsyncSession],
+    service: FromDishka[ComposeService],
     _principal: Principal = Security(require_write_or_jwt_scope),
 ) -> ComposeResponse:
     """Update a compose project (partial)."""
@@ -384,8 +352,7 @@ async def update_project(
         node_id=str(node_id),
         project_name=project_name,
     )
-    project = await _get_project(session, node_id, project_name)
-    # map schema -> DTO for update
+    _validate_project_name(project_name)
     dto = ComposeUpdateDTO(
         compose=data.compose,
         env=tuple(data.env.items()) if data.env is not None else None,
@@ -393,16 +360,15 @@ async def update_project(
         template_pack_id=data.template_pack_id,
         has_template_pack_id="template_pack_id" in data.model_fields_set,
     )
-    if dto.compose is not None:
-        project.compose = dto.compose  # type: ignore[assignment]
-    if dto.has_env and dto.env is not None:
-        project.env = dict(dto.env)  # type: ignore[assignment]
-    elif dto.has_env and dto.env is None:
-        project.env = None  # type: ignore[assignment]
-    if dto.has_template_pack_id:
-        project.template_pack_id = dto.template_pack_id  # type: ignore[assignment]
-    await session.flush()
-    return ComposeResponse.model_validate(project, from_attributes=True)
+    try:
+        updated = await service.update_project(node_id, project_name, dto)
+    except ComposeProjectNotFoundError as exc:
+        raise HTTPException(
+            status_code=404, detail="Compose project not found"
+        ) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return _to_response(updated)
 
 
 @router.delete("/projects/{project_name}", status_code=status.HTTP_204_NO_CONTENT)
@@ -410,7 +376,7 @@ async def update_project(
 async def delete_project(
     node_id: uuid.UUID,
     project_name: str,
-    session: FromDishka[AsyncSession],
+    service: FromDishka[ComposeService],
     _principal: Principal = Security(require_write_or_jwt_scope),
 ) -> None:
     """Delete a compose project (pure DB)."""
@@ -419,9 +385,15 @@ async def delete_project(
         node_id=str(node_id),
         project_name=project_name,
     )
-    project = await _get_project(session, node_id, project_name)
-    await session.delete(project)
-    await session.flush()
+    _validate_project_name(project_name)
+    try:
+        await service.delete_project(node_id, project_name)
+    except ComposeProjectNotFoundError as exc:
+        raise HTTPException(
+            status_code=404, detail="Compose project not found"
+        ) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
 # ---------------------------------------------------------------------------
@@ -438,8 +410,7 @@ async def compose_up(
     node_id: uuid.UUID,
     project_name: str,
     data: ComposeUpRequest,
-    session: FromDishka[AsyncSession],
-    runner: FromDishka[DockerCommandRunner],
+    service: FromDishka[ComposeService],
     response: Response,
     _principal: Principal = Security(require_write_or_jwt_scope),
 ) -> BulkResult[ComposeServiceBulkResult]:
@@ -447,48 +418,25 @@ async def compose_up(
     audit.info(
         "api.v2.compose.projects.ups", node_id=str(node_id), project_name=project_name
     )
-    project = await _get_project(session, node_id, project_name)
-    extra = " up -d"
-    if data.pull:
-        extra += " --pull always"
-    if data.build:
-        extra += " --build"
-    services = data.services
-
-    async def _one(svc: str) -> ComposeServiceBulkResult:
-        try:
-            out = await _run_compose(
-                runner, node_id, project, f"{extra} {shlex.quote(svc)}"
-            )
-            return ComposeServiceBulkResult(service=svc, status="success", output=out)
-        except Exception as exc:  # noqa: BLE001
-            return ComposeServiceBulkResult(service=svc, status="error", error=str(exc))
-
-    if not services:
-        try:
-            out = await _run_compose(runner, node_id, project, extra)
-            result = ComposeServiceBulkResult(
-                service=project_name, status="success", output=out
-            )
-            return BulkResult[ComposeServiceBulkResult](
-                total=1, succeeded=1, failed=0, results=[result]
-            )
-        except Exception as exc:  # noqa: BLE001
-            result = ComposeServiceBulkResult(
-                service=project_name, status="error", error=str(exc)
-            )
-            return BulkResult[ComposeServiceBulkResult](
-                total=1, succeeded=0, failed=1, results=[result]
-            )
-
-    results = await asyncio.gather(*(_one(s) for s in services))
-    succeeded = sum(1 for r in results if r.status == "success")
-    failed = len(results) - succeeded
-    if failed > 0 and succeeded > 0:
+    _validate_project_name(project_name)
+    try:
+        bulk = await service.up(
+            node_id,
+            project_name,
+            pull=data.pull,
+            build=data.build,
+            services=data.services,
+        )
+    except ComposeProjectNotFoundError as exc:
+        raise HTTPException(
+            status_code=404, detail="Compose project not found"
+        ) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    result = _bulk_to_response(bulk)
+    if result.failed > 0 and result.succeeded > 0:
         response.status_code = 207
-    return BulkResult[ComposeServiceBulkResult](
-        total=len(results), succeeded=succeeded, failed=failed, results=list(results)
-    )
+    return result
 
 
 @router.post(
@@ -500,75 +448,35 @@ async def compose_down(
     node_id: uuid.UUID,
     project_name: str,
     data: ComposeDownRequest,
-    session: FromDishka[AsyncSession],
-    runner: FromDishka[DockerCommandRunner],
+    service: FromDishka[ComposeService],
     _principal: Principal = Security(require_write_or_jwt_scope),
 ) -> ComposeActionResponse:
     """Tear down a compose project via ``compose down``."""
     audit.info(
         "api.v2.compose.projects.downs", node_id=str(node_id), project_name=project_name
     )
-    project = await _get_project(session, node_id, project_name)
-    extra = " down"
-    if data.volumes:
-        extra += " -v"
-    if data.remove_orphans:
-        extra += " --remove-orphans"
-    if data.images:
-        extra += f" --rmi {shlex.quote(data.images)}"
-    if data.timeout is not None:
-        extra += f" -t {data.timeout}"
-    out = await _run_compose(runner, node_id, project, extra, timeout=120)
+    _validate_project_name(project_name)
+    try:
+        out = await service.down(
+            node_id,
+            project_name,
+            volumes=data.volumes,
+            remove_orphans=data.remove_orphans,
+            timeout=data.timeout,
+            images=data.images,
+        )
+    except ComposeProjectNotFoundError as exc:
+        raise HTTPException(
+            status_code=404, detail="Compose project not found"
+        ) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     return ComposeActionResponse(status="down", output=out)
 
 
 # ---------------------------------------------------------------------------
-# Runtime — verb bulk with asyncio.gather and 207
+# Runtime — verb bulk with 207
 # ---------------------------------------------------------------------------
-
-
-async def _bulk_verb(
-    node_id: uuid.UUID,
-    project: ComposeProjectModel,
-    runner: DockerCommandRunner,
-    verb: str,
-    services: list[str] | None,
-    extra: str = "",
-    timeout: int = 60,
-) -> list[ComposeServiceBulkResult]:
-    """Run a compose verb per service with gather."""
-    if not services:
-        try:
-            out = await _run_compose(
-                runner, node_id, project, f"{verb}{extra}", timeout=timeout
-            )
-            return [
-                ComposeServiceBulkResult(
-                    service=project.project_name, status="success", output=out
-                )
-            ]
-        except Exception as exc:  # noqa: BLE001
-            return [
-                ComposeServiceBulkResult(
-                    service=project.project_name, status="error", error=str(exc)
-                )
-            ]
-
-    async def _one(svc: str) -> ComposeServiceBulkResult:
-        try:
-            out = await _run_compose(
-                runner,
-                node_id,
-                project,
-                f"{verb}{extra} {shlex.quote(svc)}",
-                timeout=timeout,
-            )
-            return ComposeServiceBulkResult(service=svc, status="success", output=out)
-        except Exception as exc:  # noqa: BLE001
-            return ComposeServiceBulkResult(service=svc, status="error", error=str(exc))
-
-    results = await asyncio.gather(*(_one(s) for s in services))
-    return list(results)
 
 
 @router.post(
@@ -580,8 +488,7 @@ async def compose_starts(
     node_id: uuid.UUID,
     project_name: str,
     data: ComposeServicesRequest,
-    session: FromDishka[AsyncSession],
-    runner: FromDishka[DockerCommandRunner],
+    service: FromDishka[ComposeService],
     response: Response,
     _principal: Principal = Security(require_write_or_jwt_scope),
 ) -> BulkResult[ComposeServiceBulkResult]:
@@ -591,15 +498,19 @@ async def compose_starts(
         node_id=str(node_id),
         project_name=project_name,
     )
-    project = await _get_project(session, node_id, project_name)
-    results = await _bulk_verb(node_id, project, runner, "start", data.services)
-    succeeded = sum(1 for r in results if r.status == "success")
-    failed = len(results) - succeeded
-    if failed > 0 and succeeded > 0:
+    _validate_project_name(project_name)
+    try:
+        bulk = await service.verb_bulk(node_id, project_name, "start", data.services)
+    except ComposeProjectNotFoundError as exc:
+        raise HTTPException(
+            status_code=404, detail="Compose project not found"
+        ) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    result = _bulk_to_response(bulk)
+    if result.failed > 0 and result.succeeded > 0:
         response.status_code = 207
-    return BulkResult[ComposeServiceBulkResult](
-        total=len(results), succeeded=succeeded, failed=failed, results=results
-    )
+    return result
 
 
 @router.post(
@@ -611,8 +522,7 @@ async def compose_stops(
     node_id: uuid.UUID,
     project_name: str,
     data: ComposeServicesRequest,
-    session: FromDishka[AsyncSession],
-    runner: FromDishka[DockerCommandRunner],
+    service: FromDishka[ComposeService],
     response: Response,
     timeout: int = Query(10, ge=1, le=600),
     _principal: Principal = Security(require_write_or_jwt_scope),
@@ -621,18 +531,22 @@ async def compose_stops(
     audit.info(
         "api.v2.compose.projects.stops", node_id=str(node_id), project_name=project_name
     )
-    project = await _get_project(session, node_id, project_name)
+    _validate_project_name(project_name)
     extra = f" -t {timeout}" if timeout else ""
-    results = await _bulk_verb(
-        node_id, project, runner, "stop", data.services, extra=extra
-    )
-    succeeded = sum(1 for r in results if r.status == "success")
-    failed = len(results) - succeeded
-    if failed > 0 and succeeded > 0:
+    try:
+        bulk = await service.verb_bulk(
+            node_id, project_name, "stop", data.services, extra=extra
+        )
+    except ComposeProjectNotFoundError as exc:
+        raise HTTPException(
+            status_code=404, detail="Compose project not found"
+        ) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    result = _bulk_to_response(bulk)
+    if result.failed > 0 and result.succeeded > 0:
         response.status_code = 207
-    return BulkResult[ComposeServiceBulkResult](
-        total=len(results), succeeded=succeeded, failed=failed, results=results
-    )
+    return result
 
 
 @router.post(
@@ -644,8 +558,7 @@ async def compose_restarts(
     node_id: uuid.UUID,
     project_name: str,
     data: ComposeServicesRequest,
-    session: FromDishka[AsyncSession],
-    runner: FromDishka[DockerCommandRunner],
+    service: FromDishka[ComposeService],
     response: Response,
     timeout: int = Query(10, ge=1, le=600),
     _principal: Principal = Security(require_write_or_jwt_scope),
@@ -656,18 +569,22 @@ async def compose_restarts(
         node_id=str(node_id),
         project_name=project_name,
     )
-    project = await _get_project(session, node_id, project_name)
+    _validate_project_name(project_name)
     extra = f" -t {timeout}" if timeout else ""
-    results = await _bulk_verb(
-        node_id, project, runner, "restart", data.services, extra=extra
-    )
-    succeeded = sum(1 for r in results if r.status == "success")
-    failed = len(results) - succeeded
-    if failed > 0 and succeeded > 0:
+    try:
+        bulk = await service.verb_bulk(
+            node_id, project_name, "restart", data.services, extra=extra
+        )
+    except ComposeProjectNotFoundError as exc:
+        raise HTTPException(
+            status_code=404, detail="Compose project not found"
+        ) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    result = _bulk_to_response(bulk)
+    if result.failed > 0 and result.succeeded > 0:
         response.status_code = 207
-    return BulkResult[ComposeServiceBulkResult](
-        total=len(results), succeeded=succeeded, failed=failed, results=results
-    )
+    return result
 
 
 @router.post(
@@ -679,8 +596,7 @@ async def compose_pauses(
     node_id: uuid.UUID,
     project_name: str,
     data: ComposeServicesRequest,
-    session: FromDishka[AsyncSession],
-    runner: FromDishka[DockerCommandRunner],
+    service: FromDishka[ComposeService],
     response: Response,
     _principal: Principal = Security(require_write_or_jwt_scope),
 ) -> BulkResult[ComposeServiceBulkResult]:
@@ -690,15 +606,19 @@ async def compose_pauses(
         node_id=str(node_id),
         project_name=project_name,
     )
-    project = await _get_project(session, node_id, project_name)
-    results = await _bulk_verb(node_id, project, runner, "pause", data.services)
-    succeeded = sum(1 for r in results if r.status == "success")
-    failed = len(results) - succeeded
-    if failed > 0 and succeeded > 0:
+    _validate_project_name(project_name)
+    try:
+        bulk = await service.verb_bulk(node_id, project_name, "pause", data.services)
+    except ComposeProjectNotFoundError as exc:
+        raise HTTPException(
+            status_code=404, detail="Compose project not found"
+        ) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    result = _bulk_to_response(bulk)
+    if result.failed > 0 and result.succeeded > 0:
         response.status_code = 207
-    return BulkResult[ComposeServiceBulkResult](
-        total=len(results), succeeded=succeeded, failed=failed, results=results
-    )
+    return result
 
 
 @router.post(
@@ -710,8 +630,7 @@ async def compose_unpauses(
     node_id: uuid.UUID,
     project_name: str,
     data: ComposeServicesRequest,
-    session: FromDishka[AsyncSession],
-    runner: FromDishka[DockerCommandRunner],
+    service: FromDishka[ComposeService],
     response: Response,
     _principal: Principal = Security(require_write_or_jwt_scope),
 ) -> BulkResult[ComposeServiceBulkResult]:
@@ -721,15 +640,19 @@ async def compose_unpauses(
         node_id=str(node_id),
         project_name=project_name,
     )
-    project = await _get_project(session, node_id, project_name)
-    results = await _bulk_verb(node_id, project, runner, "unpause", data.services)
-    succeeded = sum(1 for r in results if r.status == "success")
-    failed = len(results) - succeeded
-    if failed > 0 and succeeded > 0:
+    _validate_project_name(project_name)
+    try:
+        bulk = await service.verb_bulk(node_id, project_name, "unpause", data.services)
+    except ComposeProjectNotFoundError as exc:
+        raise HTTPException(
+            status_code=404, detail="Compose project not found"
+        ) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    result = _bulk_to_response(bulk)
+    if result.failed > 0 and result.succeeded > 0:
         response.status_code = 207
-    return BulkResult[ComposeServiceBulkResult](
-        total=len(results), succeeded=succeeded, failed=failed, results=results
-    )
+    return result
 
 
 @router.post(
@@ -741,8 +664,7 @@ async def compose_kills(
     node_id: uuid.UUID,
     project_name: str,
     data: ComposeKillRequest,
-    session: FromDishka[AsyncSession],
-    runner: FromDishka[DockerCommandRunner],
+    service: FromDishka[ComposeService],
     response: Response,
     _principal: Principal = Security(require_write_or_jwt_scope),
 ) -> BulkResult[ComposeServiceBulkResult]:
@@ -750,18 +672,22 @@ async def compose_kills(
     audit.info(
         "api.v2.compose.projects.kills", node_id=str(node_id), project_name=project_name
     )
-    project = await _get_project(session, node_id, project_name)
-    extra = f" -s {shlex.quote(data.signal)}" if data.signal else ""
-    results = await _bulk_verb(
-        node_id, project, runner, "kill", data.services, extra=extra
-    )
-    succeeded = sum(1 for r in results if r.status == "success")
-    failed = len(results) - succeeded
-    if failed > 0 and succeeded > 0:
+    _validate_project_name(project_name)
+    extra = f" -s {data.signal}" if data.signal else ""
+    try:
+        bulk = await service.verb_bulk(
+            node_id, project_name, "kill", data.services, extra=extra
+        )
+    except ComposeProjectNotFoundError as exc:
+        raise HTTPException(
+            status_code=404, detail="Compose project not found"
+        ) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    result = _bulk_to_response(bulk)
+    if result.failed > 0 and result.succeeded > 0:
         response.status_code = 207
-    return BulkResult[ComposeServiceBulkResult](
-        total=len(results), succeeded=succeeded, failed=failed, results=results
-    )
+    return result
 
 
 @router.post(
@@ -773,8 +699,7 @@ async def compose_creates(
     node_id: uuid.UUID,
     project_name: str,
     data: ComposeServicesRequest,
-    session: FromDishka[AsyncSession],
-    runner: FromDishka[DockerCommandRunner],
+    service: FromDishka[ComposeService],
     response: Response,
     _principal: Principal = Security(require_write_or_jwt_scope),
 ) -> BulkResult[ComposeServiceBulkResult]:
@@ -784,15 +709,19 @@ async def compose_creates(
         node_id=str(node_id),
         project_name=project_name,
     )
-    project = await _get_project(session, node_id, project_name)
-    results = await _bulk_verb(node_id, project, runner, "create", data.services)
-    succeeded = sum(1 for r in results if r.status == "success")
-    failed = len(results) - succeeded
-    if failed > 0 and succeeded > 0:
+    _validate_project_name(project_name)
+    try:
+        bulk = await service.verb_bulk(node_id, project_name, "create", data.services)
+    except ComposeProjectNotFoundError as exc:
+        raise HTTPException(
+            status_code=404, detail="Compose project not found"
+        ) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    result = _bulk_to_response(bulk)
+    if result.failed > 0 and result.succeeded > 0:
         response.status_code = 207
-    return BulkResult[ComposeServiceBulkResult](
-        total=len(results), succeeded=succeeded, failed=failed, results=results
-    )
+    return result
 
 
 @router.post(
@@ -804,8 +733,7 @@ async def compose_rms(
     node_id: uuid.UUID,
     project_name: str,
     data: ComposeServicesRequest,
-    session: FromDishka[AsyncSession],
-    runner: FromDishka[DockerCommandRunner],
+    service: FromDishka[ComposeService],
     response: Response,
     volumes: bool = Query(False),
     _principal: Principal = Security(require_write_or_jwt_scope),
@@ -814,20 +742,24 @@ async def compose_rms(
     audit.info(
         "api.v2.compose.projects.rms", node_id=str(node_id), project_name=project_name
     )
-    project = await _get_project(session, node_id, project_name)
+    _validate_project_name(project_name)
     extra = " -f"
     if volumes:
         extra += " -v"
-    results = await _bulk_verb(
-        node_id, project, runner, "rm", data.services, extra=extra
-    )
-    succeeded = sum(1 for r in results if r.status == "success")
-    failed = len(results) - succeeded
-    if failed > 0 and succeeded > 0:
+    try:
+        bulk = await service.verb_bulk(
+            node_id, project_name, "rm", data.services, extra=extra
+        )
+    except ComposeProjectNotFoundError as exc:
+        raise HTTPException(
+            status_code=404, detail="Compose project not found"
+        ) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    result = _bulk_to_response(bulk)
+    if result.failed > 0 and result.succeeded > 0:
         response.status_code = 207
-    return BulkResult[ComposeServiceBulkResult](
-        total=len(results), succeeded=succeeded, failed=failed, results=results
-    )
+    return result
 
 
 @router.post(
@@ -839,8 +771,7 @@ async def compose_pulls(
     node_id: uuid.UUID,
     project_name: str,
     data: ComposeServicesRequest,
-    session: FromDishka[AsyncSession],
-    runner: FromDishka[DockerCommandRunner],
+    service: FromDishka[ComposeService],
     response: Response,
     _principal: Principal = Security(require_write_or_jwt_scope),
 ) -> BulkResult[ComposeServiceBulkResult]:
@@ -848,15 +779,19 @@ async def compose_pulls(
     audit.info(
         "api.v2.compose.projects.pulls", node_id=str(node_id), project_name=project_name
     )
-    project = await _get_project(session, node_id, project_name)
-    results = await _bulk_verb(node_id, project, runner, "pull", data.services)
-    succeeded = sum(1 for r in results if r.status == "success")
-    failed = len(results) - succeeded
-    if failed > 0 and succeeded > 0:
+    _validate_project_name(project_name)
+    try:
+        bulk = await service.verb_bulk(node_id, project_name, "pull", data.services)
+    except ComposeProjectNotFoundError as exc:
+        raise HTTPException(
+            status_code=404, detail="Compose project not found"
+        ) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    result = _bulk_to_response(bulk)
+    if result.failed > 0 and result.succeeded > 0:
         response.status_code = 207
-    return BulkResult[ComposeServiceBulkResult](
-        total=len(results), succeeded=succeeded, failed=failed, results=results
-    )
+    return result
 
 
 @router.post(
@@ -868,8 +803,7 @@ async def compose_pushs(
     node_id: uuid.UUID,
     project_name: str,
     data: ComposeServicesRequest,
-    session: FromDishka[AsyncSession],
-    runner: FromDishka[DockerCommandRunner],
+    service: FromDishka[ComposeService],
     response: Response,
     _principal: Principal = Security(require_write_or_jwt_scope),
 ) -> BulkResult[ComposeServiceBulkResult]:
@@ -877,15 +811,19 @@ async def compose_pushs(
     audit.info(
         "api.v2.compose.projects.pushs", node_id=str(node_id), project_name=project_name
     )
-    project = await _get_project(session, node_id, project_name)
-    results = await _bulk_verb(node_id, project, runner, "push", data.services)
-    succeeded = sum(1 for r in results if r.status == "success")
-    failed = len(results) - succeeded
-    if failed > 0 and succeeded > 0:
+    _validate_project_name(project_name)
+    try:
+        bulk = await service.verb_bulk(node_id, project_name, "push", data.services)
+    except ComposeProjectNotFoundError as exc:
+        raise HTTPException(
+            status_code=404, detail="Compose project not found"
+        ) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    result = _bulk_to_response(bulk)
+    if result.failed > 0 and result.succeeded > 0:
         response.status_code = 207
-    return BulkResult[ComposeServiceBulkResult](
-        total=len(results), succeeded=succeeded, failed=failed, results=results
-    )
+    return result
 
 
 @router.post(
@@ -897,8 +835,7 @@ async def compose_builds(
     node_id: uuid.UUID,
     project_name: str,
     data: ComposeServicesRequest,
-    session: FromDishka[AsyncSession],
-    runner: FromDishka[DockerCommandRunner],
+    service: FromDishka[ComposeService],
     response: Response,
     no_cache: bool = Query(False),
     _principal: Principal = Security(require_write_or_jwt_scope),
@@ -909,18 +846,22 @@ async def compose_builds(
         node_id=str(node_id),
         project_name=project_name,
     )
-    project = await _get_project(session, node_id, project_name)
+    _validate_project_name(project_name)
     extra = " --no-cache" if no_cache else ""
-    results = await _bulk_verb(
-        node_id, project, runner, "build", data.services, extra=extra
-    )
-    succeeded = sum(1 for r in results if r.status == "success")
-    failed = len(results) - succeeded
-    if failed > 0 and succeeded > 0:
+    try:
+        bulk = await service.verb_bulk(
+            node_id, project_name, "build", data.services, extra=extra
+        )
+    except ComposeProjectNotFoundError as exc:
+        raise HTTPException(
+            status_code=404, detail="Compose project not found"
+        ) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    result = _bulk_to_response(bulk)
+    if result.failed > 0 and result.succeeded > 0:
         response.status_code = 207
-    return BulkResult[ComposeServiceBulkResult](
-        total=len(results), succeeded=succeeded, failed=failed, results=results
-    )
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -933,8 +874,7 @@ async def compose_builds(
 async def compose_ps(
     node_id: uuid.UUID,
     project_name: str,
-    session: FromDishka[AsyncSession],
-    runner: FromDishka[DockerCommandRunner],
+    service: FromDishka[ComposeService],
     all: bool = Query(False),  # noqa: A002
     _principal: Principal = Security(get_current_principal),
 ) -> ComposePsResponse:
@@ -942,20 +882,16 @@ async def compose_ps(
     audit.info(
         "api.v2.compose.projects.ps", node_id=str(node_id), project_name=project_name
     )
-    project = await _get_project(session, node_id, project_name)
-    extra = " -a" if all else ""
-    args = f"ps --format json{extra}"
-    out = await _run_compose(runner, node_id, project, args)
-    containers: list[dict[str, str]] = []
-    if out.strip():
-        for line in out.splitlines():
-            try:
-                obj = json.loads(line)
-                if isinstance(obj, dict):
-                    containers.append({str(k): str(v) for k, v in obj.items()})
-            except json.JSONDecodeError:
-                continue
-    return ComposePsResponse(output=out, containers=containers)
+    _validate_project_name(project_name)
+    try:
+        dto = await service.ps(node_id, project_name, all=all)
+    except ComposeProjectNotFoundError as exc:
+        raise HTTPException(
+            status_code=404, detail="Compose project not found"
+        ) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return ComposePsResponse(output=dto.output, containers=list(dto.containers))
 
 
 @router.get("/projects/{project_name}/logs", response_model=ComposeLogsResponse)
@@ -963,8 +899,7 @@ async def compose_ps(
 async def compose_logs(
     node_id: uuid.UUID,
     project_name: str,
-    session: FromDishka[AsyncSession],
-    runner: FromDishka[DockerCommandRunner],
+    service: FromDishka[ComposeService],
     tail: int = Query(100, ge=1, le=10000),
     since: str | None = Query(None),
     services: str | None = Query(None, description="Optional service name"),
@@ -974,11 +909,17 @@ async def compose_logs(
     audit.info(
         "api.v2.compose.projects.logs", node_id=str(node_id), project_name=project_name
     )
-    project = await _get_project(session, node_id, project_name)
-    since_arg = f" --since {shlex.quote(since)}" if since else ""
-    services_arg = f" {shlex.quote(services)}" if services else ""
-    args = f"logs --tail {tail}{since_arg}{services_arg}"
-    out = await _run_compose(runner, node_id, project, args)
+    _validate_project_name(project_name)
+    try:
+        out = await service.logs(
+            node_id, project_name, tail=tail, since=since, services=services
+        )
+    except ComposeProjectNotFoundError as exc:
+        raise HTTPException(
+            status_code=404, detail="Compose project not found"
+        ) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     return ComposeLogsResponse(output=out, logs=out)
 
 
@@ -987,8 +928,7 @@ async def compose_logs(
 async def compose_config(
     node_id: uuid.UUID,
     project_name: str,
-    session: FromDishka[AsyncSession],
-    runner: FromDishka[DockerCommandRunner],
+    service: FromDishka[ComposeService],
     _principal: Principal = Security(get_current_principal),
 ) -> ComposeConfigResponse:
     """Return resolved compose config via ``compose config``."""
@@ -997,8 +937,15 @@ async def compose_config(
         node_id=str(node_id),
         project_name=project_name,
     )
-    project = await _get_project(session, node_id, project_name)
-    out = await _run_compose(runner, node_id, project, "config")
+    _validate_project_name(project_name)
+    try:
+        out = await service.config(node_id, project_name)
+    except ComposeProjectNotFoundError as exc:
+        raise HTTPException(
+            status_code=404, detail="Compose project not found"
+        ) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     return ComposeConfigResponse(config=out, output=out)
 
 
@@ -1007,8 +954,7 @@ async def compose_config(
 async def compose_images(
     node_id: uuid.UUID,
     project_name: str,
-    session: FromDishka[AsyncSession],
-    runner: FromDishka[DockerCommandRunner],
+    service: FromDishka[ComposeService],
     _principal: Principal = Security(get_current_principal),
 ) -> ComposeImagesResponse:
     """List images for a compose project via ``compose images``."""
@@ -1017,27 +963,15 @@ async def compose_images(
         node_id=str(node_id),
         project_name=project_name,
     )
-    project = await _get_project(session, node_id, project_name)
-    # Try json format, fallback to raw
+    _validate_project_name(project_name)
     try:
-        out = await _run_compose(runner, node_id, project, "images --format json")
-    except Exception:
-        out = await _run_compose(runner, node_id, project, "config --images")
-    images: list[str] = []
-    if out.strip():
-        for line in out.splitlines():
-            stripped = line.strip()
-            if stripped.startswith("{"):
-                try:
-                    obj = json.loads(stripped)
-                    if isinstance(obj, dict):
-                        repo = obj.get("Repository") or obj.get("repository") or ""
-                        if isinstance(repo, str) and repo:
-                            images.append(repo)
-                except json.JSONDecodeError:
-                    images.append(stripped)
-            elif stripped:
-                images.append(stripped)
+        images, out = await service.images(node_id, project_name)
+    except ComposeProjectNotFoundError as exc:
+        raise HTTPException(
+            status_code=404, detail="Compose project not found"
+        ) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     return ComposeImagesResponse(images=images, output=out)
 
 
@@ -1046,26 +980,25 @@ async def compose_images(
 async def compose_top(
     node_id: uuid.UUID,
     project_name: str,
-    session: FromDishka[AsyncSession],
-    runner: FromDishka[DockerCommandRunner],
-    service: str | None = Query(None, max_length=100),
+    service: FromDishka[ComposeService],
+    service_name: str | None = Query(None, alias="service", max_length=100),
     _principal: Principal = Security(get_current_principal),
 ) -> ComposeTopResponse:
     """Return processes via ``compose top``."""
     audit.info(
         "api.v2.compose.projects.top", node_id=str(node_id), project_name=project_name
     )
-    project = await _get_project(session, node_id, project_name)
-    svc_arg = f" {shlex.quote(service)}" if service else ""
-    # compose top does not have json; parse textual
-    out = await _run_compose(runner, node_id, project, f"top{svc_arg}")
-    titles: list[str] = []
-    processes: list[list[str]] = []
-    lines = [line for line in out.strip().splitlines() if line.strip()]
-    if lines:
-        titles = lines[0].split()
-        for line in lines[1:]:
-            processes.append(line.split())
+    _validate_project_name(project_name)
+    try:
+        titles, processes, out = await service.top(
+            node_id, project_name, service=service_name
+        )
+    except ComposeProjectNotFoundError as exc:
+        raise HTTPException(
+            status_code=404, detail="Compose project not found"
+        ) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     return ComposeTopResponse(titles=titles, processes=processes, output=out)
 
 
@@ -1074,9 +1007,8 @@ async def compose_top(
 async def compose_port(
     node_id: uuid.UUID,
     project_name: str,
-    session: FromDishka[AsyncSession],
-    runner: FromDishka[DockerCommandRunner],
-    service: str = Query(..., min_length=1, max_length=100),
+    service: FromDishka[ComposeService],
+    service_name: str = Query(..., alias="service", min_length=1, max_length=100),
     private_port: str = Query(..., min_length=1, max_length=20),
     _principal: Principal = Security(get_current_principal),
 ) -> ComposePortResponse:
@@ -1084,9 +1016,17 @@ async def compose_port(
     audit.info(
         "api.v2.compose.projects.port", node_id=str(node_id), project_name=project_name
     )
-    project = await _get_project(session, node_id, project_name)
-    args = f"port {shlex.quote(service)} {shlex.quote(private_port)}"
-    out = await _run_compose(runner, node_id, project, args)
+    _validate_project_name(project_name)
+    try:
+        out = await service.port(
+            node_id, project_name, service=service_name, private_port=private_port
+        )
+    except ComposeProjectNotFoundError as exc:
+        raise HTTPException(
+            status_code=404, detail="Compose project not found"
+        ) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     return ComposePortResponse(output=out, bindings=out)
 
 
@@ -1095,8 +1035,7 @@ async def compose_port(
 async def compose_version(
     node_id: uuid.UUID,
     project_name: str,
-    session: FromDishka[AsyncSession],
-    runner: FromDishka[DockerCommandRunner],
+    service: FromDishka[ComposeService],
     _principal: Principal = Security(get_current_principal),
 ) -> ComposeVersionResponse:
     """Return compose version via ``compose version``."""
@@ -1105,31 +1044,16 @@ async def compose_version(
         node_id=str(node_id),
         project_name=project_name,
     )
-    project = await _get_project(session, node_id, project_name)
-    # version does not need file, but we reuse helper
-    node = await runner.get_target(node_id)
-    docker_args = "compose version --format json"
-    # Some versions require --short or json; fallback
+    _validate_project_name(project_name)
     try:
-        cmd = runner.build_command(node, docker_args)
-        stdout, stderr, exit_code = await runner.execute(node, cmd)
-        raise_for_docker_error(stderr, exit_code)
-        out = stdout.strip()
-        # parse
-        try:
-            obj = json.loads(out)
-            ver = (
-                str(obj.get("version") or obj.get("Version") or out)
-                if isinstance(obj, dict)
-                else out
-            )
-        except json.JSONDecodeError:
-            ver = out
-        return ComposeVersionResponse(version=ver, output=out)
-    except Exception:
-        # fallback without file
-        out = await _run_compose(runner, node_id, project, "version --short")
-        return ComposeVersionResponse(version=out.strip(), output=out)
+        ver, out = await service.version(node_id, project_name)
+    except ComposeProjectNotFoundError as exc:
+        raise HTTPException(
+            status_code=404, detail="Compose project not found"
+        ) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return ComposeVersionResponse(version=ver, output=out)
 
 
 @router.post("/projects/{project_name}/executions", response_model=ComposeExecResponse)
@@ -1138,8 +1062,7 @@ async def compose_exec(
     node_id: uuid.UUID,
     project_name: str,
     data: ComposeExecRequest,
-    session: FromDishka[AsyncSession],
-    runner: FromDishka[DockerCommandRunner],
+    service: FromDishka[ComposeService],
     _principal: Principal = Security(require_write_or_jwt_scope),
 ) -> ComposeExecResponse:
     """Execute a command in a compose service via ``compose exec``."""
@@ -1149,13 +1072,22 @@ async def compose_exec(
         project_name=project_name,
         service=data.service,
     )
-    project = await _get_project(session, node_id, project_name)
-    # -T disable pseudo-tty
-    cmd_part = shlex.quote(data.command)
-    args = f"exec -T {shlex.quote(data.service)} sh -c {cmd_part}"
-    out = await _run_compose(runner, node_id, project, args, timeout=data.timeout)
-    # For compose exec, exit code is propagated via error; assume 0 on success
-    return ComposeExecResponse(stdout=out, stderr="", exit_code=0)
+    _validate_project_name(project_name)
+    try:
+        stdout, stderr, exit_code = await service.exec(
+            node_id,
+            project_name,
+            service=data.service,
+            command=data.command,
+            timeout=data.timeout,
+        )
+    except ComposeProjectNotFoundError as exc:
+        raise HTTPException(
+            status_code=404, detail="Compose project not found"
+        ) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return ComposeExecResponse(stdout=stdout, stderr=stderr, exit_code=exit_code)
 
 
 @router.post("/projects/{project_name}/runs", response_model=ComposeRunResponse)
@@ -1164,8 +1096,7 @@ async def compose_run(
     node_id: uuid.UUID,
     project_name: str,
     data: ComposeRunRequest,
-    session: FromDishka[AsyncSession],
-    runner: FromDishka[DockerCommandRunner],
+    service: FromDishka[ComposeService],
     _principal: Principal = Security(require_write_or_jwt_scope),
 ) -> ComposeRunResponse:
     """Run a one-off command via ``compose run``."""
@@ -1175,9 +1106,20 @@ async def compose_run(
         project_name=project_name,
         service=data.service,
     )
-    project = await _get_project(session, node_id, project_name)
-    detached = " -d" if data.detached else " --rm"
-    cmd_part = f" {shlex.quote(data.command)}" if data.command else ""
-    args = f"run{detached} {shlex.quote(data.service)}{cmd_part}"
-    out = await _run_compose(runner, node_id, project, args, timeout=data.timeout)
+    _validate_project_name(project_name)
+    try:
+        out = await service.run(
+            node_id,
+            project_name,
+            service=data.service,
+            command=data.command,
+            detached=data.detached,
+            timeout=data.timeout,
+        )
+    except ComposeProjectNotFoundError as exc:
+        raise HTTPException(
+            status_code=404, detail="Compose project not found"
+        ) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     return ComposeRunResponse(output=out)

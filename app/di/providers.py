@@ -26,6 +26,7 @@ from app.adapters.persistence.audit_outbox_worker import AuditOutboxWorker
 from app.adapters.persistence.command_history import SqlAlchemyCommandHistoryGateway
 from app.adapters.persistence.command_management import SqlAlchemyCommandGateway
 from app.adapters.persistence.command_reader import ScopedCommandTemplateReader
+from app.adapters.persistence.compose import SqlAlchemyComposeGateway
 from app.adapters.persistence.config import SqlAlchemyConfigGateway
 from app.adapters.persistence.dao.command import CommandRepository
 from app.adapters.persistence.dao.health import HealthRepository
@@ -81,6 +82,7 @@ from app.application.ports.command_history import (
 )
 from app.application.ports.command_management import CommandReader, CommandWriter
 from app.application.ports.command_reader import CommandTemplateReader
+from app.application.ports.compose import ComposeReader, ComposeWriter
 from app.application.ports.config_persistence import (
     ConfigurationExporter,
     ConfigurationImporter,
@@ -139,6 +141,7 @@ from app.application.services.audit_log_service import AuditLogService
 from app.application.services.auth_service import AuthService
 from app.application.services.command_execution_service import CommandExecutionService
 from app.application.services.command_management_service import CommandManagementService
+from app.application.services.compose_service import ComposeService
 from app.application.services.config_service import ConfigService
 from app.application.services.dashboard_metrics_service import (
     DashboardMetricsService,
@@ -657,6 +660,23 @@ class RepositoryProvider(Provider):
         self, gateway: SqlAlchemyRefreshTokenGateway
     ) -> RefreshTokenWriter:
         """Bind refresh token writes to the persistence gateway."""
+        return gateway
+
+    @provide(scope=Scope.APP)
+    def get_compose_gateway(
+        self, sessionmaker: async_sessionmaker[AsyncSession]
+    ) -> SqlAlchemyComposeGateway:
+        """Get the short-scope compose persistence gateway."""
+        return SqlAlchemyComposeGateway(sessionmaker)
+
+    @provide(scope=Scope.APP, provides=ComposeReader)
+    def get_compose_reader(self, gateway: SqlAlchemyComposeGateway) -> ComposeReader:
+        """Bind compose reads to the persistence gateway."""
+        return gateway
+
+    @provide(scope=Scope.APP, provides=ComposeWriter)
+    def get_compose_writer(self, gateway: SqlAlchemyComposeGateway) -> ComposeWriter:
+        """Bind compose writes to the persistence gateway."""
         return gateway
 
 
@@ -1190,6 +1210,16 @@ class ServiceProvider(Provider):
     def get_template_pack_service(self) -> TemplatePackService:
         """Get template pack service (in-memory stub with assets)."""
         return TemplatePackService()
+
+    @provide(scope=Scope.REQUEST)
+    def get_compose_service(
+        self,
+        reader: ComposeReader,
+        writer: ComposeWriter,
+        runner: DockerCommandRunner,
+    ) -> ComposeService:
+        """Get compose project orchestration."""
+        return ComposeService(reader=reader, writer=writer, runner=runner)
 
 
 class ConfigProvider(Provider):

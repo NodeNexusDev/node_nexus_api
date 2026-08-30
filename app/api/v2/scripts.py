@@ -704,16 +704,36 @@ async def schedule_script(
     )
 
 
-@router.get("/{script_id}/schedules", response_model=ScheduledJob | None)
+@router.get("/{script_id}/schedules", response_model=ScheduledJob)
 @inject
 async def get_schedule(
     script_id: uuid.UUID,
     schedule_service: FromDishka[ScheduleManagementService],
     _principal: Principal = Security(get_current_principal),
-) -> ScheduledJob | None:
-    """Get the schedule for a script."""
+) -> ScheduledJob:
+    """Get the schedule for a script.
+
+    Returns 404 when no schedule is found (ScheduleNotFoundError).
+    """
     audit.info("api.v2.scripts.schedules.get", script_id=str(script_id))
-    return _scheduled_job(await schedule_service.get(script_id))
+    schedule = await schedule_service.get(script_id)
+    return _scheduled_job(schedule)
+
+
+@router.get(
+    "/{script_id}/schedule", response_model=ScheduledJob, include_in_schema=False
+)
+@inject
+async def get_schedule_singular(
+    script_id: uuid.UUID,
+    schedule_service: FromDishka[ScheduleManagementService],
+    _principal: Principal = Security(get_current_principal),
+) -> ScheduledJob:
+    """Singular alias for GET /{script_id}/schedules — returns 404 when missing."""
+
+    audit.info("api.v2.scripts.schedules.get", script_id=str(script_id))
+    schedule = await schedule_service.get(script_id)
+    return _scheduled_job(schedule)
 
 
 @router.delete("/{script_id}/schedules", status_code=204)

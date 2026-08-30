@@ -1,5 +1,7 @@
 """Central mapping of domain errors to HTTP responses."""
 
+from typing import cast
+
 import structlog
 from fastapi import Request
 from fastapi.responses import JSONResponse
@@ -11,6 +13,8 @@ from app.core.exceptions import (
     AuditWriteError,
     AuthenticationError,
     CommandNotFoundError,
+    ComposeProjectAlreadyExistsError,
+    ComposeProjectNotFoundError,
     ConnectionFailedError,
     ContainerNotFoundError,
     CredentialDecryptionError,
@@ -29,6 +33,8 @@ from app.core.exceptions import (
     NodeNameConflictError,
     NodeNotFoundError,
     NoteNotFoundError,
+    PackConflictError,
+    PackNotFoundError,
     RequestTimeoutError,
     ScheduledScriptExecutionError,
     ScheduleNotFoundError,
@@ -85,6 +91,10 @@ DOMAIN_ERROR_STATUS: dict[type[DomainError], int] = {
     TokenExpiredError: 401,
     InvalidTokenError: 401,
     InsufficientPermissionsError: 403,
+    ComposeProjectNotFoundError: 404,
+    ComposeProjectAlreadyExistsError: 409,
+    PackNotFoundError: 404,
+    PackConflictError: 409,
     DomainError: 422,
 }
 
@@ -102,15 +112,17 @@ PUBLIC_ERROR_MESSAGES: dict[type[DomainError], str] = {
 
 
 def status_for_domain_error(exc: DomainError) -> int:
-    """Return the most specific HTTP status registered for an error."""
-    return next(
-        (
-            status
-            for error_type, status in DOMAIN_ERROR_STATUS.items()
-            if isinstance(exc, error_type)
-        ),
-        422,
-    )
+    """Return the most specific HTTP status registered for an error.
+
+    Walks the MRO of the exception type to ensure the most specific
+    registered mapping is used regardless of dict insertion order.
+    Covers 502 Bad Gateway (DockerError) and 504 Gateway Timeout
+    (RequestTimeoutError) explicitly.
+    """
+    for cls in type(exc).__mro__:
+        if cls in DOMAIN_ERROR_STATUS:
+            return DOMAIN_ERROR_STATUS[cast(type[DomainError], cls)]
+    return 422
 
 
 async def domain_error_handler(request: Request, exc: Exception) -> JSONResponse:
@@ -118,13 +130,20 @@ async def domain_error_handler(request: Request, exc: Exception) -> JSONResponse
     if not isinstance(exc, DomainError):  # pragma: no cover - registered by type
         raise exc
     status_code = status_for_domain_error(exc)
-    log = logger.warning if status_code >= 500 else logger.info
-    log(
-        "http.domain_error",
-        path=request.url.path,
-        error_type=type(exc).__name__,
-        status_code=status_code,
-    )
+    if status_code >= 500:
+        logger.error(
+            "http.domain_error",
+            path=request.url.path,
+            error_type=type(exc).__name__,
+            status_code=status_code,
+        )
+    else:
+        logger.warning(
+            "http.domain_error",
+            path=request.url.path,
+            error_type=type(exc).__name__,
+            status_code=status_code,
+        )
     message = PUBLIC_ERROR_MESSAGES.get(type(exc), str(exc))
     request_id = getattr(request.state, "request_id", None)
     return JSONResponse(
@@ -134,5 +153,32 @@ async def domain_error_handler(request: Request, exc: Exception) -> JSONResponse
             "message": message,
             "request_id": request_id,
             "detail": message,
+        },
+    )
+
+
+async def internal_error_handler(request: Request, exc: Exception) -> JSONResponse:
+    """Fallback 500 handler for unhandled exceptions.
+
+    Ensures 500 Internal Server Error is always logged at error level
+    and returned as stable envelope. Covers 5xx including 502/504
+    documentation for gateway errors.
+    """
+
+    logger.error(
+        "http.internal_error",
+        path=request.url.path,
+        error_type=type(exc).__name__,
+        status_code=500,
+        exc_info=exc,
+    )
+    request_id = getattr(request.state, "request_id", None)
+    return JSONResponse(
+        status_code=500,
+        content={
+            "code": "InternalError",
+            "message": "Internal server error",
+            "request_id": request_id,
+            "detail": "Internal server error",
         },
     )

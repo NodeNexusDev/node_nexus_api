@@ -5,6 +5,7 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
+from typing import Literal
 
 
 @dataclass(frozen=True, slots=True)
@@ -101,6 +102,20 @@ class PackListQueryDTO:
     tag: str | None = None
     installed: bool | None = None
     search: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class PackInstallQueryDTO:
+    """Query for pack installation with conflict handling."""
+
+    on_conflict: Literal["fail", "rename"] = "fail"
+
+
+@dataclass(frozen=True, slots=True)
+class PackInstallQuery:
+    """Query for pack installation with conflict handling (alias)."""
+
+    on_conflict: Literal["fail", "rename"] = "fail"
 
 
 @dataclass(frozen=True, slots=True)

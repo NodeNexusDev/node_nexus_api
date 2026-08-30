@@ -408,16 +408,20 @@ async def unschedule_script(
     await schedule_service.delete(script_id)
 
 
-@router.get("/{script_id}/schedule", response_model=ScheduledJob | None)
+@router.get("/{script_id}/schedule", response_model=ScheduledJob)
 @inject
 async def get_schedule(
     script_id: uuid.UUID,
     schedule_service: FromDishka[ScheduleManagementService],
     _key: Principal = Security(get_current_principal),
-) -> ScheduledJob | None:
-    """Get the schedule for a script."""
+) -> ScheduledJob:
+    """Get the schedule for a script.
+
+    Returns 404 when no schedule is found (ScheduleNotFoundError).
+    """
     audit.info("api.scripts.get_schedule", script_id=str(script_id))
-    return _scheduled_job(await schedule_service.get(script_id))
+    schedule = await schedule_service.get(script_id)
+    return _scheduled_job(schedule)
 
 
 # --- Execution lifecycle ---

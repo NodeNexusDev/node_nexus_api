@@ -254,6 +254,22 @@ class DockerContainerService:
         state = _json_object(data.get("State"))
         config = _json_object(data.get("Config"))
         network_settings = _json_object(data.get("NetworkSettings"))
+        health_raw = state.get("Health")
+        health_obj = _json_object(health_raw) if isinstance(health_raw, dict) else {}
+        health_status = _optional_string(health_obj.get("Status"))
+        health_failing = health_obj.get("FailingStreak")
+        health_failing_streak: int | None = (
+            health_failing
+            if isinstance(health_failing, int) and not isinstance(health_failing, bool)
+            else None
+        )
+        health_log_raw = health_obj.get("Log")
+        if isinstance(health_log_raw, list):
+            health_log: tuple[object, ...] = tuple(
+                item for item in health_log_raw if isinstance(item, dict)
+            )
+        else:
+            health_log = ()
         audit.info(
             "docker.container.inspect",
             node_id=str(node_id),
@@ -274,6 +290,9 @@ class DockerContainerService:
                 oom_killed=(
                     _boolean(state["OOMKilled"]) if "OOMKilled" in state else None
                 ),
+                health=health_status,
+                health_failing_streak=health_failing_streak,
+                health_log=health_log,
             ),
             config=DockerContainerConfigDTO(
                 image=_optional_string(config.get("Image")),

@@ -37,6 +37,9 @@ class DockerContainerState(BaseModel):
     started_at: str | None = None
     finished_at: str | None = None
     oom_killed: bool | None = None
+    health: str | None = None
+    health_failing_streak: int | None = None
+    health_log: list[JsonObject] | None = None
 
 
 class DockerContainerConfig(BaseModel):
