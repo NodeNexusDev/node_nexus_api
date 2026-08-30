@@ -16,8 +16,17 @@ class ScriptStep(BaseModel):
     type: Literal["inline", "command"]
     command: str | None = Field(default=None, max_length=4096)
     command_id: uuid.UUID | None = None
+    command_name: str | None = Field(default=None, max_length=255)
     params: JsonObject = Field(default_factory=dict)
     on_failure: Literal["stop", "continue"] = Field(default="stop")
+
+    @model_validator(mode="after")
+    def check_command_ref(self) -> Self:
+        if self.type == "command" and not self.command_id and not self.command_name:
+            raise ValueError("command step requires command_id or command_name")
+        if self.command_id and self.command_name:
+            raise ValueError("Provide only one of command_id or command_name")
+        return self
 
 
 class ScriptCreate(BaseModel):

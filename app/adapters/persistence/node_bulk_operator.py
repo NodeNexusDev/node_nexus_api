@@ -1,10 +1,8 @@
 """Short-scope SQLAlchemy adapter for bulk node operations."""
 
 import uuid
-from typing import cast
 
-from sqlalchemy import delete, select, update
-from sqlalchemy.engine import CursorResult
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.application.dto.bulk_node_operation import (
@@ -25,13 +23,15 @@ class SqlAlchemyNodeBulkOperator:
     async def bulk_delete(self, data: BulkNodeDeleteDTO) -> BulkNodeOperationResultDTO:
         """Delete multiple nodes by IDs."""
         async with self._sessionmaker.begin() as session:
-            stmt = delete(NodeModel).where(NodeModel.id.in_(data.node_ids))
-            result = cast(CursorResult[tuple[object, ...]], await session.execute(stmt))
-            rowcount = result.rowcount
-            deleted_ids = list(data.node_ids[: max(0, rowcount or 0)])
+            existing_stmt = select(NodeModel.id).where(NodeModel.id.in_(data.node_ids))
+            existing = await session.execute(existing_stmt)
+            existing_ids = tuple(row[0] for row in existing.all())
+            if existing_ids:
+                stmt = delete(NodeModel).where(NodeModel.id.in_(existing_ids))
+                await session.execute(stmt)
         return BulkNodeOperationResultDTO(
-            affected=len(deleted_ids),
-            node_ids=tuple(deleted_ids),
+            affected=len(existing_ids),
+            node_ids=tuple(existing_ids),
         )
 
     async def bulk_add_tags(
@@ -39,7 +39,11 @@ class SqlAlchemyNodeBulkOperator:
     ) -> BulkNodeOperationResultDTO:
         """Add tags to multiple nodes."""
         async with self._sessionmaker.begin() as session:
-            stmt = select(NodeModel).where(NodeModel.id.in_(data.node_ids))
+            stmt = (
+                select(NodeModel)
+                .where(NodeModel.id.in_(data.node_ids))
+                .with_for_update()
+            )
             result = await session.execute(stmt)
             nodes = list(result.scalars().all())
 
@@ -55,14 +59,6 @@ class SqlAlchemyNodeBulkOperator:
                     node.tags = list(existing)
                     affected_ids.append(node.id)
 
-            if affected_ids:
-                update_stmt = (
-                    update(NodeModel)
-                    .where(NodeModel.id.in_(affected_ids))
-                    .values(tags=NodeModel.tags)
-                )
-                await session.execute(update_stmt)
-
         return BulkNodeOperationResultDTO(
             affected=len(affected_ids),
             node_ids=tuple(affected_ids),
@@ -73,7 +69,11 @@ class SqlAlchemyNodeBulkOperator:
     ) -> BulkNodeOperationResultDTO:
         """Remove tags from multiple nodes."""
         async with self._sessionmaker.begin() as session:
-            stmt = select(NodeModel).where(NodeModel.id.in_(data.node_ids))
+            stmt = (
+                select(NodeModel)
+                .where(NodeModel.id.in_(data.node_ids))
+                .with_for_update()
+            )
             result = await session.execute(stmt)
             nodes = list(result.scalars().all())
 
@@ -84,14 +84,6 @@ class SqlAlchemyNodeBulkOperator:
                 if len(new_tags) != len(existing):
                     node.tags = list(new_tags)
                     affected_ids.append(node.id)
-
-            if affected_ids:
-                update_stmt = (
-                    update(NodeModel)
-                    .where(NodeModel.id.in_(affected_ids))
-                    .values(tags=NodeModel.tags)
-                )
-                await session.execute(update_stmt)
 
         return BulkNodeOperationResultDTO(
             affected=len(affected_ids),

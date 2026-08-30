@@ -27,6 +27,7 @@ class NodeCreate(BaseModel):
         default=False, description="Logical docker capability toggle"
     )
     tags: list[str] = Field(default_factory=list)
+    description: str | None = Field(default=None, max_length=1000)
 
     @model_validator(mode="after")
     def check_docker_fields(self) -> Self:
@@ -57,6 +58,7 @@ class NodeUpdate(BaseModel):
         default=None, description="Logical docker capability toggle"
     )
     tags: list[str] | None = None
+    description: str | None = Field(default=None, max_length=1000)
 
     @model_validator(mode="after")
     def check_docker_fields_update(self) -> Self:
@@ -85,6 +87,7 @@ class NodeResponse(BaseModel):
     docker_host: str | None
     has_docker: bool
     tags: list[str]
+    description: str | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -438,3 +441,57 @@ class BulkCancelCommandResponse(BaseModel):
     total: int
     succeeded: int
     failed: int
+
+
+# --- 2.0 bulk-first without bulk keyword ---
+
+
+class NodeBulkCreateRequest(BaseModel):
+    """Bulk create nodes (2.0)."""
+
+    items: list[NodeCreate] = Field(min_length=1, max_length=20)
+
+
+class NodeBulkCreateResult(BaseModel):
+    """Result of creating a single node."""
+
+    node_id: uuid.UUID | None = None
+    status: Literal["success", "error"]
+    error: str = ""
+
+
+class NodeBulkCreateResponse(BaseModel):
+    """Response for bulk node creation (207 Multi-Status)."""
+
+    total: int
+    succeeded: int
+    failed: int
+    results: list[NodeBulkCreateResult]
+
+
+class NodeDeletionsRequest(BaseModel):
+    """Bulk delete without bulk keyword (2.0)."""
+
+    ids: list[uuid.UUID] = Field(min_length=1, max_length=100)
+
+
+class NodeDeletionsResponse(BaseModel):
+    """Unified bulk delete response (207)."""
+
+    total: int
+    succeeded: int
+    failed: int
+    results: list[BulkNodeUpdateResult]
+
+
+class NodeBulkUpdateItem(BaseModel):
+    """Single bulk update item."""
+
+    id: uuid.UUID
+    changes: NodeUpdate
+
+
+class NodeBulkUpdatesRequest(BaseModel):
+    """Bulk update via PATCH /nodes (2.0)."""
+
+    updates: list[NodeBulkUpdateItem] = Field(min_length=1, max_length=100)
