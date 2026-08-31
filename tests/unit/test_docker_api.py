@@ -13,7 +13,7 @@ from httpx2 import ASGITransport, AsyncClient
 
 from app.api.error_mapping import domain_error_handler
 from app.api.v1.docker import router as docker_router
-from app.api.v1.health import router as health_router
+from app.api.v2.health import router as health_router
 from app.application.dto.docker import (
     ContainerCreatedDTO,
     DockerContainerConfigDTO,

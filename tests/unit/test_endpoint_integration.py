@@ -15,8 +15,8 @@ from app.api.v1 import (
     commands,
     favorites,
     scripts,
-    search,
 )
+from app.api.v2 import search
 from app.application.dto.command_management import CommandViewDTO
 from app.application.dto.execution_stats import ExecutionStatsDTO
 from app.application.dto.favorite import FavoriteDTO
@@ -43,10 +43,10 @@ async def _noop_auth(*a, **kw):  # noqa: ANN001, ANN002, ANN003
 
 _MODULE_IMPORTS: dict[str, list[str]] = {
     "app.api.v1.commands": ["get_current_principal", "require_write_or_jwt_scope"],
-    "app.api.v1.events": ["get_current_principal"],
+    "app.api.v2.events": ["get_current_principal"],
     "app.api.v1.favorites": ["get_current_principal", "require_write_or_jwt_scope"],
     "app.api.v1.scripts": ["get_current_principal", "require_write_or_jwt_scope"],
-    "app.api.v1.search": ["get_current_principal"],
+    "app.api.v2.search": ["get_current_principal"],
     "app.api.v1.nodes": ["get_current_principal", "require_write_or_jwt_scope"],
 }
 
@@ -284,7 +284,7 @@ class TestScriptEndpoints:
 class TestEventsEndpoint:
     def test_stream_imports(self) -> None:
         """Verify the event_stream endpoint module loads and router exists."""
-        from app.api.v1.events import router as events_router
+        from app.api.v2.events import router as events_router
 
         assert any(
             getattr(route, "path", None) == "/events/stream"

@@ -20,9 +20,9 @@ from app.adapters.persistence.dao.node import NodeRepository
 from app.adapters.persistence.node_management import SqlAlchemyNodeManagementGateway
 from app.adapters.security import AesGcmCredentialCipher, HmacSha256APIKeyHasher
 from app.api.error_mapping import domain_error_handler
-from app.api.v1.api_keys import router as api_keys_router
-from app.api.v1.health import router as health_router
 from app.api.v1.nodes import router as nodes_router
+from app.api.v2.api_keys import router as api_keys_router
+from app.api.v2.health import router as health_router
 from app.application.ports.jwt_handler import JWTHandler
 from app.application.services.api_key_authentication import APIKeyAuthenticationService
 from app.application.services.api_key_management import APIKeyManagementService

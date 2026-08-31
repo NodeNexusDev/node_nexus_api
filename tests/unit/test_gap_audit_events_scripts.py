@@ -12,8 +12,8 @@ from fastapi import FastAPI
 from httpx2 import ASGITransport, AsyncClient
 
 from app.api.v1.audit import router as audit_router
-from app.api.v1.events import _event_generator
 from app.api.v1.scripts import router as scripts_router
+from app.api.v2.events import _event_generator
 from app.application.dto.audit import AuditLogDTO
 from app.application.dto.export import AuditExportQueryDTO, AuditExportRowDTO
 from app.application.ports.export import AuditExporter
@@ -209,7 +209,7 @@ class TestEventGenerator:
             return None
 
         queue.get = _fake_get
-        with patch("app.api.v1.events.get_sse_broadcaster", return_value=broadcaster):
+        with patch("app.api.v2.events.get_sse_broadcaster", return_value=broadcaster):
             gen = _event_generator(sub_id, queue)
             first = await gen.__anext__()
             assert first == ":\n\n"
@@ -230,7 +230,7 @@ class TestEventGenerator:
             return None
 
         queue.get = _fake_get
-        with patch("app.api.v1.events.get_sse_broadcaster", return_value=broadcaster):
+        with patch("app.api.v2.events.get_sse_broadcaster", return_value=broadcaster):
             gen = _event_generator(sub_id, queue)
             first = await gen.__anext__()
             assert first == ":\n\n"
@@ -256,7 +256,7 @@ class TestEventGenerator:
             return None
 
         queue.get = _fake_get
-        with patch("app.api.v1.events.get_sse_broadcaster", return_value=broadcaster):
+        with patch("app.api.v2.events.get_sse_broadcaster", return_value=broadcaster):
             gen = _event_generator(sub_id, queue)
             await gen.__anext__()  # initial
             line = await gen.__anext__()
@@ -273,7 +273,7 @@ class TestEventGenerator:
             return None
 
         queue.get = _fake_get
-        with patch("app.api.v1.events.get_sse_broadcaster", return_value=broadcaster):
+        with patch("app.api.v2.events.get_sse_broadcaster", return_value=broadcaster):
             gen = _event_generator(sub_id, queue)
             await gen.__anext__()  # initial
             with pytest.raises(StopAsyncIteration):
@@ -288,7 +288,7 @@ class TestEventGenerator:
             return None
 
         queue.get = _fake_get
-        with patch("app.api.v1.events.get_sse_broadcaster", return_value=broadcaster):
+        with patch("app.api.v2.events.get_sse_broadcaster", return_value=broadcaster):
             gen = _event_generator(sub_id, queue)
             await gen.__anext__()  # initial
             with pytest.raises(StopAsyncIteration):
@@ -300,7 +300,7 @@ class TestEventStreamEndpoint:
     """Tests for GET /events/stream endpoint."""
 
     async def test_returns_streaming_response(self) -> None:
-        from app.api.v1.events import router as events_router
+        from app.api.v2.events import router as events_router
 
         broadcaster = MagicMock(spec=SseBroadcaster)
         sub_queue: Any = AsyncMock()
@@ -308,7 +308,7 @@ class TestEventStreamEndpoint:
         broadcaster.subscribe.return_value = ("sub-1", sub_queue)
         app = FastAPI()
         app.include_router(events_router)
-        with patch("app.api.v1.events.get_sse_broadcaster", return_value=broadcaster):
+        with patch("app.api.v2.events.get_sse_broadcaster", return_value=broadcaster):
             mock = _mock_settings("master")
             with patch("app.api.deps.get_settings", return_value=mock):
                 container = make_async_container(MockAuthServiceProvider())

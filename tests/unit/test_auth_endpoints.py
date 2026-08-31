@@ -56,7 +56,7 @@ def _create_app(
     mock_service: AuthService | AsyncMock | None = None,
     mock_jwt: MagicMock | None = None,
 ) -> FastAPI:
-    from app.api.v1.auth import router
+    from app.api.v2.auth import router
 
     app = FastAPI()
     app.include_router(router)

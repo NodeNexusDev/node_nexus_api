@@ -10,7 +10,7 @@ from dishka.integrations.fastapi import setup_dishka
 from fastapi import FastAPI
 from httpx2 import ASGITransport, AsyncClient
 
-from app.api.v1.config import router as config_router
+from app.api.v2.config import router as config_router
 from app.application.dto.config import ConfigImportResultDTO, ConfigTransferDTO
 from app.application.services.config_service import ConfigService
 from tests.unit.conftest import MockAuthServiceProvider, _mock_settings

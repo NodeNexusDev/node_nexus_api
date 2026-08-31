@@ -1,4 +1,4 @@
-"""Comprehensive unit tests for app.api.v1.websocket — coverage gaps.
+"""Comprehensive unit tests for app.api.v2.websocket — coverage gaps.
 
 Targets untested branches in _validate_ws_token, _send_command_events,
 and exec_stream to push coverage from 43% to 80%+.
@@ -16,7 +16,7 @@ from uuid import uuid4
 import pytest
 from fastapi import WebSocketDisconnect
 
-from app.api.v1.websocket import (
+from app.api.v2.websocket import (
     _send_command_events,
     _validate_ws_token,
     exec_stream,

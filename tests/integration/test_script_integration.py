@@ -26,8 +26,8 @@ from app.adapters.persistence.script_gateway import (
 )
 from app.adapters.security import AesGcmCredentialCipher, HmacSha256APIKeyHasher
 from app.api.error_mapping import domain_error_handler
-from app.api.v1.health import router as health_router
 from app.api.v1.scripts import router as scripts_router
+from app.api.v2.health import router as health_router
 from app.application.ports.jwt_handler import JWTHandler
 from app.application.services.api_key_authentication import APIKeyAuthenticationService
 from app.application.services.script_execution_service import ScriptExecutionService

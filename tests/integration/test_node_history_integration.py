@@ -23,8 +23,8 @@ from app.adapters.persistence.node_management import SqlAlchemyNodeManagementGat
 from app.adapters.security import HmacSha256APIKeyHasher
 from app.api.error_mapping import domain_error_handler
 from app.api.v1.commands import router as commands_router
-from app.api.v1.health import router as health_router
 from app.api.v1.nodes import router as nodes_router
+from app.api.v2.health import router as health_router
 from app.application.ports.jwt_handler import JWTHandler
 from app.application.services.api_key_authentication import APIKeyAuthenticationService
 from app.application.services.execution_history_service import ExecutionHistoryService

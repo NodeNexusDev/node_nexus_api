@@ -14,7 +14,7 @@ from httpx2 import ASGITransport, AsyncClient
 
 from app.api.error_mapping import domain_error_handler
 from app.api.v1.commands import router as commands_router
-from app.api.v1.health import router as health_router
+from app.api.v2.health import router as health_router
 from app.application.dto.command_management import CommandViewDTO
 from app.application.services.command_execution_service import CommandExecutionService
 from app.application.services.command_management_service import CommandManagementService

@@ -389,9 +389,9 @@ class TestPasswordHasher:
 
 
 class TestHealthVersion:
-    @patch("app.api.v1.health.pkg_version", side_effect=PackageNotFoundError)
+    @patch("app.api.v2.health.pkg_version", side_effect=PackageNotFoundError)
     def test_version_unknown_on_exception(self, mock_pkg_version: Any) -> None:
-        from app.api.v1.health import _get_app_version
+        from app.api.v2.health import _get_app_version
 
         result = _get_app_version()
         assert result == "unknown"

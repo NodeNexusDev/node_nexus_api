@@ -24,9 +24,9 @@ from app.adapters.security import HmacSha256APIKeyHasher
 from app.api.error_mapping import domain_error_handler
 from app.api.v1.audit import router as audit_router
 from app.api.v1.commands import router as commands_router
-from app.api.v1.health import router as health_router
 from app.api.v1.nodes import router as nodes_router
 from app.api.v1.scripts import router as scripts_router
+from app.api.v2.health import router as health_router
 from app.application.services.api_key_authentication import APIKeyAuthenticationService
 from app.core.exceptions import DomainError
 from app.models.audit_log import AuditLogModel

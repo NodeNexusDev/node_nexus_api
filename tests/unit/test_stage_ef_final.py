@@ -233,9 +233,9 @@ class TestSseEvents:
         sub_id, queue = bc.subscribe()
 
         with pytest.MonkeyPatch.context() as mp:
-            mp.setattr("app.api.v1.events.get_sse_broadcaster", lambda: bc)
+            mp.setattr("app.api.v2.events.get_sse_broadcaster", lambda: bc)
 
-            from app.api.v1.events import _event_generator
+            from app.api.v2.events import _event_generator
 
             gen = _event_generator(sub_id, queue)
             first = await gen.__anext__()
@@ -251,9 +251,9 @@ class TestSseEvents:
         bc.publish("test.event", {"key": "value"})
 
         with pytest.MonkeyPatch.context() as mp:
-            mp.setattr("app.api.v1.events.get_sse_broadcaster", lambda: bc)
+            mp.setattr("app.api.v2.events.get_sse_broadcaster", lambda: bc)
 
-            from app.api.v1.events import _event_generator
+            from app.api.v2.events import _event_generator
 
             gen = _event_generator(sub_id, queue)
             await gen.__anext__()  # initial comment
@@ -270,9 +270,9 @@ class TestSseEvents:
         queue.put_nowait(None)
 
         with pytest.MonkeyPatch.context() as mp:
-            mp.setattr("app.api.v1.events.get_sse_broadcaster", lambda: bc)
+            mp.setattr("app.api.v2.events.get_sse_broadcaster", lambda: bc)
 
-            from app.api.v1.events import _event_generator
+            from app.api.v2.events import _event_generator
 
             gen = _event_generator(sub_id, queue)
             first = await gen.__anext__()

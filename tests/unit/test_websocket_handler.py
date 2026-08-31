@@ -10,7 +10,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from fastapi import WebSocketDisconnect
 
-from app.api.v1.websocket import _send_command_events, _validate_ws_token, exec_stream
+from app.api.v2.websocket import _send_command_events, _validate_ws_token, exec_stream
 from app.application.dto.remote_stream import RemoteStreamEventDTO
 from app.core.exceptions import ConnectionFailedError, NodeNotFoundError
 
@@ -70,7 +70,7 @@ class TestExecStreamFullCoverage:
     async def test_master_token_authentication(self) -> None:
         ws = _make_ws()
         settings = SimpleNamespace(MASTER_API_KEY="master")
-        with patch("app.api.v1.websocket.get_settings", return_value=settings):
+        with patch("app.api.v2.websocket.get_settings", return_value=settings):
             assert await _validate_ws_token(ws, "master", _api_key_service()) is True
 
     async def test_read_only_and_invalid_token_are_rejected(self) -> None:

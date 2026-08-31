@@ -53,7 +53,7 @@ def _create_app(
     mock_jwt: MagicMock | None = None,
     is_superuser: bool = True,
 ) -> FastAPI:
-    from app.api.v1.users import router
+    from app.api.v2.users import router
 
     app = FastAPI()
     app.include_router(router)

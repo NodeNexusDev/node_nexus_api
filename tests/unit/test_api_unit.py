@@ -14,8 +14,8 @@ from httpx2 import ASGITransport, AsyncClient
 
 from app.api.error_mapping import domain_error_handler
 from app.api.v1.commands import router as commands_router
-from app.api.v1.health import router as health_router
 from app.api.v1.nodes import router as nodes_router
+from app.api.v2.health import router as health_router
 from app.application.dto.node_view import NodeViewDTO
 from app.application.dto.value_objects import NodeEndpoint
 from app.application.services.node_bulk_command_service import NodeBulkCommandService

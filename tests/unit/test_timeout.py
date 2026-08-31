@@ -10,8 +10,8 @@ from fastapi import FastAPI
 from httpx2 import ASGITransport, AsyncClient
 
 from app.api.middleware import TimeoutMiddleware
-from app.api.v1.health import router as health_router
 from app.api.v1.nodes import router as nodes_router
+from app.api.v2.health import router as health_router
 from app.application.services.node_management_service import NodeManagementService
 from tests.typing import as_typed_mock
 from tests.unit.conftest import MockAuthServiceProvider, _mock_settings

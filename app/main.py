@@ -28,23 +28,23 @@ from app.api.middleware import (
     RequestLoggingMiddleware,
     TimeoutMiddleware,
 )
-from app.api.v1.api_keys import router as api_keys_router
-from app.api.v1.auth import router as auth_router
-from app.api.v1.config import router as config_router
-from app.api.v1.events import router as events_router
-from app.api.v1.health import router as health_router
-from app.api.v1.internal import router as internal_router
-from app.api.v1.search import router as search_router
-from app.api.v1.users import router as users_router
-from app.api.v1.websocket import router as ws_router
+from app.api.v2.api_keys import router as api_keys_router
 from app.api.v2.audit import router as audit_router
+from app.api.v2.auth import router as auth_router
 from app.api.v2.commands import router as commands_router
 from app.api.v2.compose import router as compose_router
+from app.api.v2.config import router as config_router
 from app.api.v2.docker import router as docker_router
+from app.api.v2.events import router as events_router
 from app.api.v2.favorites import router as favorites_router
+from app.api.v2.health import router as health_router
+from app.api.v2.internal import router as internal_router
 from app.api.v2.nodes import router as nodes_router
 from app.api.v2.scripts import router as scripts_router
+from app.api.v2.search import router as search_router
 from app.api.v2.templates import router as templates_router
+from app.api.v2.users import router as users_router
+from app.api.v2.websocket import router as ws_router
 from app.core.config import get_settings
 from app.core.exceptions import DomainError
 from app.di.container import container
