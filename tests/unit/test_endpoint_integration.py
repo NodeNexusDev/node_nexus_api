@@ -14,7 +14,6 @@ from httpx2 import ASGITransport, AsyncClient, Response
 from app.api.v1 import (
     commands,
     favorites,
-    notes,
     scripts,
     search,
 )
@@ -22,7 +21,6 @@ from app.application.dto.command_management import CommandViewDTO
 from app.application.dto.execution_stats import ExecutionStatsDTO
 from app.application.dto.favorite import FavoriteDTO
 from app.application.dto.global_search import GlobalSearchResultDTO
-from app.application.dto.note import NoteDTO
 from app.application.dto.script_management import ScriptViewDTO
 from app.application.ports.jwt_handler import JWTHandler
 from app.application.services.api_key_authentication import (
@@ -34,7 +32,6 @@ from app.application.services.command_management_service import (
 from app.application.services.execution_stats_service import ExecutionStatsService
 from app.application.services.favorite_service import FavoriteService
 from app.application.services.global_search_service import GlobalSearchService
-from app.application.services.note_service import NoteService
 from app.application.services.script_management_service import (
     ScriptManagementService,
 )
@@ -48,7 +45,6 @@ _MODULE_IMPORTS: dict[str, list[str]] = {
     "app.api.v1.commands": ["get_current_principal", "require_write_or_jwt_scope"],
     "app.api.v1.events": ["get_current_principal"],
     "app.api.v1.favorites": ["get_current_principal", "require_write_or_jwt_scope"],
-    "app.api.v1.notes": ["get_current_principal", "require_write_or_jwt_scope"],
     "app.api.v1.scripts": ["get_current_principal", "require_write_or_jwt_scope"],
     "app.api.v1.search": ["get_current_principal"],
     "app.api.v1.nodes": ["get_current_principal", "require_write_or_jwt_scope"],
@@ -104,107 +100,6 @@ async def _request(app: FastAPI, method: str, path: str, **kwargs) -> Response:
         base_url="http://test",
     ) as client:
         return await client.request(method, path, **kwargs)
-
-
-class TestNoteEndpoints:
-    async def test_list(self) -> None:
-        mock_svc = AsyncMock(spec=NoteService)
-        mock_svc.list_notes.return_value = []
-
-        app = _build_app_with_service(NoteService, mock_svc)
-        app.include_router(notes.router)
-
-        patches = _patch_auth()
-        try:
-            resp = await _request(
-                app,
-                "GET",
-                f"/notes/command/{uuid.uuid4()}",
-                headers={"X-API-Key": "test"},
-            )
-        finally:
-            _stop_patches(patches)
-        assert resp.status_code == 200
-
-    async def test_create(self) -> None:
-        mock_svc = AsyncMock(spec=NoteService)
-        target_id = uuid.uuid4()
-        mock_svc.create_note.return_value = NoteDTO(
-            id=uuid.uuid4(),
-            target_type="command",
-            target_id=target_id,
-            content="note",
-            created_at=datetime.now(UTC),
-            updated_at=datetime.now(UTC),
-        )
-
-        app = _build_app_with_service(NoteService, mock_svc)
-        app.include_router(notes.router)
-
-        patches = _patch_auth()
-        try:
-            resp = await _request(
-                app,
-                "POST",
-                f"/notes/command/{target_id}",
-                json={
-                    "target_type": "command",
-                    "target_id": str(target_id),
-                    "content": "note",
-                },
-                headers={"X-API-Key": "test"},
-            )
-        finally:
-            _stop_patches(patches)
-        assert resp.status_code == 201
-        assert resp.json()["content"] == "note"
-
-    async def test_update(self) -> None:
-        mock_svc = AsyncMock(spec=NoteService)
-        mock_svc.update_note.return_value = NoteDTO(
-            id=uuid.uuid4(),
-            target_type="command",
-            target_id=uuid.uuid4(),
-            content="updated",
-            created_at=datetime.now(UTC),
-            updated_at=datetime.now(UTC),
-        )
-
-        app = _build_app_with_service(NoteService, mock_svc)
-        app.include_router(notes.router)
-
-        patches = _patch_auth()
-        try:
-            resp = await _request(
-                app,
-                "PUT",
-                f"/notes/{uuid.uuid4()}",
-                json={"content": "updated"},
-                headers={"X-API-Key": "test"},
-            )
-        finally:
-            _stop_patches(patches)
-        assert resp.status_code == 200
-        assert resp.json()["content"] == "updated"
-
-    async def test_delete(self) -> None:
-        mock_svc = AsyncMock(spec=NoteService)
-        mock_svc.delete_note.return_value = True
-
-        app = _build_app_with_service(NoteService, mock_svc)
-        app.include_router(notes.router)
-
-        patches = _patch_auth()
-        try:
-            resp = await _request(
-                app,
-                "DELETE",
-                f"/notes/{uuid.uuid4()}",
-                headers={"X-API-Key": "test"},
-            )
-        finally:
-            _stop_patches(patches)
-        assert resp.status_code == 204
 
 
 class TestFavoriteEndpoints:

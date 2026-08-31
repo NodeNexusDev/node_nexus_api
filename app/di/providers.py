@@ -33,10 +33,6 @@ from app.adapters.persistence.dao.health import HealthRepository
 from app.adapters.persistence.dao.node import NodeRepository
 from app.adapters.persistence.dao.script import ScriptRepository
 from app.adapters.persistence.dao.script_execution import ScriptExecutionRepository
-from app.adapters.persistence.dashboard import SqlAlchemyDashboardGateway
-from app.adapters.persistence.dashboard_metrics import (
-    SqlAlchemyDashboardMetricsGateway,
-)
 from app.adapters.persistence.execution_lifecycle import (
     SqlAlchemyExecutionLifecycleGateway,
 )
@@ -51,7 +47,6 @@ from app.adapters.persistence.node_reader import ScopedNodeConnectionReader
 from app.adapters.persistence.node_status_history import (
     SqlAlchemyNodeStatusHistoryGateway,
 )
-from app.adapters.persistence.note import SqlAlchemyNoteGateway
 from app.adapters.persistence.schedule import SqlAlchemyScheduleGateway
 from app.adapters.persistence.script_gateway import (
     ScopedScriptDefinitionReader,
@@ -88,8 +83,6 @@ from app.application.ports.config_persistence import (
     ConfigurationImporter,
 )
 from app.application.ports.credential_cipher import CredentialCipher
-from app.application.ports.dashboard import DashboardReader
-from app.application.ports.dashboard_metrics import DashboardMetricsReader
 from app.application.ports.docker_runtime import DockerRuntime
 from app.application.ports.execution_lifecycle import ExecutionLifecycleManager
 from app.application.ports.execution_stats import ExecutionStatsReader
@@ -110,7 +103,6 @@ from app.application.ports.node_status_history import (
     NodeStatusHistoryWriter,
 )
 from app.application.ports.node_validation import NodeCredentialValidator
-from app.application.ports.note import NoteReader, NoteWriter
 from app.application.ports.password_hasher import PasswordHasher
 from app.application.ports.refresh_token_persistence import (
     RefreshTokenReader,
@@ -143,10 +135,6 @@ from app.application.services.command_execution_service import CommandExecutionS
 from app.application.services.command_management_service import CommandManagementService
 from app.application.services.compose_service import ComposeService
 from app.application.services.config_service import ConfigService
-from app.application.services.dashboard_metrics_service import (
-    DashboardMetricsService,
-)
-from app.application.services.dashboard_service import DashboardService
 from app.application.services.docker.bulk_service import DockerBulkService
 from app.application.services.docker.command_runner import DockerCommandRunner
 from app.application.services.docker.container_service import DockerContainerService
@@ -173,7 +161,6 @@ from app.application.services.node_status_history_service import (
     NodeStatusHistoryService,
 )
 from app.application.services.node_validation_service import NodeValidationService
-from app.application.services.note_service import NoteService
 from app.application.services.schedule_management import (
     ScheduleManagementService,
 )
@@ -488,39 +475,6 @@ class RepositoryProvider(Provider):
         """Bind audit-log retention writes."""
         return gateway
 
-    @provide(scope=Scope.APP)
-    def get_dashboard_gateway(
-        self,
-        sessionmaker: async_sessionmaker[AsyncSession],
-        node_reader: NodeConnectionReader,
-        runtime: DockerRuntime,
-    ) -> SqlAlchemyDashboardGateway:
-        """Get the dashboard aggregation gateway."""
-        return SqlAlchemyDashboardGateway(
-            sessionmaker, node_reader=node_reader, runtime=runtime
-        )
-
-    @provide(scope=Scope.APP, provides=DashboardReader)
-    def get_dashboard_reader(
-        self, gateway: SqlAlchemyDashboardGateway
-    ) -> DashboardReader:
-        """Bind dashboard reads to the persistence gateway."""
-        return gateway
-
-    @provide(scope=Scope.APP)
-    def get_dashboard_metrics_gateway(
-        self, sessionmaker: async_sessionmaker[AsyncSession]
-    ) -> SqlAlchemyDashboardMetricsGateway:
-        """Get the short-scope dashboard metrics gateway."""
-        return SqlAlchemyDashboardMetricsGateway(sessionmaker)
-
-    @provide(scope=Scope.APP, provides=DashboardMetricsReader)
-    def get_dashboard_metrics_reader(
-        self, gateway: SqlAlchemyDashboardMetricsGateway
-    ) -> DashboardMetricsReader:
-        """Bind dashboard metrics reads to the persistence gateway."""
-        return gateway
-
     @provide(scope=Scope.REQUEST, provides=AuditExporter)
     def get_audit_exporter(self, session: AsyncSession) -> AuditExporter:
         """Bind audit export to the persistence adapter."""
@@ -535,16 +489,6 @@ class RepositoryProvider(Provider):
     def get_favorite_writer(self, session: AsyncSession) -> FavoriteWriter:
         """Bind favorite writer to the persistence adapter."""
         return SqlAlchemyFavoriteGateway(session)
-
-    @provide(scope=Scope.REQUEST, provides=NoteReader)
-    def get_note_reader(self, session: AsyncSession) -> NoteReader:
-        """Bind note reader to the persistence adapter."""
-        return SqlAlchemyNoteGateway(session)
-
-    @provide(scope=Scope.REQUEST, provides=NoteWriter)
-    def get_note_writer(self, session: AsyncSession) -> NoteWriter:
-        """Bind note writer to the persistence adapter."""
-        return SqlAlchemyNoteGateway(session)
 
     @provide(scope=Scope.REQUEST)
     def get_command_repository(self, session: AsyncSession) -> CommandRepository:
@@ -1106,14 +1050,6 @@ class ServiceProvider(Provider):
         return ConfigService(exporter=exporter, importer=importer)
 
     @provide(scope=Scope.APP)
-    def get_dashboard_service(
-        self,
-        reader: DashboardReader,
-    ) -> DashboardService:
-        """Get dashboard overview service."""
-        return DashboardService(reader=reader)
-
-    @provide(scope=Scope.APP)
     def get_node_validation_service(
         self,
         validator: NodeCredentialValidator,
@@ -1147,14 +1083,6 @@ class ServiceProvider(Provider):
         return GlobalSearchService(reader=reader)
 
     @provide(scope=Scope.REQUEST)
-    def get_dashboard_metrics_service(
-        self,
-        reader: DashboardMetricsReader,
-    ) -> DashboardMetricsService:
-        """Get dashboard metrics service."""
-        return DashboardMetricsService(reader=reader)
-
-    @provide(scope=Scope.REQUEST)
     def get_favorite_service(
         self,
         reader: FavoriteReader,
@@ -1162,15 +1090,6 @@ class ServiceProvider(Provider):
     ) -> FavoriteService:
         """Get favorite service."""
         return FavoriteService(reader=reader, writer=writer)
-
-    @provide(scope=Scope.REQUEST)
-    def get_note_service(
-        self,
-        reader: NoteReader,
-        writer: NoteWriter,
-    ) -> NoteService:
-        """Get note service."""
-        return NoteService(reader=reader, writer=writer)
 
     @provide(scope=Scope.REQUEST)
     def get_auth_service(

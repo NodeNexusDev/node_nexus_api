@@ -12,13 +12,11 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from app.adapters.persistence.audit_export import SqlAlchemyAuditExporter
-from app.adapters.persistence.dao.dashboard_metrics import DashboardMetricsRepository
 from app.adapters.persistence.dao.execution_stats import (
     _DEFAULT_STATS,
     ExecutionStatsRepository,
 )
 from app.adapters.runtime.scheduler import ApschedulerJobScheduler
-from app.application.dto.dashboard_metrics import MetricsQueryDTO
 from app.application.dto.export import AuditExportQueryDTO, AuditExportRowDTO
 from app.application.dto.node_connection import NodeConnectionDTO
 from app.application.dto.node_management import NodeCursorQueryDTO
@@ -224,150 +222,6 @@ class TestScriptStats:
         result = await repo.script_stats(script_id=uuid.uuid4())
 
         assert result == dict(_DEFAULT_STATS)
-
-
-# ===========================================================================
-# DashboardMetricsRepository
-# ===========================================================================
-
-
-class TestCommandMetrics:
-    async def test_date_filters_add_where_clauses(self) -> None:
-        row = SimpleNamespace(
-            period=datetime(2026, 3, 1, tzinfo=UTC),
-            total=50,
-            successful=45,
-            failed=5,
-            cancelled=0,
-            avg_duration_ms=200.0,
-        )
-        execute_result = MagicMock()
-        execute_result.all.return_value = [row]
-        session = _mock_session_with_result(execute_result)
-        repo = DashboardMetricsRepository(session)
-        dt_from = datetime(2026, 1, 1, tzinfo=UTC)
-        dt_to = datetime(2026, 12, 31, tzinfo=UTC)
-        query = MetricsQueryDTO(date_from=dt_from, date_to=dt_to, group_by="day")
-
-        result = await repo.command_metrics(query)
-
-        call_args = session.execute.call_args
-        sql = str(call_args[0][0])
-        params = call_args[0][1]
-
-        assert "ce.started_at >= :date_from" in sql
-        assert "ce.started_at < :date_to" in sql
-        assert params["date_from"] == dt_from
-        assert params["date_to"] == dt_to
-        assert params["grp"] == "day"
-        assert len(result) == 1
-        assert result[0].total == 50
-
-    async def test_no_filters_where_true(self) -> None:
-        execute_result = MagicMock()
-        execute_result.all.return_value = []
-        session = _mock_session_with_result(execute_result)
-        repo = DashboardMetricsRepository(session)
-        query = MetricsQueryDTO(group_by="hour")
-
-        result = await repo.command_metrics(query)
-
-        call_args = session.execute.call_args
-        sql = str(call_args[0][0])
-        params = call_args[0][1]
-        assert "TRUE" in sql
-        assert params["grp"] == "hour"
-        assert result == []
-
-    async def test_week_group_by(self) -> None:
-        execute_result = MagicMock()
-        execute_result.all.return_value = []
-        session = _mock_session_with_result(execute_result)
-        repo = DashboardMetricsRepository(session)
-        query = MetricsQueryDTO(group_by="week")
-
-        await repo.command_metrics(query)
-
-        params = session.execute.call_args[0][1]
-        assert params["grp"] == "week"
-
-    async def test_month_group_by(self) -> None:
-        execute_result = MagicMock()
-        execute_result.all.return_value = []
-        session = _mock_session_with_result(execute_result)
-        repo = DashboardMetricsRepository(session)
-        query = MetricsQueryDTO(group_by="month")
-
-        await repo.command_metrics(query)
-
-        params = session.execute.call_args[0][1]
-        assert params["grp"] == "month"
-
-
-class TestScriptMetrics:
-    async def test_date_filters_add_where_clauses(self) -> None:
-        row = SimpleNamespace(
-            period=datetime(2026, 5, 1, tzinfo=UTC),
-            total=30,
-            successful=28,
-            failed=2,
-            cancelled=0,
-            avg_duration_ms=180.0,
-        )
-        execute_result = MagicMock()
-        execute_result.all.return_value = [row]
-        session = _mock_session_with_result(execute_result)
-        repo = DashboardMetricsRepository(session)
-        dt_from = datetime(2026, 4, 1, tzinfo=UTC)
-        dt_to = datetime(2026, 8, 1, tzinfo=UTC)
-        query = MetricsQueryDTO(date_from=dt_from, date_to=dt_to, group_by="day")
-
-        result = await repo.script_metrics(query)
-
-        call_args = session.execute.call_args
-        sql = str(call_args[0][0])
-        params = call_args[0][1]
-
-        assert "se.started_at >= :date_from" in sql
-        assert "se.started_at < :date_to" in sql
-        assert params["date_from"] == dt_from
-        assert params["date_to"] == dt_to
-        assert len(result) == 1
-        assert result[0].avg_duration_ms == 180.0
-        assert "se.status IN ('success', 'completed')" in sql
-        assert "se.status IN ('error', 'failed')" in sql
-        assert "se.status !=" not in sql
-
-    async def test_no_filters_where_true(self) -> None:
-        execute_result = MagicMock()
-        execute_result.all.return_value = []
-        session = _mock_session_with_result(execute_result)
-        repo = DashboardMetricsRepository(session)
-        query = MetricsQueryDTO(group_by="day")
-
-        result = await repo.script_metrics(query)
-
-        call_args = session.execute.call_args
-        sql = str(call_args[0][0])
-        assert "TRUE" in sql
-        assert result == []
-
-    async def test_partial_filters_only_date_from(self) -> None:
-        execute_result = MagicMock()
-        execute_result.all.return_value = []
-        session = _mock_session_with_result(execute_result)
-        repo = DashboardMetricsRepository(session)
-        dt_from = datetime(2026, 1, 1, tzinfo=UTC)
-        query = MetricsQueryDTO(date_from=dt_from, group_by="hour")
-
-        await repo.script_metrics(query)
-
-        call_args = session.execute.call_args
-        sql = str(call_args[0][0])
-        params = call_args[0][1]
-        assert "se.started_at >= :date_from" in sql
-        assert "se.started_at < :date_to" not in sql
-        assert "date_to" not in params
 
 
 # ===========================================================================

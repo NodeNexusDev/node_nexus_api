@@ -40,9 +40,7 @@ class TemplatePackModel(Base):
     )
     manifest_sha: Mapped[str | None] = mapped_column(String(64), nullable=True)
     readme: Mapped[str | None] = mapped_column(Text, nullable=True)
-    installed_version: Mapped[str | None] = mapped_column(
-        String(50), nullable=True
-    )
+    installed_version: Mapped[str | None] = mapped_column(String(50), nullable=True)
     installed_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )

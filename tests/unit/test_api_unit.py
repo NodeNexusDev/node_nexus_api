@@ -16,7 +16,6 @@ from app.api.error_mapping import domain_error_handler
 from app.api.v1.commands import router as commands_router
 from app.api.v1.health import router as health_router
 from app.api.v1.nodes import router as nodes_router
-from app.api.v1.nodes_bulk import router as nodes_bulk_router
 from app.application.dto.node_view import NodeViewDTO
 from app.application.dto.value_objects import NodeEndpoint
 from app.application.services.node_bulk_command_service import NodeBulkCommandService
@@ -72,7 +71,6 @@ def _create_test_app(service: NodeManagementService | AsyncMock) -> FastAPI:
     app.add_exception_handler(DomainError, domain_error_handler)
     app.include_router(health_router)
     app.include_router(commands_router, prefix="/api/v1")
-    app.include_router(nodes_bulk_router, prefix="/api/v1")
     app.include_router(nodes_router, prefix="/api/v1")
 
     class MockServiceProvider(Provider):

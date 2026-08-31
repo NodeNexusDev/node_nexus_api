@@ -26,7 +26,6 @@ from app.core.exceptions import (
     ImageNotFoundError,
     NodeNameConflictError,
     NodeNotFoundError,
-    NoteNotFoundError,
     RequestTimeoutError,
     ScheduledScriptExecutionError,
     ScheduleNotFoundError,
@@ -70,7 +69,6 @@ _ROUTES: dict[str, type[DomainError]] = {
     "/test-execution-not-found": ExecutionNotFoundError,
     "/test-scheduled-script-execution": ScheduledScriptExecutionError,
     "/test-favorite-not-found": FavoriteNotFoundError,
-    "/test-note-not-found": NoteNotFoundError,
 }
 
 
@@ -183,7 +181,6 @@ class TestDomainErrorHandler:
                 id="ScheduledScriptExecutionError",
             ),
             pytest.param("/test-favorite-not-found", 404, id="FavoriteNotFoundError"),
-            pytest.param("/test-note-not-found", 404, id="NoteNotFoundError"),
         ],
     )
     async def test_exception_maps_to_correct_status(
@@ -202,7 +199,6 @@ class TestDomainErrorHandler:
             "/test-apikey-expired",
             "/test-docker-error",
             "/test-favorite-not-found",
-            "/test-note-not-found",
         ],
     )
     async def test_error_response_body_contract(self, path: str) -> None:

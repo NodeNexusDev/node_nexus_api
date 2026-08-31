@@ -74,9 +74,7 @@ class SqlAlchemyTemplateAssetGateway:
         """List persisted assets for a pack."""
         async with self._sessionmaker() as session:
             rows = await session.execute(
-                select(TemplateAssetModel).where(
-                    TemplateAssetModel.pack_id == pack_id
-                )
+                select(TemplateAssetModel).where(TemplateAssetModel.pack_id == pack_id)
             )
             models = rows.scalars().all()
             return tuple(
@@ -96,9 +94,7 @@ class SqlAlchemyTemplateAssetGateway:
         """Stream assets as tar archive bytes."""
         async with self._sessionmaker() as session:
             rows = await session.execute(
-                select(TemplateAssetModel).where(
-                    TemplateAssetModel.pack_id == pack_id
-                )
+                select(TemplateAssetModel).where(TemplateAssetModel.pack_id == pack_id)
             )
             models = rows.scalars().all()
             buf = io.BytesIO()

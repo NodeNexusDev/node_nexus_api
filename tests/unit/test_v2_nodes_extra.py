@@ -38,7 +38,6 @@ from app.application.dto.node_status_history import (
     NodeStatusHistoryPageDTO,
     NodeStatusHistoryRecordDTO,
 )
-from app.application.dto.node_validation import NodeValidationResultDTO
 from app.application.dto.node_view import NodeViewDTO
 from app.application.dto.value_objects import NodeEndpoint
 from app.application.services.node_bulk_command_service import NodeBulkCommandService
@@ -976,80 +975,6 @@ class TestCredentialValidations:
 # ---------------------------------------------------------------------------
 # POST /validate
 # ---------------------------------------------------------------------------
-
-
-class TestValidateSingle:
-    async def test_validate_success(self) -> None:
-        svc = AsyncMock(spec=NodeValidationService)
-        svc.validate_credentials.return_value = NodeValidationResultDTO(
-            status="active", message="Credentials valid"
-        )
-        app = _create_v2_nodes_app(node_validation=svc)
-        payload = {
-            "host": "10.0.0.1",
-            "port": 22,
-            "connection_type": "ssh",
-            "username": "root",
-            "password": "secret",
-        }
-        with _SETTINGS_PATCH:
-            async with AsyncClient(
-                transport=ASGITransport(app=app),
-                base_url="http://test",
-                headers={"X-API-Key": "test-master"},
-            ) as ac:
-                resp = await ac.post("/api/v2/nodes/validate", json=payload)
-        assert resp.status_code == 200
-        data = resp.json()
-        assert data["status"] == "active"
-        assert data["message"] == "Credentials valid"
-        svc.validate_credentials.assert_awaited_once()
-        dto = svc.validate_credentials.call_args.args[0]
-        assert dto.endpoint.host == "10.0.0.1"
-        assert dto.credentials.username == "root"
-
-    async def test_validate_unreachable(self) -> None:
-        svc = AsyncMock(spec=NodeValidationService)
-        svc.validate_credentials.return_value = NodeValidationResultDTO(
-            status="unreachable", message="timeout"
-        )
-        app = _create_v2_nodes_app(node_validation=svc)
-        with _SETTINGS_PATCH:
-            async with AsyncClient(
-                transport=ASGITransport(app=app),
-                base_url="http://test",
-                headers={"X-API-Key": "test-master"},
-            ) as ac:
-                resp = await ac.post(
-                    "/api/v2/nodes/validate",
-                    json={"host": "10.0.0.1", "username": "root"},
-                )
-        assert resp.status_code == 200
-        assert resp.json()["status"] == "unreachable"
-
-    async def test_validate_with_ssh_key(self) -> None:
-        svc = AsyncMock(spec=NodeValidationService)
-        svc.validate_credentials.return_value = NodeValidationResultDTO(
-            status="active", message="ok"
-        )
-        app = _create_v2_nodes_app(node_validation=svc)
-        payload = {
-            "host": "10.0.0.1",
-            "username": "root",
-            "ssh_key": "-----BEGIN OPENSSH PRIVATE KEY-----",
-            "passphrase": "secret",
-        }
-        with _SETTINGS_PATCH:
-            async with AsyncClient(
-                transport=ASGITransport(app=app),
-                base_url="http://test",
-                headers={"X-API-Key": "test-master"},
-            ) as ac:
-                resp = await ac.post("/api/v2/nodes/validate", json=payload)
-        assert resp.status_code == 200
-        dto = svc.validate_credentials.call_args.args[0]
-        assert dto.credentials.ssh_key is not None
-        assert dto.credentials.passphrase == "secret"
 
 
 # ---------------------------------------------------------------------------

@@ -30,40 +30,6 @@ class RequestIdMiddleware(BaseHTTPMiddleware):
         return response
 
 
-class ApiVersionMiddleware(BaseHTTPMiddleware):
-    """Enforce header-based API versioning via ``X-API-Version``."""
-
-    EXCLUDED_PATHS = frozenset({"/health", "/ready", "/metrics"})
-
-    def __init__(
-        self,
-        app: ASGIApp,
-        supported_versions: list[str] | None = None,
-    ) -> None:
-        super().__init__(app)
-        self._supported_versions = set(supported_versions or ["1"])
-
-    @override
-    async def dispatch(
-        self, request: Request, call_next: RequestResponseEndpoint
-    ) -> Response:
-        if request.url.path in self.EXCLUDED_PATHS:
-            return await call_next(request)
-
-        version = request.headers.get("X-API-Version", "1")
-        if version not in self._supported_versions:
-            return Response(
-                content=json.dumps({"detail": f"Unsupported API version: {version}"}),
-                status_code=400,
-                headers={"X-API-Version": "1"},
-                media_type="application/json",
-            )
-
-        response = await call_next(request)
-        response.headers["X-API-Version"] = version
-        return response
-
-
 class RequestLoggingMiddleware(BaseHTTPMiddleware):
     """Log every HTTP request with request_id, method, path, status, duration."""
 

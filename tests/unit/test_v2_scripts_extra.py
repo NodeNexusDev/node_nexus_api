@@ -969,7 +969,7 @@ class TestBulkExecutions:
             params={str(sid): "not-a-dict"},  # type: ignore[dict-item]
         )
         resp = Response()
-        orig = bulk_executions.__dishka_orig_func__  # type: ignore[attr-defined]
+        orig = getattr(bulk_executions, "__dishka_orig_func__")  # type: ignore[attr-defined]
         result = await orig(req, svc, resp, MagicMock())  # type: ignore[arg-type]
         assert result.total == 1
         # ensure service was called with empty params tuple (string coerced to {})

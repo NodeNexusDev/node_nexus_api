@@ -16,7 +16,6 @@ from app.api.deps import Principal, get_current_principal, require_write_or_jwt_
 from app.application.dto.bulk_node_operation import BulkNodeDeleteDTO
 from app.application.dto.node_management import NodeCreateDTO, NodeUpdateDTO
 from app.application.dto.node_status_history import NodeStatusHistoryQueryDTO
-from app.application.dto.node_validation import NodeValidationRequestDTO
 from app.application.dto.node_view import NodeViewDTO
 from app.application.dto.value_objects import NodeCredentials, NodeEndpoint
 from app.application.services.node_bulk_command_service import NodeBulkCommandService
@@ -28,7 +27,6 @@ from app.application.services.node_metrics_service import NodeMetricsService
 from app.application.services.node_status_history_service import (
     NodeStatusHistoryService,
 )
-from app.application.services.node_validation_service import NodeValidationService
 from app.schemas.common import BulkResult, CursorPage, decode_cursor, encode_cursor
 from app.schemas.node import (
     BulkNodeMetricsResult,
@@ -51,8 +49,6 @@ from app.schemas.node import (
     NodeResponse,
     NodeStatusHistoryItem,
     NodeUpdate,
-    NodeValidateRequest,
-    NodeValidateResponse,
 )
 
 audit = structlog.get_logger("audit")
@@ -440,38 +436,6 @@ async def credential_validations(
         failed=failed,
         results=results,
     )
-
-
-# ---------------------------------------------------------------------------
-# Validate single — POST /validate
-# ---------------------------------------------------------------------------
-
-
-@router.post("/validate", response_model=NodeValidateResponse)
-@inject
-async def validate_single(
-    data: NodeValidateRequest,
-    service: FromDishka[NodeValidationService],
-    _principal: Principal = Security(require_write_or_jwt_scope),
-) -> NodeValidateResponse:
-    """Validate SSH credentials without saving a node."""
-    audit.info("api.v2.nodes.validate", host=data.host, port=data.port)
-    result = await service.validate_credentials(
-        NodeValidationRequestDTO(
-            endpoint=NodeEndpoint(
-                host=data.host,
-                port=data.port,
-                connection_type=data.connection_type,
-            ),
-            credentials=NodeCredentials(
-                username=data.username,
-                password=data.password,
-                ssh_key=data.ssh_key,
-                passphrase=data.passphrase,
-            ),
-        )
-    )
-    return NodeValidateResponse(status=result.status, message=result.message)
 
 
 # ---------------------------------------------------------------------------

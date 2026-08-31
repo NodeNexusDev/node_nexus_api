@@ -614,9 +614,7 @@ class DockerContainerService:
             {"container_id": validated_id},
         )
 
-    async def get_archive(
-        self, node_id: UUID, container_id: str, path: str
-    ) -> str:
+    async def get_archive(self, node_id: UUID, container_id: str, path: str) -> str:
         """Copy a file from a container via ``docker cp``."""
         validated_id = validate_container_id(container_id)
         node = await self._runner.get_target(node_id)

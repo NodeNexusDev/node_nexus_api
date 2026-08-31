@@ -1,4 +1,4 @@
-"""Tests for Stage E/F services: favorite, note, tag, stats, export, sse."""
+"""Tests for Stage E/F services: favorite, tag, stats, export, sse."""
 
 from __future__ import annotations
 
@@ -14,17 +14,12 @@ from app.application.dto.global_search import (
     GlobalSearchResultDTO,
     SearchResultItemDTO,
 )
-from app.application.dto.note import NoteCreateDTO, NoteDTO, NoteUpdateDTO
-from app.application.services.dashboard_metrics_service import (
-    DashboardMetricsService,
-)
 from app.application.services.execution_stats_service import ExecutionStatsService
 from app.application.services.export_service import ExportService
 from app.application.services.favorite_service import FavoriteService
 from app.application.services.global_search_service import GlobalSearchService
-from app.application.services.note_service import NoteService
 from app.application.services.sse_broadcaster import SseBroadcaster, SseEvent
-from app.core.exceptions import FavoriteNotFoundError, NoteNotFoundError
+from app.core.exceptions import FavoriteNotFoundError
 
 # ─── FavoriteService ───
 
@@ -93,119 +88,6 @@ class TestFavoriteService:
 
         with pytest.raises(FavoriteNotFoundError):
             await svc.remove_favorite("command", str(uuid.uuid4()))
-
-
-# ─── NoteService ───
-
-
-class TestNoteService:
-    @pytest.mark.asyncio
-    async def test_list_notes(self) -> None:
-        reader = AsyncMock()
-        reader.list_notes.return_value = []
-        writer = AsyncMock()
-        svc = NoteService(reader=reader, writer=writer)
-
-        result = await svc.list_notes("command", str(uuid.uuid4()))
-        assert result == []
-
-    @pytest.mark.asyncio
-    async def test_get_note_found(self) -> None:
-        reader = AsyncMock()
-        expected = NoteDTO(
-            id=uuid.uuid4(),
-            target_type="command",
-            target_id=uuid.uuid4(),
-            content="hi",
-            created_at=datetime.now(UTC),
-            updated_at=datetime.now(UTC),
-        )
-        reader.get_note.return_value = expected
-        writer = AsyncMock()
-        svc = NoteService(reader=reader, writer=writer)
-
-        result = await svc.get_note(str(expected.id))
-        assert result == expected
-
-    @pytest.mark.asyncio
-    async def test_get_note_not_found(self) -> None:
-        reader = AsyncMock()
-        reader.get_note.return_value = None
-        writer = AsyncMock()
-        svc = NoteService(reader=reader, writer=writer)
-
-        with pytest.raises(NoteNotFoundError):
-            await svc.get_note(str(uuid.uuid4()))
-
-    @pytest.mark.asyncio
-    async def test_create_note(self) -> None:
-        reader = AsyncMock()
-        writer = AsyncMock()
-        expected = NoteDTO(
-            id=uuid.uuid4(),
-            target_type="node",
-            target_id=uuid.uuid4(),
-            content="test",
-            created_at=datetime.now(UTC),
-            updated_at=datetime.now(UTC),
-        )
-        writer.create_note.return_value = expected
-        svc = NoteService(reader=reader, writer=writer)
-
-        result = await svc.create_note(
-            NoteCreateDTO(target_type="node", target_id=uuid.uuid4(), content="test")
-        )
-        assert result == expected
-
-    @pytest.mark.asyncio
-    async def test_update_note_found(self) -> None:
-        reader = AsyncMock()
-        writer = AsyncMock()
-        expected = NoteDTO(
-            id=uuid.uuid4(),
-            target_type="node",
-            target_id=uuid.uuid4(),
-            content="updated",
-            created_at=datetime.now(UTC),
-            updated_at=datetime.now(UTC),
-        )
-        writer.update_note.return_value = expected
-        svc = NoteService(reader=reader, writer=writer)
-
-        result = await svc.update_note(
-            str(expected.id), NoteUpdateDTO(content="updated")
-        )
-        assert result.content == "updated"
-
-    @pytest.mark.asyncio
-    async def test_update_note_not_found(self) -> None:
-        reader = AsyncMock()
-        writer = AsyncMock()
-        writer.update_note.return_value = None
-        svc = NoteService(reader=reader, writer=writer)
-
-        with pytest.raises(NoteNotFoundError):
-            await svc.update_note(str(uuid.uuid4()), NoteUpdateDTO(content="x"))
-
-    @pytest.mark.asyncio
-    async def test_delete_note_found(self) -> None:
-        reader = AsyncMock()
-        writer = AsyncMock()
-        writer.delete_note.return_value = True
-        svc = NoteService(reader=reader, writer=writer)
-
-        result = await svc.delete_note(str(uuid.uuid4()))
-        assert result is True
-
-    @pytest.mark.asyncio
-    async def test_delete_note_not_found(self) -> None:
-        reader = AsyncMock()
-        writer = AsyncMock()
-        writer.delete_note.return_value = False
-        svc = NoteService(reader=reader, writer=writer)
-
-        with pytest.raises(NoteNotFoundError):
-            await svc.delete_note(str(uuid.uuid4()))
 
 
 # ─── ExecutionStatsService ───
@@ -334,38 +216,6 @@ class TestGlobalSearchService:
         result = await svc.search(q="web", limit=5)
         assert len(result.nodes) == 1
         assert len(result.tags) == 1
-
-
-# ─── DashboardMetricsService ───
-
-
-class TestDashboardMetricsService:
-    @pytest.mark.asyncio
-    async def test_get_metrics(self) -> None:
-        from app.application.dto.dashboard_metrics import (
-            DashboardMetricsDTO,
-            MetricsBucketDTO,
-        )
-
-        reader = AsyncMock()
-        expected = DashboardMetricsDTO(
-            command_metrics=(
-                MetricsBucketDTO(
-                    period="2026-08-01",
-                    total=10,
-                    successful=8,
-                    failed=2,
-                    cancelled=0,
-                    avg_duration_ms=100,
-                ),
-            ),
-            script_metrics=(),
-        )
-        reader.get_metrics.return_value = expected
-        svc = DashboardMetricsService(reader=reader)
-
-        result = await svc.get_metrics(group_by="day")
-        assert len(result.command_metrics) == 1
 
 
 # ─── SseBroadcaster ───

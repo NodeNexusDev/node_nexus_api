@@ -1396,9 +1396,7 @@ class TestSystem:
                 base_url="http://test",
                 headers={"X-API-Key": "test-master"},
             ) as ac:
-                resp = await ac.post(
-                    f"/api/v2/nodes/{NODE_ID}/docker/containers/prune"
-                )
+                resp = await ac.post(f"/api/v2/nodes/{NODE_ID}/docker/containers/prune")
         assert resp.status_code == 200
         assert "c1" in resp.json()["containers_deleted"]
 
@@ -1652,9 +1650,7 @@ class TestContainerCreateAndInspect:
                 base_url="http://test",
                 headers={"X-API-Key": "test-master"},
             ) as ac:
-                resp = await ac.get(
-                    f"/api/v2/nodes/{NODE_ID}/docker/containers/{CID}"
-                )
+                resp = await ac.get(f"/api/v2/nodes/{NODE_ID}/docker/containers/{CID}")
         assert resp.status_code == 200
         assert resp.json()["Id"] == CID
 
@@ -1982,9 +1978,7 @@ class TestImagesSingle:
                 base_url="http://test",
                 headers={"X-API-Key": "test-master"},
             ) as ac:
-                resp = await ac.get(
-                    f"/api/v2/nodes/{NODE_ID}/docker/images/{IMG}"
-                )
+                resp = await ac.get(f"/api/v2/nodes/{NODE_ID}/docker/images/{IMG}")
         assert resp.status_code == 200
         assert resp.json()["id"] == "sha256:abc"
 
@@ -1998,9 +1992,7 @@ class TestImagesSingle:
                 base_url="http://test",
                 headers={"X-API-Key": "test-master"},
             ) as ac:
-                resp = await ac.delete(
-                    f"/api/v2/nodes/{NODE_ID}/docker/images/{IMG}"
-                )
+                resp = await ac.delete(f"/api/v2/nodes/{NODE_ID}/docker/images/{IMG}")
         assert resp.status_code == 204
 
     async def test_push_body_success(self) -> None:
@@ -2062,9 +2054,7 @@ class TestNetworksSingle:
                 base_url="http://test",
                 headers={"X-API-Key": "test-master"},
             ) as ac:
-                resp = await ac.get(
-                    f"/api/v2/nodes/{NODE_ID}/docker/networks/{NET}"
-                )
+                resp = await ac.get(f"/api/v2/nodes/{NODE_ID}/docker/networks/{NET}")
         assert resp.status_code == 200
         assert resp.json()["id"] == NET
 
@@ -2078,9 +2068,7 @@ class TestNetworksSingle:
                 base_url="http://test",
                 headers={"X-API-Key": "test-master"},
             ) as ac:
-                resp = await ac.delete(
-                    f"/api/v2/nodes/{NODE_ID}/docker/networks/{NET}"
-                )
+                resp = await ac.delete(f"/api/v2/nodes/{NODE_ID}/docker/networks/{NET}")
         assert resp.status_code == 204
 
     async def test_connect_success(self) -> None:
@@ -2126,9 +2114,7 @@ class TestNetworksSingle:
                 base_url="http://test",
                 headers={"X-API-Key": "test-master"},
             ) as ac:
-                resp = await ac.get(
-                    f"/api/v2/nodes/{NODE_ID}/docker/networks/{BAD_ID}"
-                )
+                resp = await ac.get(f"/api/v2/nodes/{NODE_ID}/docker/networks/{BAD_ID}")
         assert resp.status_code == 422
 
 
@@ -2165,9 +2151,7 @@ class TestVolumesSingle:
                 base_url="http://test",
                 headers={"X-API-Key": "test-master"},
             ) as ac:
-                resp = await ac.get(
-                    f"/api/v2/nodes/{NODE_ID}/docker/volumes/{VOL}"
-                )
+                resp = await ac.get(f"/api/v2/nodes/{NODE_ID}/docker/volumes/{VOL}")
         assert resp.status_code == 200
         assert resp.json()["name"] == VOL
 
@@ -2181,9 +2165,7 @@ class TestVolumesSingle:
                 base_url="http://test",
                 headers={"X-API-Key": "test-master"},
             ) as ac:
-                resp = await ac.delete(
-                    f"/api/v2/nodes/{NODE_ID}/docker/volumes/{VOL}"
-                )
+                resp = await ac.delete(f"/api/v2/nodes/{NODE_ID}/docker/volumes/{VOL}")
         assert resp.status_code == 204
 
     async def test_inspect_invalid_422(self) -> None:
@@ -2195,7 +2177,5 @@ class TestVolumesSingle:
                 base_url="http://test",
                 headers={"X-API-Key": "test-master"},
             ) as ac:
-                resp = await ac.get(
-                    f"/api/v2/nodes/{NODE_ID}/docker/volumes/{BAD_ID}"
-                )
+                resp = await ac.get(f"/api/v2/nodes/{NODE_ID}/docker/volumes/{BAD_ID}")
         assert resp.status_code == 422

@@ -348,13 +348,3 @@ def test_favorite_service_provider() -> None:
     writer = MagicMock()
     svc = svc_provider.get_favorite_service(reader, writer)
     assert isinstance(svc, FavoriteService)
-
-
-def test_note_service_provider() -> None:
-    from app.application.services.note_service import NoteService
-
-    svc_provider = ServiceProvider()
-    reader = MagicMock()
-    writer = MagicMock()
-    svc = svc_provider.get_note_service(reader, writer)
-    assert isinstance(svc, NoteService)
