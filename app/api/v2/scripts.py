@@ -12,7 +12,6 @@ from typing import Any, Literal
 import structlog
 from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
 from fastapi import APIRouter, HTTPException, Query, Response, Security
-from pydantic import BaseModel, Field
 
 from app.api.deps import Principal, get_current_principal, require_write_or_jwt_scope
 from app.application.dto.execution_lifecycle import CancelExecutionDTO, RetryScriptDTO
@@ -36,18 +35,32 @@ from app.application.services.schedule_management import ScheduleManagementServi
 from app.application.services.script_execution_service import ScriptExecutionService
 from app.application.services.script_history_service import ScriptHistoryService
 from app.application.services.script_management_service import ScriptManagementService
-from app.core.types import JsonObject
 from app.schemas.common import BulkResult, CursorPage
-from app.schemas.execution_stats import ExecutionStatsResponse
+from app.schemas.execution_stats import (
+    ExecutionStatsResponse,
+    StatsBucket,
+    StatsBucketsResponse,
+)
 from app.schemas.scheduler import ScheduledJob, ScheduleRequest, ScheduleResponse
 from app.schemas.script import (
+    ScriptBulkCreateRequest,
+    ScriptBulkCreateResult,
     ScriptCreate,
+    ScriptExecutionsRequest,
     ScriptResponse,
     ScriptStep,
     ScriptStepResult,
     ScriptUpdate,
 )
-from app.schemas.script_execution import ScriptExecutionResponse
+from app.schemas.script_execution import (
+    BulkCancelScriptResult,
+    BulkRetryScriptResult,
+    BulkScriptExecutionBatchResponse,
+    BulkScriptExecutionItem,
+    ExecutionCancelsRequest,
+    ExecutionRetriesRequest,
+    ScriptExecutionResponse,
+)
 
 audit = structlog.get_logger("audit")
 
@@ -151,102 +164,6 @@ def _decode_offset(cursor: str) -> int:
         return int(data["offset"])
     except Exception as exc:
         raise ValueError(f"Invalid cursor: {cursor}") from exc
-
-
-# ---------------------------------------------------------------------------
-# Schemas for v2 bulk-first (no bulk keyword)
-# ---------------------------------------------------------------------------
-
-
-class ScriptBulkCreateRequest(BaseModel):
-    """Bulk create scripts (1..20)."""
-
-    items: list[ScriptCreate] = Field(min_length=1, max_length=20)
-
-
-class ScriptBulkCreateResult(BaseModel):
-    """Result of creating a single script."""
-
-    id: uuid.UUID | None = None
-    name: str | None = None
-    status: Literal["success", "error"]
-    error: str = ""
-
-
-class StatsBucket(BaseModel):
-    """Single time bucket for stats grouping."""
-
-    period: str
-    total: int
-    successful: int
-    failed: int
-    cancelled: int
-    avg_duration_ms: float | None = None
-
-
-class StatsBucketsResponse(BaseModel):
-    """Buckets response when group_by is present."""
-
-    buckets: list[StatsBucket]
-
-
-class ScriptExecutionsRequest(BaseModel):
-    """M×N script executions (script_ids × nodes)."""
-
-    script_ids: list[uuid.UUID] = Field(min_length=1, max_length=20)
-    node_ids: list[uuid.UUID] = Field(default_factory=list)
-    node_tags: list[str] = Field(default_factory=list)
-    params: dict[str, JsonObject] = Field(default_factory=dict)
-
-
-class BulkScriptExecutionItem(BaseModel):
-    """Result of a single script execution on a single node."""
-
-    script_id: uuid.UUID | None = None
-    execution_id: uuid.UUID | None = None
-    node_id: uuid.UUID | None = None
-    node_name: str | None = None
-    status: Literal["success", "error"]
-    steps: list[ScriptStepResult] = Field(default_factory=list)
-    error: str = ""
-
-
-class BulkScriptExecutionBatchResponse(BaseModel):
-    """Batch response for M×N script executions."""
-
-    batch_id: uuid.UUID
-    total: int
-    succeeded: int
-    failed: int
-    results: list[BulkScriptExecutionItem]
-
-
-class ExecutionRetriesRequest(BaseModel):
-    """Request to retry multiple executions."""
-
-    execution_ids: list[uuid.UUID] = Field(min_length=1, max_length=100)
-
-
-class ExecutionCancelsRequest(BaseModel):
-    """Request to cancel multiple executions."""
-
-    execution_ids: list[uuid.UUID] = Field(min_length=1, max_length=100)
-
-
-class BulkRetryScriptResult(BaseModel):
-    """Result of retrying a single script execution."""
-
-    execution_id: str
-    status: Literal["retry_scheduled", "error"]
-    message: str = ""
-
-
-class BulkCancelScriptResult(BaseModel):
-    """Result of cancelling a single script execution."""
-
-    execution_id: str
-    status: Literal["cancelled", "error"]
-    message: str = ""
 
 
 # ---------------------------------------------------------------------------

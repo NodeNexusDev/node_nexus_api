@@ -6,14 +6,12 @@ import base64
 import io
 import json
 import uuid
-from datetime import datetime
 from typing import Annotated, Any, Literal, cast
 
 import structlog
 from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
 from fastapi import APIRouter, HTTPException, Query, Response, Security
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, Field
 
 from app.api.deps import Principal, get_current_principal, require_write_or_jwt_scope
 from app.application.dto.template_pack import (
@@ -33,10 +31,17 @@ from app.application.services.template_registry_service import (
     RegistryNotFoundError,
     TemplateRegistryService,
 )
-from app.schemas.command import CommandCreate
 from app.schemas.common import BulkResult, CursorPage
-from app.schemas.script import ScriptCreate
-from app.schemas.template_pack import PackAssetResponse, PackResponse
+from app.schemas.template_pack import (
+    PackAssetResponse,
+    PackDetailWithAssetsResponse,
+    PackInstallationResponse,
+    PackInstallResult,
+    PackLocalCreateRequest,
+    PackResponse,
+    PackStatsResponse,
+    StatsBucket,
+)
 from app.schemas.template_registry import (
     RegistryCreate,
     RegistryResponse,
@@ -68,118 +73,6 @@ def _decode_offset(cursor: str) -> int:
         return int(data["offset"])
     except Exception as exc:
         raise ValueError(f"Invalid cursor: {cursor}") from exc
-
-
-# ---------------------------------------------------------------------------
-# Local schemas for v2 (manifest + assets)
-# ---------------------------------------------------------------------------
-
-
-class PackManifestRequest(BaseModel):
-    """Manifest for local pack upload."""
-
-    pack_id: str = Field(..., min_length=1, max_length=100)
-    name: str = Field(..., min_length=1, max_length=255)
-    description: str | None = Field(default=None, max_length=5000)
-    version: str = Field(..., min_length=1, max_length=50)
-    author: str | None = Field(default=None, max_length=255)
-    tags: list[str] = Field(default_factory=list)
-    manifest_sha: str | None = Field(default=None, max_length=64)
-
-
-class PackAssetCreateRequest(BaseModel):
-    """Asset with base64 content."""
-
-    path: str = Field(..., min_length=1, max_length=255)
-    content_base64: str = Field(..., min_length=1)
-
-
-class PackLocalCreateRequest(BaseModel):
-    """Local pack creation (2.0 with assets)."""
-
-    manifest: PackManifestRequest
-    commands: list[CommandCreate] = Field(default_factory=list)
-    scripts: list[ScriptCreate] = Field(default_factory=list)
-    readme: str | None = Field(default=None)
-    assets: list[PackAssetCreateRequest] | None = Field(default=None)
-    registry_id: uuid.UUID | None = Field(default=None)
-
-
-class PackDetailWithAssetsResponse(BaseModel):
-    """Pack detail with assets."""
-
-    id: uuid.UUID
-    registry_id: uuid.UUID | None
-    pack_id: str
-    name: str
-    description: str | None
-    version: str
-    author: str | None
-    tags: list[str] | None
-    manifest_sha: str | None
-    readme: str | None
-    installed_version: str | None
-    installed_at: datetime | None
-    created_at: datetime
-    updated_at: datetime
-    assets: list[PackAssetResponse] = Field(default_factory=list)
-
-
-class PackInstallResult(BaseModel):
-    """Single install result."""
-
-    entity_type: Literal["command", "script"]
-    entity_id: uuid.UUID | None = None
-    name: str
-    status: Literal["success", "error"]
-    error: str = ""
-
-
-class PackInstallResponse(BaseModel):
-    """Bulk install / update response."""
-
-    pack_id: uuid.UUID
-    version: str
-    total: int
-    succeeded: int
-    failed: int
-    results: list[PackInstallResult]
-
-
-class PackInstallQuery(BaseModel):
-    """Query for pack installation with conflict handling."""
-
-    on_conflict: Literal["fail", "rename"] = Field(
-        default="fail", description="Conflict handling: fail (409) or rename (_1,_2)"
-    )
-
-
-class PackInstallationResponse(BaseModel):
-    """Single installation link."""
-
-    id: uuid.UUID
-    pack_id: uuid.UUID
-    entity_type: str
-    entity_id: uuid.UUID
-    created_at: datetime
-
-
-class StatsBucket(BaseModel):
-    """Stats bucket for group_by."""
-
-    group: str
-    total: int
-    installed: int
-    not_installed: int
-
-
-class PackStatsResponse(BaseModel):
-    """Stats response (group_by optional)."""
-
-    total: int
-    installed: int
-    not_installed: int
-    buckets: list[StatsBucket] = Field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------

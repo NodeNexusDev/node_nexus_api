@@ -11,7 +11,6 @@ from datetime import datetime
 import structlog
 from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
 from fastapi import APIRouter, HTTPException, Query, Response, Security
-from pydantic import BaseModel, Field
 
 from app.api.deps import Principal, get_current_principal, require_write_or_jwt_scope
 from app.application.dto.bulk_node_operation import BulkNodeDeleteDTO
@@ -36,16 +35,19 @@ from app.schemas.node import (
     BulkNodeUpdateResult,
     BulkValidateCredentialsResult,
     CpuMetrics,
+    CredentialValidationsRequest,
     DiskMetrics,
     LoadAverage,
     MemoryMetrics,
     NodeBulkCreateRequest,
     NodeBulkCreateResult,
     NodeBulkUpdatesRequest,
+    NodeChecksRequest,
     NodeCreate,
     NodeCursorListResponse,
     NodeDeletionsRequest,
     NodeMetrics,
+    NodeMetricsRequest,
     NodeResponse,
     NodeStatusHistoryItem,
     NodeUpdate,
@@ -90,25 +92,6 @@ def _decode_offset(cursor: str) -> int:
         return int(data["offset"])
     except Exception as exc:
         raise ValueError(f"Invalid cursor: {cursor}") from exc
-
-
-class NodeChecksRequest(BaseModel):
-    """Request for bulk checks without bulk keyword."""
-
-    ids: list[uuid.UUID] = Field(min_length=1, max_length=100)
-
-
-class NodeMetricsRequest(BaseModel):
-    """Request for bulk metrics without bulk keyword."""
-
-    ids: list[uuid.UUID] = Field(min_length=1, max_length=100)
-
-
-class CredentialValidationsRequest(BaseModel):
-    """Request for credential validations without bulk keyword."""
-
-    ids: list[uuid.UUID] | None = Field(default=None, min_length=1, max_length=100)
-    tags: list[str] | None = Field(default=None, min_length=1)
 
 
 # ---------------------------------------------------------------------------

@@ -152,3 +152,27 @@ class ScriptCancelResponse(BaseModel):
     execution_id: str
     status: str
     message: str
+
+
+class ScriptBulkCreateRequest(BaseModel):
+    """Bulk create scripts (1..20)."""
+
+    items: list[ScriptCreate] = Field(min_length=1, max_length=20)
+
+
+class ScriptBulkCreateResult(BaseModel):
+    """Result of creating a single script."""
+
+    id: uuid.UUID | None = None
+    name: str | None = None
+    status: Literal["success", "error"]
+    error: str = ""
+
+
+class ScriptExecutionsRequest(BaseModel):
+    """M×N script executions (script_ids × nodes)."""
+
+    script_ids: list[uuid.UUID] = Field(min_length=1, max_length=20)
+    node_ids: list[uuid.UUID] = Field(default_factory=list)
+    node_tags: list[str] = Field(default_factory=list)
+    params: dict[str, JsonObject] = Field(default_factory=dict)

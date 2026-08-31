@@ -12,7 +12,6 @@ from typing import Annotated, Any, Literal
 import structlog
 from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
 from fastapi import APIRouter, HTTPException, Query, Response, Security
-from pydantic import BaseModel, Field
 
 from app.api.deps import Principal, get_current_principal, require_write_or_jwt_scope
 from app.application.dto.command_execution import BulkCommandRequestDTO
@@ -31,15 +30,26 @@ from app.application.services.execution_lifecycle_service import (
 from app.application.services.execution_stats_service import ExecutionStatsService
 from app.application.services.node_bulk_command_service import NodeBulkCommandService
 from app.core.template import render_command
-from app.core.types import JsonObject
 from app.schemas.command import (
+    BulkExecutionBatchResponse,
+    BulkExecutionItem,
+    CommandBulkCreateRequest,
+    CommandBulkCreateResult,
     CommandCreate,
+    CommandExecutionsRequest,
     CommandParameter,
     CommandResponse,
     CommandUpdate,
+    ExecutionCancelsRequest,
+    ExecutionRetriesRequest,
+    RawExecutionsRequest,
 )
 from app.schemas.common import BulkResult, CursorPage
-from app.schemas.execution_stats import ExecutionStatsResponse
+from app.schemas.execution_stats import (
+    ExecutionStatsResponse,
+    StatsBucket,
+    StatsBucketsResponse,
+)
 from app.schemas.node import (
     BulkCancelCommandResult,
     BulkRetryCommandResult,
@@ -102,102 +112,6 @@ def _decode_offset(cursor: str) -> int:
         return int(data["offset"])
     except Exception as exc:
         raise ValueError(f"Invalid cursor: {cursor}") from exc
-
-
-# ---------------------------------------------------------------------------
-# Schemas for v2 bulk-first (no bulk keyword)
-# ---------------------------------------------------------------------------
-
-
-class CommandBulkCreateRequest(BaseModel):
-    """Bulk create commands (1..20)."""
-
-    items: list[CommandCreate] = Field(min_length=1, max_length=20)
-
-
-class CommandBulkCreateResult(BaseModel):
-    """Result of creating a single command."""
-
-    id: uuid.UUID | None = None
-    name: str | None = None
-    status: Literal["success", "error"]
-    error: str = ""
-
-
-class StatsBucket(BaseModel):
-    """Single time bucket for stats grouping."""
-
-    period: str
-    total: int
-    successful: int
-    failed: int
-    cancelled: int
-    avg_duration_ms: float | None = None
-
-
-class StatsBucketsResponse(BaseModel):
-    """Buckets response when group_by is present."""
-
-    buckets: list[StatsBucket]
-
-
-class CommandExecutionsRequest(BaseModel):
-    """M×N command executions (command_ids × nodes)."""
-
-    command_ids: list[uuid.UUID] = Field(min_length=1, max_length=20)
-    node_ids: list[uuid.UUID] = Field(default_factory=list)
-    node_tags: list[str] = Field(default_factory=list)
-    params: dict[str, JsonObject] = Field(default_factory=dict)
-
-    @property
-    def _estimated_n(self) -> int:
-        # best-effort M*N check without resolving tags
-        n = len(self.node_ids) if self.node_ids else (len(self.node_tags) or 1)
-        return len(self.command_ids) * n
-
-
-class RawExecutionsRequest(BaseModel):
-    """Bulk raw command executions."""
-
-    commands: list[str] = Field(min_length=1, max_length=20)
-    node_ids: list[uuid.UUID] = Field(default_factory=list)
-    node_tags: list[str] = Field(default_factory=list)
-
-
-class BulkExecutionItem(BaseModel):
-    """Result of a single command execution on a single node."""
-
-    command_id: uuid.UUID | None = None
-    command: str | None = None
-    node_id: uuid.UUID | None = None
-    node_name: str | None = None
-    stdout: str = ""
-    stderr: str = ""
-    exit_code: int | None = None
-    status: Literal["success", "error"]
-    error: str = ""
-
-
-class BulkExecutionBatchResponse(BaseModel):
-    """Batch response for M×N executions."""
-
-    batch_id: uuid.UUID
-    total: int
-    succeeded: int
-    failed: int
-    results: list[BulkExecutionItem]
-
-
-class ExecutionRetriesRequest(BaseModel):
-    """Request to retry multiple executions."""
-
-    execution_ids: list[uuid.UUID] = Field(min_length=1, max_length=100)
-
-
-class ExecutionCancelsRequest(BaseModel):
-    """Request to cancel multiple executions."""
-
-    execution_ids: list[uuid.UUID] = Field(min_length=1, max_length=100)
 
 
 # ---------------------------------------------------------------------------

@@ -525,3 +525,223 @@ class BulkDockerImageBuildResponse(BaseModel):
     total: int
     succeeded: int
     failed: int
+
+
+# ---------------------------------------------------------------------------
+# v2 vert bulk schemas (moved from app/api/v2/docker.py)
+# ---------------------------------------------------------------------------
+
+
+class ContainerIdsRequest(BaseModel):
+    """Bulk container ids (1..100)."""
+
+    container_ids: list[str] = Field(min_length=1, max_length=100)
+
+
+class ContainerKillsRequest(BaseModel):
+    """Bulk kills with signal."""
+
+    container_ids: list[str] = Field(min_length=1, max_length=100)
+    signal: str = Field(default="SIGTERM", min_length=1, max_length=20)
+
+
+class ContainerUpdatesRequest(BaseModel):
+    """Bulk updates."""
+
+    container_ids: list[str] = Field(min_length=1, max_length=100)
+    memory: str | None = Field(default=None, max_length=64)
+    cpus: str | None = Field(default=None, max_length=64)
+    restart_policy: str | None = Field(default=None, max_length=64)
+
+
+class ContainerExecutionsRequest(BaseModel):
+    """Bulk executions."""
+
+    container_ids: list[str] = Field(min_length=1, max_length=100)
+    command: str = Field(min_length=1, max_length=4096)
+    timeout: int = Field(default=30, ge=1, le=600)
+
+
+class ContainerInspectionsRequest(BaseModel):
+    """Bulk inspections."""
+
+    container_ids: list[str] = Field(min_length=1, max_length=100)
+
+
+class ContainerLogsRequest(BaseModel):
+    """Bulk logs."""
+
+    container_ids: list[str] = Field(min_length=1, max_length=100)
+    tail: int = Field(default=100, ge=1, le=10000)
+    since: str | None = None
+
+
+class ContainerStatsRequest(BaseModel):
+    """Bulk stats."""
+
+    container_ids: list[str] = Field(min_length=1, max_length=100)
+
+
+class ImagePullsRequest(BaseModel):
+    """Bulk image pulls."""
+
+    images: list[str] = Field(min_length=1, max_length=100)
+    timeout: int = Field(default=300, ge=1, le=3600)
+
+
+class ImageRemovalsRequest(BaseModel):
+    """Bulk image removals."""
+
+    image_ids: list[str] = Field(min_length=1, max_length=100)
+
+
+class NetworkRemovalsRequest(BaseModel):
+    """Bulk network removals."""
+
+    network_ids: list[str] = Field(min_length=1, max_length=100)
+
+
+class VolumeRemovalsRequest(BaseModel):
+    """Bulk volume removals."""
+
+    volume_names: list[str] = Field(min_length=1, max_length=100)
+
+
+class ContainerBulkResult(BaseModel):
+    """Result of a bulk container action."""
+
+    container_id: str
+    status: Literal["success", "error"]
+    error: str = ""
+    output: str = ""
+
+
+class ContainerInspectBulkResult(BaseModel):
+    """Bulk inspect result with payload."""
+
+    container_id: str
+    status: Literal["success", "error"]
+    error: str = ""
+    data: DockerContainerInspect | None = None
+
+
+class ContainerExecBulkResult(BaseModel):
+    """Bulk exec result."""
+
+    container_id: str
+    status: Literal["success", "error"]
+    error: str = ""
+    stdout: str = ""
+    stderr: str = ""
+    exit_code: int | None = None
+
+
+class ContainerLogsBulkResult(BaseModel):
+    """Bulk logs result."""
+
+    container_id: str
+    status: Literal["success", "error"]
+    error: str = ""
+    logs: str = ""
+
+
+class ContainerStatsBulkResult(BaseModel):
+    """Bulk stats result."""
+
+    container_id: str
+    status: Literal["success", "error"]
+    error: str = ""
+    stats: DockerStats | None = None
+
+
+class ImageBulkResult(BaseModel):
+    """Result of a bulk image action."""
+
+    image: str
+    status: Literal["success", "error"]
+    error: str = ""
+    output: str = ""
+
+
+class NetworkBulkResult(BaseModel):
+    """Result of a bulk network action."""
+
+    network_id: str
+    status: Literal["success", "error"]
+    error: str = ""
+
+
+class VolumeBulkResult(BaseModel):
+    """Result of a bulk volume action."""
+
+    volume_name: str
+    status: Literal["success", "error"]
+    error: str = ""
+
+
+class KillRequest(BaseModel):
+    """Single kill request."""
+
+    signal: str = Field(default="SIGTERM", min_length=1, max_length=20)
+
+
+class UpdateRequest(BaseModel):
+    """Single update request."""
+
+    memory: str | None = Field(default=None, max_length=64)
+    cpus: str | None = Field(default=None, max_length=64)
+    restart_policy: str | None = Field(default=None, max_length=64)
+
+
+class DockerVersionResponse(BaseModel):
+    """Response for ``docker version``."""
+
+    server_version: str = ""
+    api_version: str = ""
+    go_version: str = ""
+    git_commit: str = ""
+    build_time: str = ""
+    os: str = ""
+    arch: str = ""
+
+
+class DockerPortResponse(BaseModel):
+    """Response for ``docker port``."""
+
+    output: str
+    bindings: str = ""
+
+
+class DockerWaitResponse(BaseModel):
+    """Response for ``docker wait``."""
+
+    exit_code: int
+
+
+class DockerArchiveResponse(BaseModel):
+    """Response for ``docker cp`` archive get."""
+
+    output: str
+    path: str
+
+
+class DockerImageHistoryItem(BaseModel):
+    """Single history entry."""
+
+    id: str = ""
+    created: str = ""
+    created_by: str = ""
+    size: str = ""
+    comment: str = ""
+
+
+class DockerImageHistoryResponse(BaseModel):
+    """Response for ``docker history``."""
+
+    layers: list[DockerImageHistoryItem]
+
+
+class DockerImagePushRequest(BaseModel):
+    """Request to push an image."""
+
+    image: str = Field(min_length=1, max_length=255)

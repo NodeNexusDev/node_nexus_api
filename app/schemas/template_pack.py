@@ -6,7 +6,9 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.schemas.command import CommandCreate
 from app.schemas.common import BulkResult, CursorPage, PaginatedResponse
+from app.schemas.script import ScriptCreate
 
 # --- Asset schemas ---
 
@@ -207,3 +209,96 @@ class PackUninstallResponse(BaseModel):
     pack_id: uuid.UUID
     status: str
     message: str = ""
+
+
+# --- Local pack creation (2.0 with assets) ---
+
+
+class PackManifestRequest(BaseModel):
+    """Manifest for local pack upload."""
+
+    pack_id: str = Field(..., min_length=1, max_length=100)
+    name: str = Field(..., min_length=1, max_length=255)
+    description: str | None = Field(default=None, max_length=5000)
+    version: str = Field(..., min_length=1, max_length=50)
+    author: str | None = Field(default=None, max_length=255)
+    tags: list[str] = Field(default_factory=list)
+    manifest_sha: str | None = Field(default=None, max_length=64)
+
+
+class PackAssetCreateRequest(BaseModel):
+    """Asset with base64 content."""
+
+    path: str = Field(..., min_length=1, max_length=255)
+    content_base64: str = Field(..., min_length=1)
+
+
+class PackLocalCreateRequest(BaseModel):
+    """Local pack creation (2.0 with assets)."""
+
+    manifest: PackManifestRequest
+    commands: list[CommandCreate] = Field(default_factory=list)
+    scripts: list[ScriptCreate] = Field(default_factory=list)
+    readme: str | None = Field(default=None)
+    assets: list[PackAssetCreateRequest] | None = Field(default=None)
+    registry_id: uuid.UUID | None = Field(default=None)
+
+
+class PackDetailWithAssetsResponse(BaseModel):
+    """Pack detail with assets."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    registry_id: uuid.UUID | None
+    pack_id: str
+    name: str
+    description: str | None
+    version: str
+    author: str | None
+    tags: list[str] | None
+    manifest_sha: str | None
+    readme: str | None
+    installed_version: str | None
+    installed_at: datetime | None
+    created_at: datetime
+    updated_at: datetime
+    assets: list[PackAssetResponse] = Field(default_factory=list)
+
+
+class PackInstallQuery(BaseModel):
+    """Query for pack installation with conflict handling."""
+
+    on_conflict: Literal["fail", "rename"] = Field(
+        default="fail", description="Conflict handling: fail (409) or rename (_1,_2)"
+    )
+
+
+class PackInstallationResponse(BaseModel):
+    """Single installation link."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    pack_id: uuid.UUID
+    entity_type: str
+    entity_id: uuid.UUID
+    created_at: datetime
+
+
+class StatsBucket(BaseModel):
+    """Stats bucket for group_by."""
+
+    group: str
+    total: int
+    installed: int
+    not_installed: int
+
+
+class PackStatsResponse(BaseModel):
+    """Stats response (group_by optional)."""
+
+    total: int
+    installed: int
+    not_installed: int
+    buckets: list[StatsBucket] = Field(default_factory=list)

@@ -11,7 +11,6 @@ from typing import Literal
 import structlog
 from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
 from fastapi import APIRouter, HTTPException, Query, Response, Security, status
-from pydantic import BaseModel, Field
 
 from app.api.deps import Principal, get_current_principal, require_write_or_jwt_scope
 from app.application.dto.compose import ComposeCreateDTO, ComposeUpdateDTO
@@ -21,7 +20,28 @@ from app.core.exceptions import (
     ComposeProjectNotFoundError,
 )
 from app.schemas.common import BulkResult, CursorPage
-from app.schemas.compose import ComposeCreate, ComposeResponse, ComposeUpdate
+from app.schemas.compose import (
+    ComposeActionResponse,
+    ComposeConfigResponse,
+    ComposeCreate,
+    ComposeDownRequest,
+    ComposeExecRequest,
+    ComposeExecResponse,
+    ComposeImagesResponse,
+    ComposeKillRequest,
+    ComposeLogsResponse,
+    ComposePortResponse,
+    ComposePsResponse,
+    ComposeResponse,
+    ComposeRunRequest,
+    ComposeRunResponse,
+    ComposeServiceBulkResult,
+    ComposeServicesRequest,
+    ComposeTopResponse,
+    ComposeUpdate,
+    ComposeUpRequest,
+    ComposeVersionResponse,
+)
 
 audit = structlog.get_logger("audit")
 router = APIRouter(
@@ -93,142 +113,6 @@ def _to_response(dto: object) -> ComposeResponse:
         created_at=dto.created_at,
         updated_at=dto.updated_at,
     )
-
-
-# ---------------------------------------------------------------------------
-# Local schemas for compose runtime (v2)
-# ---------------------------------------------------------------------------
-
-
-class ComposeUpRequest(BaseModel):
-    """Request for ``compose up``."""
-
-    pull: bool = Field(default=False, description="Pull images before up")
-    build: bool = Field(default=False, description="Build images before up")
-    services: list[str] | None = Field(
-        default=None, min_length=1, max_length=100, description="Target services"
-    )
-
-
-class ComposeDownRequest(BaseModel):
-    """Request for ``compose down``."""
-
-    volumes: bool = Field(default=False, description="Remove volumes")
-    remove_orphans: bool = Field(default=False, description="Remove orphans")
-    timeout: int | None = Field(default=None, ge=1, le=600)
-    images: str | None = Field(default=None, max_length=64, description="all|local")
-
-
-class ComposeServicesRequest(BaseModel):
-    """Services selection for verb bulk."""
-
-    services: list[str] | None = Field(
-        default=None, min_length=1, max_length=100, description="Target services"
-    )
-
-
-class ComposeKillRequest(BaseModel):
-    """Kill request with signal."""
-
-    signal: str = Field(default="SIGTERM", min_length=1, max_length=20)
-    services: list[str] | None = Field(default=None, min_length=1, max_length=100)
-
-
-class ComposeExecRequest(BaseModel):
-    """Compose exec request."""
-
-    service: str = Field(min_length=1, max_length=100)
-    command: str = Field(min_length=1, max_length=4096)
-    timeout: int = Field(default=30, ge=1, le=600)
-
-
-class ComposeRunRequest(BaseModel):
-    """Compose run request."""
-
-    service: str = Field(min_length=1, max_length=100)
-    command: str | None = Field(default=None, min_length=1, max_length=4096)
-    detached: bool = Field(default=False)
-    timeout: int = Field(default=60, ge=1, le=600)
-
-
-class ComposeServiceBulkResult(BaseModel):
-    """Bulk result for per-service compose verb."""
-
-    service: str
-    status: Literal["success", "error"]
-    error: str = ""
-    output: str = ""
-
-
-class ComposePsResponse(BaseModel):
-    """Response for ``compose ps``."""
-
-    output: str
-    containers: list[dict[str, str]] = Field(default_factory=list)
-
-
-class ComposeLogsResponse(BaseModel):
-    """Response for ``compose logs``."""
-
-    output: str
-    logs: str = ""
-
-
-class ComposeConfigResponse(BaseModel):
-    """Response for ``compose config``."""
-
-    config: str
-    output: str = ""
-
-
-class ComposeImagesResponse(BaseModel):
-    """Response for ``compose images``."""
-
-    images: list[str] = Field(default_factory=list)
-    output: str = ""
-
-
-class ComposeTopResponse(BaseModel):
-    """Response for ``compose top``."""
-
-    titles: list[str] = Field(default_factory=list)
-    processes: list[list[str]] = Field(default_factory=list)
-    output: str = ""
-
-
-class ComposePortResponse(BaseModel):
-    """Response for ``compose port``."""
-
-    output: str
-    bindings: str = ""
-
-
-class ComposeExecResponse(BaseModel):
-    """Response for ``compose exec``."""
-
-    stdout: str
-    stderr: str
-    exit_code: int
-
-
-class ComposeRunResponse(BaseModel):
-    """Response for ``compose run``."""
-
-    output: str
-
-
-class ComposeVersionResponse(BaseModel):
-    """Response for ``compose version``."""
-
-    version: str
-    output: str = ""
-
-
-class ComposeActionResponse(BaseModel):
-    """Generic action response."""
-
-    status: str
-    output: str = ""
 
 
 def _bulk_to_response(

@@ -12,7 +12,6 @@ import structlog
 from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
 from fastapi import APIRouter, HTTPException, Query, Response, Security
 from fastapi.responses import PlainTextResponse
-from pydantic import BaseModel, Field
 
 from app.api.deps import Principal, get_current_principal, require_write_or_jwt_scope
 from app.application.dto.audit import AuditLogDTO
@@ -20,7 +19,7 @@ from app.application.dto.export import AuditExportFormat, AuditExportQueryDTO
 from app.application.export_utils import rows_to_csv, rows_to_json
 from app.application.ports.export import AuditExporter
 from app.application.services.audit_log_service import AuditLogService
-from app.schemas.audit_log import AuditLogResponse
+from app.schemas.audit_log import AuditLogResponse, AuditStatsBucket, AuditStatsResponse
 from app.schemas.common import BulkResult, CursorPage
 
 audit = structlog.get_logger("audit")
@@ -54,32 +53,6 @@ def _to_response(log: AuditLogDTO) -> AuditLogResponse:
         details=log.details,
         created_at=log.created_at,
     )
-
-
-# ---------------------------------------------------------------------------
-# Local schemas for stats (2.0)
-# ---------------------------------------------------------------------------
-
-
-class AuditStatsBucket(BaseModel):
-    """Single time bucket for audit stats grouping."""
-
-    bucket: str = Field(description="Bucket label, e.g. 2026-08-30 or 2026-08-30T10:00")
-    count: int = Field(description="Number of audit entries in bucket")
-
-
-class AuditStatsResponse(BaseModel):
-    """Aggregate audit stats without group_by."""
-
-    total: int
-    buckets: list[AuditStatsBucket] = Field(default_factory=list)
-
-
-class AuditBucketsResponse(BaseModel):
-    """Buckets response when group_by is present."""
-
-    total: int
-    buckets: list[AuditStatsBucket]
 
 
 # ---------------------------------------------------------------------------

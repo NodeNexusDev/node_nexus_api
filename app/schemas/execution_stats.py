@@ -21,3 +21,20 @@ class ExecutionStatsResponse(BaseModel):
     min_duration_ms: float | None = None
     max_duration_ms: float | None = None
     last_executed_at: datetime | None = None
+
+
+class StatsBucket(BaseModel):
+    """Single time bucket for stats grouping."""
+
+    period: str
+    total: int
+    successful: int
+    failed: int
+    cancelled: int
+    avg_duration_ms: float | None = None
+
+
+class StatsBucketsResponse(BaseModel):
+    """Buckets response when group_by is present."""
+
+    buckets: list[StatsBucket]

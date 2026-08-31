@@ -495,3 +495,22 @@ class NodeBulkUpdatesRequest(BaseModel):
     """Bulk update via PATCH /nodes (2.0)."""
 
     updates: list[NodeBulkUpdateItem] = Field(min_length=1, max_length=100)
+
+
+class NodeChecksRequest(BaseModel):
+    """Request for bulk checks without bulk keyword."""
+
+    ids: list[uuid.UUID] = Field(min_length=1, max_length=100)
+
+
+class NodeMetricsRequest(BaseModel):
+    """Request for bulk metrics without bulk keyword."""
+
+    ids: list[uuid.UUID] = Field(min_length=1, max_length=100)
+
+
+class CredentialValidationsRequest(BaseModel):
+    """Request for credential validations without bulk keyword."""
+
+    ids: list[uuid.UUID] | None = Field(default=None, min_length=1, max_length=100)
+    tags: list[str] | None = Field(default=None, min_length=1)
