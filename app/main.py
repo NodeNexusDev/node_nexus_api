@@ -29,22 +29,11 @@ from app.api.middleware import (
     TimeoutMiddleware,
 )
 from app.api.v1.api_keys import router as api_keys_router
-from app.api.v1.audit import router as audit_router_v1
 from app.api.v1.auth import router as auth_router
-from app.api.v1.commands import router as commands_router_v1
 from app.api.v1.config import router as config_router
-from app.api.v1.dashboard import router as dashboard_router
-from app.api.v1.docker import router as docker_router_v1
-from app.api.v1.docker_bulk import router as docker_bulk_router
 from app.api.v1.events import router as events_router
-from app.api.v1.favorites import router as favorites_router_v1
 from app.api.v1.health import router as health_router
 from app.api.v1.internal import router as internal_router
-from app.api.v1.nodes import router as nodes_router_v1
-from app.api.v1.nodes_bulk import router as nodes_bulk_router
-from app.api.v1.notes import router as notes_router
-from app.api.v1.scripts import router as scripts_router_v1
-from app.api.v1.scripts_bulk import router as scripts_bulk_router
 from app.api.v1.search import router as search_router
 from app.api.v1.users import router as users_router
 from app.api.v1.websocket import router as ws_router
@@ -251,37 +240,7 @@ def create_app() -> FastAPI:
 
     setup_dishka(container, app)
     app.include_router(health_router)
-    # v1 (legacy, kept for migration period)
-    v1_protected = (
-        nodes_bulk_router,
-        nodes_router_v1,
-        commands_router_v1,
-        scripts_router_v1,
-        scripts_bulk_router,
-        audit_router_v1,
-        dashboard_router,
-        api_keys_router,
-        config_router,
-        docker_router_v1,
-        docker_bulk_router,
-        events_router,
-        ws_router,
-        search_router,
-        favorites_router_v1,
-        notes_router,
-        users_router,
-    )
-    for router in v1_protected:
-        app.include_router(
-            router,
-            prefix="/api/v1",
-            responses=AUTHENTICATED_ERROR_RESPONSES,
-        )
-    app.include_router(auth_router, prefix="/api/v1")
-    if settings.E2E_ENABLED:
-        app.include_router(internal_router, prefix="/api/v1")
-
-    # v2 (bulk-first, cursor, 207)
+    # v2 only (v1 removed without compatibility — 2.0 breaking)
     v2_protected = (
         nodes_router,
         commands_router,
