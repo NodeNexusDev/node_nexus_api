@@ -3,7 +3,7 @@
 These tests verify the real WebSocket → application service →
 AsyncSSH adapter → SSH container data flow.
 
-Endpoint: ws://.../api/v1/nodes/{node_id}/exec-stream
+Endpoint: ws://.../api/v2/nodes/{node_id}/exec-stream
 Authentication: x-api-key header
 
 The WebSocket router uses Dishka's explicit ``@inject`` integration because
@@ -31,7 +31,7 @@ pytestmark = [pytest.mark.docker, pytest.mark.e2e_smoke]
 # Helpers
 # ---------------------------------------------------------------------------
 
-_WS_PATH = "/api/v1/nodes/{node_id}/exec-stream"
+_WS_PATH = "/api/v2/nodes/{node_id}/exec-stream"
 
 
 def _close_code(exc: websockets.exceptions.ConnectionClosed) -> int | None:
@@ -124,7 +124,7 @@ async def test_ws_connect_with_managed_key(
 ) -> None:
     """WebSocket connects with a managed read-write API key."""
     resp = e2e_client.post(
-        "/api/v1/api-keys/",
+        "/api/v2/api-keys/",
         json={"name": "ws-rw-test", "scope": "read-write"},
     )
     assert resp.status_code == 201
@@ -142,7 +142,7 @@ async def test_ws_connect_with_managed_key(
             msg = await _receive_until_type(ws, "exit")
             assert msg.get("exit_code") == 0
     finally:
-        e2e_client.delete(f"/api/v1/api-keys/{key_id}")
+        e2e_client.delete(f"/api/v2/api-keys/{key_id}")
 
 
 @pytest.mark.asyncio
@@ -204,11 +204,11 @@ async def test_ws_inactive_managed_key_closed(
     api_key = e2e_resources.create_api_key()
     node = e2e_resources.create_ssh_node()
     if credential_state == "revoked":
-        response = e2e_client.delete(f"/api/v1/api-keys/{api_key['id']}")
+        response = e2e_client.delete(f"/api/v2/api-keys/{api_key['id']}")
         assert response.status_code == 204, response.text
     else:
         response = e2e_client.patch(
-            f"/api/v1/api-keys/{api_key['id']}",
+            f"/api/v2/api-keys/{api_key['id']}",
             json={"expires_at": "2000-01-01T00:00:00Z"},
         )
         assert response.status_code == 200, response.text
@@ -230,7 +230,7 @@ async def test_ws_readonly_key_closed(
 ) -> None:
     """WebSocket with read-only key is closed with code 4003."""
     resp = e2e_client.post(
-        "/api/v1/api-keys/",
+        "/api/v2/api-keys/",
         json={"name": "ws-ro-test", "scope": "read-only"},
     )
     assert resp.status_code == 201
@@ -247,7 +247,7 @@ async def test_ws_readonly_key_closed(
                 await ws.recv()
         assert _close_code(exc_info.value) == 4003
     finally:
-        e2e_client.delete(f"/api/v1/api-keys/{key_id}")
+        e2e_client.delete(f"/api/v2/api-keys/{key_id}")
 
 
 # ---------------------------------------------------------------------------
@@ -475,7 +475,7 @@ async def test_ws_disconnect_terminates_remote_process(
         deadline = asyncio.get_running_loop().time() + 10
         while True:
             response = e2e_client.post(
-                "/api/v1/commands/execute",
+                "/api/v2/commands/execute",
                 json={
                     "node_id": node["id"],
                     "command": (
@@ -490,7 +490,7 @@ async def test_ws_disconnect_terminates_remote_process(
                 break
             if asyncio.get_running_loop().time() >= deadline:
                 process_state = e2e_client.post(
-                    "/api/v1/commands/execute",
+                    "/api/v2/commands/execute",
                     json={
                         "node_id": node["id"],
                         "command": (
@@ -506,7 +506,7 @@ async def test_ws_disconnect_terminates_remote_process(
             await asyncio.sleep(0.2)
     finally:
         e2e_client.post(
-            "/api/v1/commands/execute",
+            "/api/v2/commands/execute",
             json={"node_id": node["id"], "command": f"rm -f {pid_file}"},
         )
 
@@ -543,7 +543,7 @@ async def test_ws_ssh_auth_failure_internal_error(
         "username": "wronguser",
         "password": "wrongpass",
     }
-    resp = e2e_client.post("/api/v1/nodes/", json=data)
+    resp = e2e_client.post("/api/v2/nodes/", json=data)
     assert resp.status_code == 201
     node = resp.json()
 
@@ -561,7 +561,7 @@ async def test_ws_ssh_auth_failure_internal_error(
             assert "wronguser" not in message.lower()
             assert "wrongpass" not in message.lower()
     finally:
-        e2e_client.delete(f"/api/v1/nodes/{node['id']}")
+        e2e_client.delete(f"/api/v2/nodes/{node['id']}")
 
 
 @pytest.mark.asyncio

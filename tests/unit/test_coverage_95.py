@@ -12,10 +12,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from pydantic import ValidationError
 
-from app.adapters.security.credential_cipher import (
-    _looks_like_legacy_ciphertext,
-    decrypt_value,
-)
+from app.adapters.security.credential_cipher import decrypt_value
 from app.application.dto.docker import (
     DockerImageBuildRequestDTO,
     DockerImageTagRequestDTO,
@@ -687,25 +684,17 @@ class TestComposeService:
 
 
 class TestCredentialCipherCoverage:
-    def test_looks_like_legacy_true(self) -> None:
-        # 32 bytes => base64 length triggers >=28 true -> line 54
-        raw = b"a" * 32
-        val = base64.b64encode(raw).decode()
-        assert _looks_like_legacy_ciphertext(val) is True
-
-    def test_looks_like_legacy_false_short(self) -> None:
-        raw = b"short"
-        val = base64.b64encode(raw).decode()
-        assert _looks_like_legacy_ciphertext(val) is False
-
-    def test_looks_like_legacy_false_invalid(self) -> None:
-        assert _looks_like_legacy_ciphertext("not-base64!!!") is False
-
-    def test_decrypt_value_plaintext_warning(self) -> None:
-        # not encrypted -> returns as is, line 65-71
-        assert decrypt_value("plain_text") == "plain_text"
+    def test_decrypt_value_plaintext_raises(self) -> None:
+        # legacy plaintext no longer accepted — only enc:v1: allowed
+        with pytest.raises(CredentialDecryptionError):
+            decrypt_value("plain_text")
         assert decrypt_value("") == ""
         assert decrypt_value(None) is None
+
+    def test_decrypt_without_prefix_raises(self) -> None:
+        raw = base64.b64encode(b"a" * 32).decode()
+        with pytest.raises(CredentialDecryptionError):
+            decrypt_value(raw)
 
     def test_decrypt_value_generic_exception(self) -> None:
         # line 76-77

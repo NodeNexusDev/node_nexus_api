@@ -26,7 +26,7 @@ published database port are not production defaults.
 3. Build an immutable image from the reviewed commit and scan dependencies.
 4. Apply `uv run alembic upgrade head` as one controlled job.
 5. Start one instance and wait for both `/health` and `/ready`.
-6. Request `/api/v1/nodes/?page=1&size=1` with a valid key.
+6. Request `/api/v2/nodes/?page=1&size=1` with a valid key.
 7. Shift traffic gradually while monitoring errors, timeouts, and database health.
 
 Keep `SCHEDULER_ENABLED=true` on eligible replicas. PostgreSQL persists

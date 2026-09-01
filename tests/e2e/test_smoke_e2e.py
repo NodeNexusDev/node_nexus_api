@@ -50,7 +50,7 @@ def test_security_headers(e2e_client: httpx.Client) -> None:
 
 def test_cors_preflight(e2e_client: httpx.Client) -> None:
     resp = e2e_client.options(
-        "/api/v1/nodes/",
+        "/api/v2/nodes/",
         headers={
             "Origin": "http://localhost:3000",
             "Access-Control-Request-Method": "POST",
@@ -62,7 +62,7 @@ def test_cors_preflight(e2e_client: httpx.Client) -> None:
 
     # Also verify that a regular GET response includes CORS headers
     resp = e2e_client.get(
-        "/api/v1/nodes/",
+        "/api/v2/nodes/",
         headers={"Origin": "http://localhost:3000"},
     )
     assert resp.headers.get("access-control-allow-origin") == "http://localhost:3000"
@@ -92,7 +92,7 @@ def test_readiness_probe(e2e_client: httpx.Client) -> None:
 
 def test_rate_limit_headers(e2e_client: httpx.Client) -> None:
     """Responses include rate limit headers."""
-    resp = e2e_client.get("/api/v1/nodes/")
+    resp = e2e_client.get("/api/v2/nodes/")
     assert resp.status_code == 200
     assert "X-RateLimit-Limit" in resp.headers
     assert "X-RateLimit-Remaining" in resp.headers

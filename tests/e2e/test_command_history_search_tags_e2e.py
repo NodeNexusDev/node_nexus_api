@@ -14,7 +14,7 @@ def test_command_execution_is_recorded_in_history(
     command_text = "echo e2e-history-test"
 
     exec_resp = e2e_client.post(
-        "/api/v1/commands/execute",
+        "/api/v2/commands/execute",
         json={"node_id": node["id"], "command": command_text},
     )
     assert exec_resp.status_code == 200
@@ -23,7 +23,7 @@ def test_command_execution_is_recorded_in_history(
     assert "e2e-history-test" in exec_data["stdout"]
 
     history_resp = e2e_client.get(
-        "/api/v1/commands/history", params={"node_id": node["id"]}
+        "/api/v2/commands/history", params={"node_id": node["id"]}
     )
     assert history_resp.status_code == 200
     history = history_resp.json()
@@ -50,18 +50,18 @@ def test_command_search_and_tags(e2e_client: httpx.Client, e2e_resources) -> Non
         tags=["other"],
     )
 
-    search_resp = e2e_client.get("/api/v1/commands/?search=alpha")
+    search_resp = e2e_client.get("/api/v2/commands/?search=alpha")
     assert search_resp.status_code == 200
     search_data = search_resp.json()
     assert any(item["id"] == command["id"] for item in search_data["items"])
 
-    tag_resp = e2e_client.get(f"/api/v1/commands/?tag={unique_tag}")
+    tag_resp = e2e_client.get(f"/api/v2/commands/?tag={unique_tag}")
     assert tag_resp.status_code == 200
     tag_data = tag_resp.json()
     assert all(unique_tag in item["tags"] for item in tag_data["items"])
     assert any(item["id"] == command["id"] for item in tag_data["items"])
 
-    tags_resp = e2e_client.get("/api/v1/commands/tags")
+    tags_resp = e2e_client.get("/api/v2/commands/tags")
     assert tags_resp.status_code == 200
     assert unique_tag in tags_resp.json()
 
@@ -79,18 +79,18 @@ def test_script_search_and_tags(e2e_client: httpx.Client, e2e_resources) -> None
         tags=["other"],
     )
 
-    search_resp = e2e_client.get("/api/v1/scripts/?search=gamma")
+    search_resp = e2e_client.get("/api/v2/scripts/?search=gamma")
     assert search_resp.status_code == 200
     search_data = search_resp.json()
     assert any(item["id"] == script["id"] for item in search_data["items"])
 
-    tag_resp = e2e_client.get(f"/api/v1/scripts/?tag={unique_tag}")
+    tag_resp = e2e_client.get(f"/api/v2/scripts/?tag={unique_tag}")
     assert tag_resp.status_code == 200
     tag_data = tag_resp.json()
     assert all(unique_tag in item["tags"] for item in tag_data["items"])
     assert any(item["id"] == script["id"] for item in tag_data["items"])
 
-    tags_resp = e2e_client.get("/api/v1/scripts/tags")
+    tags_resp = e2e_client.get("/api/v2/scripts/tags")
     assert tags_resp.status_code == 200
     assert unique_tag in tags_resp.json()
 
@@ -106,7 +106,7 @@ def test_bulk_execute_and_history(e2e_client: httpx.Client, e2e_resources) -> No
     node2 = e2e_resources.create_ssh_node(name=e2e_resources.unique_name("bulk-2"))
 
     bulk_resp = e2e_client.post(
-        "/api/v1/commands/bulk/execute",
+        "/api/v2/commands/bulk/execute",
         json={
             "command": "echo bulk-ok",
             "node_ids": [node1["id"], node2["id"]],
@@ -120,7 +120,7 @@ def test_bulk_execute_and_history(e2e_client: httpx.Client, e2e_resources) -> No
     # Verify each node's history
     for node in (node1, node2):
         hist_resp = e2e_client.get(
-            "/api/v1/commands/history", params={"node_id": node["id"]}
+            "/api/v2/commands/history", params={"node_id": node["id"]}
         )
         assert hist_resp.status_code == 200
         assert hist_resp.json()["total"] >= 1
@@ -129,7 +129,7 @@ def test_bulk_execute_and_history(e2e_client: httpx.Client, e2e_resources) -> No
 def test_bulk_history_empty_batch(e2e_client: httpx.Client) -> None:
     """Bulk history for a nonexistent batch_id returns empty list."""
     resp = e2e_client.get(
-        "/api/v1/commands/bulk/history",
+        "/api/v2/commands/bulk/history",
         params={"batch_id": "00000000-0000-0000-0000-000000000000"},
     )
     assert resp.status_code == 200

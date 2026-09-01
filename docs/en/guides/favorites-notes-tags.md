@@ -19,7 +19,7 @@ Mark commands, scripts, or nodes as favorites for quick access.
 ```bash
 curl --fail-with-body \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
-  "${NODE_NEXUS_URL}/api/v1/favorites"
+  "${NODE_NEXUS_URL}/api/v2/favorites"
 ```
 
 Returns all favorites for the current key, ordered by creation time.
@@ -31,7 +31,7 @@ curl --fail-with-body -X POST \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
   -H "Content-Type: application/json" \
   -d '{"target_type": "command", "target_id": "<command-id>"}' \
-  "${NODE_NEXUS_URL}/api/v1/favorites"
+  "${NODE_NEXUS_URL}/api/v2/favorites"
 ```
 
 `target_type` must be one of `command`, `script`, or `node`.
@@ -41,7 +41,7 @@ curl --fail-with-body -X POST \
 ```bash
 curl --fail-with-body -X DELETE \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
-  "${NODE_NEXUS_URL}/api/v1/favorites/command/<command-id>"
+  "${NODE_NEXUS_URL}/api/v2/favorites/command/<command-id>"
 ```
 
 Returns `204 No Content` on success.
@@ -55,7 +55,7 @@ Attach notes to commands, scripts, or nodes for inline documentation.
 ```bash
 curl --fail-with-body \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
-  "${NODE_NEXUS_URL}/api/v1/notes/command/<command-id>"
+  "${NODE_NEXUS_URL}/api/v2/notes/command/<command-id>"
 ```
 
 Returns all notes for the target, ordered by creation time.
@@ -67,7 +67,7 @@ curl --fail-with-body -X POST \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
   -H "Content-Type: application/json" \
   -d '{"content": "TODO: review parameters before production"}' \
-  "${NODE_NEXUS_URL}/api/v1/notes/command/<command-id>"
+  "${NODE_NEXUS_URL}/api/v2/notes/command/<command-id>"
 ```
 
 ### Update a note
@@ -77,7 +77,7 @@ curl --fail-with-body -X PUT \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
   -H "Content-Type: application/json" \
   -d '{"content": "Updated: parameters reviewed and approved"}' \
-  "${NODE_NEXUS_URL}/api/v1/notes/<note-id>"
+  "${NODE_NEXUS_URL}/api/v2/notes/<note-id>"
 ```
 
 ### Delete a note
@@ -85,7 +85,7 @@ curl --fail-with-body -X PUT \
 ```bash
 curl --fail-with-body -X DELETE \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
-  "${NODE_NEXUS_URL}/api/v1/notes/<note-id>"
+  "${NODE_NEXUS_URL}/api/v2/notes/<note-id>"
 ```
 
 Returns `204 No Content` on success.
@@ -102,7 +102,7 @@ curl --fail-with-body -X PATCH \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
   -H "Content-Type: application/json" \
   -d '{"new_name": "production-ready"}' \
-  "${NODE_NEXUS_URL}/api/v1/tags/old-tag-name"
+  "${NODE_NEXUS_URL}/api/v2/tags/old-tag-name"
 ```
 
 ### Delete a tag
@@ -110,7 +110,7 @@ curl --fail-with-body -X PATCH \
 ```bash
 curl --fail-with-body -X DELETE \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
-  "${NODE_NEXUS_URL}/api/v1/tags/tag-to-delete"
+  "${NODE_NEXUS_URL}/api/v2/tags/tag-to-delete"
 ```
 
 Deleting a tag removes it from all entities. The entities themselves are not
@@ -125,7 +125,7 @@ Clone commands and scripts to create copies with a new name.
 ```bash
 curl --fail-with-body -X POST \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
-  "${NODE_NEXUS_URL}/api/v1/commands/<command-id>/clone?new_name=my-disk-usage"
+  "${NODE_NEXUS_URL}/api/v2/commands/<command-id>/clone?new_name=my-disk-usage"
 ```
 
 ### Clone a script
@@ -133,7 +133,7 @@ curl --fail-with-body -X POST \
 ```bash
 curl --fail-with-body -X POST \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
-  "${NODE_NEXUS_URL}/api/v1/scripts/<script-id>/clone?new_name=my-deploy"
+  "${NODE_NEXUS_URL}/api/v2/scripts/<script-id>/clone?new_name=my-deploy"
 ```
 
 The cloned entity retains the same parameters, tags, and steps. The clone

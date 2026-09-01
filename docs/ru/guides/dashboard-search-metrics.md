@@ -15,7 +15,7 @@ Stage E добавляет агрегированные представлени
 ```bash
 curl --fail-with-body \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
-  "${NODE_NEXUS_URL}/api/v1/dashboard/"
+  "${NODE_NEXUS_URL}/api/v2/dashboard/"
 ```
 
 Возвращает агрегированные счётчики нод, Docker-контейнеров, скриптов,
@@ -26,7 +26,7 @@ curl --fail-with-body \
 ```bash
 curl --fail-with-body \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
-  "${NODE_NEXUS_URL}/api/v1/dashboard/metrics?group_by=day"
+  "${NODE_NEXUS_URL}/api/v2/dashboard/metrics?group_by=day"
 ```
 
 Параметры:
@@ -48,7 +48,7 @@ curl --fail-with-body \
 curl --fail-with-body --get \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
   --data-urlencode 'q=deploy' \
-  "${NODE_NEXUS_URL}/api/v1/search"
+  "${NODE_NEXUS_URL}/api/v2/search"
 ```
 
 Ищет по нодам, командам, скриптам и тегам.
@@ -60,7 +60,7 @@ curl --fail-with-body --get \
 ```bash
 curl --fail-with-body \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
-  "${NODE_NEXUS_URL}/api/v1/commands/<command-id>/stats"
+  "${NODE_NEXUS_URL}/api/v2/commands/<command-id>/stats"
 ```
 
 ### Статистика скриптов
@@ -68,7 +68,7 @@ curl --fail-with-body \
 ```bash
 curl --fail-with-body \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
-  "${NODE_NEXUS_URL}/api/v1/scripts/<script-id>/stats"
+  "${NODE_NEXUS_URL}/api/v2/scripts/<script-id>/stats"
 ```
 
 ### Статистика команд для ноды
@@ -76,7 +76,7 @@ curl --fail-with-body \
 ```bash
 curl --fail-with-body \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
-  "${NODE_NEXUS_URL}/api/v1/commands/stats?node_id=<node-id>"
+  "${NODE_NEXUS_URL}/api/v2/commands/stats?node_id=<node-id>"
 ```
 
 Каждый эндпоинт возвращает `total`, `successful`, `failed`, `cancelled`, `success_rate` (`0..1`, `0.8 = 80%`, `cancelled` не в `total`), `avg_duration_ms`, `min_duration_ms`, `max_duration_ms` и `last_executed_at`.
@@ -87,7 +87,7 @@ curl --fail-with-body \
 ```bash
 curl --fail-with-body \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
-  "${NODE_NEXUS_URL}/api/v1/events/stream"
+  "${NODE_NEXUS_URL}/api/v2/events/stream"
 ```
 
 События: `node.status_changed`, `execution.completed`,
@@ -98,7 +98,7 @@ curl --fail-with-body \
 ```bash
 curl --fail-with-body \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
-  "${NODE_NEXUS_URL}/api/v1/audit/export?fmt=csv"
+  "${NODE_NEXUS_URL}/api/v2/audit/export?fmt=csv"
 ```
 
 Форматы: `json` (по умолчанию) и `csv`.

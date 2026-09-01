@@ -46,7 +46,7 @@ def wait_for_container_status(
 
     def _check() -> bool:
         resp = e2e_client.get(
-            f"/api/v1/nodes/{node_id}/docker/containers/{container_id}"
+            f"/api/v2/nodes/{node_id}/docker/containers/{container_id}"
         )
         if resp.status_code != 200:
             return False
@@ -67,7 +67,7 @@ def wait_for_image_present(
     description = f"image {image} present"
 
     def _check() -> bool:
-        resp = e2e_client.get(f"/api/v1/nodes/{node_id}/docker/images")
+        resp = e2e_client.get(f"/api/v2/nodes/{node_id}/docker/images")
         if resp.status_code != 200:
             return False
         images = resp.json()
@@ -96,7 +96,7 @@ def wait_for_audit_record(
     started_at = time.monotonic()
     deadline = started_at + timeout
     while True:
-        response = e2e_client.get(f"/api/v1/audit/{query}")
+        response = e2e_client.get(f"/api/v2/audit/{query}")
         assert response.status_code == 200
         data = response.json()
         actions = {item["action"] for item in data["items"]}

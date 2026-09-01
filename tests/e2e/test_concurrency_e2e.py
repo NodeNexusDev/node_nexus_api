@@ -57,7 +57,7 @@ async def test_concurrent_create_same_name(
             # Wait for barrier before sending
             await barrier.wait()
             return await client.post(
-                "/api/v1/nodes/",
+                "/api/v2/nodes/",
                 json={
                     "name": name,
                     "host": "10.0.0.1",
@@ -89,7 +89,7 @@ async def test_concurrent_create_same_name(
             async with httpx.AsyncClient(
                 base_url=base, timeout=30.0, headers=_auth_headers()
             ) as client:
-                await client.delete(f"/api/v1/nodes/{node_id}")
+                await client.delete(f"/api/v2/nodes/{node_id}")
 
 
 @pytest.mark.asyncio
@@ -104,7 +104,7 @@ async def test_repeat_delete_idempotent(
     ) as client:
         # Create node
         resp = await client.post(
-            "/api/v1/nodes/",
+            "/api/v2/nodes/",
             json={
                 "name": f"idempotent-del-{uuid4().hex[:8]}",
                 "host": "10.0.0.1",
@@ -116,17 +116,17 @@ async def test_repeat_delete_idempotent(
         node_id = resp.json()["id"]
 
         # First delete — should succeed
-        resp1 = await client.delete(f"/api/v1/nodes/{node_id}")
+        resp1 = await client.delete(f"/api/v2/nodes/{node_id}")
         assert resp1.status_code == 204, f"First delete: {resp1.status_code}"
 
         # Second delete — should be 404
-        resp2 = await client.delete(f"/api/v1/nodes/{node_id}")
+        resp2 = await client.delete(f"/api/v2/nodes/{node_id}")
         assert resp2.status_code == 404, (
             f"Second delete: expected 404, got {resp2.status_code}"
         )
 
         # Third delete — still 404, never 500
-        resp3 = await client.delete(f"/api/v1/nodes/{node_id}")
+        resp3 = await client.delete(f"/api/v2/nodes/{node_id}")
         assert resp3.status_code == 404, (
             f"Third delete: expected 404, got {resp3.status_code}"
         )
@@ -144,7 +144,7 @@ async def test_concurrent_patch_api_key(
     ) as client:
         # Create API key
         resp = await client.post(
-            "/api/v1/api-keys/",
+            "/api/v2/api-keys/",
             json={"name": "concurrent-patch-key"},
         )
         assert resp.status_code == 201
@@ -159,7 +159,7 @@ async def test_concurrent_patch_api_key(
                 ) as c:
                     await barrier.wait()
                     return await c.patch(
-                        f"/api/v1/api-keys/{key_id}",
+                        f"/api/v2/api-keys/{key_id}",
                         json={"name": new_name},
                     )
 
@@ -174,7 +174,7 @@ async def test_concurrent_patch_api_key(
             assert resp_b.status_code == 200
 
             # Final name should be one of the two (consistent state)
-            resp = await client.get("/api/v1/api-keys/")
+            resp = await client.get("/api/v2/api-keys/")
             assert resp.status_code == 200
             items = resp.json()["items"]
             key_data = [k for k in items if k["id"] == key_id]
@@ -184,7 +184,7 @@ async def test_concurrent_patch_api_key(
                 f"Unexpected final name: {final_name}"
             )
         finally:
-            await client.delete(f"/api/v1/api-keys/{key_id}")
+            await client.delete(f"/api/v2/api-keys/{key_id}")
 
 
 @pytest.mark.asyncio
@@ -202,7 +202,7 @@ async def test_concurrent_config_imports(
         ) as client:
             await barrier.wait()
             return await client.post(
-                "/api/v1/config/import",
+                "/api/v2/config/import",
                 json={
                     "nodes": [
                         {
@@ -229,10 +229,10 @@ async def test_concurrent_config_imports(
     async with httpx.AsyncClient(
         base_url=base, timeout=30.0, headers=_auth_headers()
     ) as client:
-        resp = await client.get("/api/v1/nodes/")
+        resp = await client.get("/api/v2/nodes/")
         for n in resp.json()["items"]:
             if n["name"].startswith("cc-import-"):
-                await client.delete(f"/api/v1/nodes/{n['id']}")
+                await client.delete(f"/api/v2/nodes/{n['id']}")
 
 
 @pytest.mark.asyncio
@@ -249,7 +249,7 @@ async def test_concurrent_bulk_commands(
         nodes = []
         for i in range(2):
             resp = await client.post(
-                "/api/v1/nodes/",
+                "/api/v2/nodes/",
                 json={
                     "name": f"cc-bulk-{uuid4().hex[:8]}",
                     "host": "ssh-server",
@@ -271,7 +271,7 @@ async def test_concurrent_bulk_commands(
                 ) as c:
                     await barrier.wait()
                     return await c.post(
-                        "/api/v1/commands/bulk/execute",
+                        "/api/v2/commands/bulk/execute",
                         json={
                             "node_ids": [n["id"] for n in nodes],
                             "command": "echo bulk-ok",
@@ -293,4 +293,4 @@ async def test_concurrent_bulk_commands(
             )
         finally:
             for n in nodes:
-                await client.delete(f"/api/v1/nodes/{n['id']}")
+                await client.delete(f"/api/v2/nodes/{n['id']}")

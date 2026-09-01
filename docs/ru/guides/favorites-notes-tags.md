@@ -19,7 +19,7 @@ Stage F добавляет лёгкие коллаборационные фун�
 ```bash
 curl --fail-with-body \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
-  "${NODE_NEXUS_URL}/api/v1/favorites"
+  "${NODE_NEXUS_URL}/api/v2/favorites"
 ```
 
 ### Добавить в избранное
@@ -29,7 +29,7 @@ curl --fail-with-body -X POST \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
   -H "Content-Type: application/json" \
   -d '{"target_type": "command", "target_id": "<command-id>"}' \
-  "${NODE_NEXUS_URL}/api/v1/favorites"
+  "${NODE_NEXUS_URL}/api/v2/favorites"
 ```
 
 `target_type` — `command`, `script` или `node`.
@@ -39,7 +39,7 @@ curl --fail-with-body -X POST \
 ```bash
 curl --fail-with-body -X DELETE \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
-  "${NODE_NEXUS_URL}/api/v1/favorites/command/<command-id>"
+  "${NODE_NEXUS_URL}/api/v2/favorites/command/<command-id>"
 ```
 
 ## Заметки
@@ -51,7 +51,7 @@ curl --fail-with-body -X DELETE \
 ```bash
 curl --fail-with-body \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
-  "${NODE_NEXUS_URL}/api/v1/notes/command/<command-id>"
+  "${NODE_NEXUS_URL}/api/v2/notes/command/<command-id>"
 ```
 
 ### Создать заметку
@@ -61,7 +61,7 @@ curl --fail-with-body -X POST \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
   -H "Content-Type: application/json" \
   -d '{"content": "TODO: проверить параметры"}' \
-  "${NODE_NEXUS_URL}/api/v1/notes/command/<command-id>"
+  "${NODE_NEXUS_URL}/api/v2/notes/command/<command-id>"
 ```
 
 ### Обновить заметку
@@ -71,7 +71,7 @@ curl --fail-with-body -X PUT \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
   -H "Content-Type: application/json" \
   -d '{"content": "Обновлено: параметры проверены"}' \
-  "${NODE_NEXUS_URL}/api/v1/notes/<note-id>"
+  "${NODE_NEXUS_URL}/api/v2/notes/<note-id>"
 ```
 
 ### Удалить заметку
@@ -79,7 +79,7 @@ curl --fail-with-body -X PUT \
 ```bash
 curl --fail-with-body -X DELETE \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
-  "${NODE_NEXUS_URL}/api/v1/notes/<note-id>"
+  "${NODE_NEXUS_URL}/api/v2/notes/<note-id>"
 ```
 
 ## Управление тегами
@@ -94,7 +94,7 @@ curl --fail-with-body -X PATCH \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
   -H "Content-Type: application/json" \
   -d '{"new_name": "production-ready"}' \
-  "${NODE_NEXUS_URL}/api/v1/tags/old-tag-name"
+  "${NODE_NEXUS_URL}/api/v2/tags/old-tag-name"
 ```
 
 ### Удалить тег
@@ -102,7 +102,7 @@ curl --fail-with-body -X PATCH \
 ```bash
 curl --fail-with-body -X DELETE \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
-  "${NODE_NEXUS_URL}/api/v1/tags/tag-to-delete"
+  "${NODE_NEXUS_URL}/api/v2/tags/tag-to-delete"
 ```
 
 ## Клонирование
@@ -114,7 +114,7 @@ curl --fail-with-body -X DELETE \
 ```bash
 curl --fail-with-body -X POST \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
-  "${NODE_NEXUS_URL}/api/v1/commands/<command-id>/clone?new_name=my-copy"
+  "${NODE_NEXUS_URL}/api/v2/commands/<command-id>/clone?new_name=my-copy"
 ```
 
 ### Клонировать скрипт
@@ -122,5 +122,5 @@ curl --fail-with-body -X POST \
 ```bash
 curl --fail-with-body -X POST \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
-  "${NODE_NEXUS_URL}/api/v1/scripts/<script-id>/clone?new_name=my-copy"
+  "${NODE_NEXUS_URL}/api/v2/scripts/<script-id>/clone?new_name=my-copy"
 ```

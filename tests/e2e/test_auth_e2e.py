@@ -17,7 +17,7 @@ def _get_master_key() -> str:
 def test_api_key_create(e2e_client: httpx.Client) -> None:
     master_key = _get_master_key()
     resp = e2e_client.post(
-        "/api/v1/api-keys/",
+        "/api/v2/api-keys/",
         json={"name": "e2e-key-create"},
         headers={"X-API-Key": master_key},
     )
@@ -32,13 +32,13 @@ def test_api_key_list(e2e_client: httpx.Client) -> None:
     master_key = _get_master_key()
     # Create a key first
     e2e_client.post(
-        "/api/v1/api-keys/",
+        "/api/v2/api-keys/",
         json={"name": "e2e-key-list"},
         headers={"X-API-Key": master_key},
     )
 
     resp = e2e_client.get(
-        "/api/v1/api-keys/",
+        "/api/v2/api-keys/",
         headers={"X-API-Key": master_key},
     )
     assert resp.status_code == 200
@@ -52,7 +52,7 @@ def test_api_key_revoke(e2e_client: httpx.Client) -> None:
     master_key = _get_master_key()
     # Create
     resp = e2e_client.post(
-        "/api/v1/api-keys/",
+        "/api/v2/api-keys/",
         json={"name": "e2e-key-revoke"},
         headers={"X-API-Key": master_key},
     )
@@ -61,21 +61,21 @@ def test_api_key_revoke(e2e_client: httpx.Client) -> None:
 
     # Revoke
     resp = e2e_client.delete(
-        f"/api/v1/api-keys/{key_id}",
+        f"/api/v2/api-keys/{key_id}",
         headers={"X-API-Key": master_key},
     )
     assert resp.status_code == 204
 
     # Verify revoked key is rejected
     resp = e2e_client.get(
-        "/api/v1/nodes/",
+        "/api/v2/nodes/",
         headers={"X-API-Key": generated_key},
     )
     assert resp.status_code == 401
 
     # Verify list shows key as inactive
     resp = e2e_client.get(
-        "/api/v1/api-keys/",
+        "/api/v2/api-keys/",
         headers={"X-API-Key": master_key},
     )
     items = resp.json()["items"]
@@ -87,7 +87,7 @@ def test_api_key_revoke(e2e_client: httpx.Client) -> None:
 def test_api_key_revoke_not_found(e2e_client: httpx.Client) -> None:
     master_key = _get_master_key()
     resp = e2e_client.delete(
-        f"/api/v1/api-keys/{uuid4()}",
+        f"/api/v2/api-keys/{uuid4()}",
         headers={"X-API-Key": master_key},
     )
     assert resp.status_code == 404
@@ -97,7 +97,7 @@ def test_api_key_use_generated_key(e2e_client: httpx.Client) -> None:
     """Created API key can authenticate subsequent requests."""
     master_key = _get_master_key()
     resp = e2e_client.post(
-        "/api/v1/api-keys/",
+        "/api/v2/api-keys/",
         json={"name": "e2e-key-auth"},
         headers={"X-API-Key": master_key},
     )
@@ -105,20 +105,20 @@ def test_api_key_use_generated_key(e2e_client: httpx.Client) -> None:
 
     # Use generated key to access a protected endpoint
     resp = e2e_client.get(
-        "/api/v1/nodes/",
+        "/api/v2/nodes/",
         headers={"X-API-Key": generated_key},
     )
     assert resp.status_code == 200
 
 
 def test_api_key_missing_header(e2e_client_no_auth: httpx.Client) -> None:
-    resp = e2e_client_no_auth.get("/api/v1/nodes/")
+    resp = e2e_client_no_auth.get("/api/v2/nodes/")
     assert resp.status_code == 401
 
 
 def test_api_key_invalid_key(e2e_client: httpx.Client) -> None:
     resp = e2e_client.get(
-        "/api/v1/nodes/",
+        "/api/v2/nodes/",
         headers={"X-API-Key": "nnk_invalid_key_12345678901234567890"},
     )
     assert resp.status_code == 401
@@ -127,7 +127,7 @@ def test_api_key_invalid_key(e2e_client: httpx.Client) -> None:
 def test_api_key_create_validation_error(e2e_client: httpx.Client) -> None:
     master_key = _get_master_key()
     resp = e2e_client.post(
-        "/api/v1/api-keys/",
+        "/api/v2/api-keys/",
         json={"name": ""},
         headers={"X-API-Key": master_key},
     )
@@ -144,7 +144,7 @@ def test_api_key_patch_name(e2e_client: httpx.Client) -> None:
     master_key = _get_master_key()
     # Create
     resp = e2e_client.post(
-        "/api/v1/api-keys/",
+        "/api/v2/api-keys/",
         json={"name": "patch-test"},
         headers={"X-API-Key": master_key},
     )
@@ -153,7 +153,7 @@ def test_api_key_patch_name(e2e_client: httpx.Client) -> None:
 
     # Patch
     resp = e2e_client.patch(
-        f"/api/v1/api-keys/{key_id}",
+        f"/api/v2/api-keys/{key_id}",
         json={"name": "patched-name"},
         headers={"X-API-Key": master_key},
     )
@@ -162,7 +162,7 @@ def test_api_key_patch_name(e2e_client: httpx.Client) -> None:
 
     # Cleanup
     e2e_client.delete(
-        f"/api/v1/api-keys/{key_id}",
+        f"/api/v2/api-keys/{key_id}",
         headers={"X-API-Key": master_key},
     )
 
@@ -172,7 +172,7 @@ def test_api_key_patch_scope(e2e_client: httpx.Client) -> None:
     master_key = _get_master_key()
     # Create
     resp = e2e_client.post(
-        "/api/v1/api-keys/",
+        "/api/v2/api-keys/",
         json={"name": "scope-test"},
         headers={"X-API-Key": master_key},
     )
@@ -181,7 +181,7 @@ def test_api_key_patch_scope(e2e_client: httpx.Client) -> None:
 
     # Patch scope to read-only
     resp = e2e_client.patch(
-        f"/api/v1/api-keys/{key_id}",
+        f"/api/v2/api-keys/{key_id}",
         json={"scope": "read-only"},
         headers={"X-API-Key": master_key},
     )
@@ -190,7 +190,7 @@ def test_api_key_patch_scope(e2e_client: httpx.Client) -> None:
 
     # Cleanup
     e2e_client.delete(
-        f"/api/v1/api-keys/{key_id}",
+        f"/api/v2/api-keys/{key_id}",
         headers={"X-API-Key": master_key},
     )
 
@@ -200,7 +200,7 @@ def test_api_key_patch_expires_at(e2e_client: httpx.Client) -> None:
     master_key = _get_master_key()
     # Create
     resp = e2e_client.post(
-        "/api/v1/api-keys/",
+        "/api/v2/api-keys/",
         json={"name": "expires-test"},
         headers={"X-API-Key": master_key},
     )
@@ -209,7 +209,7 @@ def test_api_key_patch_expires_at(e2e_client: httpx.Client) -> None:
 
     # Patch expires_at
     resp = e2e_client.patch(
-        f"/api/v1/api-keys/{key_id}",
+        f"/api/v2/api-keys/{key_id}",
         json={"expires_at": "2099-12-31T23:59:59Z"},
         headers={"X-API-Key": master_key},
     )
@@ -218,7 +218,7 @@ def test_api_key_patch_expires_at(e2e_client: httpx.Client) -> None:
 
     # Cleanup
     e2e_client.delete(
-        f"/api/v1/api-keys/{key_id}",
+        f"/api/v2/api-keys/{key_id}",
         headers={"X-API-Key": master_key},
     )
 
@@ -233,7 +233,7 @@ def test_api_key_plain_key_not_in_list(e2e_client: httpx.Client) -> None:
     master_key = _get_master_key()
     # Create key — plain value returned
     resp = e2e_client.post(
-        "/api/v1/api-keys/",
+        "/api/v2/api-keys/",
         json={"name": "no-plain-in-list"},
         headers={"X-API-Key": master_key},
     )
@@ -243,7 +243,7 @@ def test_api_key_plain_key_not_in_list(e2e_client: httpx.Client) -> None:
     try:
         # List — plain key must NOT appear
         resp = e2e_client.get(
-            "/api/v1/api-keys/",
+            "/api/v2/api-keys/",
             headers={"X-API-Key": master_key},
         )
         items = resp.json()["items"]
@@ -255,7 +255,7 @@ def test_api_key_plain_key_not_in_list(e2e_client: httpx.Client) -> None:
         assert "key_prefix" in found[0]
     finally:
         e2e_client.delete(
-            f"/api/v1/api-keys/{key_id}",
+            f"/api/v2/api-keys/{key_id}",
             headers={"X-API-Key": master_key},
         )
 
@@ -264,7 +264,7 @@ def test_api_key_hash_not_in_export(e2e_client: httpx.Client) -> None:
     """API key hash must not appear in config export."""
     master_key = _get_master_key()
     resp = e2e_client.post(
-        "/api/v1/api-keys/",
+        "/api/v2/api-keys/",
         json={"name": "hash-not-in-export"},
         headers={"X-API-Key": master_key},
     )
@@ -273,7 +273,7 @@ def test_api_key_hash_not_in_export(e2e_client: httpx.Client) -> None:
 
     try:
         resp = e2e_client.get(
-            "/api/v1/config/export",
+            "/api/v2/config/export",
             headers={"X-API-Key": master_key},
         )
         assert resp.status_code == 200
@@ -286,7 +286,7 @@ def test_api_key_hash_not_in_export(e2e_client: httpx.Client) -> None:
             assert "key" not in key_data, f"Plain key leaked in export: {key_data}"
     finally:
         e2e_client.delete(
-            f"/api/v1/api-keys/{key_id}",
+            f"/api/v2/api-keys/{key_id}",
             headers={"X-API-Key": master_key},
         )
 
@@ -297,7 +297,7 @@ def test_revoked_key_rejected_on_all_endpoints(
     """Revoked API key is rejected on both read and write endpoints."""
     master_key = _get_master_key()
     resp = e2e_client.post(
-        "/api/v1/api-keys/",
+        "/api/v2/api-keys/",
         json={"name": "revoked-reject-all"},
         headers={"X-API-Key": master_key},
     )
@@ -307,13 +307,13 @@ def test_revoked_key_rejected_on_all_endpoints(
 
     # Revoke
     e2e_client.delete(
-        f"/api/v1/api-keys/{key_id}",
+        f"/api/v2/api-keys/{key_id}",
         headers={"X-API-Key": master_key},
     )
 
     # Should fail on GET
     resp = e2e_client.get(
-        "/api/v1/nodes/",
+        "/api/v2/nodes/",
         headers={"X-API-Key": revoked_key},
     )
     assert resp.status_code == 401, (
@@ -322,7 +322,7 @@ def test_revoked_key_rejected_on_all_endpoints(
 
     # Should fail on POST
     resp = e2e_client.post(
-        "/api/v1/nodes/",
+        "/api/v2/nodes/",
         json={
             "name": "should-fail-revoked",
             "host": "1.1.1.1",
@@ -341,14 +341,14 @@ def test_master_key_always_accepted(e2e_client: httpx.Client) -> None:
     master_key = _get_master_key()
     # Master key can read
     resp = e2e_client.get(
-        "/api/v1/nodes/",
+        "/api/v2/nodes/",
         headers={"X-API-Key": master_key},
     )
     assert resp.status_code == 200
 
     # Master key can write
     resp = e2e_client.post(
-        "/api/v1/nodes/",
+        "/api/v2/nodes/",
         json={
             "name": "master-key-test-node",
             "host": "10.0.0.210",
@@ -363,12 +363,12 @@ def test_master_key_always_accepted(e2e_client: httpx.Client) -> None:
     try:
         # Master key can access audit
         resp = e2e_client.get(
-            "/api/v1/audit/",
+            "/api/v2/audit/",
             headers={"X-API-Key": master_key},
         )
         assert resp.status_code == 200
     finally:
-        e2e_client.delete(f"/api/v1/nodes/{node_id}")
+        e2e_client.delete(f"/api/v2/nodes/{node_id}")
 
 
 # ---------------------------------------------------------------------------
@@ -380,7 +380,7 @@ def test_read_only_key_rejected_on_write(e2e_client):
     """403 when read-only API key tries POST/PUT/DELETE."""
     master_key = _get_master_key()
     resp = e2e_client.post(
-        "/api/v1/api-keys/",
+        "/api/v2/api-keys/",
         json={"name": "ro-scope-test", "scope": "read-only"},
         headers={"X-API-Key": master_key},
     )
@@ -391,7 +391,7 @@ def test_read_only_key_rejected_on_write(e2e_client):
     try:
         # POST with read-only key should return 403
         resp = e2e_client.post(
-            "/api/v1/nodes/",
+            "/api/v2/nodes/",
             json={
                 "name": "should-fail",
                 "host": "1.1.1.1",
@@ -403,7 +403,7 @@ def test_read_only_key_rejected_on_write(e2e_client):
         assert resp.status_code == 403
     finally:
         e2e_client.delete(
-            f"/api/v1/api-keys/{key_id}",
+            f"/api/v2/api-keys/{key_id}",
             headers={"X-API-Key": master_key},
         )
 
@@ -412,7 +412,7 @@ def test_read_only_key_can_read(e2e_client):
     """200 when read-only API key accesses GET endpoints."""
     master_key = _get_master_key()
     resp = e2e_client.post(
-        "/api/v1/api-keys/",
+        "/api/v2/api-keys/",
         json={"name": "ro-read-test", "scope": "read-only"},
         headers={"X-API-Key": master_key},
     )
@@ -422,13 +422,13 @@ def test_read_only_key_can_read(e2e_client):
 
     try:
         resp = e2e_client.get(
-            "/api/v1/nodes/",
+            "/api/v2/nodes/",
             headers={"X-API-Key": ro_key},
         )
         assert resp.status_code == 200
     finally:
         e2e_client.delete(
-            f"/api/v1/api-keys/{key_id}",
+            f"/api/v2/api-keys/{key_id}",
             headers={"X-API-Key": master_key},
         )
 
@@ -442,7 +442,7 @@ def test_expired_api_key_returns_401(e2e_client: httpx.Client) -> None:
     """API key with expires_at in the past is rejected with 401."""
     master_key = _get_master_key()
     resp = e2e_client.post(
-        "/api/v1/api-keys/",
+        "/api/v2/api-keys/",
         json={"name": "expired-key-test"},
         headers={"X-API-Key": master_key},
     )
@@ -456,7 +456,7 @@ def test_expired_api_key_returns_401(e2e_client: httpx.Client) -> None:
             "%Y-%m-%dT%H:%M:%SZ"
         )
         resp = e2e_client.patch(
-            f"/api/v1/api-keys/{key_id}",
+            f"/api/v2/api-keys/{key_id}",
             json={"expires_at": past_time},
             headers={"X-API-Key": master_key},
         )
@@ -464,13 +464,13 @@ def test_expired_api_key_returns_401(e2e_client: httpx.Client) -> None:
 
         # Expired key should be rejected
         resp = e2e_client.get(
-            "/api/v1/nodes/",
+            "/api/v2/nodes/",
             headers={"X-API-Key": generated_key},
         )
         assert resp.status_code == 401
     finally:
         e2e_client.delete(
-            f"/api/v1/api-keys/{key_id}",
+            f"/api/v2/api-keys/{key_id}",
             headers={"X-API-Key": master_key},
         )
 

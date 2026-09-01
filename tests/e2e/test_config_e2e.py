@@ -7,8 +7,8 @@ pytestmark = pytest.mark.docker
 
 
 def test_config_export(e2e_client: httpx.Client) -> None:
-    """GET /api/v1/config/export returns all data."""
-    resp = e2e_client.get("/api/v1/config/export")
+    """GET /api/v2/config/export returns all data."""
+    resp = e2e_client.get("/api/v2/config/export")
     assert resp.status_code == 200
     data = resp.json()
     assert "version" in data
@@ -21,7 +21,7 @@ def test_config_export(e2e_client: httpx.Client) -> None:
 def test_config_export_excludes_secrets(e2e_client: httpx.Client) -> None:
     """Exported nodes don't contain password/ssh_key."""
     resp = e2e_client.post(
-        "/api/v1/nodes/",
+        "/api/v2/nodes/",
         json={
             "name": "export-secret-node",
             "host": "10.0.0.99",
@@ -34,7 +34,7 @@ def test_config_export_excludes_secrets(e2e_client: httpx.Client) -> None:
     node_id = resp.json()["id"]
 
     try:
-        resp = e2e_client.get("/api/v1/config/export")
+        resp = e2e_client.get("/api/v2/config/export")
         data = resp.json()
         exported = next(
             (n for n in data["nodes"] if n["name"] == "export-secret-node"), None
@@ -44,13 +44,13 @@ def test_config_export_excludes_secrets(e2e_client: httpx.Client) -> None:
         assert "ssh_key" not in exported
         assert "passphrase" not in exported
     finally:
-        e2e_client.delete(f"/api/v1/nodes/{node_id}")
+        e2e_client.delete(f"/api/v2/nodes/{node_id}")
 
 
 def test_config_import(e2e_client: httpx.Client) -> None:
-    """POST /api/v1/config/import creates items."""
+    """POST /api/v2/config/import creates items."""
     resp = e2e_client.post(
-        "/api/v1/config/import",
+        "/api/v2/config/import",
         json={
             "nodes": [
                 {
@@ -70,20 +70,20 @@ def test_config_import(e2e_client: httpx.Client) -> None:
     assert result["commands_created"] >= 1
 
     # Cleanup — export doesn't include id, use list endpoints instead
-    resp = e2e_client.get("/api/v1/nodes/")
+    resp = e2e_client.get("/api/v2/nodes/")
     for n in resp.json()["items"]:
         if n["name"] == "imported-e2e":
-            e2e_client.delete(f"/api/v1/nodes/{n['id']}")
-    resp = e2e_client.get("/api/v1/commands/")
+            e2e_client.delete(f"/api/v2/nodes/{n['id']}")
+    resp = e2e_client.get("/api/v2/commands/")
     for c in resp.json()["items"]:
         if c["name"] == "imported-cmd-e2e":
-            e2e_client.delete(f"/api/v1/commands/{c['id']}")
+            e2e_client.delete(f"/api/v2/commands/{c['id']}")
 
 
 def test_config_import_skips_duplicates(e2e_client: httpx.Client) -> None:
     """Import skips items that already exist by name."""
     resp = e2e_client.post(
-        "/api/v1/commands/",
+        "/api/v2/commands/",
         json={"name": "dup-e2e-cmd", "command": "echo dup"},
     )
     assert resp.status_code == 201
@@ -91,7 +91,7 @@ def test_config_import_skips_duplicates(e2e_client: httpx.Client) -> None:
 
     try:
         resp = e2e_client.post(
-            "/api/v1/config/import",
+            "/api/v2/config/import",
             json={"commands": [{"name": "dup-e2e-cmd", "command": "echo dup"}]},
         )
         assert resp.status_code == 200
@@ -99,14 +99,14 @@ def test_config_import_skips_duplicates(e2e_client: httpx.Client) -> None:
         assert result["commands_created"] == 0
         assert len(result["errors"]) >= 1
     finally:
-        e2e_client.delete(f"/api/v1/commands/{cmd_id}")
+        e2e_client.delete(f"/api/v2/commands/{cmd_id}")
 
 
 def test_config_roundtrip_export_import(e2e_client: httpx.Client) -> None:
     """Export → clear → import → re-export produces equivalent data."""
     # 1. Create test data
     node_resp = e2e_client.post(
-        "/api/v1/nodes/",
+        "/api/v2/nodes/",
         json={
             "name": "rt-node",
             "host": "10.0.0.200",
@@ -118,7 +118,7 @@ def test_config_roundtrip_export_import(e2e_client: httpx.Client) -> None:
     node = node_resp.json()
 
     cmd_resp = e2e_client.post(
-        "/api/v1/commands/",
+        "/api/v2/commands/",
         json={"name": "rt-cmd", "command": "echo rt"},
     )
     assert cmd_resp.status_code == 201
@@ -126,13 +126,13 @@ def test_config_roundtrip_export_import(e2e_client: httpx.Client) -> None:
 
     try:
         # 2. Export
-        export1 = e2e_client.get("/api/v1/config/export").json()
+        export1 = e2e_client.get("/api/v2/config/export").json()
         assert any(n["name"] == "rt-node" for n in export1["nodes"])
         assert any(c["name"] == "rt-cmd" for c in export1["commands"])
 
         # 3. Delete test data
-        e2e_client.delete(f"/api/v1/nodes/{node['id']}")
-        e2e_client.delete(f"/api/v1/commands/{cmd['id']}")
+        e2e_client.delete(f"/api/v2/nodes/{node['id']}")
+        e2e_client.delete(f"/api/v2/commands/{cmd['id']}")
 
         # 4. Import back
         import_payload = {
@@ -140,46 +140,46 @@ def test_config_roundtrip_export_import(e2e_client: httpx.Client) -> None:
             "commands": [c for c in export1["commands"] if c["name"] == "rt-cmd"],
             "scripts": [],
         }
-        import_resp = e2e_client.post("/api/v1/config/import", json=import_payload)
+        import_resp = e2e_client.post("/api/v2/config/import", json=import_payload)
         assert import_resp.status_code == 200
         result = import_resp.json()
         assert result["nodes_created"] >= 1
         assert result["commands_created"] >= 1
 
         # 5. Re-export and verify
-        export2 = e2e_client.get("/api/v1/config/export").json()
+        export2 = e2e_client.get("/api/v2/config/export").json()
         assert any(n["name"] == "rt-node" for n in export2["nodes"])
         assert any(c["name"] == "rt-cmd" for c in export2["commands"])
 
         # 6. Cleanup re-imported data
-        nodes_resp = e2e_client.get("/api/v1/nodes/")
+        nodes_resp = e2e_client.get("/api/v2/nodes/")
         for n in nodes_resp.json()["items"]:
             if n["name"] == "rt-node":
-                e2e_client.delete(f"/api/v1/nodes/{n['id']}")
-        cmds_resp = e2e_client.get("/api/v1/commands/")
+                e2e_client.delete(f"/api/v2/nodes/{n['id']}")
+        cmds_resp = e2e_client.get("/api/v2/commands/")
         for c in cmds_resp.json()["items"]:
             if c["name"] == "rt-cmd":
-                e2e_client.delete(f"/api/v1/commands/{c['id']}")
+                e2e_client.delete(f"/api/v2/commands/{c['id']}")
     finally:
         # Ensure cleanup in case of mid-test failure
-        nodes_resp = e2e_client.get("/api/v1/nodes/")
+        nodes_resp = e2e_client.get("/api/v2/nodes/")
         for n in nodes_resp.json()["items"]:
             if n["name"] == "rt-node":
-                e2e_client.delete(f"/api/v1/nodes/{n['id']}")
-        cmds_resp = e2e_client.get("/api/v1/commands/")
+                e2e_client.delete(f"/api/v2/nodes/{n['id']}")
+        cmds_resp = e2e_client.get("/api/v2/commands/")
         for c in cmds_resp.json()["items"]:
             if c["name"] == "rt-cmd":
-                e2e_client.delete(f"/api/v1/commands/{c['id']}")
+                e2e_client.delete(f"/api/v2/commands/{c['id']}")
 
 
 def test_config_import_atomic_rollback(e2e_client: httpx.Client) -> None:
     """Invalid item in import payload causes atomic rollback — no partial data."""
     # Count existing nodes before import
-    before = e2e_client.get("/api/v1/nodes/").json()["total"]
+    before = e2e_client.get("/api/v2/nodes/").json()["total"]
 
     # Payload: one valid node, one invalid (missing required fields)
     resp = e2e_client.post(
-        "/api/v1/config/import",
+        "/api/v2/config/import",
         json={
             "nodes": [
                 {
@@ -198,13 +198,13 @@ def test_config_import_atomic_rollback(e2e_client: httpx.Client) -> None:
     )
 
     # Verify no nodes were created
-    after = e2e_client.get("/api/v1/nodes/").json()["total"]
+    after = e2e_client.get("/api/v2/nodes/").json()["total"]
     assert after == before, (
         f"Atomicity violation: {after - before} nodes leaked despite import error"
     )
 
     # Also verify "atomic-good" was NOT created
-    nodes = e2e_client.get("/api/v1/nodes/").json()["items"]
+    nodes = e2e_client.get("/api/v2/nodes/").json()["items"]
     assert not any(n["name"] == "atomic-good" for n in nodes), (
         "Partial import: 'atomic-good' node was created despite payload error"
     )
@@ -214,7 +214,7 @@ def test_config_import_invalid_uuid(e2e_client: httpx.Client) -> None:
     """Import with invalid UUID reference: API accepts or rejects gracefully."""
 
     resp = e2e_client.post(
-        "/api/v1/config/import",
+        "/api/v2/config/import",
         json={
             "nodes": [
                 {
@@ -234,19 +234,19 @@ def test_config_import_invalid_uuid(e2e_client: httpx.Client) -> None:
     )
 
     # Cleanup if node was created
-    after = e2e_client.get("/api/v1/nodes/").json()
+    after = e2e_client.get("/api/v2/nodes/").json()
     for n in after["items"]:
         if n["name"] == "bad-uuid-node":
-            e2e_client.delete(f"/api/v1/nodes/{n['id']}")
+            e2e_client.delete(f"/api/v2/nodes/{n['id']}")
 
 
 def test_config_import_unsupported_version(e2e_client: httpx.Client) -> None:
     """Import with unsupported version does not change DB."""
-    before_nodes = e2e_client.get("/api/v1/nodes/").json()["total"]
-    before_cmds = e2e_client.get("/api/v1/commands/").json()["total"]
+    before_nodes = e2e_client.get("/api/v2/nodes/").json()["total"]
+    before_cmds = e2e_client.get("/api/v2/commands/").json()["total"]
 
     resp = e2e_client.post(
-        "/api/v1/config/import",
+        "/api/v2/config/import",
         json={
             "version": 999,
             "nodes": [
@@ -264,8 +264,8 @@ def test_config_import_unsupported_version(e2e_client: httpx.Client) -> None:
         f"Expected error for unsupported version, got {resp.status_code}: {resp.text}"
     )
 
-    after_nodes = e2e_client.get("/api/v1/nodes/").json()["total"]
-    after_cmds = e2e_client.get("/api/v1/commands/").json()["total"]
+    after_nodes = e2e_client.get("/api/v2/nodes/").json()["total"]
+    after_cmds = e2e_client.get("/api/v2/commands/").json()["total"]
     assert after_nodes == before_nodes, "Nodes changed despite unsupported version"
     assert after_cmds == before_cmds, "Commands changed despite unsupported version"
 
@@ -276,11 +276,11 @@ def test_config_import_unsupported_version(e2e_client: httpx.Client) -> None:
 
 
 def test_config_import_dry_run(e2e_client: httpx.Client) -> None:
-    """POST /api/v1/config/import with dry_run=true returns preview without writing."""
-    before_nodes = e2e_client.get("/api/v1/nodes/").json()["total"]
+    """POST /api/v2/config/import with dry_run=true returns preview without writing."""
+    before_nodes = e2e_client.get("/api/v2/nodes/").json()["total"]
 
     resp = e2e_client.post(
-        "/api/v1/config/import",
+        "/api/v2/config/import",
         json={
             "dry_run": True,
             "nodes": [
@@ -308,7 +308,7 @@ def test_config_import_dry_run(e2e_client: httpx.Client) -> None:
     assert data["errors"] == []
 
     # Verify nothing was actually created
-    after_nodes = e2e_client.get("/api/v1/nodes/").json()["total"]
+    after_nodes = e2e_client.get("/api/v2/nodes/").json()["total"]
     assert after_nodes == before_nodes
 
 
@@ -316,7 +316,7 @@ def test_config_import_dry_run_reports_duplicates(e2e_client: httpx.Client) -> N
     """Dry-run reports existing items as duplicates without writing."""
     # Create a node first
     resp = e2e_client.post(
-        "/api/v1/nodes/",
+        "/api/v2/nodes/",
         json={
             "name": "dry-dup-node",
             "host": "10.0.0.61",
@@ -329,7 +329,7 @@ def test_config_import_dry_run_reports_duplicates(e2e_client: httpx.Client) -> N
 
     try:
         resp = e2e_client.post(
-            "/api/v1/config/import",
+            "/api/v2/config/import",
             json={
                 "dry_run": True,
                 "nodes": [
@@ -358,13 +358,13 @@ def test_config_import_dry_run_reports_duplicates(e2e_client: httpx.Client) -> N
         assert len(data["duplicates"]) == 1
         assert "dry-dup-node" in data["duplicates"][0]
     finally:
-        e2e_client.delete(f"/api/v1/nodes/{node_id}")
+        e2e_client.delete(f"/api/v2/nodes/{node_id}")
 
 
 def test_config_import_dry_run_unsupported_version(e2e_client: httpx.Client) -> None:
     """Dry-run still rejects unsupported format versions."""
     resp = e2e_client.post(
-        "/api/v1/config/import",
+        "/api/v2/config/import",
         json={
             "dry_run": True,
             "format_version": "99.0",
@@ -389,7 +389,7 @@ def test_config_import_dry_run_unsupported_version(e2e_client: httpx.Client) -> 
 def test_config_export_includes_docker_host(e2e_client: httpx.Client) -> None:
     """Export includes docker_host when set on a node."""
     resp = e2e_client.post(
-        "/api/v1/nodes/",
+        "/api/v2/nodes/",
         json={
             "name": "docker-host-export",
             "host": "10.0.0.99",
@@ -403,14 +403,14 @@ def test_config_export_includes_docker_host(e2e_client: httpx.Client) -> None:
     node_id = resp.json()["id"]
 
     try:
-        export = e2e_client.get("/api/v1/config/export").json()
+        export = e2e_client.get("/api/v2/config/export").json()
         exported = next(
             (n for n in export["nodes"] if n["name"] == "docker-host-export"), None
         )
         assert exported is not None
         assert exported["docker_host"] == "tcp://192.168.1.100:2375"
     finally:
-        e2e_client.delete(f"/api/v1/nodes/{node_id}")
+        e2e_client.delete(f"/api/v2/nodes/{node_id}")
 
 
 def test_config_round_trip_preserves_docker_host(
@@ -418,7 +418,7 @@ def test_config_round_trip_preserves_docker_host(
 ) -> None:
     """Export → import round-trip preserves docker_host."""
     resp = e2e_client.post(
-        "/api/v1/nodes/",
+        "/api/v2/nodes/",
         json={
             "name": "docker-host-rt",
             "host": "10.0.0.99",
@@ -432,29 +432,29 @@ def test_config_round_trip_preserves_docker_host(
     node_id = resp.json()["id"]
 
     try:
-        export1 = e2e_client.get("/api/v1/config/export").json()
+        export1 = e2e_client.get("/api/v2/config/export").json()
         exported_node = next(
             n for n in export1["nodes"] if n["name"] == "docker-host-rt"
         )
         assert exported_node["docker_host"] == "tcp://dind:2375"
 
-        e2e_client.delete(f"/api/v1/nodes/{node_id}")
+        e2e_client.delete(f"/api/v2/nodes/{node_id}")
 
         import_resp = e2e_client.post(
-            "/api/v1/config/import",
+            "/api/v2/config/import",
             json={"nodes": [exported_node], "commands": [], "scripts": []},
         )
         assert import_resp.status_code == 200
         assert import_resp.json()["nodes_created"] == 1
 
-        export2 = e2e_client.get("/api/v1/config/export").json()
+        export2 = e2e_client.get("/api/v2/config/export").json()
         reimported = next(n for n in export2["nodes"] if n["name"] == "docker-host-rt")
         assert reimported["docker_host"] == "tcp://dind:2375"
     finally:
-        nodes_resp = e2e_client.get("/api/v1/nodes/")
+        nodes_resp = e2e_client.get("/api/v2/nodes/")
         for n in nodes_resp.json()["items"]:
             if n["name"] == "docker-host-rt":
-                e2e_client.delete(f"/api/v1/nodes/{n['id']}")
+                e2e_client.delete(f"/api/v2/nodes/{n['id']}")
 
 
 # ---------------------------------------------------------------------------

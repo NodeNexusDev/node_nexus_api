@@ -16,7 +16,7 @@ source_revision: "2026-07-29"
 Для создания нужны права на запись:
 
 ```bash
-curl --fail-with-body -X POST "${NODE_NEXUS_URL}/api/v1/api-keys/" \
+curl --fail-with-body -X POST "${NODE_NEXUS_URL}/api/v2/api-keys/" \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
   -H 'Content-Type: application/json' \
   -d '{"name": "inventory-reader", "scope": "read-only"}'
@@ -28,12 +28,12 @@ curl --fail-with-body -X POST "${NODE_NEXUS_URL}/api/v1/api-keys/" \
 
 ## Срок действия и область доступа
 
-Получите список через `GET /api/v1/api-keys/?page=1&size=20`, затем измените
+Получите список через `GET /api/v2/api-keys/?page=1&size=20`, затем измените
 ключ по UUID:
 
 ```bash
 curl --fail-with-body -X PATCH \
-  "${NODE_NEXUS_URL}/api/v1/api-keys/${KEY_ID}" \
+  "${NODE_NEXUS_URL}/api/v2/api-keys/${KEY_ID}" \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
   -H 'Content-Type: application/json' \
   -d '{"scope": "read-write", "expires_at": "2026-12-31T23:59:59Z"}'
@@ -51,7 +51,7 @@ curl --fail-with-body -X PATCH \
 2. Сохраните его в менеджере секретов потребителя.
 3. Обновите потребителя и проверьте успешные запросы.
 4. Отключите старый ключ и убедитесь, что обращений с ним больше нет.
-5. Отзовите его через `DELETE /api/v1/api-keys/{key_id}`.
+5. Отзовите его через `DELETE /api/v2/api-keys/{key_id}`.
 
 Успешный отзыв возвращает `204 No Content`. Не используйте мастер-ключ в
 повседневной автоматизации и не выдавайте один ключ несвязанным потребителям.

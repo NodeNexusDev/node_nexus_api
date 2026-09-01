@@ -7,7 +7,7 @@ source_revision: "2026-08-26"
 
 # HTTP API
 
-Base path — `/api/v1`. Запросы и ответы используют JSON, если endpoint не
+Base path — `/api/v2`. Запросы и ответы используют JSON, если endpoint не
 говорит иначе. Защищённым операциям нужен `X-API-Key` или JWT
 `Authorization: Bearer` токен. Подробности обоих методах см. в
 [руководстве по аутентификации](../guides/authentication.md).
@@ -35,7 +35,7 @@ FastAPI envelope, domain errors —
 
 ```bash
 curl -H 'X-API-Key: your-key' \
-  'http://localhost:8000/api/v1/nodes/?page=1&size=20'
+  'http://localhost:8000/api/v2/nodes/?page=1&size=20'
 ```
 
 Полный каталог endpoints и schemas генерируется из routes и Pydantic models.

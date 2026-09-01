@@ -37,14 +37,14 @@ this alone is not a failure when another healthy replica owns the advisory lock.
 
 ## Dashboard
 
-An aggregated system overview is available at `GET /api/v1/dashboard/`. The
+An aggregated system overview is available at `GET /api/v2/dashboard/`. The
 endpoint returns statistics for nodes, Docker containers, scripts, commands,
 and recent audit log activity.
 
 ```bash
 curl --fail-with-body \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
-  "${NODE_NEXUS_URL}/api/v1/dashboard/"
+  "${NODE_NEXUS_URL}/api/v2/dashboard/"
 ```
 
 ### Response
@@ -100,19 +100,19 @@ gracefully).
 
 ## Dashboard metrics
 
-Time-series execution metrics are available at `GET /api/v1/dashboard/metrics`.
+Time-series execution metrics are available at `GET /api/v2/dashboard/metrics`.
 Supports `hour`, `day`, `week`, and `month` bucket granularity with optional
 `date_from` and `date_to` range filters. Returns command and script metrics
 with `total`, `success`, `failure` counts per bucket.
 
 ## SSE event stream
 
-Live server-sent events are available at `GET /api/v1/events/stream`. Events
+Live server-sent events are available at `GET /api/v2/events/stream`. Events
 include `node.status_changed`, `execution.completed`, `execution.failed`,
 `script.scheduled`, and `job.progress`. Subscribe for real-time monitoring
 without polling.
 
 ## Audit export
 
-Audit log entries can be exported at `GET /api/v1/audit/export` with `fmt=json`
+Audit log entries can be exported at `GET /api/v2/audit/export` with `fmt=json`
 or `fmt=csv`. Use for external SIEM integration or compliance reporting.

@@ -182,5 +182,5 @@ erDiagram
 ```
 
 `COMMAND`, `AUDIT_OUTBOX`, `API_KEY`, and `USER` are standalone entities. User
-accounts are managed through `/api/v1/users/` (superuser-only). Refresh tokens
+accounts are managed through `/api/v2/users/` (superuser-only). Refresh tokens
 are stored as SHA-256 hashes and used for JWT token rotation.

@@ -16,7 +16,7 @@ pytestmark = pytest.mark.docker
 def test_crud_full_cycle(e2e_client: httpx.Client) -> None:
     # Create
     resp = e2e_client.post(
-        "/api/v1/nodes/",
+        "/api/v2/nodes/",
         json={
             "name": "e2e-node",
             "host": "10.0.0.1",
@@ -31,12 +31,12 @@ def test_crud_full_cycle(e2e_client: httpx.Client) -> None:
     assert node["status"] == "active"
 
     # Read
-    resp = e2e_client.get(f"/api/v1/nodes/{node_id}")
+    resp = e2e_client.get(f"/api/v2/nodes/{node_id}")
     assert resp.status_code == 200
     assert resp.json()["name"] == "e2e-node"
 
     # Read all — verify PaginatedResponse structure
-    resp = e2e_client.get("/api/v1/nodes/")
+    resp = e2e_client.get("/api/v2/nodes/")
     assert resp.status_code == 200
     data = resp.json()
     assert "items" in data
@@ -49,18 +49,18 @@ def test_crud_full_cycle(e2e_client: httpx.Client) -> None:
 
     # Update
     resp = e2e_client.patch(
-        f"/api/v1/nodes/{node_id}",
+        f"/api/v2/nodes/{node_id}",
         json={"name": "e2e-node-updated"},
     )
     assert resp.status_code == 200
     assert resp.json()["name"] == "e2e-node-updated"
 
     # Delete
-    resp = e2e_client.delete(f"/api/v1/nodes/{node_id}")
+    resp = e2e_client.delete(f"/api/v2/nodes/{node_id}")
     assert resp.status_code == 204
 
     # Verify deleted
-    resp = e2e_client.get(f"/api/v1/nodes/{node_id}")
+    resp = e2e_client.get(f"/api/v2/nodes/{node_id}")
     assert resp.status_code == 404
 
 
@@ -68,7 +68,7 @@ def test_create_with_credentials(
     e2e_client: httpx.Client, service_ports: ServicePorts
 ) -> None:
     resp = e2e_client.post(
-        "/api/v1/nodes/",
+        "/api/v2/nodes/",
         json={
             "name": "ssh-node",
             "host": service_ports.ssh_host,
@@ -92,7 +92,7 @@ def test_create_with_passphrase(
     e2e_client: httpx.Client, service_ports: ServicePorts
 ) -> None:
     resp = e2e_client.post(
-        "/api/v1/nodes/",
+        "/api/v2/nodes/",
         json={
             "name": "ssh-passphrase-node",
             "host": service_ports.ssh_host,
@@ -127,7 +127,7 @@ def test_ssh_key_auth_check(
 ) -> None:
     """Connect via unencrypted SSH key — /check returns active."""
     node = e2e_resources.create_ssh_key_node(encrypted=False)
-    resp = e2e_client.post(f"/api/v1/nodes/{node['id']}/check")
+    resp = e2e_client.post(f"/api/v2/nodes/{node['id']}/check")
     assert resp.status_code == 200
     assert resp.json()["status"] == "active"
 
@@ -139,7 +139,7 @@ def test_ssh_key_auth_execute(
     """Execute a command via unencrypted SSH key."""
     node = e2e_resources.create_ssh_key_node(encrypted=False)
     resp = e2e_client.post(
-        "/api/v1/commands/execute",
+        "/api/v2/commands/execute",
         json={"node_id": node["id"], "command": "echo e2e-key-works"},
     )
     assert resp.status_code == 200
@@ -154,7 +154,7 @@ def test_ssh_encrypted_key_auth_check(
 ) -> None:
     """Connect via encrypted SSH key + passphrase — /check returns active."""
     node = e2e_resources.create_ssh_key_node(encrypted=True)
-    resp = e2e_client.post(f"/api/v1/nodes/{node['id']}/check")
+    resp = e2e_client.post(f"/api/v2/nodes/{node['id']}/check")
     assert resp.status_code == 200
     assert resp.json()["status"] == "active"
 
@@ -166,7 +166,7 @@ def test_ssh_encrypted_key_auth_execute(
     """Execute a command via encrypted SSH key + passphrase."""
     node = e2e_resources.create_ssh_key_node(encrypted=True)
     resp = e2e_client.post(
-        "/api/v1/commands/execute",
+        "/api/v2/commands/execute",
         json={"node_id": node["id"], "command": "echo e2e-enc-key-works"},
     )
     assert resp.status_code == 200
@@ -184,14 +184,14 @@ def test_ssh_encrypted_key_wrong_passphrase(
         encrypted=True,
         passphrase="wrong-passphrase",
     )
-    resp = e2e_client.post(f"/api/v1/nodes/{node['id']}/check")
+    resp = e2e_client.post(f"/api/v2/nodes/{node['id']}/check")
     assert resp.status_code == 200
     assert resp.json()["status"] == "unreachable"
 
 
 def test_validation_error(e2e_client: httpx.Client) -> None:
     resp = e2e_client.post(
-        "/api/v1/nodes/",
+        "/api/v2/nodes/",
         json={"name": "incomplete"},
     )
     assert resp.status_code == 422
@@ -200,16 +200,16 @@ def test_validation_error(e2e_client: httpx.Client) -> None:
 def test_not_found_errors(e2e_client: httpx.Client) -> None:
     fake_id = str(uuid4())
 
-    resp = e2e_client.get(f"/api/v1/nodes/{fake_id}")
+    resp = e2e_client.get(f"/api/v2/nodes/{fake_id}")
     assert resp.status_code == 404
 
     resp = e2e_client.patch(
-        f"/api/v1/nodes/{fake_id}",
+        f"/api/v2/nodes/{fake_id}",
         json={"name": "x"},
     )
     assert resp.status_code == 404
 
-    resp = e2e_client.delete(f"/api/v1/nodes/{fake_id}")
+    resp = e2e_client.delete(f"/api/v2/nodes/{fake_id}")
     assert resp.status_code == 404
 
 
@@ -218,7 +218,7 @@ def test_ssh_check_connectivity(
     e2e_resources: UniqueResourceFactory,
 ) -> None:
     node = e2e_resources.create_ssh_node(name="ssh-test")
-    resp = e2e_client.post(f"/api/v1/nodes/{node['id']}/check")
+    resp = e2e_client.post(f"/api/v2/nodes/{node['id']}/check")
     assert resp.status_code == 200
     assert resp.json()["status"] == "active"
 
@@ -229,7 +229,7 @@ def test_ssh_execute_command(
 ) -> None:
     node = e2e_resources.create_ssh_node(name="ssh-exec")
     resp = e2e_client.post(
-        "/api/v1/commands/execute",
+        "/api/v2/commands/execute",
         json={"node_id": node["id"], "command": "echo e2e-works"},
     )
     assert resp.status_code == 200
@@ -245,7 +245,7 @@ def test_ssh_execute_command_non_zero_exit(
 ) -> None:
     node = e2e_resources.create_ssh_node(name="ssh-fail")
     resp = e2e_client.post(
-        "/api/v1/commands/execute",
+        "/api/v2/commands/execute",
         json={"node_id": node["id"], "command": "exit 42"},
     )
     assert resp.status_code == 200
@@ -259,7 +259,7 @@ def test_ssh_execute_command_stderr(
 ) -> None:
     node = e2e_resources.create_ssh_node(name="ssh-stderr")
     resp = e2e_client.post(
-        "/api/v1/commands/execute",
+        "/api/v2/commands/execute",
         json={"node_id": node["id"], "command": "echo error-output >&2"},
     )
     assert resp.status_code == 200
@@ -269,13 +269,13 @@ def test_ssh_execute_command_stderr(
 
 
 def test_ssh_check_not_found(e2e_client: httpx.Client) -> None:
-    resp = e2e_client.post(f"/api/v1/nodes/{uuid4()}/check")
+    resp = e2e_client.post(f"/api/v2/nodes/{uuid4()}/check")
     assert resp.status_code == 404
 
 
 def test_ssh_execute_not_found(e2e_client: httpx.Client) -> None:
     resp = e2e_client.post(
-        "/api/v1/commands/execute",
+        "/api/v2/commands/execute",
         json={"node_id": str(uuid4()), "command": "ls"},
     )
     assert resp.status_code == 404
@@ -285,7 +285,7 @@ def test_pagination_page2(e2e_client: httpx.Client) -> None:
     created: list[str] = []
     for i in range(3):
         resp = e2e_client.post(
-            "/api/v1/nodes/",
+            "/api/v2/nodes/",
             json={
                 "name": f"page-test-{i}",
                 "host": "10.0.0.1",
@@ -295,7 +295,7 @@ def test_pagination_page2(e2e_client: httpx.Client) -> None:
         )
         created.append(resp.json()["id"])
 
-    resp = e2e_client.get("/api/v1/nodes/?page=1&size=2")
+    resp = e2e_client.get("/api/v2/nodes/?page=1&size=2")
     assert resp.status_code == 200
     data = resp.json()
     assert len(data["items"]) == 2
@@ -304,7 +304,7 @@ def test_pagination_page2(e2e_client: httpx.Client) -> None:
     assert data["size"] == 2
 
     for node_id in created:
-        e2e_client.delete(f"/api/v1/nodes/{node_id}")
+        e2e_client.delete(f"/api/v2/nodes/{node_id}")
 
 
 # ---------------------------------------------------------------------------
@@ -324,7 +324,7 @@ def test_ssh_check_wrong_credentials(
     node = e2e_resources.create_ssh_node(
         name="ssh-bad", username="testuser", password="wrongpass"
     )
-    resp = e2e_client.post(f"/api/v1/nodes/{node['id']}/check")
+    resp = e2e_client.post(f"/api/v2/nodes/{node['id']}/check")
     assert resp.status_code == 200
     assert resp.json()["status"] == "unreachable"
 
@@ -336,7 +336,7 @@ def test_ssh_check_wrong_credentials(
 
 def test_partial_update(e2e_client: httpx.Client) -> None:
     resp = e2e_client.post(
-        "/api/v1/nodes/",
+        "/api/v2/nodes/",
         json={
             "name": "partial-orig",
             "host": "10.0.0.99",
@@ -348,7 +348,7 @@ def test_partial_update(e2e_client: httpx.Client) -> None:
     node_id = resp.json()["id"]
     original_host = resp.json()["host"]
 
-    resp = e2e_client.patch(f"/api/v1/nodes/{node_id}", json={"name": "partial-new"})
+    resp = e2e_client.patch(f"/api/v2/nodes/{node_id}", json={"name": "partial-new"})
     assert resp.status_code == 200
     updated = resp.json()
     assert updated["name"] == "partial-new"
@@ -363,7 +363,7 @@ def test_partial_update(e2e_client: httpx.Client) -> None:
 
 def test_create_node_invalid_connection_type(e2e_client: httpx.Client) -> None:
     resp = e2e_client.post(
-        "/api/v1/nodes/",
+        "/api/v2/nodes/",
         json={
             "name": "bad-type",
             "host": "10.0.0.1",
@@ -377,7 +377,7 @@ def test_create_node_invalid_connection_type(e2e_client: httpx.Client) -> None:
 def test_create_node_valid_connection_types(e2e_client: httpx.Client) -> None:
     for ctype in ("ssh",):
         resp = e2e_client.post(
-            "/api/v1/nodes/",
+            "/api/v2/nodes/",
             json={
                 "name": f"type-{ctype}",
                 "host": "10.0.0.1",
@@ -387,7 +387,7 @@ def test_create_node_valid_connection_types(e2e_client: httpx.Client) -> None:
         )
         assert resp.status_code == 201
         assert resp.json()["connection_type"] == ctype
-        e2e_client.delete(f"/api/v1/nodes/{resp.json()['id']}")
+        e2e_client.delete(f"/api/v2/nodes/{resp.json()['id']}")
 
 
 # ---------------------------------------------------------------------------
@@ -397,7 +397,7 @@ def test_create_node_valid_connection_types(e2e_client: httpx.Client) -> None:
 
 def test_create_node_invalid_port(e2e_client: httpx.Client) -> None:
     resp = e2e_client.post(
-        "/api/v1/nodes/",
+        "/api/v2/nodes/",
         json={
             "name": "bad-port",
             "host": "10.0.0.1",
@@ -410,7 +410,7 @@ def test_create_node_invalid_port(e2e_client: httpx.Client) -> None:
 
 def test_create_node_port_zero(e2e_client: httpx.Client) -> None:
     resp = e2e_client.post(
-        "/api/v1/nodes/",
+        "/api/v2/nodes/",
         json={
             "name": "port-zero",
             "host": "10.0.0.1",
@@ -433,7 +433,7 @@ def test_create_node_duplicate_name(
     """Node names are unique and duplicate creation is a conflict."""
     e2e_resources.create_node(name="dup-name")
     resp = e2e_client.post(
-        "/api/v1/nodes/",
+        "/api/v2/nodes/",
         json={
             "name": "dup-name",
             "host": "10.0.0.2",
@@ -451,7 +451,7 @@ def test_create_node_duplicate_name(
 
 def test_node_create_with_tags(e2e_client: httpx.Client) -> None:
     resp = e2e_client.post(
-        "/api/v1/nodes/",
+        "/api/v2/nodes/",
         json={
             "name": "tagged-node",
             "host": "10.0.0.1",
@@ -465,11 +465,11 @@ def test_node_create_with_tags(e2e_client: httpx.Client) -> None:
     assert sorted(node["tags"]) == ["prod", "web"]
 
     # Read back
-    resp = e2e_client.get(f"/api/v1/nodes/{node['id']}")
+    resp = e2e_client.get(f"/api/v2/nodes/{node['id']}")
     assert resp.status_code == 200
     assert sorted(resp.json()["tags"]) == ["prod", "web"]
 
-    e2e_client.delete(f"/api/v1/nodes/{node['id']}")
+    e2e_client.delete(f"/api/v2/nodes/{node['id']}")
 
 
 def test_node_get_all_tags(
@@ -479,7 +479,7 @@ def test_node_get_all_tags(
     e2e_resources.create_node(name="tag-a", tags=["alpha", "beta"])
     e2e_resources.create_node(name="tag-b", tags=["beta", "gamma"])
 
-    resp = e2e_client.get("/api/v1/nodes/tags")
+    resp = e2e_client.get("/api/v2/nodes/tags")
     assert resp.status_code == 200
     tags = resp.json()
     assert "alpha" in tags
@@ -500,7 +500,7 @@ def test_node_filter_by_tags(
     e2e_resources.create_node(name="filter-prod-db", tags=["prod", "db"])
     e2e_resources.create_node(name="filter-staging", tags=["staging"])
 
-    resp = e2e_client.get("/api/v1/nodes/?tags=prod")
+    resp = e2e_client.get("/api/v2/nodes/?tags=prod")
     assert resp.status_code == 200
     data = resp.json()
     names = {n["name"] for n in data["items"]}
@@ -517,7 +517,7 @@ def test_node_filter_by_multiple_tags(
     e2e_resources.create_node(name="multi-tag-2", tags=["prod", "db"])
     e2e_resources.create_node(name="multi-tag-3", tags=["prod"])
 
-    resp = e2e_client.get("/api/v1/nodes/?tags=prod,web")
+    resp = e2e_client.get("/api/v2/nodes/?tags=prod,web")
     assert resp.status_code == 200
     data = resp.json()
     names = {n["name"] for n in data["items"]}
@@ -532,7 +532,7 @@ def test_node_search_by_name(
     e2e_resources.create_node(name="search-web-1", host="10.0.0.1")
     e2e_resources.create_node(name="search-db-1", host="10.0.0.2")
 
-    resp = e2e_client.get("/api/v1/nodes/?search=web")
+    resp = e2e_client.get("/api/v2/nodes/?search=web")
     assert resp.status_code == 200
     data = resp.json()
     names = {n["name"] for n in data["items"]}
@@ -547,7 +547,7 @@ def test_node_search_by_host(
     e2e_resources.create_node(name="host-alpha", host="prod.example.com")
     e2e_resources.create_node(name="host-beta", host="staging.example.com")
 
-    resp = e2e_client.get("/api/v1/nodes/?search=prod")
+    resp = e2e_client.get("/api/v2/nodes/?search=prod")
     assert resp.status_code == 200
     data = resp.json()
     names = {n["name"] for n in data["items"]}
@@ -571,7 +571,7 @@ def test_node_filter_by_tags_and_search(
         tags=["staging", "web"],
     )
 
-    resp = e2e_client.get("/api/v1/nodes/?tags=prod&search=web")
+    resp = e2e_client.get("/api/v2/nodes/?tags=prod&search=web")
     assert resp.status_code == 200
     data = resp.json()
     names = {n["name"] for n in data["items"]}
@@ -586,7 +586,7 @@ def test_node_filter_empty_result(
 ) -> None:
     e2e_resources.create_node(name="no-match", tags=["dev"])
 
-    resp = e2e_client.get("/api/v1/nodes/?search=nonexistent")
+    resp = e2e_client.get("/api/v2/nodes/?search=nonexistent")
     assert resp.status_code == 200
     assert resp.json()["total"] == 0
 
@@ -602,7 +602,7 @@ def test_node_metrics(
 ) -> None:
     """GET /nodes/{id}/metrics returns system metrics."""
     node = e2e_resources.create_ssh_node(name="metrics-node")
-    resp = e2e_client.get(f"/api/v1/nodes/{node['id']}/metrics")
+    resp = e2e_client.get(f"/api/v2/nodes/{node['id']}/metrics")
     assert resp.status_code == 200
     data = resp.json()
     assert "cpu" in data
@@ -615,7 +615,7 @@ def test_node_metrics(
 
 def test_node_metrics_not_found(e2e_client: httpx.Client) -> None:
     """GET /nodes/{id}/metrics returns 404 for nonexistent node."""
-    resp = e2e_client.get(f"/api/v1/nodes/{uuid4()}/metrics")
+    resp = e2e_client.get(f"/api/v2/nodes/{uuid4()}/metrics")
     assert resp.status_code == 404
 
 
@@ -629,7 +629,7 @@ def test_cursor_first_page(e2e_client: httpx.Client) -> None:
     nodes = []
     for i in range(3):
         resp = e2e_client.post(
-            "/api/v1/nodes/",
+            "/api/v2/nodes/",
             json={
                 "name": f"cursor-node-{i}",
                 "host": f"10.0.0.{i}",
@@ -642,7 +642,7 @@ def test_cursor_first_page(e2e_client: httpx.Client) -> None:
 
     try:
         cursor = encode_cursor(datetime.now(UTC), uuid4())
-        resp = e2e_client.get(f"/api/v1/nodes/?cursor={cursor}&limit=2")
+        resp = e2e_client.get(f"/api/v2/nodes/?cursor={cursor}&limit=2")
         assert resp.status_code == 200
         data = resp.json()
         assert "items" in data
@@ -651,7 +651,7 @@ def test_cursor_first_page(e2e_client: httpx.Client) -> None:
         assert len(data["items"]) <= 2
     finally:
         for node in nodes:
-            e2e_client.delete(f"/api/v1/nodes/{node['id']}")
+            e2e_client.delete(f"/api/v2/nodes/{node['id']}")
 
 
 def test_cursor_pagination(e2e_client: httpx.Client) -> None:
@@ -659,7 +659,7 @@ def test_cursor_pagination(e2e_client: httpx.Client) -> None:
     nodes = []
     for i in range(5):
         resp = e2e_client.post(
-            "/api/v1/nodes/",
+            "/api/v2/nodes/",
             json={
                 "name": f"cursor-page-{i}",
                 "host": f"10.0.1.{i}",
@@ -672,13 +672,13 @@ def test_cursor_pagination(e2e_client: httpx.Client) -> None:
 
     try:
         cursor = encode_cursor(datetime.now(UTC), uuid4())
-        resp = e2e_client.get(f"/api/v1/nodes/?cursor={cursor}&limit=2")
+        resp = e2e_client.get(f"/api/v2/nodes/?cursor={cursor}&limit=2")
         assert resp.status_code == 200
         page1 = resp.json()
         assert page1["has_more"] is True
         assert page1["next_cursor"] is not None
 
-        resp = e2e_client.get(f"/api/v1/nodes/?cursor={page1['next_cursor']}&limit=2")
+        resp = e2e_client.get(f"/api/v2/nodes/?cursor={page1['next_cursor']}&limit=2")
         assert resp.status_code == 200
         page2 = resp.json()
 
@@ -687,12 +687,12 @@ def test_cursor_pagination(e2e_client: httpx.Client) -> None:
         assert not page1_ids & page2_ids
     finally:
         for node in nodes:
-            e2e_client.delete(f"/api/v1/nodes/{node['id']}")
+            e2e_client.delete(f"/api/v2/nodes/{node['id']}")
 
 
 def test_cursor_invalid(e2e_client: httpx.Client) -> None:
     """Invalid cursor returns 422."""
-    resp = e2e_client.get("/api/v1/nodes/?cursor=invalid-cursor!!!")
+    resp = e2e_client.get("/api/v2/nodes/?cursor=invalid-cursor!!!")
     assert resp.status_code == 422
 
 

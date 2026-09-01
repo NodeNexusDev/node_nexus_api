@@ -16,7 +16,7 @@ scoped, observed, and revoked independently.
 Creating a key requires write access:
 
 ```bash
-curl --fail-with-body -X POST "${NODE_NEXUS_URL}/api/v1/api-keys/" \
+curl --fail-with-body -X POST "${NODE_NEXUS_URL}/api/v2/api-keys/" \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
   -H 'Content-Type: application/json' \
   -d '{"name": "inventory-reader", "scope": "read-only"}'
@@ -28,11 +28,11 @@ is suitable for identification but not authentication.
 
 ## Set expiration or change scope
 
-List keys with `GET /api/v1/api-keys/?page=1&size=20`, then update one by UUID:
+List keys with `GET /api/v2/api-keys/?page=1&size=20`, then update one by UUID:
 
 ```bash
 curl --fail-with-body -X PATCH \
-  "${NODE_NEXUS_URL}/api/v1/api-keys/${KEY_ID}" \
+  "${NODE_NEXUS_URL}/api/v2/api-keys/${KEY_ID}" \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
   -H 'Content-Type: application/json' \
   -d '{"scope": "read-write", "expires_at": "2026-12-31T23:59:59Z"}'
@@ -50,7 +50,7 @@ Rotate without downtime:
 2. Store it in the consumer's secret manager.
 3. Deploy or reload the consumer and verify successful requests.
 4. Disable the old key and monitor for unexpected use.
-5. Revoke it with `DELETE /api/v1/api-keys/{key_id}`.
+5. Revoke it with `DELETE /api/v2/api-keys/{key_id}`.
 
 Revocation returns `204 No Content`. Keep the master key outside routine
 automation, and never use one shared key for unrelated consumers.

@@ -18,7 +18,7 @@ pytestmark = [pytest.mark.docker, pytest.mark.e2e_slow]
 
 def _docker_pull_alpine(e2e_client: httpx.Client, node_id: str) -> None:
     resp = e2e_client.post(
-        f"/api/v1/nodes/{node_id}/docker/images/pull",
+        f"/api/v2/nodes/{node_id}/docker/images/pull",
         json={"image": "alpine:latest", "timeout": 120},
     )
     assert resp.status_code == 200
@@ -38,7 +38,7 @@ def test_large_stdout_ssh_command(
     # Generate ~100KB of output (100 * 1024 bytes)
     cmd = "dd if=/dev/zero bs=1K count=100 2>/dev/null | base64 | head -c 102400"
     resp = e2e_client.post(
-        "/api/v1/commands/execute",
+        "/api/v2/commands/execute",
         json={"node_id": node["id"], "command": cmd},
         timeout=60.0,
     )
@@ -60,7 +60,7 @@ def test_large_stdout_docker_exec(
         # Start a container
         cmd = "docker run -d --name lp-exec-large alpine sleep 300"
         e2e_client.post(
-            "/api/v1/commands/execute",
+            "/api/v2/commands/execute",
             json={"node_id": node["id"], "command": cmd},
         )
         # Exec with large output
@@ -68,7 +68,7 @@ def test_large_stdout_docker_exec(
             "dd if=/dev/zero bs=1K count=100 2>/dev/null | base64 | head -c 102400"
         )
         resp = e2e_client.post(
-            f"/api/v1/nodes/{node['id']}/docker/containers/lp-exec-large/exec",
+            f"/api/v2/nodes/{node['id']}/docker/containers/lp-exec-large/exec",
             json={"command": exec_cmd, "timeout": 60},
             timeout=90.0,
         )
@@ -80,7 +80,7 @@ def test_large_stdout_docker_exec(
         assert len(stdout) > 50000, f"Expected >50KB stdout, got {len(stdout)} bytes"
     finally:
         e2e_client.delete(
-            f"/api/v1/nodes/{node['id']}/docker/containers/lp-exec-large?force=true"
+            f"/api/v2/nodes/{node['id']}/docker/containers/lp-exec-large?force=true"
         )
 
 
@@ -95,7 +95,7 @@ def test_many_nodes_pagination(e2e_client: httpx.Client) -> None:
     try:
         for i in range(50):
             resp = e2e_client.post(
-                "/api/v1/nodes/",
+                "/api/v2/nodes/",
                 json={
                     "name": f"lp-many-{i:03d}",
                     "host": "10.0.0.1",
@@ -107,7 +107,7 @@ def test_many_nodes_pagination(e2e_client: httpx.Client) -> None:
             node_ids.append(resp.json()["id"])
 
         # Verify pagination
-        resp = e2e_client.get("/api/v1/nodes/?size=100")
+        resp = e2e_client.get("/api/v2/nodes/?size=100")
         assert resp.status_code == 200
         data = resp.json()
         assert data["total"] >= 50
@@ -119,7 +119,7 @@ def test_many_nodes_pagination(e2e_client: httpx.Client) -> None:
             )
     finally:
         for nid in node_ids:
-            e2e_client.delete(f"/api/v1/nodes/{nid}")
+            e2e_client.delete(f"/api/v2/nodes/{nid}")
 
 
 # ---------------------------------------------------------------------------
@@ -131,7 +131,7 @@ def test_unicode_node_name(e2e_client: httpx.Client) -> None:
     """Node name with Unicode characters is correctly preserved."""
     name = "テスト-节点-é2e-№"
     resp = e2e_client.post(
-        "/api/v1/nodes/",
+        "/api/v2/nodes/",
         json={
             "name": name,
             "host": "10.0.0.210",
@@ -144,13 +144,13 @@ def test_unicode_node_name(e2e_client: httpx.Client) -> None:
     assert resp.json()["name"] == name
 
     try:
-        resp = e2e_client.get(f"/api/v1/nodes/{node_id}")
+        resp = e2e_client.get(f"/api/v2/nodes/{node_id}")
         assert resp.status_code == 200
         assert resp.json()["name"] == name, (
             f"Unicode name not preserved: {resp.json()['name']!r} != {name!r}"
         )
     finally:
-        e2e_client.delete(f"/api/v1/nodes/{node_id}")
+        e2e_client.delete(f"/api/v2/nodes/{node_id}")
 
 
 def test_special_chars_in_ssh_command(
@@ -162,7 +162,7 @@ def test_special_chars_in_ssh_command(
     # Command with single quotes, double quotes, dollar sign
     cmd = """echo 'single-quotes' && echo "double-quotes" && echo dollar-$"""
     resp = e2e_client.post(
-        "/api/v1/commands/execute",
+        "/api/v2/commands/execute",
         json={"node_id": node["id"], "command": cmd},
     )
     assert resp.status_code == 200
@@ -175,7 +175,7 @@ def test_special_chars_in_ssh_command(
 def test_null_byte_in_node_name_rejected(e2e_client: httpx.Client) -> None:
     """Node name containing null byte is rejected with 422."""
     resp = e2e_client.post(
-        "/api/v1/nodes/",
+        "/api/v2/nodes/",
         json={
             "name": "bad\x00name",
             "host": "10.0.0.211",
@@ -201,14 +201,14 @@ def test_script_many_steps(e2e_client: httpx.Client) -> None:
         for i in range(50)
     ]
     resp = e2e_client.post(
-        "/api/v1/scripts/",
+        "/api/v2/scripts/",
         json={"name": "lp-many-steps", "steps": steps},
     )
     assert resp.status_code == 201
     script_id = resp.json()["id"]
 
     try:
-        resp = e2e_client.get(f"/api/v1/scripts/{script_id}")
+        resp = e2e_client.get(f"/api/v2/scripts/{script_id}")
         assert resp.status_code == 200
         data = resp.json()
         assert len(data["steps"]) == 50
@@ -216,7 +216,7 @@ def test_script_many_steps(e2e_client: httpx.Client) -> None:
             assert step["label"] == f"step-{i}"
             assert step["command"] == f"echo step{i}"
     finally:
-        e2e_client.delete(f"/api/v1/scripts/{script_id}")
+        e2e_client.delete(f"/api/v2/scripts/{script_id}")
 
 
 def test_script_step_long_command(e2e_client: httpx.Client) -> None:
@@ -224,7 +224,7 @@ def test_script_step_long_command(e2e_client: httpx.Client) -> None:
     # 4096 chars — the max for DockerExecRequest.command
     long_cmd = "echo " + "A" * 4090
     resp = e2e_client.post(
-        "/api/v1/scripts/",
+        "/api/v2/scripts/",
         json={
             "name": "lp-long-cmd",
             "steps": [{"label": "long-step", "type": "inline", "command": long_cmd}],
@@ -232,7 +232,7 @@ def test_script_step_long_command(e2e_client: httpx.Client) -> None:
     )
     if resp.status_code == 201:
         script_id = resp.json()["id"]
-        e2e_client.delete(f"/api/v1/scripts/{script_id}")
+        e2e_client.delete(f"/api/v2/scripts/{script_id}")
     else:
         # 422 is acceptable if the field is length-constrained
         assert resp.status_code == 422, (
@@ -248,7 +248,7 @@ def test_many_nodes_search(e2e_client: httpx.Client) -> None:
         # Create background nodes
         for i in range(10):
             resp = e2e_client.post(
-                "/api/v1/nodes/",
+                "/api/v2/nodes/",
                 json={
                     "name": f"lp-search-bg-{i}",
                     "host": "10.0.0.1",
@@ -260,7 +260,7 @@ def test_many_nodes_search(e2e_client: httpx.Client) -> None:
             node_ids.append(resp.json()["id"])
         # Create target
         resp = e2e_client.post(
-            "/api/v1/nodes/",
+            "/api/v2/nodes/",
             json={
                 "name": target_name,
                 "host": "10.0.0.99",
@@ -272,14 +272,14 @@ def test_many_nodes_search(e2e_client: httpx.Client) -> None:
         node_ids.append(resp.json()["id"])
 
         # Search for target
-        resp = e2e_client.get(f"/api/v1/nodes/?search={target_name}")
+        resp = e2e_client.get(f"/api/v2/nodes/?search={target_name}")
         assert resp.status_code == 200
         items = resp.json()["items"]
         assert len(items) == 1
         assert items[0]["name"] == target_name
     finally:
         for nid in node_ids:
-            e2e_client.delete(f"/api/v1/nodes/{nid}")
+            e2e_client.delete(f"/api/v2/nodes/{nid}")
 
 
 def test_deeply_nested_json_boundary(e2e_client: httpx.Client) -> None:
@@ -294,7 +294,7 @@ def test_deeply_nested_json_boundary(e2e_client: httpx.Client) -> None:
     current["value"] = "deep"
 
     resp = e2e_client.post(
-        "/api/v1/scripts/",
+        "/api/v2/scripts/",
         json={
             "name": "lp-nested",
             "steps": [{"label": "s1", "type": "inline", "command": "echo ok"}],
@@ -305,4 +305,4 @@ def test_deeply_nested_json_boundary(e2e_client: httpx.Client) -> None:
         f"Got 5xx on script with extra fields: {resp.status_code}"
     )
     if resp.status_code == 201:
-        e2e_client.delete(f"/api/v1/scripts/{resp.json()['id']}")
+        e2e_client.delete(f"/api/v2/scripts/{resp.json()['id']}")

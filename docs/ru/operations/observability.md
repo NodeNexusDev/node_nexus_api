@@ -38,14 +38,14 @@ scheduler. Значение `node_nexus_scheduler_owner 0` у non-owner репл
 
 ## Dashboard
 
-Агрегированный обзор системы доступен через `GET /api/v1/dashboard/`. Эндпоинт
+Агрегированный обзор системы доступен через `GET /api/v2/dashboard/`. Эндпоинт
 возвращает статистику по нодам, Docker-контейнерам, скриптам, командам и
 последним действиям в журнале аудита.
 
 ```bash
 curl --fail-with-body \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
-  "${NODE_NEXUS_URL}/api/v1/dashboard/"
+  "${NODE_NEXUS_URL}/api/v2/dashboard/"
 ```
 
 ### Ответ
@@ -101,20 +101,20 @@ Docker-ноде. Если нода недоступна, её контейнер
 
 ## Метрики дашборда
 
-Временные ряды метрик выполнения доступны через `GET /api/v1/dashboard/metrics`.
+Временные ряды метрик выполнения доступны через `GET /api/v2/dashboard/metrics`.
 Поддерживаются гранулярности `hour`, `day`, `week`, `month` с фильтрами
 `date_from` и `date_to`. Возвращаются метрики команд и скриптов с полями
 `total`, `success`, `failure` для каждого бакета.
 
 ## SSE поток событий
 
-Поток серверных событий доступен через `GET /api/v1/events/stream`. События:
+Поток серверных событий доступен через `GET /api/v2/events/stream`. События:
 `node.status_changed`, `execution.completed`, `execution.failed`,
 `script.scheduled`, `job.progress`. Подпишитесь для мониторинга в реальном
 времени без опроса.
 
 ## Экспорт аудита
 
-Записи журнала аудита доступны для экспорта через `GET /api/v1/audit/export`
+Записи журнала аудита доступны для экспорта через `GET /api/v2/audit/export`
 с параметрами `fmt=json` или `fmt=csv`. Используйте для интеграции с SIEM
 или compliance-отчётности.

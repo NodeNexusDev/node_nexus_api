@@ -55,7 +55,7 @@ def _create_command(
         "description": "E2E test command",
         **overrides,
     }
-    resp = e2e_client.post("/api/v1/commands/", json=data)
+    resp = e2e_client.post("/api/v2/commands/", json=data)
     assert resp.status_code == 201
     return resp.json()
 
@@ -78,7 +78,7 @@ def _create_script(
         "steps": steps,
         **overrides,
     }
-    resp = e2e_client.post("/api/v1/scripts/", json=data)
+    resp = e2e_client.post("/api/v2/scripts/", json=data)
     assert resp.status_code == 201
     return resp.json()
 
@@ -91,12 +91,12 @@ def test_script_crud_full_cycle(e2e_client: httpx.Client) -> None:
     assert len(script["steps"]) == 1
 
     # Read
-    resp = e2e_client.get(f"/api/v1/scripts/{script_id}")
+    resp = e2e_client.get(f"/api/v2/scripts/{script_id}")
     assert resp.status_code == 200
     assert resp.json()["name"] == "script-create"
 
     # Read all
-    resp = e2e_client.get("/api/v1/scripts/")
+    resp = e2e_client.get("/api/v2/scripts/")
     assert resp.status_code == 200
     data = resp.json()
     assert "items" in data and "total" in data
@@ -104,24 +104,24 @@ def test_script_crud_full_cycle(e2e_client: httpx.Client) -> None:
 
     # Update
     resp = e2e_client.patch(
-        f"/api/v1/scripts/{script_id}",
+        f"/api/v2/scripts/{script_id}",
         json={"name": "script-updated"},
     )
     assert resp.status_code == 200
     assert resp.json()["name"] == "script-updated"
 
     # Delete
-    resp = e2e_client.delete(f"/api/v1/scripts/{script_id}")
+    resp = e2e_client.delete(f"/api/v2/scripts/{script_id}")
     assert resp.status_code == 204
 
     # Verify deleted
-    resp = e2e_client.get(f"/api/v1/scripts/{script_id}")
+    resp = e2e_client.get(f"/api/v2/scripts/{script_id}")
     assert resp.status_code == 404
 
 
 def test_script_create_multiple_steps(e2e_client: httpx.Client) -> None:
     resp = e2e_client.post(
-        "/api/v1/scripts/",
+        "/api/v2/scripts/",
         json={
             "name": "multi-step",
             "steps": [
@@ -143,19 +143,19 @@ def test_script_create_multiple_steps(e2e_client: httpx.Client) -> None:
 
 
 def test_script_validation_error(e2e_client: httpx.Client) -> None:
-    resp = e2e_client.post("/api/v1/scripts/", json={"name": "no-steps"})
+    resp = e2e_client.post("/api/v2/scripts/", json={"name": "no-steps"})
     assert resp.status_code == 422
 
 
 def test_script_not_found(e2e_client: httpx.Client) -> None:
     fake_id = str(uuid4())
-    resp = e2e_client.get(f"/api/v1/scripts/{fake_id}")
+    resp = e2e_client.get(f"/api/v2/scripts/{fake_id}")
     assert resp.status_code == 404
 
-    resp = e2e_client.patch(f"/api/v1/scripts/{fake_id}", json={"name": "x"})
+    resp = e2e_client.patch(f"/api/v2/scripts/{fake_id}", json={"name": "x"})
     assert resp.status_code == 404
 
-    resp = e2e_client.delete(f"/api/v1/scripts/{fake_id}")
+    resp = e2e_client.delete(f"/api/v2/scripts/{fake_id}")
     assert resp.status_code == 404
 
 
@@ -172,7 +172,7 @@ def test_script_execute_on_ssh_node(
     script = _create_script(e2e_client, name="exec-script")
 
     resp = e2e_client.post(
-        f"/api/v1/scripts/{script['id']}/execute",
+        f"/api/v2/scripts/{script['id']}/execute",
         json={"node_ids": [node["id"]], "params": {}},
     )
     assert resp.status_code == 200
@@ -188,7 +188,7 @@ def test_script_execute_on_ssh_node(
 
 def test_script_execute_not_found(e2e_client: httpx.Client) -> None:
     resp = e2e_client.post(
-        f"/api/v1/scripts/{uuid4()}/execute",
+        f"/api/v2/scripts/{uuid4()}/execute",
         json={"node_ids": [str(uuid4())], "params": {}},
     )
     assert resp.status_code == 404
@@ -197,7 +197,7 @@ def test_script_execute_not_found(e2e_client: httpx.Client) -> None:
 def test_script_execute_node_not_found(e2e_client: httpx.Client) -> None:
     script = _create_script(e2e_client, name="no-node-script")
     resp = e2e_client.post(
-        f"/api/v1/scripts/{script['id']}/execute",
+        f"/api/v2/scripts/{script['id']}/execute",
         json={"node_ids": [str(uuid4())], "params": {}},
     )
     # All targets are validated before any remote side effect.
@@ -213,12 +213,12 @@ def test_script_executions_history(
 
     # Execute
     e2e_client.post(
-        f"/api/v1/scripts/{script['id']}/execute",
+        f"/api/v2/scripts/{script['id']}/execute",
         json={"node_ids": [node["id"]], "params": {}},
     )
 
     # Check history
-    resp = e2e_client.get(f"/api/v1/scripts/{script['id']}/executions")
+    resp = e2e_client.get(f"/api/v2/scripts/{script['id']}/executions")
     assert resp.status_code == 200
     data = resp.json()
     assert data["total"] >= 1
@@ -228,7 +228,7 @@ def test_script_executions_history(
 
 
 def test_script_executions_not_found(e2e_client: httpx.Client) -> None:
-    resp = e2e_client.get(f"/api/v1/scripts/{uuid4()}/executions")
+    resp = e2e_client.get(f"/api/v2/scripts/{uuid4()}/executions")
     assert resp.status_code == 404
 
 
@@ -243,7 +243,7 @@ def test_script_pagination(e2e_client: httpx.Client) -> None:
         script = _create_script(e2e_client, name=f"page-script-{i}")
         created.append(script["id"])
 
-    resp = e2e_client.get("/api/v1/scripts/?page=1&size=2")
+    resp = e2e_client.get("/api/v2/scripts/?page=1&size=2")
     assert resp.status_code == 200
     data = resp.json()
     assert len(data["items"]) == 2
@@ -252,7 +252,7 @@ def test_script_pagination(e2e_client: httpx.Client) -> None:
     assert data["size"] == 2
 
     for script_id in created:
-        e2e_client.delete(f"/api/v1/scripts/{script_id}")
+        e2e_client.delete(f"/api/v2/scripts/{script_id}")
 
 
 # ---------------------------------------------------------------------------
@@ -268,7 +268,7 @@ def test_script_execute_with_command_reference(
     cmd = _create_command(e2e_client, name="ref-cmd", command="echo ref-ok")
 
     resp = e2e_client.post(
-        "/api/v1/scripts/",
+        "/api/v2/scripts/",
         json={
             "name": "cmd-ref-script",
             "steps": [
@@ -285,7 +285,7 @@ def test_script_execute_with_command_reference(
     script = resp.json()
 
     resp = e2e_client.post(
-        f"/api/v1/scripts/{script['id']}/execute",
+        f"/api/v2/scripts/{script['id']}/execute",
         json={"node_ids": [node["id"]], "params": {}},
     )
     assert resp.status_code == 200
@@ -305,7 +305,7 @@ def test_script_execute_multi_node(
     script = _create_script(e2e_client, name="multi-script")
 
     resp = e2e_client.post(
-        f"/api/v1/scripts/{script['id']}/execute",
+        f"/api/v2/scripts/{script['id']}/execute",
         json={"node_ids": [node1["id"], node2["id"]], "params": {}},
     )
     assert resp.status_code == 200
@@ -327,7 +327,7 @@ def test_script_partial_update(e2e_client: httpx.Client) -> None:
     script = _create_script(e2e_client, name="script-partial")
 
     resp = e2e_client.patch(
-        f"/api/v1/scripts/{script['id']}",
+        f"/api/v2/scripts/{script['id']}",
         json={"name": "script-partial-updated"},
     )
     assert resp.status_code == 200
@@ -345,7 +345,7 @@ def test_script_with_tags(e2e_client: httpx.Client) -> None:
     """Scripts can be created with tags and filtered by tag."""
     # Create script with tags
     resp = e2e_client.post(
-        "/api/v1/scripts/",
+        "/api/v2/scripts/",
         json={
             "name": "tagged-script",
             "steps": [{"label": "Step 1", "type": "inline", "command": "echo ok"}],
@@ -358,14 +358,14 @@ def test_script_with_tags(e2e_client: httpx.Client) -> None:
     script_id = script["id"]
 
     # Filter by tag
-    resp = e2e_client.get("/api/v1/scripts/?tag=deploy")
+    resp = e2e_client.get("/api/v2/scripts/?tag=deploy")
     assert resp.status_code == 200
     data = resp.json()
     names = {s["name"] for s in data["items"]}
     assert "tagged-script" in names
 
     # Cleanup
-    e2e_client.delete(f"/api/v1/scripts/{script_id}")
+    e2e_client.delete(f"/api/v2/scripts/{script_id}")
 
 
 # ---------------------------------------------------------------------------
@@ -379,14 +379,14 @@ _INLINE_STEP = [{"label": "step1", "type": "inline", "command": "echo ok"}]
 def test_script_schedule(e2e_client: httpx.Client) -> None:
     """POST /scripts/{id}/schedule schedules a script."""
     resp = e2e_client.post(
-        "/api/v1/scripts/",
+        "/api/v2/scripts/",
         json={"name": "sched-e2e-script", "steps": _INLINE_STEP},
     )
     assert resp.status_code == 201
     script = resp.json()
 
     resp = e2e_client.post(
-        "/api/v1/nodes/",
+        "/api/v2/nodes/",
         json={
             "name": "sched-e2e-node",
             "host": "10.0.0.1",
@@ -399,27 +399,27 @@ def test_script_schedule(e2e_client: httpx.Client) -> None:
 
     try:
         resp = e2e_client.post(
-            f"/api/v1/scripts/{script['id']}/schedule",
+            f"/api/v2/scripts/{script['id']}/schedule",
             json={"cron": "0 9 * * *", "node_ids": [node["id"]]},
         )
         assert resp.status_code == 200
         assert resp.json()["cron"] == "0 9 * * *"
     finally:
-        e2e_client.delete(f"/api/v1/scripts/{script['id']}")
-        e2e_client.delete(f"/api/v1/nodes/{node['id']}")
+        e2e_client.delete(f"/api/v2/scripts/{script['id']}")
+        e2e_client.delete(f"/api/v2/nodes/{node['id']}")
 
 
 def test_script_unschedule(e2e_client: httpx.Client) -> None:
     """DELETE /scripts/{id}/schedule removes schedule."""
     resp = e2e_client.post(
-        "/api/v1/scripts/",
+        "/api/v2/scripts/",
         json={"name": "unsched-e2e-script", "steps": _INLINE_STEP},
     )
     assert resp.status_code == 201
     script = resp.json()
 
     resp = e2e_client.post(
-        "/api/v1/nodes/",
+        "/api/v2/nodes/",
         json={
             "name": "unsched-e2e-node",
             "host": "10.0.0.1",
@@ -432,27 +432,27 @@ def test_script_unschedule(e2e_client: httpx.Client) -> None:
 
     try:
         e2e_client.post(
-            f"/api/v1/scripts/{script['id']}/schedule",
+            f"/api/v2/scripts/{script['id']}/schedule",
             json={"cron": "0 9 * * *", "node_ids": [node["id"]]},
         )
-        resp = e2e_client.delete(f"/api/v1/scripts/{script['id']}/schedule")
+        resp = e2e_client.delete(f"/api/v2/scripts/{script['id']}/schedule")
         assert resp.status_code == 204
     finally:
-        e2e_client.delete(f"/api/v1/scripts/{script['id']}")
-        e2e_client.delete(f"/api/v1/nodes/{node['id']}")
+        e2e_client.delete(f"/api/v2/scripts/{script['id']}")
+        e2e_client.delete(f"/api/v2/nodes/{node['id']}")
 
 
 def test_script_get_schedule(e2e_client: httpx.Client) -> None:
     """GET /scripts/{id}/schedule returns schedule info."""
     resp = e2e_client.post(
-        "/api/v1/scripts/",
+        "/api/v2/scripts/",
         json={"name": "getsched-e2e", "steps": _INLINE_STEP},
     )
     assert resp.status_code == 201
     script = resp.json()
 
     resp = e2e_client.post(
-        "/api/v1/nodes/",
+        "/api/v2/nodes/",
         json={
             "name": "getsched-e2e-node",
             "host": "10.0.0.1",
@@ -465,37 +465,37 @@ def test_script_get_schedule(e2e_client: httpx.Client) -> None:
 
     try:
         e2e_client.post(
-            f"/api/v1/scripts/{script['id']}/schedule",
+            f"/api/v2/scripts/{script['id']}/schedule",
             json={"cron": "0 9 * * *", "node_ids": [node["id"]]},
         )
-        resp = e2e_client.get(f"/api/v1/scripts/{script['id']}/schedule")
+        resp = e2e_client.get(f"/api/v2/scripts/{script['id']}/schedule")
         assert resp.status_code == 200
         assert "cron" in resp.json()
     finally:
-        e2e_client.delete(f"/api/v1/scripts/{script['id']}")
-        e2e_client.delete(f"/api/v1/nodes/{node['id']}")
+        e2e_client.delete(f"/api/v2/scripts/{script['id']}")
+        e2e_client.delete(f"/api/v2/nodes/{node['id']}")
 
 
 def test_script_get_schedule_not_found(e2e_client: httpx.Client) -> None:
     """GET /scripts/{id}/schedule returns 404 when not scheduled."""
     resp = e2e_client.post(
-        "/api/v1/scripts/",
+        "/api/v2/scripts/",
         json={"name": "nosched-e2e", "steps": _INLINE_STEP},
     )
     assert resp.status_code == 201
     script = resp.json()
 
     try:
-        resp = e2e_client.get(f"/api/v1/scripts/{script['id']}/schedule")
+        resp = e2e_client.get(f"/api/v2/scripts/{script['id']}/schedule")
         assert resp.status_code == 404
     finally:
-        e2e_client.delete(f"/api/v1/scripts/{script['id']}")
+        e2e_client.delete(f"/api/v2/scripts/{script['id']}")
 
 
 def test_script_schedule_nonexistent(e2e_client: httpx.Client) -> None:
     """POST /scripts/{id}/schedule returns 404 for missing script."""
     resp = e2e_client.post(
-        f"/api/v1/scripts/{uuid4()}/schedule",
+        f"/api/v2/scripts/{uuid4()}/schedule",
         json={"cron": "0 9 * * *", "node_ids": [str(uuid4())]},
     )
     assert resp.status_code == 404
@@ -504,14 +504,14 @@ def test_script_schedule_nonexistent(e2e_client: httpx.Client) -> None:
 def test_script_schedule_invalid_cron(e2e_client: httpx.Client) -> None:
     """POST /scripts/{id}/schedule returns 422 for invalid cron expression."""
     resp = e2e_client.post(
-        "/api/v1/scripts/",
+        "/api/v2/scripts/",
         json={"name": "invalid-cron-script", "steps": _INLINE_STEP},
     )
     assert resp.status_code == 201
     script = resp.json()
 
     resp = e2e_client.post(
-        "/api/v1/nodes/",
+        "/api/v2/nodes/",
         json={
             "name": "invalid-cron-node",
             "host": "10.0.0.1",
@@ -524,13 +524,13 @@ def test_script_schedule_invalid_cron(e2e_client: httpx.Client) -> None:
 
     try:
         resp = e2e_client.post(
-            f"/api/v1/scripts/{script['id']}/schedule",
+            f"/api/v2/scripts/{script['id']}/schedule",
             json={"cron": "not-a-valid-cron", "node_ids": [node["id"]]},
         )
         assert resp.status_code == 422
     finally:
-        e2e_client.delete(f"/api/v1/scripts/{script['id']}")
-        e2e_client.delete(f"/api/v1/nodes/{node['id']}")
+        e2e_client.delete(f"/api/v2/scripts/{script['id']}")
+        e2e_client.delete(f"/api/v2/nodes/{node['id']}")
 
 
 @pytest.mark.e2e_scheduler
@@ -563,14 +563,14 @@ def test_script_schedule_rejects_invalid_trigger_options(
 ) -> None:
     """Invalid cron, timezone, and misfire grace are rejected without side effects."""
     resp = e2e_client.post(
-        "/api/v1/scripts/",
+        "/api/v2/scripts/",
         json={"name": "badcron-e2e", "steps": _INLINE_STEP},
     )
     assert resp.status_code == 201
     script = resp.json()
 
     resp = e2e_client.post(
-        "/api/v1/nodes/",
+        "/api/v2/nodes/",
         json={
             "name": "badcron-e2e-node",
             "host": "10.0.0.1",
@@ -597,16 +597,16 @@ def test_script_schedule_rejects_invalid_trigger_options(
         )
         for payload in invalid_payloads:
             resp = e2e_client.post(
-                f"/api/v1/scripts/{script['id']}/schedule",
+                f"/api/v2/scripts/{script['id']}/schedule",
                 json=payload,
             )
             assert resp.status_code == 422, resp.text
 
-        current = e2e_client.get(f"/api/v1/scripts/{script['id']}/schedule")
+        current = e2e_client.get(f"/api/v2/scripts/{script['id']}/schedule")
         assert current.status_code == 404
     finally:
-        e2e_client.delete(f"/api/v1/scripts/{script['id']}")
-        e2e_client.delete(f"/api/v1/nodes/{node['id']}")
+        e2e_client.delete(f"/api/v2/scripts/{script['id']}")
+        e2e_client.delete(f"/api/v2/nodes/{node['id']}")
 
 
 # ---------------------------------------------------------------------------
@@ -632,13 +632,13 @@ def test_scheduler_executes_script_on_cron(e2e_client: httpx.Client) -> None:
         "username": "testuser",
         "password": "testpass",
     }
-    resp = e2e_client.post("/api/v1/nodes/", json=node_data)
+    resp = e2e_client.post("/api/v2/nodes/", json=node_data)
     assert resp.status_code == 201
     node = resp.json()
 
     # Create script
     resp = e2e_client.post(
-        "/api/v1/scripts/",
+        "/api/v2/scripts/",
         json={
             "name": "sched-exec-script",
             "steps": [
@@ -652,13 +652,13 @@ def test_scheduler_executes_script_on_cron(e2e_client: httpx.Client) -> None:
     try:
         # Register, then replace the same runtime job with a per-minute cron.
         resp = e2e_client.post(
-            f"/api/v1/scripts/{script['id']}/schedule",
+            f"/api/v2/scripts/{script['id']}/schedule",
             json={"cron": "*/2 * * * *", "node_ids": [node["id"]]},
         )
         assert resp.status_code == 200
         assert resp.json()["cron"] == "*/2 * * * *"
         resp = e2e_client.post(
-            f"/api/v1/scripts/{script['id']}/schedule",
+            f"/api/v2/scripts/{script['id']}/schedule",
             json={"cron": "* * * * *", "node_ids": [node["id"]]},
         )
         assert resp.status_code == 200
@@ -667,13 +667,13 @@ def test_scheduler_executes_script_on_cron(e2e_client: httpx.Client) -> None:
 
         # Trigger execution immediately instead of waiting for the next minute.
         resp = e2e_client.post(
-            f"/api/v1/internal/e2e/scheduler/{script['id']}/trigger-now"
+            f"/api/v2/internal/e2e/scheduler/{script['id']}/trigger-now"
         )
         assert resp.status_code == 200
         assert resp.json()["status"] == "triggered"
 
         def _execution_completed() -> bool:
-            resp = e2e_client.get(f"/api/v1/scripts/{script['id']}/executions")
+            resp = e2e_client.get(f"/api/v2/scripts/{script['id']}/executions")
             if resp.status_code != 200:
                 return False
             data = resp.json()
@@ -689,7 +689,7 @@ def test_scheduler_executes_script_on_cron(e2e_client: httpx.Client) -> None:
             description="scheduled execution to complete",
         )
 
-        history = e2e_client.get(f"/api/v1/scripts/{script['id']}/executions")
+        history = e2e_client.get(f"/api/v2/scripts/{script['id']}/executions")
         assert history.status_code == 200
         data = history.json()
         assert data["total"] == 1
@@ -701,7 +701,7 @@ def test_scheduler_executes_script_on_cron(e2e_client: httpx.Client) -> None:
         assert exec_item["steps"][0]["exit_code"] == 0
 
         # Verify schedule metadata updated
-        resp = e2e_client.get(f"/api/v1/scripts/{script['id']}/schedule")
+        resp = e2e_client.get(f"/api/v2/scripts/{script['id']}/schedule")
         assert resp.status_code == 200
         schedule_after = resp.json()
         assert schedule_after["last_run_at"] is not None
@@ -710,9 +710,9 @@ def test_scheduler_executes_script_on_cron(e2e_client: httpx.Client) -> None:
 
     finally:
         # Unschedule and cleanup
-        e2e_client.delete(f"/api/v1/scripts/{script['id']}/schedule")
-        e2e_client.delete(f"/api/v1/scripts/{script['id']}")
-        e2e_client.delete(f"/api/v1/nodes/{node['id']}")
+        e2e_client.delete(f"/api/v2/scripts/{script['id']}/schedule")
+        e2e_client.delete(f"/api/v2/scripts/{script['id']}")
+        e2e_client.delete(f"/api/v2/nodes/{node['id']}")
 
 
 @pytest.mark.e2e_scheduler
@@ -727,12 +727,12 @@ def test_scheduler_records_failed_execution(e2e_client: httpx.Client) -> None:
         "username": "testuser",
         "password": "testpass",
     }
-    resp = e2e_client.post("/api/v1/nodes/", json=node_data)
+    resp = e2e_client.post("/api/v2/nodes/", json=node_data)
     assert resp.status_code == 201
     node = resp.json()
 
     resp = e2e_client.post(
-        "/api/v1/scripts/",
+        "/api/v2/scripts/",
         json={
             "name": "sched-fail-script",
             "steps": [{"label": "s1", "type": "inline", "command": "exit 1"}],
@@ -743,20 +743,20 @@ def test_scheduler_records_failed_execution(e2e_client: httpx.Client) -> None:
 
     try:
         resp = e2e_client.post(
-            f"/api/v1/scripts/{script['id']}/schedule",
+            f"/api/v2/scripts/{script['id']}/schedule",
             json={"cron": "* * * * *", "node_ids": [node["id"]]},
         )
         assert resp.status_code == 200
 
         # Trigger execution immediately; the harness endpoint records failures.
         resp = e2e_client.post(
-            f"/api/v1/internal/e2e/scheduler/{script['id']}/trigger-now"
+            f"/api/v2/internal/e2e/scheduler/{script['id']}/trigger-now"
         )
         assert resp.status_code == 200
         assert resp.json()["status"] == "failed"
 
         def _execution_recorded() -> bool:
-            resp = e2e_client.get(f"/api/v1/scripts/{script['id']}/executions")
+            resp = e2e_client.get(f"/api/v2/scripts/{script['id']}/executions")
             if resp.status_code != 200:
                 return False
             return bool(resp.json().get("total", 0) > 0)
@@ -768,7 +768,7 @@ def test_scheduler_records_failed_execution(e2e_client: httpx.Client) -> None:
             description="failed scheduled execution to be recorded",
         )
 
-        data = e2e_client.get(f"/api/v1/scripts/{script['id']}/executions").json()
+        data = e2e_client.get(f"/api/v2/scripts/{script['id']}/executions").json()
         exec_item = data["items"][0]
         # Non-zero exit should be recorded on the step and status.
         step_exit_code = exec_item["steps"][0]["exit_code"]
@@ -777,9 +777,9 @@ def test_scheduler_records_failed_execution(e2e_client: httpx.Client) -> None:
             f"Expected failed execution, got: {exec_item}"
         )
     finally:
-        e2e_client.delete(f"/api/v1/scripts/{script['id']}/schedule")
-        e2e_client.delete(f"/api/v1/scripts/{script['id']}")
-        e2e_client.delete(f"/api/v1/nodes/{node['id']}")
+        e2e_client.delete(f"/api/v2/scripts/{script['id']}/schedule")
+        e2e_client.delete(f"/api/v2/scripts/{script['id']}")
+        e2e_client.delete(f"/api/v2/nodes/{node['id']}")
 
 
 # ---------------------------------------------------------------------------

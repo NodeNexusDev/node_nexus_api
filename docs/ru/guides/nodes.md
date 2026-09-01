@@ -14,7 +14,7 @@ source_revision: "2026-08-16"
 ## Создание ноды
 
 ```bash
-curl --fail-with-body -X POST "${NODE_NEXUS_URL}/api/v1/nodes/" \
+curl --fail-with-body -X POST "${NODE_NEXUS_URL}/api/v2/nodes/" \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
   -H 'Content-Type: application/json' \
   -d '{
@@ -37,7 +37,7 @@ curl --fail-with-body -X POST "${NODE_NEXUS_URL}/api/v1/nodes/" \
 ключ зашифрован, укажите passphrase:
 
 ```bash
-curl --fail-with-body -X POST "${NODE_NEXUS_URL}/api/v1/nodes/" \
+curl --fail-with-body -X POST "${NODE_NEXUS_URL}/api/v2/nodes/" \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
   -H 'Content-Type: application/json' \
   -d '{
@@ -61,7 +61,7 @@ curl --fail-with-body -X POST "${NODE_NEXUS_URL}/api/v1/nodes/" \
 ноды в базу данных. Полезно перед созданием ноды для проверки доступности.
 
 ```bash
-curl --fail-with-body -X POST "${NODE_NEXUS_URL}/api/v1/nodes/validate-credentials" \
+curl --fail-with-body -X POST "${NODE_NEXUS_URL}/api/v2/nodes/validate-credentials" \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
   -H 'Content-Type: application/json' \
   -d '{
@@ -102,7 +102,7 @@ curl --fail-with-body --get \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
   --data-urlencode 'page=1' \
   --data-urlencode 'size=20' \
-  "${NODE_NEXUS_URL}/api/v1/nodes/"
+  "${NODE_NEXUS_URL}/api/v2/nodes/"
 ```
 
 Фильтрация по тегам с логикой AND:
@@ -112,7 +112,7 @@ curl --fail-with-body --get \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
   --data-urlencode 'tags=production' \
   --data-urlencode 'tags=frontend' \
-  "${NODE_NEXUS_URL}/api/v1/nodes/"
+  "${NODE_NEXUS_URL}/api/v2/nodes/"
 ```
 
 Не смешивайте offset-пагинацию (`page`/`size`) и cursor-пагинацию
@@ -124,7 +124,7 @@ curl --fail-with-body --get \
 ```bash
 curl --fail-with-body -X POST \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
-  "${NODE_NEXUS_URL}/api/v1/nodes/${NODE_ID}/check/"
+  "${NODE_NEXUS_URL}/api/v2/nodes/${NODE_ID}/check/"
 ```
 
 Успешная проверка подтверждает доступность по SSH. Статус ноды обновляется
@@ -135,7 +135,7 @@ curl --fail-with-body -X POST \
 ```bash
 curl --fail-with-body \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
-  "${NODE_NEXUS_URL}/api/v1/nodes/${NODE_ID}/metrics/"
+  "${NODE_NEXUS_URL}/api/v2/nodes/${NODE_ID}/metrics/"
 ```
 
 Возвращает информацию о CPU, памяти, дисках и нагрузке с удалённого хоста.
@@ -145,7 +145,7 @@ curl --fail-with-body \
 ```bash
 curl --fail-with-body \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
-  "${NODE_NEXUS_URL}/api/v1/nodes/${NODE_ID}/commands/history?page=1&size=20"
+  "${NODE_NEXUS_URL}/api/v2/nodes/${NODE_ID}/commands/history?page=1&size=20"
 ```
 
 Возвращает пагинированный список выполненных команд на данной ноде. Каждая
@@ -160,7 +160,7 @@ curl --fail-with-body \
 ```bash
 curl --fail-with-body \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
-  "${NODE_NEXUS_URL}/api/v1/nodes/${NODE_ID}/status-history?page=1&size=50"
+  "${NODE_NEXUS_URL}/api/v2/nodes/${NODE_ID}/status-history?page=1&size=50"
 ```
 
 Необязательные параметры: `from` и `to` (ISO 8601), `status` (например,
@@ -180,7 +180,7 @@ curl --fail-with-body -X POST \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
   -H "Content-Type: application/json" \
   -d '{"node_ids": ["<id-1>", "<id-2>"]}' \
-  "${NODE_NEXUS_URL}/api/v1/nodes/bulk/check"
+  "${NODE_NEXUS_URL}/api/v2/nodes/bulk/check"
 ```
 
 ### Массовое добавление тегов
@@ -190,7 +190,7 @@ curl --fail-with-body -X POST \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
   -H "Content-Type: application/json" \
   -d '{"node_ids": ["<id-1>"], "tags": ["staging"]}' \
-  "${NODE_NEXUS_URL}/api/v1/nodes/bulk/tags/add"
+  "${NODE_NEXUS_URL}/api/v2/nodes/bulk/tags/add"
 ```
 
 ### Массовое удаление тегов
@@ -200,7 +200,7 @@ curl --fail-with-body -X POST \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
   -H "Content-Type: application/json" \
   -d '{"node_ids": ["<id-1>"], "tags": ["deprecated"]}' \
-  "${NODE_NEXUS_URL}/api/v1/nodes/bulk/tags/remove"
+  "${NODE_NEXUS_URL}/api/v2/nodes/bulk/tags/remove"
 ```
 
 ### Массовое удаление нод
@@ -210,7 +210,7 @@ curl --fail-with-body -X POST \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
   -H "Content-Type: application/json" \
   -d '{"node_ids": ["<id-1>", "<id-2>"]}' \
-  "${NODE_NEXUS_URL}/api/v1/nodes/bulk/delete"
+  "${NODE_NEXUS_URL}/api/v2/nodes/bulk/delete"
 ```
 
 Все массовые endpoint'ы принимают `node_ids` и/или `node_tags` (пересечение AND).

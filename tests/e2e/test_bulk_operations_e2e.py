@@ -30,7 +30,7 @@ def test_docker_bulk_pull(
     """POST /docker/bulk/pull pulls an image on multiple Docker nodes."""
     node = e2e_resources.create_docker_node()
     resp = e2e_client.post(
-        "/api/v1/docker/bulk/pull",
+        "/api/v2/docker/bulk/pull",
         json={
             "node_ids": [node["id"]],
             "image": "busybox:latest",
@@ -58,11 +58,11 @@ def test_docker_bulk_remove(
     node = e2e_resources.create_docker_node()
     # Pull image and create a container
     e2e_client.post(
-        f"/api/v1/nodes/{node['id']}/docker/images/pull",
+        f"/api/v2/nodes/{node['id']}/docker/images/pull",
         json={"image": "alpine:latest", "timeout": 120},
     )
     e2e_client.post(
-        "/api/v1/commands/execute",
+        "/api/v2/commands/execute",
         json={
             "node_id": node["id"],
             "command": "docker run -d --name bulk-rm-test alpine sleep 300",
@@ -72,7 +72,7 @@ def test_docker_bulk_remove(
     # Wait for container to be running
     def _container_running() -> bool:
         resp = e2e_client.get(
-            f"/api/v1/nodes/{node['id']}/docker/containers/bulk-rm-test"
+            f"/api/v2/nodes/{node['id']}/docker/containers/bulk-rm-test"
         )
         if resp.status_code != 200:
             return False
@@ -84,7 +84,7 @@ def test_docker_bulk_remove(
     )
 
     resp = e2e_client.post(
-        "/api/v1/docker/bulk/remove",
+        "/api/v2/docker/bulk/remove",
         json={
             "node_ids": [node["id"]],
             "container_id": "bulk-rm-test",
@@ -110,13 +110,13 @@ def test_docker_bulk_image_remove(
     node = e2e_resources.create_docker_node()
     # Pull a unique image to remove
     resp = e2e_client.post(
-        f"/api/v1/nodes/{node['id']}/docker/images/pull",
+        f"/api/v2/nodes/{node['id']}/docker/images/pull",
         json={"image": "busybox:latest", "timeout": 120},
     )
     assert resp.status_code == 200
 
     resp = e2e_client.post(
-        "/api/v1/docker/bulk/images/remove",
+        "/api/v2/docker/bulk/images/remove",
         json={
             "node_ids": [node["id"]],
             "image_id": "busybox:latest",
@@ -144,7 +144,7 @@ def test_docker_bulk_image_build(
     tag = f"local/e2e-bulk-build-{uuid.uuid4().hex[:8]}"
 
     resp = e2e_client.post(
-        "/api/v1/docker/bulk/images/build",
+        "/api/v2/docker/bulk/images/build",
         json={
             "node_ids": [node["id"]],
             "dockerfile": dockerfile,
@@ -161,7 +161,7 @@ def test_docker_bulk_image_build(
     assert data["results"][0]["status"] == "success"
 
     # Cleanup built image
-    e2e_client.delete(f"/api/v1/nodes/{node['id']}/docker/images/{tag}")
+    e2e_client.delete(f"/api/v2/nodes/{node['id']}/docker/images/{tag}")
 
 
 # ---------------------------------------------------------------------------
@@ -176,7 +176,7 @@ def test_node_bulk_metrics(
     """POST /nodes/bulk/metrics collects metrics from multiple nodes."""
     node = e2e_resources.create_ssh_node(name="bulk-metrics")
     resp = e2e_client.post(
-        "/api/v1/nodes/bulk/metrics",
+        "/api/v2/nodes/bulk/metrics",
         json={"node_ids": [node["id"]]},
     )
     assert resp.status_code == 200
@@ -203,7 +203,7 @@ def test_node_bulk_update(
     node2 = e2e_resources.create_ssh_node(name="bulk-upd-2")
 
     resp = e2e_client.patch(
-        "/api/v1/nodes/bulk/update",
+        "/api/v2/nodes/bulk/update",
         json={
             "node_ids": [node1["id"], node2["id"]],
             "changes": {"port": 23022},
@@ -214,7 +214,7 @@ def test_node_bulk_update(
     assert data["total"] == 2
 
     # Verify the update persisted on at least one node
-    resp = e2e_client.get(f"/api/v1/nodes/{node1['id']}")
+    resp = e2e_client.get(f"/api/v2/nodes/{node1['id']}")
     assert resp.status_code == 200
     assert resp.json()["port"] == 23022
 
@@ -231,7 +231,7 @@ def test_node_bulk_validate_credentials(
     """POST /nodes/bulk/validate-credentials validates SSH credentials."""
     node = e2e_resources.create_ssh_node(name="bulk-cred")
     resp = e2e_client.post(
-        "/api/v1/nodes/bulk/validate-credentials",
+        "/api/v2/nodes/bulk/validate-credentials",
         json={"node_ids": [node["id"]]},
     )
     assert resp.status_code == 200
@@ -255,7 +255,7 @@ def test_node_bulk_retry_cancel(
     fake_id = str(uuid.uuid4())
 
     resp = e2e_client.post(
-        "/api/v1/commands/bulk/retry",
+        "/api/v2/commands/bulk/retry",
         json={"execution_ids": [fake_id]},
     )
     assert resp.status_code == 200
@@ -264,7 +264,7 @@ def test_node_bulk_retry_cancel(
     assert data["failed"] == 1
 
     resp = e2e_client.post(
-        "/api/v1/commands/bulk/cancel",
+        "/api/v2/commands/bulk/cancel",
         json={"execution_ids": [fake_id]},
     )
     assert resp.status_code == 200
@@ -287,7 +287,7 @@ def test_command_bulk_execute(
     cmd = e2e_resources.create_command(command="echo template-ok")
 
     resp = e2e_client.post(
-        f"/api/v1/commands/{cmd['id']}/bulk-execute",
+        f"/api/v2/commands/{cmd['id']}/bulk-execute",
         json={"command": "unused", "node_ids": [node["id"]]},
     )
     assert resp.status_code == 200
@@ -310,13 +310,13 @@ def test_script_bulk_retry_cancel(
     fake_id = str(uuid.uuid4())
 
     resp = e2e_client.post(
-        "/api/v1/scripts/bulk/retry",
+        "/api/v2/scripts/bulk/retry",
         json={"execution_ids": [fake_id]},
     )
     assert resp.status_code == 200
 
     resp = e2e_client.post(
-        "/api/v1/scripts/bulk/cancel",
+        "/api/v2/scripts/bulk/cancel",
         json={"execution_ids": [fake_id]},
     )
     assert resp.status_code == 200

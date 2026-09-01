@@ -40,7 +40,7 @@ def create_node(e2e_client: httpx.Client, **overrides: object) -> UnvalidatedJso
     _deprecation_warning("create_node")
     data = {**_NODE_PAYLOAD, **overrides}
     data.setdefault("name", f"e2e-node-{uuid4().hex[:8]}")
-    resp = e2e_client.post("/api/v1/nodes/", json=data)
+    resp = e2e_client.post("/api/v2/nodes/", json=data)
     assert resp.status_code == 201
     return resp.json()
 
@@ -70,7 +70,7 @@ def create_ssh_node(
         "password": SSH_PASSWORD,
     }
     data.update(overrides)
-    resp = e2e_client.post("/api/v1/nodes/", json=data)
+    resp = e2e_client.post("/api/v2/nodes/", json=data)
     assert resp.status_code == 201
     return resp.json()
 
@@ -94,7 +94,7 @@ def create_docker_node(
         "docker_host": DOCKER_HOST,
     }
     data.update(overrides)
-    resp = e2e_client.post("/api/v1/nodes/", json=data)
+    resp = e2e_client.post("/api/v2/nodes/", json=data)
     assert resp.status_code == 201
     return resp.json()
 
@@ -120,9 +120,9 @@ def wait_for_audit(
         if node_id:
             params["node_id"] = node_id
         if query:
-            response = client.get(f"/api/v1/audit/{query}", params=params)
+            response = client.get(f"/api/v2/audit/{query}", params=params)
         else:
-            response = client.get("/api/v1/audit/", params=params)
+            response = client.get("/api/v2/audit/", params=params)
         assert response.status_code == 200
         data = response.json()
         if data["total"] >= minimum_total:

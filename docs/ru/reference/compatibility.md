@@ -7,7 +7,7 @@ source_revision: "2026-08-25"
 
 # Совместимость и поддержка
 
-Проект следует Semantic Versioning. Prefix `/api/v1` обозначает текущий major
+Проект следует Semantic Versioning. Prefix `/api/v2` обозначает текущий major
 HTTP contract; minor versions могут добавлять поля и endpoints. Удаление или
 изменение обязательных полей, смысла, paths или status semantics является
 breaking change и требует contract review и стратегии major version.

@@ -27,7 +27,7 @@ export NODE_NEXUS_API_KEY='replace-with-your-key'
 
 curl --fail-with-body \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
-  "${NODE_NEXUS_URL}/api/v1/nodes/"
+  "${NODE_NEXUS_URL}/api/v2/nodes/"
 ```
 
 The master key configured through `MASTER_API_KEY` always has read-write access.
@@ -57,7 +57,7 @@ curl --fail-with-body \
   -X POST \
   -H "Content-Type: application/json" \
   -d '{"email": "user@example.com", "password": "secret"}' \
-  "${NODE_NEXUS_URL}/api/v1/auth/login"
+  "${NODE_NEXUS_URL}/api/v2/auth/login"
 ```
 
 Response:
@@ -77,7 +77,7 @@ The response also sets a `refresh_token` cookie (`HttpOnly`, `Secure`,
 ```bash
 curl --fail-with-body \
   -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIs..." \
-  "${NODE_NEXUS_URL}/api/v1/auth/me"
+  "${NODE_NEXUS_URL}/api/v2/auth/me"
 ```
 
 ### Refreshing the token
@@ -91,13 +91,13 @@ curl --fail-with-body \
   -b cookies.txt \
   -c cookies.txt \
   -X POST \
-  "${NODE_NEXUS_URL}/api/v1/auth/refresh"
+  "${NODE_NEXUS_URL}/api/v2/auth/refresh"
 ```
 
 ### Logout
 
 ```bash
-curl -b cookies.txt -X POST "${NODE_NEXUS_URL}/api/v1/auth/logout"
+curl -b cookies.txt -X POST "${NODE_NEXUS_URL}/api/v2/auth/logout"
 ```
 
 This clears the refresh token cookie and invalidates the refresh token
@@ -112,13 +112,13 @@ server-side.
 
 ## Superuser-only endpoints
 
-Endpoints under `/api/v1/users/` require a JWT with the `is_superuser` claim.
+Endpoints under `/api/v2/users/` require a JWT with the `is_superuser` claim.
 API keys **cannot** be used for these endpoints — the server returns `401` with
 the message "Master key cannot be used for user authentication".
 
 The first superuser is created automatically on startup when
 `INITIAL_SUPERUSER_EMAIL` and `INITIAL_SUPERUSER_PASSWORD` are set. All other
-users are created via `POST /api/v1/users/` by an existing superuser.
+users are created via `POST /api/v2/users/` by an existing superuser.
 
 ## Authentication priority
 
@@ -132,7 +132,7 @@ security dependency checks in this order:
 The server never hides an invalid Bearer token by falling back to a second
 credential supplied in the same request.
 
-For superuser endpoints (`/api/v1/users/*`), only JWT is accepted. API keys
+For superuser endpoints (`/api/v2/users/*`), only JWT is accepted. API keys
 are rejected with `401`.
 
 ## Rate limiting

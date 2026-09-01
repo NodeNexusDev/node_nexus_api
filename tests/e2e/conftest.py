@@ -285,7 +285,7 @@ async def e2e_db_isolation(
         timeout=30.0,
         headers={"X-API-Key": _MASTER_API_KEY},
     ) as client:
-        await client.post("/api/v1/internal/e2e/pause-background")
+        await client.post("/api/v2/internal/e2e/pause-background")
         try:
             await postgres_connection.execute(
                 """
@@ -296,7 +296,7 @@ async def e2e_db_isolation(
                 """
             )
         finally:
-            await client.post("/api/v1/internal/e2e/resume-background")
+            await client.post("/api/v2/internal/e2e/resume-background")
 
 
 @pytest.fixture(scope="session", autouse=True)

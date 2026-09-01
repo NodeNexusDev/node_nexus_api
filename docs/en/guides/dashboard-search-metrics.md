@@ -15,7 +15,7 @@ live event stream for monitoring.
 ```bash
 curl --fail-with-body \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
-  "${NODE_NEXUS_URL}/api/v1/dashboard/"
+  "${NODE_NEXUS_URL}/api/v2/dashboard/"
 ```
 
 Returns aggregated counts for nodes, Docker containers, scripts, commands,
@@ -40,7 +40,7 @@ and recent audit activity.
 ```bash
 curl --fail-with-body \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
-  "${NODE_NEXUS_URL}/api/v1/dashboard/metrics?group_by=day"
+  "${NODE_NEXUS_URL}/api/v2/dashboard/metrics?group_by=day"
 ```
 
 Returns time-bucketed execution metrics for charts. Parameters:
@@ -77,7 +77,7 @@ Returns time-bucketed execution metrics for charts. Parameters:
 curl --fail-with-body --get \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
   --data-urlencode 'q=deploy' \
-  "${NODE_NEXUS_URL}/api/v1/search"
+  "${NODE_NEXUS_URL}/api/v2/search"
 ```
 
 Searches across nodes, commands, scripts, and tags. Returns grouped results
@@ -90,7 +90,7 @@ by entity type.
 ```bash
 curl --fail-with-body \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
-  "${NODE_NEXUS_URL}/api/v1/commands/<command-id>/stats"
+  "${NODE_NEXUS_URL}/api/v2/commands/<command-id>/stats"
 ```
 
 ### Script stats
@@ -98,7 +98,7 @@ curl --fail-with-body \
 ```bash
 curl --fail-with-body \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
-  "${NODE_NEXUS_URL}/api/v1/scripts/<script-id>/stats"
+  "${NODE_NEXUS_URL}/api/v2/scripts/<script-id>/stats"
 ```
 
 ### Command stats for a node
@@ -106,7 +106,7 @@ curl --fail-with-body \
 ```bash
 curl --fail-with-body \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
-  "${NODE_NEXUS_URL}/api/v1/commands/stats?node_id=<node-id>"
+  "${NODE_NEXUS_URL}/api/v2/commands/stats?node_id=<node-id>"
 ```
 
 Each stats endpoint returns `total`, `successful`, `failed`, `cancelled`, `success_rate` (`0..1`, `0.8 = 80%`, cancelled excluded), `avg_duration_ms`, `min_duration_ms`, `max_duration_ms`, and `last_executed_at`. Script `total` is terminal `success|error` (legacy `completed|failed`) only; `cancelled` is separate and not in `total`/`success_rate`; `pending`/`running` are excluded. `date_to` is exclusive.
@@ -118,7 +118,7 @@ Subscribe to live server-sent events:
 ```bash
 curl --fail-with-body \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
-  "${NODE_NEXUS_URL}/api/v1/events/stream"
+  "${NODE_NEXUS_URL}/api/v2/events/stream"
 ```
 
 Events include `node.status_changed`, `execution.completed`,
@@ -131,7 +131,7 @@ Export audit log entries as JSON or CSV:
 ```bash
 curl --fail-with-body \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
-  "${NODE_NEXUS_URL}/api/v1/audit/export?fmt=csv"
+  "${NODE_NEXUS_URL}/api/v2/audit/export?fmt=csv"
 ```
 
 Supported formats: `json` (default) and `csv`.

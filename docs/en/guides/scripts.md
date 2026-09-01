@@ -30,7 +30,7 @@ Add the `search` query parameter to filter by name or description:
 curl --fail-with-body --get \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
   --data-urlencode 'search=deploy' \
-  "${NODE_NEXUS_URL}/api/v1/scripts/"
+  "${NODE_NEXUS_URL}/api/v2/scripts/"
 ```
 
 Search matches against the `name` and `description` fields using
@@ -42,7 +42,7 @@ name or description contain the search substring.
 ```bash
 curl --fail-with-body \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
-  "${NODE_NEXUS_URL}/api/v1/scripts/tags"
+  "${NODE_NEXUS_URL}/api/v2/scripts/tags"
 ```
 
 Returns a sorted list of unique tags used across all scripts. Useful for
@@ -61,7 +61,7 @@ curl --fail-with-body -X POST \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
   -H "Content-Type: application/json" \
   -d '{"node_ids": ["<node-id-1>", "<node-id-2>"], "params": {"branch": "main"}}' \
-  "${NODE_NEXUS_URL}/api/v1/scripts/<script_id>/execute"
+  "${NODE_NEXUS_URL}/api/v2/scripts/<script_id>/execute"
 ```
 
 ### Execute by tags
@@ -71,7 +71,7 @@ curl --fail-with-body -X POST \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
   -H "Content-Type: application/json" \
   -d '{"node_tags": ["web", "production"], "params": {"branch": "main"}}' \
-  "${NODE_NEXUS_URL}/api/v1/scripts/<script_id>/execute"
+  "${NODE_NEXUS_URL}/api/v2/scripts/<script_id>/execute"
 ```
 
 Runs on all nodes that have both tags `web` AND `production`.
@@ -83,7 +83,7 @@ curl --fail-with-body -X POST \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
   -H "Content-Type: application/json" \
   -d '{"node_ids": ["<node-id>"], "node_tags": ["web"], "params": {}}' \
-  "${NODE_NEXUS_URL}/api/v1/scripts/<script_id>/execute"
+  "${NODE_NEXUS_URL}/api/v2/scripts/<script_id>/execute"
 ```
 
 The result is the intersection: nodes from `node_ids` that also have all
@@ -114,7 +114,7 @@ Re-run a failed command or script execution with the same parameters.
 ```bash
 curl --fail-with-body -X POST \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
-  "${NODE_NEXUS_URL}/api/v1/nodes/${NODE_ID}/commands/${EXECUTION_ID}/retry"
+  "${NODE_NEXUS_URL}/api/v2/nodes/${NODE_ID}/commands/${EXECUTION_ID}/retry"
 ```
 
 ### Retry a script execution
@@ -122,7 +122,7 @@ curl --fail-with-body -X POST \
 ```bash
 curl --fail-with-body -X POST \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
-  "${NODE_NEXUS_URL}/api/v1/scripts/executions/${EXECUTION_ID}/retry"
+  "${NODE_NEXUS_URL}/api/v2/scripts/executions/${EXECUTION_ID}/retry"
 ```
 
 Returns a new execution with the same `script_id`, `node_id`, and `params`.
@@ -134,7 +134,7 @@ Cancel a still-running script execution:
 ```bash
 curl --fail-with-body -X POST \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
-  "${NODE_NEXUS_URL}/api/v1/scripts/executions/${EXECUTION_ID}/cancel"
+  "${NODE_NEXUS_URL}/api/v2/scripts/executions/${EXECUTION_ID}/cancel"
 ```
 
 Only running executions can be cancelled. Already completed or failed executions
@@ -147,7 +147,7 @@ View the execution history of a specific schedule (cron-triggered runs):
 ```bash
 curl --fail-with-body \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
-  "${NODE_NEXUS_URL}/api/v1/scripts/${SCRIPT_ID}/schedule/history?page=1&size=20"
+  "${NODE_NEXUS_URL}/api/v2/scripts/${SCRIPT_ID}/schedule/history?page=1&size=20"
 ```
 
 Optional query: `trigger` — filter by trigger type (`manual`, `scheduled`,

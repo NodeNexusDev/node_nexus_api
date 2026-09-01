@@ -34,7 +34,7 @@ def test_content_type_missing_on_post(e2e_client: httpx.Client) -> None:
     # Use a fresh client without default headers to avoid
     # httpx auto-setting Content-Type from json= parameter.
     resp = httpx.Client().post(
-        f"{e2e_client.base_url}/api/v1/nodes/",
+        f"{e2e_client.base_url}/api/v2/nodes/",
         content=payload,
         headers={"X-API-Key": "e2e-master-key-12345"},
     )
@@ -49,7 +49,7 @@ def test_content_type_text_plain(e2e_client: httpx.Client) -> None:
     validation error (422), not 415.
     """
     resp = e2e_client.post(
-        "/api/v1/nodes/",
+        "/api/v2/nodes/",
         content="not-json",
         headers={"Content-Type": "text/plain"},
     )
@@ -66,14 +66,14 @@ def test_content_type_json_with_charset(e2e_client: httpx.Client) -> None:
         "connection_type": "ssh",
     }
     resp = e2e_client.post(
-        "/api/v1/nodes/",
+        "/api/v2/nodes/",
         content=json.dumps(payload),
         headers={"Content-Type": "application/json; charset=utf-8"},
     )
     assert resp.status_code == 201, f"Expected 201, got {resp.status_code}: {resp.text}"
     # Cleanup
     node = resp.json()
-    e2e_client.delete(f"/api/v1/nodes/{node['id']}")
+    e2e_client.delete(f"/api/v2/nodes/{node['id']}")
 
 
 def test_content_type_multipart_rejected(e2e_client: httpx.Client) -> None:
@@ -90,7 +90,7 @@ def test_content_type_multipart_rejected(e2e_client: httpx.Client) -> None:
         f"--{boundary}--\r\n"
     )
     resp = e2e_client.post(
-        "/api/v1/nodes/",
+        "/api/v2/nodes/",
         content=body,
         headers={"Content-Type": f"multipart/form-data; boundary={boundary}"},
     )
@@ -105,7 +105,7 @@ def test_content_type_multipart_rejected(e2e_client: httpx.Client) -> None:
 def test_accept_json_returns_json(e2e_client: httpx.Client) -> None:
     """GET with Accept: application/json should return JSON."""
     resp = e2e_client.get(
-        "/api/v1/nodes/",
+        "/api/v2/nodes/",
         headers={"Accept": "application/json"},
     )
     assert resp.status_code == 200
@@ -115,7 +115,7 @@ def test_accept_json_returns_json(e2e_client: httpx.Client) -> None:
 def test_accept_wildcard_returns_json(e2e_client: httpx.Client) -> None:
     """GET with Accept: */* should return JSON."""
     resp = e2e_client.get(
-        "/api/v1/nodes/",
+        "/api/v2/nodes/",
         headers={"Accept": "*/*"},
     )
     assert resp.status_code == 200
@@ -129,7 +129,7 @@ def test_accept_wildcard_returns_json(e2e_client: httpx.Client) -> None:
 
 def test_method_not_allowed_put_collection(e2e_client: httpx.Client) -> None:
     """PUT on collection endpoint (no resource id) should return 405."""
-    resp = e2e_client.put("/api/v1/nodes/", json={})
+    resp = e2e_client.put("/api/v2/nodes/", json={})
     assert_http_error(resp, 405)
 
 
@@ -137,7 +137,7 @@ def test_method_not_allowed_post_resource(e2e_client: httpx.Client) -> None:
     """POST on resource endpoint (with id) should return 405."""
     # Create a node first to get a valid id
     node = e2e_client.post(
-        "/api/v1/nodes/",
+        "/api/v2/nodes/",
         json={
             "name": "test-405-resource",
             "host": "10.0.0.101",
@@ -149,17 +149,17 @@ def test_method_not_allowed_post_resource(e2e_client: httpx.Client) -> None:
     node_id = node.json()["id"]
 
     try:
-        resp = e2e_client.post(f"/api/v1/nodes/{node_id}", json={})
+        resp = e2e_client.post(f"/api/v2/nodes/{node_id}", json={})
         assert resp.status_code == 405, (
             f"Expected 405, got {resp.status_code}: {resp.text}"
         )
     finally:
-        e2e_client.delete(f"/api/v1/nodes/{node_id}")
+        e2e_client.delete(f"/api/v2/nodes/{node_id}")
 
 
 def test_method_not_allowed_delete_collection(e2e_client: httpx.Client) -> None:
     """DELETE on collection endpoint should return 405."""
-    resp = e2e_client.delete("/api/v1/nodes/")
+    resp = e2e_client.delete("/api/v2/nodes/")
     assert_http_error(resp, 405)
 
 
@@ -171,7 +171,7 @@ def test_method_not_allowed_delete_collection(e2e_client: httpx.Client) -> None:
 def test_oversized_string_field_rejected(e2e_client: httpx.Client) -> None:
     """POST with a very long name field should return 422."""
     resp = e2e_client.post(
-        "/api/v1/nodes/",
+        "/api/v2/nodes/",
         json={
             "name": "A" * 10_000,
             "host": "10.0.0.102",
@@ -207,7 +207,7 @@ def test_deeply_nested_json_not_500(e2e_client: httpx.Client) -> None:
     current["port"] = 22
     current["connection_type"] = "ssh"
 
-    resp = e2e_client.post("/api/v1/nodes/", json=nested)
+    resp = e2e_client.post("/api/v2/nodes/", json=nested)
     # Must NOT be 500 — should be 4xx validation or 200 (if fields found)
     assert resp.status_code < 500, (
         f"Got 5xx ({resp.status_code}) on deeply nested JSON. Body: {resp.text[:500]}"

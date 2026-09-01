@@ -29,7 +29,7 @@ without writing to the database. The response includes:
 Request example:
 
 ```json
-POST /api/v1/config/import
+POST /api/v2/config/import
 {
   "dry_run": true,
   "nodes": [

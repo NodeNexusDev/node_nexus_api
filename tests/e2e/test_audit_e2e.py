@@ -35,7 +35,7 @@ def test_mutating_request_creates_audit_log(
     e2e_resources: UniqueResourceFactory,
 ) -> None:
     """A mutating request produces both an outbox record and an audit log."""
-    total_before = e2e_client.get("/api/v1/audit/").json()["total"]
+    total_before = e2e_client.get("/api/v2/audit/").json()["total"]
     node = e2e_resources.create_ssh_node()
 
     data = _wait_for_audit(e2e_client, action="create", minimum_total=total_before + 1)
@@ -141,12 +141,12 @@ async def test_deleted_node_does_not_break_delivery(
     _wait_for_audit(e2e_client, action="create", node_id=node_id)
 
     # Delete the node — this creates a delete audit event
-    resp = e2e_client.delete(f"/api/v1/nodes/{node_id}")
+    resp = e2e_client.delete(f"/api/v2/nodes/{node_id}")
     assert resp.status_code == 204
 
     # The delete audit event should still be delivered with node_id=NULL
     def _check_delete_audit() -> bool:
-        resp = e2e_client.get("/api/v1/audit/?action=delete")
+        resp = e2e_client.get("/api/v2/audit/?action=delete")
         if resp.status_code != 200:
             return False
         for log in resp.json()["items"]:
@@ -358,15 +358,15 @@ def test_audit_logs_track_crud_operations(
     assert "create" in actions
 
     # update action recorded
-    e2e_client.patch(f"/api/v1/nodes/{node_id}", json={"name": "audit-crud-upd"})
+    e2e_client.patch(f"/api/v2/nodes/{node_id}", json={"name": "audit-crud-upd"})
     data = _wait_for_audit(e2e_client, query=f"?node_id={node_id}", action="update")
     actions = [log["action"] for log in data["items"]]
     assert "update" in actions
 
     # delete action recorded — ON DELETE SET NULL nullifies node_id,
     # so query by action instead of node_id.
-    total_before = e2e_client.get("/api/v1/audit/").json()["total"]
-    e2e_client.delete(f"/api/v1/nodes/{node_id}")
+    total_before = e2e_client.get("/api/v2/audit/").json()["total"]
+    e2e_client.delete(f"/api/v2/nodes/{node_id}")
     data = _wait_for_audit(e2e_client, action="delete", minimum_total=total_before + 1)
     all_actions = [log["action"] for log in data["items"]]
     assert "delete" in all_actions
@@ -380,12 +380,12 @@ def test_delete_creates_audit_log_and_removes_node(
     node = e2e_resources.create_node(name="audit-fk-regression")
     node_id = node["id"]
 
-    total_before = e2e_client.get("/api/v1/audit/").json()["total"]
-    resp = e2e_client.delete(f"/api/v1/nodes/{node_id}")
+    total_before = e2e_client.get("/api/v2/audit/").json()["total"]
+    resp = e2e_client.delete(f"/api/v2/nodes/{node_id}")
     assert resp.status_code == 204
 
     # node is gone
-    resp = e2e_client.get(f"/api/v1/nodes/{node_id}")
+    resp = e2e_client.get(f"/api/v2/nodes/{node_id}")
     assert resp.status_code == 404
 
     # audit entry exists (ON DELETE SET NULL nullifies node_id,
@@ -402,7 +402,7 @@ def test_audit_log_filter_by_action(
     e2e_resources.create_node(name="audit-filter")
     _wait_for_audit(e2e_client, action="create")
 
-    resp = e2e_client.get("/api/v1/audit/?action=create")
+    resp = e2e_client.get("/api/v2/audit/?action=create")
     assert resp.status_code == 200
     assert resp.json()["total"] >= 1
     for log in resp.json()["items"]:
@@ -420,7 +420,7 @@ def test_audit_log_pagination(
     data = _wait_for_audit(e2e_client, minimum_total=3)
     assert data["total"] >= 3
 
-    resp = e2e_client.get("/api/v1/audit/?page=1&size=2")
+    resp = e2e_client.get("/api/v2/audit/?page=1&size=2")
     assert resp.status_code == 200
     data = resp.json()
     assert len(data["items"]) == 2
@@ -464,7 +464,7 @@ def test_audit_log_filter_by_user(
     assert data["total"] >= 1
 
     # Filter by user — audit events have user set from the API key
-    resp = e2e_client.get("/api/v1/audit/?user=e2e-master-key-12345")
+    resp = e2e_client.get("/api/v2/audit/?user=e2e-master-key-12345")
     assert resp.status_code == 200
     # All results should have this user
     for log in resp.json()["items"]:
@@ -481,14 +481,14 @@ def test_audit_log_filter_by_date_range(
 
     # Filter with a wide date range that includes all records
     resp = e2e_client.get(
-        "/api/v1/audit/?date_from=2020-01-01T00:00:00&date_to=2030-12-31T23:59:59"
+        "/api/v2/audit/?date_from=2020-01-01T00:00:00&date_to=2030-12-31T23:59:59"
     )
     assert resp.status_code == 200
     assert resp.json()["total"] >= 1
 
     # Filter with a narrow range that excludes everything
     resp = e2e_client.get(
-        "/api/v1/audit/?date_from=2099-01-01T00:00:00&date_to=2099-12-31T23:59:59"
+        "/api/v2/audit/?date_from=2099-01-01T00:00:00&date_to=2099-12-31T23:59:59"
     )
     assert resp.status_code == 200
     assert resp.json()["total"] == 0
@@ -503,7 +503,7 @@ def test_audit_log_filter_by_action_and_date(
     _wait_for_audit(e2e_client, action="create")
 
     resp = e2e_client.get(
-        "/api/v1/audit/?action=create"
+        "/api/v2/audit/?action=create"
         "&date_from=2020-01-01T00:00:00&date_to=2030-12-31T23:59:59"
     )
     assert resp.status_code == 200
@@ -522,7 +522,7 @@ def test_audit_delete_requires_master_key(e2e_client: httpx.Client) -> None:
     # Create a non-master key
     master_key = _get_master_key()
     resp = e2e_client.post(
-        "/api/v1/api-keys/",
+        "/api/v2/api-keys/",
         json={"name": "non-master-key"},
         headers={"X-API-Key": master_key},
     )
@@ -532,14 +532,14 @@ def test_audit_delete_requires_master_key(e2e_client: httpx.Client) -> None:
 
     # Try to delete audit logs with non-master key
     resp = e2e_client.delete(
-        "/api/v1/audit/?confirm=yes",
+        "/api/v2/audit/?confirm=yes",
         headers={"X-API-Key": generated_key},
     )
     assert resp.status_code == 403
 
     # Cleanup
     e2e_client.delete(
-        f"/api/v1/api-keys/{key_id}",
+        f"/api/v2/api-keys/{key_id}",
         headers={"X-API-Key": master_key},
     )
 
@@ -548,7 +548,7 @@ def test_audit_delete_requires_confirm(e2e_client: httpx.Client) -> None:
     """DELETE /audit without confirm=yes returns 422."""
     master_key = _get_master_key()
     resp = e2e_client.delete(
-        "/api/v1/audit/",
+        "/api/v2/audit/",
         headers={"X-API-Key": master_key},
     )
     assert resp.status_code == 422
@@ -558,7 +558,7 @@ def test_audit_delete_with_master_key(e2e_client: httpx.Client) -> None:
     """DELETE /audit with master key and confirm=yes succeeds."""
     master_key = _get_master_key()
     resp = e2e_client.delete(
-        "/api/v1/audit/?confirm=yes",
+        "/api/v2/audit/?confirm=yes",
         headers={"X-API-Key": master_key},
     )
     assert resp.status_code == 204

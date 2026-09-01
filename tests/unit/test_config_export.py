@@ -6,7 +6,6 @@ import pytest
 
 from app.application.dto.config import (
     CONFIG_FORMAT_VERSION,
-    LEGACY_CONFIG_VERSION,
     ConfigImportResultDTO,
     ConfigTransferDTO,
     NodeConfigDTO,
@@ -36,7 +35,6 @@ async def test_export_enriches_adapter_snapshot_with_metadata() -> None:
     assert result.nodes == snapshot.nodes
     assert result.format_version == CONFIG_FORMAT_VERSION
     assert result.application_version
-    assert result.legacy_version == LEGACY_CONFIG_VERSION
     assert result.exported_at is not None
     exporter.export_config.assert_awaited_once_with()
 
@@ -78,7 +76,6 @@ def test_config_export_schema_can_be_serialized() -> None:
 
     assert dumped["format_version"] == CONFIG_FORMAT_VERSION
     assert dumped["application_version"]
-    assert dumped["version"] == LEGACY_CONFIG_VERSION
     assert len(dumped["nodes"]) == 1
 
 

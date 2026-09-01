@@ -23,7 +23,7 @@ curl --get --fail-with-body \
   --data-urlencode 'action=execute_failed' \
   --data-urlencode 'page=1' \
   --data-urlencode 'size=50' \
-  "${NODE_NEXUS_URL}/api/v1/audit/"
+  "${NODE_NEXUS_URL}/api/v2/audit/"
 ```
 
 Common actions include `create`, `update`, `delete`, `check`, `execute`, and
@@ -39,7 +39,7 @@ curl --get --fail-with-body \
   --data-urlencode 'user=admin' \
   --data-urlencode 'date_from=2026-08-01T00:00:00' \
   --data-urlencode 'date_to=2026-08-16T23:59:59' \
-  "${NODE_NEXUS_URL}/api/v1/audit/"
+  "${NODE_NEXUS_URL}/api/v2/audit/"
 ```
 
 Parameters:
@@ -59,7 +59,7 @@ Export audit events for external analysis in JSON or CSV format:
 ```bash
 curl --fail-with-body \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
-  "${NODE_NEXUS_URL}/api/v1/audit/export?fmt=csv"
+  "${NODE_NEXUS_URL}/api/v2/audit/export?fmt=csv"
 ```
 
 See [Dashboard, search, and metrics](dashboard-search-metrics.md) for the live
@@ -77,7 +77,7 @@ confirmation:
 ```bash
 curl --fail-with-body -X DELETE \
   -H "X-API-Key: ${MASTER_API_KEY}" \
-  "${NODE_NEXUS_URL}/api/v1/audit/?confirm=yes"
+  "${NODE_NEXUS_URL}/api/v2/audit/?confirm=yes"
 ```
 
 This operation is irreversible in the application database. Export or back up

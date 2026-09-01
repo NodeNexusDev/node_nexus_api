@@ -92,7 +92,7 @@ class TestMigrationDataPreservation:
             time.sleep(1)
 
         # Data should still be accessible
-        resp = e2e_client.get(f"/api/v1/nodes/{node['id']}")
+        resp = e2e_client.get(f"/api/v2/nodes/{node['id']}")
         assert resp.status_code == 200
         assert resp.json()["id"] == node["id"]
         assert resp.json()["name"] == node["name"]
@@ -120,7 +120,7 @@ class TestMigrationDataPreservation:
                 time.sleep(1)
 
         # Data should still be accessible
-        resp = e2e_client.get(f"/api/v1/nodes/{node['id']}")
+        resp = e2e_client.get(f"/api/v2/nodes/{node['id']}")
         assert resp.status_code == 200
         assert resp.json()["id"] == node["id"]
 
@@ -137,7 +137,7 @@ class TestMigrationDataPreservation:
         # Wait for audit delivery
         deadline = time.monotonic() + 10.0
         while time.monotonic() < deadline:
-            resp = e2e_client.get(f"/api/v1/audit/?node_id={node['id']}")
+            resp = e2e_client.get(f"/api/v2/audit/?node_id={node['id']}")
             if resp.status_code == 200 and resp.json()["total"] > 0:
                 break
             time.sleep(0.5)
@@ -155,6 +155,6 @@ class TestMigrationDataPreservation:
             time.sleep(1)
 
         # Audit log should still exist
-        resp = e2e_client.get(f"/api/v1/audit/?node_id={node['id']}")
+        resp = e2e_client.get(f"/api/v2/audit/?node_id={node['id']}")
         assert resp.status_code == 200
         assert resp.json()["total"] >= 1

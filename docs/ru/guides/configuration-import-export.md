@@ -28,7 +28,7 @@ version. Legacy-поле `version` временно сохранено для о
 Пример запроса:
 
 ```json
-POST /api/v1/config/import
+POST /api/v2/config/import
 {
   "dry_run": true,
   "nodes": [

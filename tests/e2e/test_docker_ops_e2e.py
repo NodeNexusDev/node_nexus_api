@@ -13,7 +13,7 @@ pytestmark = pytest.mark.docker
 def _docker_pull_alpine(e2e_client, node_id):
     """Pull alpine image on a Docker node (prerequisite for container tests)."""
     resp = e2e_client.post(
-        f"/api/v1/nodes/{node_id}/docker/images/pull",
+        f"/api/v2/nodes/{node_id}/docker/images/pull",
         json={"image": "alpine:latest", "timeout": 120},
     )
     assert resp.status_code == 200
@@ -31,7 +31,7 @@ def test_docker_list_images(
     """GET /nodes/{id}/docker/images returns image list."""
     node = e2e_resources.create_docker_node()
     _docker_pull_alpine(e2e_client, node["id"])
-    resp = e2e_client.get(f"/api/v1/nodes/{node['id']}/docker/images")
+    resp = e2e_client.get(f"/api/v2/nodes/{node['id']}/docker/images")
     assert resp.status_code == 200
     images = resp.json()
     assert isinstance(images, list)
@@ -46,7 +46,7 @@ def test_docker_pull_image(
     """POST /nodes/{id}/docker/images/pull pulls an image."""
     node = e2e_resources.create_docker_node()
     resp = e2e_client.post(
-        f"/api/v1/nodes/{node['id']}/docker/images/pull",
+        f"/api/v2/nodes/{node['id']}/docker/images/pull",
         json={"image": "alpine:3.20", "timeout": 120},
     )
     assert resp.status_code == 200
@@ -66,7 +66,7 @@ def test_docker_list_containers(
     """GET /nodes/{id}/docker/containers returns list."""
     node = e2e_resources.create_docker_node()
     _docker_pull_alpine(e2e_client, node["id"])
-    resp = e2e_client.get(f"/api/v1/nodes/{node['id']}/docker/containers")
+    resp = e2e_client.get(f"/api/v2/nodes/{node['id']}/docker/containers")
     assert resp.status_code == 200
     assert isinstance(resp.json(), list)
 
@@ -78,7 +78,7 @@ def test_docker_list_containers_all(
     """GET .../containers?all=true includes stopped containers."""
     node = e2e_resources.create_docker_node()
     _docker_pull_alpine(e2e_client, node["id"])
-    resp = e2e_client.get(f"/api/v1/nodes/{node['id']}/docker/containers?all=true")
+    resp = e2e_client.get(f"/api/v2/nodes/{node['id']}/docker/containers?all=true")
     assert resp.status_code == 200
     assert isinstance(resp.json(), list)
 
@@ -93,7 +93,7 @@ def test_docker_container_lifecycle(
 
     # Run a container via SSH exec (docker run -d alpine sleep 300)
     resp = e2e_client.post(
-        "/api/v1/commands/execute",
+        "/api/v2/commands/execute",
         json={
             "node_id": node["id"],
             "command": "docker run -d --name e2e-test-ctr alpine sleep 300",
@@ -102,38 +102,38 @@ def test_docker_container_lifecycle(
     assert resp.status_code == 200
 
     # Inspect
-    resp = e2e_client.get(f"/api/v1/nodes/{node['id']}/docker/containers/e2e-test-ctr")
+    resp = e2e_client.get(f"/api/v2/nodes/{node['id']}/docker/containers/e2e-test-ctr")
     assert resp.status_code == 200
     data = resp.json()
     assert data["State"]["status"] == "running"
 
     # Stop
     resp = e2e_client.post(
-        f"/api/v1/nodes/{node['id']}/docker/containers/e2e-test-ctr/stop"
+        f"/api/v2/nodes/{node['id']}/docker/containers/e2e-test-ctr/stop"
     )
     assert resp.status_code == 204
 
     # Start
     resp = e2e_client.post(
-        f"/api/v1/nodes/{node['id']}/docker/containers/e2e-test-ctr/start"
+        f"/api/v2/nodes/{node['id']}/docker/containers/e2e-test-ctr/start"
     )
     assert resp.status_code == 204
 
     # Restart
     resp = e2e_client.post(
-        f"/api/v1/nodes/{node['id']}/docker/containers/e2e-test-ctr/restart"
+        f"/api/v2/nodes/{node['id']}/docker/containers/e2e-test-ctr/restart"
     )
     assert resp.status_code == 204
 
     # Logs
     resp = e2e_client.get(
-        f"/api/v1/nodes/{node['id']}/docker/containers/e2e-test-ctr/logs"
+        f"/api/v2/nodes/{node['id']}/docker/containers/e2e-test-ctr/logs"
     )
     assert resp.status_code == 200
 
     # Exec
     resp = e2e_client.post(
-        f"/api/v1/nodes/{node['id']}/docker/containers/e2e-test-ctr/exec",
+        f"/api/v2/nodes/{node['id']}/docker/containers/e2e-test-ctr/exec",
         json={"command": "echo exec-ok"},
     )
     assert resp.status_code == 200
@@ -142,7 +142,7 @@ def test_docker_container_lifecycle(
 
     # Stats
     resp = e2e_client.get(
-        f"/api/v1/nodes/{node['id']}/docker/containers/e2e-test-ctr/stats"
+        f"/api/v2/nodes/{node['id']}/docker/containers/e2e-test-ctr/stats"
     )
     assert resp.status_code == 200
     stats = resp.json()
@@ -150,7 +150,7 @@ def test_docker_container_lifecycle(
 
     # Remove (force)
     resp = e2e_client.delete(
-        f"/api/v1/nodes/{node['id']}/docker/containers/e2e-test-ctr?force=true"
+        f"/api/v2/nodes/{node['id']}/docker/containers/e2e-test-ctr?force=true"
     )
     assert resp.status_code == 204
 
@@ -161,7 +161,7 @@ def test_docker_container_not_found(
 ):
     """GET .../containers/{id} returns 404 for missing container."""
     node = e2e_resources.create_docker_node()
-    resp = e2e_client.get(f"/api/v1/nodes/{node['id']}/docker/containers/nonexistent")
+    resp = e2e_client.get(f"/api/v2/nodes/{node['id']}/docker/containers/nonexistent")
     assert resp.status_code == 404
 
 
@@ -172,7 +172,7 @@ def test_docker_exec_validation(
     """POST .../exec returns 422 for invalid container ID."""
     node = e2e_resources.create_docker_node()
     resp = e2e_client.post(
-        f"/api/v1/nodes/{node['id']}/docker/containers/bad;$id/exec",
+        f"/api/v2/nodes/{node['id']}/docker/containers/bad;$id/exec",
         json={"command": "ls"},
     )
     assert resp.status_code == 422
@@ -189,7 +189,7 @@ def test_docker_list_networks(
 ):
     """GET /nodes/{id}/docker/networks returns network list."""
     node = e2e_resources.create_docker_node()
-    resp = e2e_client.get(f"/api/v1/nodes/{node['id']}/docker/networks")
+    resp = e2e_client.get(f"/api/v2/nodes/{node['id']}/docker/networks")
     assert resp.status_code == 200
     networks = resp.json()
     assert isinstance(networks, list)
@@ -204,7 +204,7 @@ def test_docker_list_volumes(
 ):
     """GET /nodes/{id}/docker/volumes returns volume list."""
     node = e2e_resources.create_docker_node()
-    resp = e2e_client.get(f"/api/v1/nodes/{node['id']}/docker/volumes")
+    resp = e2e_client.get(f"/api/v2/nodes/{node['id']}/docker/volumes")
     assert resp.status_code == 200
     assert isinstance(resp.json(), list)
 
@@ -218,22 +218,22 @@ def test_docker_bulk_start(
     e2e_client,
     e2e_resources: UniqueResourceFactory,
 ):
-    """POST /api/v1/docker/bulk/start starts container on multiple nodes."""
+    """POST /api/v2/docker/bulk/start starts container on multiple nodes."""
     node = e2e_resources.create_docker_node()
     _docker_pull_alpine(e2e_client, node["id"])
     # Run a container via SSH
     e2e_client.post(
-        "/api/v1/commands/execute",
+        "/api/v2/commands/execute",
         json={
             "node_id": node["id"],
             "command": "docker run -d --name bulk-start-ctr alpine sleep 300",
         },
     )
     # Stop it first
-    e2e_client.post(f"/api/v1/nodes/{node['id']}/docker/containers/bulk-start-ctr/stop")
+    e2e_client.post(f"/api/v2/nodes/{node['id']}/docker/containers/bulk-start-ctr/stop")
 
     resp = e2e_client.post(
-        "/api/v1/docker/bulk/start",
+        "/api/v2/docker/bulk/start",
         json={
             "node_ids": [node["id"]],
             "container_id": "bulk-start-ctr",
@@ -250,11 +250,11 @@ def test_docker_bulk_stop(
     e2e_client,
     e2e_resources: UniqueResourceFactory,
 ):
-    """POST /api/v1/docker/bulk/stop stops container on multiple nodes."""
+    """POST /api/v2/docker/bulk/stop stops container on multiple nodes."""
     node = e2e_resources.create_docker_node()
     _docker_pull_alpine(e2e_client, node["id"])
     e2e_client.post(
-        "/api/v1/commands/execute",
+        "/api/v2/commands/execute",
         json={
             "node_id": node["id"],
             "command": "docker run -d --name bulk-stop-ctr alpine sleep 300",
@@ -262,7 +262,7 @@ def test_docker_bulk_stop(
     )
 
     resp = e2e_client.post(
-        "/api/v1/docker/bulk/stop",
+        "/api/v2/docker/bulk/stop",
         json={
             "node_ids": [node["id"]],
             "container_id": "bulk-stop-ctr",
@@ -279,11 +279,11 @@ def test_docker_bulk_restart(
     e2e_client,
     e2e_resources: UniqueResourceFactory,
 ):
-    """POST /api/v1/docker/bulk/restart restarts container on multiple nodes."""
+    """POST /api/v2/docker/bulk/restart restarts container on multiple nodes."""
     node = e2e_resources.create_docker_node()
     _docker_pull_alpine(e2e_client, node["id"])
     e2e_client.post(
-        "/api/v1/commands/execute",
+        "/api/v2/commands/execute",
         json={
             "node_id": node["id"],
             "command": "docker run -d --name bulk-restart-ctr alpine sleep 300",
@@ -291,7 +291,7 @@ def test_docker_bulk_restart(
     )
 
     resp = e2e_client.post(
-        "/api/v1/docker/bulk/restart",
+        "/api/v2/docker/bulk/restart",
         json={
             "node_ids": [node["id"]],
             "container_id": "bulk-restart-ctr",
@@ -308,11 +308,11 @@ def test_docker_bulk_exec(
     e2e_client,
     e2e_resources: UniqueResourceFactory,
 ):
-    """POST /api/v1/docker/bulk/exec runs command in containers."""
+    """POST /api/v2/docker/bulk/exec runs command in containers."""
     node = e2e_resources.create_docker_node()
     _docker_pull_alpine(e2e_client, node["id"])
     e2e_client.post(
-        "/api/v1/commands/execute",
+        "/api/v2/commands/execute",
         json={
             "node_id": node["id"],
             "command": "docker run -d --name bulk-exec-ctr alpine sleep 300",
@@ -320,7 +320,7 @@ def test_docker_bulk_exec(
     )
 
     resp = e2e_client.post(
-        "/api/v1/docker/bulk/exec",
+        "/api/v2/docker/bulk/exec",
         json={
             "node_ids": [node["id"]],
             "container_id": "bulk-exec-ctr",
@@ -355,7 +355,7 @@ def test_docker_container_logs_explicit_tail(
             "'for i in $(seq 1 10); do echo line-$i; done; sleep 60'"
         )
         resp = e2e_client.post(
-            "/api/v1/commands/execute",
+            "/api/v2/commands/execute",
             json={"node_id": node["id"], "command": cmd},
         )
         assert resp.status_code == 200
@@ -363,7 +363,7 @@ def test_docker_container_logs_explicit_tail(
         # Wait for container to finish printing by polling logs endpoint
         def _has_logs() -> bool:
             resp = e2e_client.get(
-                f"/api/v1/nodes/{node['id']}/docker/containers/e2e-logs-tail/logs?tail=3"
+                f"/api/v2/nodes/{node['id']}/docker/containers/e2e-logs-tail/logs?tail=3"
             )
             if resp.status_code != 200:
                 return False
@@ -382,7 +382,7 @@ def test_docker_container_logs_explicit_tail(
         )
 
         resp = e2e_client.get(
-            f"/api/v1/nodes/{node['id']}/docker/containers/e2e-logs-tail/logs?tail=3"
+            f"/api/v2/nodes/{node['id']}/docker/containers/e2e-logs-tail/logs?tail=3"
         )
         assert resp.status_code == 200, f"logs failed: {resp.status_code} {resp.text}"
         output = (
@@ -398,7 +398,7 @@ def test_docker_container_logs_explicit_tail(
             )
     finally:
         e2e_client.delete(
-            f"/api/v1/nodes/{node['id']}/docker/containers/e2e-logs-tail?force=true"
+            f"/api/v2/nodes/{node['id']}/docker/containers/e2e-logs-tail?force=true"
         )
 
 
@@ -414,7 +414,7 @@ def test_docker_container_logs_tail_default(
             "docker run -d --name e2e-logs-default alpine sh -c 'echo hello; sleep 60'"
         )
         resp = e2e_client.post(
-            "/api/v1/commands/execute",
+            "/api/v2/commands/execute",
             json={"node_id": node["id"], "command": cmd},
         )
         assert resp.status_code == 200
@@ -422,7 +422,7 @@ def test_docker_container_logs_tail_default(
         # Wait for container to start and print by polling logs endpoint
         def _has_logs() -> bool:
             resp = e2e_client.get(
-                f"/api/v1/nodes/{node['id']}/docker/containers/e2e-logs-default/logs"
+                f"/api/v2/nodes/{node['id']}/docker/containers/e2e-logs-default/logs"
             )
             if resp.status_code != 200:
                 return False
@@ -438,7 +438,7 @@ def test_docker_container_logs_tail_default(
         )
 
         resp = e2e_client.get(
-            f"/api/v1/nodes/{node['id']}/docker/containers/e2e-logs-default/logs"
+            f"/api/v2/nodes/{node['id']}/docker/containers/e2e-logs-default/logs"
         )
         assert resp.status_code == 200
         output = (
@@ -449,7 +449,7 @@ def test_docker_container_logs_tail_default(
         assert "hello" in str(output).lower() or len(str(output)) > 0
     finally:
         e2e_client.delete(
-            f"/api/v1/nodes/{node['id']}/docker/containers/e2e-logs-default?force=true"
+            f"/api/v2/nodes/{node['id']}/docker/containers/e2e-logs-default?force=true"
         )
 
 
@@ -472,7 +472,7 @@ def test_docker_container_logs_since_iso_timestamp(
             "'echo before-sleep; sleep 2; echo after-sleep; sleep 60'"
         )
         resp = e2e_client.post(
-            "/api/v1/commands/execute",
+            "/api/v2/commands/execute",
             json={"node_id": node["id"], "command": cmd},
         )
         assert resp.status_code == 200
@@ -480,7 +480,7 @@ def test_docker_container_logs_since_iso_timestamp(
         # Wait for container to start and print first line by polling logs
         def _has_first_line() -> bool:
             resp = e2e_client.get(
-                f"/api/v1/nodes/{node['id']}/docker/containers/e2e-logs-since/logs"
+                f"/api/v2/nodes/{node['id']}/docker/containers/e2e-logs-since/logs"
             )
             if resp.status_code != 200:
                 return False
@@ -495,7 +495,7 @@ def test_docker_container_logs_since_iso_timestamp(
         # Wait for second echo by polling logs
         def _has_second_line() -> bool:
             resp = e2e_client.get(
-                f"/api/v1/nodes/{node['id']}/docker/containers/e2e-logs-since/logs"
+                f"/api/v2/nodes/{node['id']}/docker/containers/e2e-logs-since/logs"
             )
             if resp.status_code != 200:
                 return False
@@ -507,7 +507,7 @@ def test_docker_container_logs_since_iso_timestamp(
 
         # Get logs since the captured ISO 8601 timestamp
         resp = e2e_client.get(
-            f"/api/v1/nodes/{node['id']}/docker/containers/e2e-logs-since/logs"
+            f"/api/v2/nodes/{node['id']}/docker/containers/e2e-logs-since/logs"
             f"?since={since}"
         )
         assert resp.status_code == 200
@@ -516,7 +516,7 @@ def test_docker_container_logs_since_iso_timestamp(
         assert "after-sleep" in output
     finally:
         e2e_client.delete(
-            f"/api/v1/nodes/{node['id']}/docker/containers/e2e-logs-since?force=true"
+            f"/api/v2/nodes/{node['id']}/docker/containers/e2e-logs-since?force=true"
         )
 
 
@@ -530,18 +530,18 @@ def test_docker_container_logs_invalid_tail_zero(
         _docker_pull_alpine(e2e_client, node["id"])
         cmd = "docker run -d --name e2e-logs-zero alpine sleep 60"
         e2e_client.post(
-            "/api/v1/commands/execute",
+            "/api/v2/commands/execute",
             json={"node_id": node["id"], "command": cmd},
         )
         resp = e2e_client.get(
-            f"/api/v1/nodes/{node['id']}/docker/containers/e2e-logs-zero/logs?tail=0"
+            f"/api/v2/nodes/{node['id']}/docker/containers/e2e-logs-zero/logs?tail=0"
         )
         assert resp.status_code == 422, (
             f"Expected 422 for tail=0, got {resp.status_code}: {resp.text}"
         )
     finally:
         e2e_client.delete(
-            f"/api/v1/nodes/{node['id']}/docker/containers/e2e-logs-zero?force=true"
+            f"/api/v2/nodes/{node['id']}/docker/containers/e2e-logs-zero?force=true"
         )
 
 
@@ -555,18 +555,18 @@ def test_docker_container_logs_invalid_tail_overflow(
         _docker_pull_alpine(e2e_client, node["id"])
         cmd = "docker run -d --name e2e-logs-overflow alpine sleep 60"
         e2e_client.post(
-            "/api/v1/commands/execute",
+            "/api/v2/commands/execute",
             json={"node_id": node["id"], "command": cmd},
         )
         resp = e2e_client.get(
-            f"/api/v1/nodes/{node['id']}/docker/containers/e2e-logs-overflow/logs?tail=99999"
+            f"/api/v2/nodes/{node['id']}/docker/containers/e2e-logs-overflow/logs?tail=99999"
         )
         assert resp.status_code == 422, (
             f"Expected 422 for tail=99999, got {resp.status_code}: {resp.text}"
         )
     finally:
         e2e_client.delete(
-            f"/api/v1/nodes/{node['id']}/docker/containers/e2e-logs-overflow?force=true"
+            f"/api/v2/nodes/{node['id']}/docker/containers/e2e-logs-overflow?force=true"
         )
 
 
@@ -585,11 +585,11 @@ def test_docker_container_exec_timeout_boundary(
         _docker_pull_alpine(e2e_client, node["id"])
         cmd = "docker run -d --name e2e-exec-t1 alpine sleep 300"
         e2e_client.post(
-            "/api/v1/commands/execute",
+            "/api/v2/commands/execute",
             json={"node_id": node["id"], "command": cmd},
         )
         resp = e2e_client.post(
-            f"/api/v1/nodes/{node['id']}/docker/containers/e2e-exec-t1/exec",
+            f"/api/v2/nodes/{node['id']}/docker/containers/e2e-exec-t1/exec",
             json={"command": "echo ok", "timeout": 1},
         )
         assert resp.status_code == 200, (
@@ -597,7 +597,7 @@ def test_docker_container_exec_timeout_boundary(
         )
     finally:
         e2e_client.delete(
-            f"/api/v1/nodes/{node['id']}/docker/containers/e2e-exec-t1?force=true"
+            f"/api/v2/nodes/{node['id']}/docker/containers/e2e-exec-t1?force=true"
         )
 
 
@@ -611,11 +611,11 @@ def test_docker_container_exec_timeout_max(
         _docker_pull_alpine(e2e_client, node["id"])
         cmd = "docker run -d --name e2e-exec-tmax alpine sleep 300"
         e2e_client.post(
-            "/api/v1/commands/execute",
+            "/api/v2/commands/execute",
             json={"node_id": node["id"], "command": cmd},
         )
         resp = e2e_client.post(
-            f"/api/v1/nodes/{node['id']}/docker/containers/e2e-exec-tmax/exec",
+            f"/api/v2/nodes/{node['id']}/docker/containers/e2e-exec-tmax/exec",
             json={"command": "echo ok", "timeout": 600},
         )
         assert resp.status_code == 200, (
@@ -623,7 +623,7 @@ def test_docker_container_exec_timeout_max(
         )
     finally:
         e2e_client.delete(
-            f"/api/v1/nodes/{node['id']}/docker/containers/e2e-exec-tmax?force=true"
+            f"/api/v2/nodes/{node['id']}/docker/containers/e2e-exec-tmax?force=true"
         )
 
 
@@ -637,11 +637,11 @@ def test_docker_container_exec_command_too_long(
         _docker_pull_alpine(e2e_client, node["id"])
         cmd = "docker run -d --name e2e-exec-long alpine sleep 300"
         e2e_client.post(
-            "/api/v1/commands/execute",
+            "/api/v2/commands/execute",
             json={"node_id": node["id"], "command": cmd},
         )
         resp = e2e_client.post(
-            f"/api/v1/nodes/{node['id']}/docker/containers/e2e-exec-long/exec",
+            f"/api/v2/nodes/{node['id']}/docker/containers/e2e-exec-long/exec",
             json={"command": "A" * 5000, "timeout": 30},
         )
         assert resp.status_code == 422, (
@@ -649,7 +649,7 @@ def test_docker_container_exec_command_too_long(
         )
     finally:
         e2e_client.delete(
-            f"/api/v1/nodes/{node['id']}/docker/containers/e2e-exec-long?force=true"
+            f"/api/v2/nodes/{node['id']}/docker/containers/e2e-exec-long?force=true"
         )
 
 
@@ -663,11 +663,11 @@ def test_docker_container_exec_timeout_exceeded(
         _docker_pull_alpine(e2e_client, node["id"])
         cmd = "docker run -d --name e2e-exec-timeout alpine sleep 300"
         e2e_client.post(
-            "/api/v1/commands/execute",
+            "/api/v2/commands/execute",
             json={"node_id": node["id"], "command": cmd},
         )
         resp = e2e_client.post(
-            f"/api/v1/nodes/{node['id']}/docker/containers/e2e-exec-timeout/exec",
+            f"/api/v2/nodes/{node['id']}/docker/containers/e2e-exec-timeout/exec",
             json={"command": "sleep 10", "timeout": 1},
         )
         # May be 200 with non-zero exit, or may be an error response
@@ -677,7 +677,7 @@ def test_docker_container_exec_timeout_exceeded(
         )
     finally:
         e2e_client.delete(
-            f"/api/v1/nodes/{node['id']}/docker/containers/e2e-exec-timeout?force=true"
+            f"/api/v2/nodes/{node['id']}/docker/containers/e2e-exec-timeout?force=true"
         )
 
 
@@ -696,11 +696,11 @@ def test_docker_container_stats_fields(
         _docker_pull_alpine(e2e_client, node["id"])
         cmd = "docker run -d --name e2e-stats-fields alpine sleep 300"
         e2e_client.post(
-            "/api/v1/commands/execute",
+            "/api/v2/commands/execute",
             json={"node_id": node["id"], "command": cmd},
         )
         resp = e2e_client.get(
-            f"/api/v1/nodes/{node['id']}/docker/containers/e2e-stats-fields/stats"
+            f"/api/v2/nodes/{node['id']}/docker/containers/e2e-stats-fields/stats"
         )
         assert resp.status_code == 200, f"stats failed: {resp.status_code} {resp.text}"
         stats = resp.json()
@@ -718,7 +718,7 @@ def test_docker_container_stats_fields(
         )
     finally:
         e2e_client.delete(
-            f"/api/v1/nodes/{node['id']}/docker/containers/e2e-stats-fields?force=true"
+            f"/api/v2/nodes/{node['id']}/docker/containers/e2e-stats-fields?force=true"
         )
 
 
@@ -729,7 +729,7 @@ def test_docker_container_stats_not_found(
     """GET .../containers/nonexistent/stats should return 404."""
     node = e2e_resources.create_docker_node()
     resp = e2e_client.get(
-        f"/api/v1/nodes/{node['id']}/docker/containers/nonexistent-ctr/stats"
+        f"/api/v2/nodes/{node['id']}/docker/containers/nonexistent-ctr/stats"
     )
     assert resp.status_code == 404, f"Expected 404, got {resp.status_code}: {resp.text}"
 
@@ -748,7 +748,7 @@ def test_docker_container_create(
     node = e2e_resources.create_docker_node()
     _docker_pull_alpine(e2e_client, node["id"])
     resp = e2e_client.post(
-        f"/api/v1/nodes/{node['id']}/docker/containers",
+        f"/api/v2/nodes/{node['id']}/docker/containers",
         json={
             "image": "alpine:latest",
             "name": "e2e-create-ctr",
@@ -765,14 +765,14 @@ def test_docker_container_create(
 
     # Inspect via existing endpoint to confirm it exists
     resp = e2e_client.get(
-        f"/api/v1/nodes/{node['id']}/docker/containers/e2e-create-ctr"
+        f"/api/v2/nodes/{node['id']}/docker/containers/e2e-create-ctr"
     )
     assert resp.status_code == 200
     assert resp.json()["State"]["status"] == "created"
 
     # Remove (force) via existing endpoint
     resp = e2e_client.delete(
-        f"/api/v1/nodes/{node['id']}/docker/containers/e2e-create-ctr?force=true"
+        f"/api/v2/nodes/{node['id']}/docker/containers/e2e-create-ctr?force=true"
     )
     assert resp.status_code == 204
 
@@ -784,7 +784,7 @@ def test_docker_image_inspect(
     """GET .../images/{image_id} returns image details."""
     node = e2e_resources.create_docker_node()
     _docker_pull_alpine(e2e_client, node["id"])
-    resp = e2e_client.get(f"/api/v1/nodes/{node['id']}/docker/images/alpine:latest")
+    resp = e2e_client.get(f"/api/v2/nodes/{node['id']}/docker/images/alpine:latest")
     assert resp.status_code == 200, f"inspect failed: {resp.status_code} {resp.text}"
     data = resp.json()
     assert data["id"].startswith("sha256:")
@@ -802,16 +802,16 @@ def test_docker_image_remove(
     node = e2e_resources.create_docker_node()
     # Pull a separate image so we don't affect other tests
     resp = e2e_client.post(
-        f"/api/v1/nodes/{node['id']}/docker/images/pull",
+        f"/api/v2/nodes/{node['id']}/docker/images/pull",
         json={"image": "busybox:latest", "timeout": 120},
     )
     assert resp.status_code == 200
 
-    resp = e2e_client.delete(f"/api/v1/nodes/{node['id']}/docker/images/busybox:latest")
+    resp = e2e_client.delete(f"/api/v2/nodes/{node['id']}/docker/images/busybox:latest")
     assert resp.status_code == 204, f"remove failed: {resp.status_code} {resp.text}"
 
     # Verify it's gone (inspect should 404)
-    resp = e2e_client.get(f"/api/v1/nodes/{node['id']}/docker/images/busybox:latest")
+    resp = e2e_client.get(f"/api/v2/nodes/{node['id']}/docker/images/busybox:latest")
     assert resp.status_code == 404
 
 
@@ -823,7 +823,7 @@ def test_docker_image_tag(
     node = e2e_resources.create_docker_node()
     _docker_pull_alpine(e2e_client, node["id"])
     resp = e2e_client.post(
-        f"/api/v1/nodes/{node['id']}/docker/images/alpine:latest/tag",
+        f"/api/v2/nodes/{node['id']}/docker/images/alpine:latest/tag",
         json={"repo": "local/e2e-alpine", "tag": "v1.0"},
     )
     assert resp.status_code == 200, f"tag failed: {resp.status_code} {resp.text}"
@@ -833,13 +833,13 @@ def test_docker_image_tag(
 
     # Inspect the tagged image to confirm it exists
     resp = e2e_client.get(
-        f"/api/v1/nodes/{node['id']}/docker/images/local/e2e-alpine:v1.0"
+        f"/api/v2/nodes/{node['id']}/docker/images/local/e2e-alpine:v1.0"
     )
     assert resp.status_code == 200
     assert "local/e2e-alpine:v1.0" in resp.json()["repo_tags"]
 
     # Cleanup the tag
-    e2e_client.delete(f"/api/v1/nodes/{node['id']}/docker/images/local/e2e-alpine:v1.0")
+    e2e_client.delete(f"/api/v2/nodes/{node['id']}/docker/images/local/e2e-alpine:v1.0")
 
 
 @pytest.mark.e2e_slow
@@ -851,7 +851,7 @@ def test_docker_image_build(
     node = e2e_resources.create_docker_node()
     dockerfile = "FROM alpine:latest\nRUN echo hello > /built-marker\n"
     resp = e2e_client.post(
-        f"/api/v1/nodes/{node['id']}/docker/images/build",
+        f"/api/v2/nodes/{node['id']}/docker/images/build",
         json={
             "dockerfile": dockerfile,
             "tag": "local/e2e-built:v1",
@@ -866,13 +866,13 @@ def test_docker_image_build(
 
     # Verify the built image exists via inspect
     resp = e2e_client.get(
-        f"/api/v1/nodes/{node['id']}/docker/images/local/e2e-built:v1"
+        f"/api/v2/nodes/{node['id']}/docker/images/local/e2e-built:v1"
     )
     assert resp.status_code == 200
     assert "local/e2e-built:v1" in resp.json()["repo_tags"]
 
     # Cleanup
-    e2e_client.delete(f"/api/v1/nodes/{node['id']}/docker/images/local/e2e-built:v1")
+    e2e_client.delete(f"/api/v2/nodes/{node['id']}/docker/images/local/e2e-built:v1")
 
 
 # ---------------------------------------------------------------------------
@@ -890,7 +890,7 @@ def test_docker_network_create_and_inspect(
 
     # Create
     resp = e2e_client.post(
-        f"/api/v1/nodes/{node['id']}/docker/networks",
+        f"/api/v2/nodes/{node['id']}/docker/networks",
         json={"name": net_name, "driver": "bridge"},
     )
     assert resp.status_code == 201, f"create failed: {resp.text}"
@@ -899,7 +899,7 @@ def test_docker_network_create_and_inspect(
 
     try:
         # Inspect
-        resp = e2e_client.get(f"/api/v1/nodes/{node['id']}/docker/networks/{net_id}")
+        resp = e2e_client.get(f"/api/v2/nodes/{node['id']}/docker/networks/{net_id}")
         assert resp.status_code == 200
         data = resp.json()
         assert data["name"] == net_name
@@ -907,7 +907,7 @@ def test_docker_network_create_and_inspect(
         assert data["id"] == net_id
     finally:
         # Cleanup
-        e2e_client.delete(f"/api/v1/nodes/{node['id']}/docker/networks/{net_id}")
+        e2e_client.delete(f"/api/v2/nodes/{node['id']}/docker/networks/{net_id}")
 
 
 def test_docker_network_remove(
@@ -919,18 +919,18 @@ def test_docker_network_remove(
 
     # Create
     resp = e2e_client.post(
-        f"/api/v1/nodes/{node['id']}/docker/networks",
+        f"/api/v2/nodes/{node['id']}/docker/networks",
         json={"name": "e2e-rm-net", "driver": "bridge"},
     )
     assert resp.status_code == 201
     net_id = resp.json()["id"]
 
     # Remove
-    resp = e2e_client.delete(f"/api/v1/nodes/{node['id']}/docker/networks/{net_id}")
+    resp = e2e_client.delete(f"/api/v2/nodes/{node['id']}/docker/networks/{net_id}")
     assert resp.status_code == 204
 
     # Verify removed
-    resp = e2e_client.get(f"/api/v1/nodes/{node['id']}/docker/networks/{net_id}")
+    resp = e2e_client.get(f"/api/v2/nodes/{node['id']}/docker/networks/{net_id}")
     assert resp.status_code in (404, 500)
 
 
@@ -944,7 +944,7 @@ def test_docker_network_connect_disconnect(
 
     # Create network
     resp = e2e_client.post(
-        f"/api/v1/nodes/{node['id']}/docker/networks",
+        f"/api/v2/nodes/{node['id']}/docker/networks",
         json={"name": "e2e-conn-net", "driver": "bridge"},
     )
     assert resp.status_code == 201
@@ -952,7 +952,7 @@ def test_docker_network_connect_disconnect(
 
     # Create container
     resp = e2e_client.post(
-        f"/api/v1/nodes/{node['id']}/docker/containers",
+        f"/api/v2/nodes/{node['id']}/docker/containers",
         json={"image": "alpine:latest", "command": "sleep 300"},
     )
     assert resp.status_code == 201
@@ -961,26 +961,26 @@ def test_docker_network_connect_disconnect(
     try:
         # Start container so it appears in network inspect
         e2e_client.post(
-            f"/api/v1/nodes/{node['id']}/docker/containers/{container_id}/start"
+            f"/api/v2/nodes/{node['id']}/docker/containers/{container_id}/start"
         )
 
         # Connect
         resp = e2e_client.post(
-            f"/api/v1/nodes/{node['id']}/docker/networks/{net_id}/connect",
+            f"/api/v2/nodes/{node['id']}/docker/networks/{net_id}/connect",
             json={"container_id": container_id},
         )
         assert resp.status_code == 200
         assert resp.json()["status"] == "connected"
 
         # Inspect should show the container
-        resp = e2e_client.get(f"/api/v1/nodes/{node['id']}/docker/networks/{net_id}")
+        resp = e2e_client.get(f"/api/v2/nodes/{node['id']}/docker/networks/{net_id}")
         assert resp.status_code == 200
         connected = resp.json()["containers"]
         assert len(connected) >= 1
 
         # Disconnect
         resp = e2e_client.post(
-            f"/api/v1/nodes/{node['id']}/docker/networks/{net_id}/disconnect",
+            f"/api/v2/nodes/{node['id']}/docker/networks/{net_id}/disconnect",
             json={"container_id": container_id},
         )
         assert resp.status_code == 200
@@ -988,12 +988,12 @@ def test_docker_network_connect_disconnect(
     finally:
         # Cleanup
         e2e_client.post(
-            f"/api/v1/nodes/{node['id']}/docker/containers/{container_id}/stop"
+            f"/api/v2/nodes/{node['id']}/docker/containers/{container_id}/stop"
         )
         e2e_client.delete(
-            f"/api/v1/nodes/{node['id']}/docker/containers/{container_id}"
+            f"/api/v2/nodes/{node['id']}/docker/containers/{container_id}"
         )
-        e2e_client.delete(f"/api/v1/nodes/{node['id']}/docker/networks/{net_id}")
+        e2e_client.delete(f"/api/v2/nodes/{node['id']}/docker/networks/{net_id}")
 
 
 # ---------------------------------------------------------------------------
@@ -1010,7 +1010,7 @@ def test_docker_volume_create_and_inspect(
 
     # Create
     resp = e2e_client.post(
-        f"/api/v1/nodes/{node['id']}/docker/volumes",
+        f"/api/v2/nodes/{node['id']}/docker/volumes",
         json={"driver": "local"},
     )
     assert resp.status_code == 201, f"create failed: {resp.text}"
@@ -1019,7 +1019,7 @@ def test_docker_volume_create_and_inspect(
 
     try:
         # Inspect
-        resp = e2e_client.get(f"/api/v1/nodes/{node['id']}/docker/volumes/{vol_name}")
+        resp = e2e_client.get(f"/api/v2/nodes/{node['id']}/docker/volumes/{vol_name}")
         assert resp.status_code == 200
         data = resp.json()
         assert data["name"] == vol_name
@@ -1027,7 +1027,7 @@ def test_docker_volume_create_and_inspect(
         assert data["mountpoint"]
     finally:
         # Cleanup
-        e2e_client.delete(f"/api/v1/nodes/{node['id']}/docker/volumes/{vol_name}")
+        e2e_client.delete(f"/api/v2/nodes/{node['id']}/docker/volumes/{vol_name}")
 
 
 def test_docker_volume_remove(
@@ -1039,18 +1039,18 @@ def test_docker_volume_remove(
 
     # Create
     resp = e2e_client.post(
-        f"/api/v1/nodes/{node['id']}/docker/volumes",
+        f"/api/v2/nodes/{node['id']}/docker/volumes",
         json={"driver": "local"},
     )
     assert resp.status_code == 201
     vol_name = resp.json()["name"]
 
     # Remove
-    resp = e2e_client.delete(f"/api/v1/nodes/{node['id']}/docker/volumes/{vol_name}")
+    resp = e2e_client.delete(f"/api/v2/nodes/{node['id']}/docker/volumes/{vol_name}")
     assert resp.status_code == 204
 
     # Verify removed
-    resp = e2e_client.get(f"/api/v1/nodes/{node['id']}/docker/volumes/{vol_name}")
+    resp = e2e_client.get(f"/api/v2/nodes/{node['id']}/docker/volumes/{vol_name}")
     assert resp.status_code in (404, 500)
 
 
@@ -1062,7 +1062,7 @@ def test_docker_volume_prune(
     node = e2e_resources.create_docker_node()
 
     resp = e2e_client.post(
-        f"/api/v1/nodes/{node['id']}/docker/volumes/prune",
+        f"/api/v2/nodes/{node['id']}/docker/volumes/prune",
     )
     assert resp.status_code == 200
     assert "output" in resp.json()
@@ -1083,7 +1083,7 @@ def test_docker_container_pause_unpause(
 
     # Create and start
     resp = e2e_client.post(
-        f"/api/v1/nodes/{node['id']}/docker/containers",
+        f"/api/v2/nodes/{node['id']}/docker/containers",
         json={"image": "alpine:latest", "command": "sleep 300"},
     )
     assert resp.status_code == 201
@@ -1091,35 +1091,35 @@ def test_docker_container_pause_unpause(
 
     try:
         e2e_client.post(
-            f"/api/v1/nodes/{node['id']}/docker/containers/{container_id}/start"
+            f"/api/v2/nodes/{node['id']}/docker/containers/{container_id}/start"
         )
 
         # Pause
         resp = e2e_client.post(
-            f"/api/v1/nodes/{node['id']}/docker/containers/{container_id}/pause"
+            f"/api/v2/nodes/{node['id']}/docker/containers/{container_id}/pause"
         )
         assert resp.status_code == 200
         assert resp.json()["status"] == "paused"
 
         # Verify paused state
         resp = e2e_client.get(
-            f"/api/v1/nodes/{node['id']}/docker/containers/{container_id}"
+            f"/api/v2/nodes/{node['id']}/docker/containers/{container_id}"
         )
         assert resp.status_code == 200
         assert resp.json()["State"]["status"] == "paused"
 
         # Unpause
         resp = e2e_client.post(
-            f"/api/v1/nodes/{node['id']}/docker/containers/{container_id}/unpause"
+            f"/api/v2/nodes/{node['id']}/docker/containers/{container_id}/unpause"
         )
         assert resp.status_code == 200
         assert resp.json()["status"] == "unpaused"
     finally:
         e2e_client.post(
-            f"/api/v1/nodes/{node['id']}/docker/containers/{container_id}/stop"
+            f"/api/v2/nodes/{node['id']}/docker/containers/{container_id}/stop"
         )
         e2e_client.delete(
-            f"/api/v1/nodes/{node['id']}/docker/containers/{container_id}"
+            f"/api/v2/nodes/{node['id']}/docker/containers/{container_id}"
         )
 
 
@@ -1133,7 +1133,7 @@ def test_docker_container_rename(
 
     # Create
     resp = e2e_client.post(
-        f"/api/v1/nodes/{node['id']}/docker/containers",
+        f"/api/v2/nodes/{node['id']}/docker/containers",
         json={"image": "alpine:latest", "command": "sleep 300"},
     )
     assert resp.status_code == 201
@@ -1142,7 +1142,7 @@ def test_docker_container_rename(
     try:
         # Rename
         resp = e2e_client.post(
-            f"/api/v1/nodes/{node['id']}/docker/containers/{container_id}/rename",
+            f"/api/v2/nodes/{node['id']}/docker/containers/{container_id}/rename",
             json={"new_name": "e2e-renamed"},
         )
         assert resp.status_code == 200
@@ -1150,13 +1150,13 @@ def test_docker_container_rename(
 
         # Inspect should show the new name
         resp = e2e_client.get(
-            f"/api/v1/nodes/{node['id']}/docker/containers/{container_id}"
+            f"/api/v2/nodes/{node['id']}/docker/containers/{container_id}"
         )
         assert resp.status_code == 200
         assert "e2e-renamed" in resp.json()["Name"]
     finally:
         e2e_client.delete(
-            f"/api/v1/nodes/{node['id']}/docker/containers/{container_id}"
+            f"/api/v2/nodes/{node['id']}/docker/containers/{container_id}"
         )
 
 
@@ -1170,7 +1170,7 @@ def test_docker_container_top(
 
     # Create and start
     resp = e2e_client.post(
-        f"/api/v1/nodes/{node['id']}/docker/containers",
+        f"/api/v2/nodes/{node['id']}/docker/containers",
         json={"image": "alpine:latest", "command": "sleep 300"},
     )
     assert resp.status_code == 201
@@ -1178,12 +1178,12 @@ def test_docker_container_top(
 
     try:
         e2e_client.post(
-            f"/api/v1/nodes/{node['id']}/docker/containers/{container_id}/start"
+            f"/api/v2/nodes/{node['id']}/docker/containers/{container_id}/start"
         )
 
         # Top
         resp = e2e_client.get(
-            f"/api/v1/nodes/{node['id']}/docker/containers/{container_id}/top"
+            f"/api/v2/nodes/{node['id']}/docker/containers/{container_id}/top"
         )
         assert resp.status_code == 200
         data = resp.json()
@@ -1193,10 +1193,10 @@ def test_docker_container_top(
         assert len(data["processes"]) >= 1
     finally:
         e2e_client.post(
-            f"/api/v1/nodes/{node['id']}/docker/containers/{container_id}/stop"
+            f"/api/v2/nodes/{node['id']}/docker/containers/{container_id}/stop"
         )
         e2e_client.delete(
-            f"/api/v1/nodes/{node['id']}/docker/containers/{container_id}"
+            f"/api/v2/nodes/{node['id']}/docker/containers/{container_id}"
         )
 
 
@@ -1211,7 +1211,7 @@ def test_docker_system_info(
 ):
     """GET /nodes/{id}/docker/system/info returns Docker system info."""
     node = e2e_resources.create_docker_node()
-    resp = e2e_client.get(f"/api/v1/nodes/{node['id']}/docker/system/info")
+    resp = e2e_client.get(f"/api/v2/nodes/{node['id']}/docker/system/info")
     assert resp.status_code == 200
     data = resp.json()
     assert "server_version" in data
@@ -1230,7 +1230,7 @@ def test_docker_system_df(
 ):
     """GET /nodes/{id}/docker/system/df returns disk usage."""
     node = e2e_resources.create_docker_node()
-    resp = e2e_client.get(f"/api/v1/nodes/{node['id']}/docker/system/df")
+    resp = e2e_client.get(f"/api/v2/nodes/{node['id']}/docker/system/df")
     assert resp.status_code == 200
     data = resp.json()
     assert isinstance(data, list)
@@ -1250,7 +1250,7 @@ def test_docker_container_prune(
 
     # Create and stop a container to make it pruneable
     resp = e2e_client.post(
-        f"/api/v1/nodes/{node['id']}/docker/containers",
+        f"/api/v2/nodes/{node['id']}/docker/containers",
         json={"image": "alpine:latest", "command": "echo done"},
     )
     assert resp.status_code == 201
@@ -1261,7 +1261,7 @@ def test_docker_container_prune(
     time.sleep(2)
 
     # Prune
-    resp = e2e_client.post(f"/api/v1/nodes/{node['id']}/docker/containers/prune")
+    resp = e2e_client.post(f"/api/v2/nodes/{node['id']}/docker/containers/prune")
     assert resp.status_code == 200
     data = resp.json()
     assert "containers_deleted" in data
@@ -1275,7 +1275,7 @@ def test_docker_image_prune(
     """POST /nodes/{id}/docker/images/prune prunes unused images."""
     node = e2e_resources.create_docker_node()
 
-    resp = e2e_client.post(f"/api/v1/nodes/{node['id']}/docker/images/prune")
+    resp = e2e_client.post(f"/api/v2/nodes/{node['id']}/docker/images/prune")
     assert resp.status_code == 200
     data = resp.json()
     assert "images_deleted" in data
@@ -1291,11 +1291,11 @@ def test_docker_bulk_inspect(
     e2e_client,
     e2e_resources: UniqueResourceFactory,
 ):
-    """POST /api/v1/docker/bulk/inspect inspects container on multiple nodes."""
+    """POST /api/v2/docker/bulk/inspect inspects container on multiple nodes."""
     node = e2e_resources.create_docker_node()
     _docker_pull_alpine(e2e_client, node["id"])
     e2e_client.post(
-        "/api/v1/commands/execute",
+        "/api/v2/commands/execute",
         json={
             "node_id": node["id"],
             "command": "docker run -d --name bulk-inspect-ctr alpine sleep 300",
@@ -1303,7 +1303,7 @@ def test_docker_bulk_inspect(
     )
 
     resp = e2e_client.post(
-        "/api/v1/docker/bulk/inspect",
+        "/api/v2/docker/bulk/inspect",
         json={
             "node_ids": [node["id"]],
             "container_id": "bulk-inspect-ctr",
@@ -1321,11 +1321,11 @@ def test_docker_bulk_logs(
     e2e_client,
     e2e_resources: UniqueResourceFactory,
 ):
-    """POST /api/v1/docker/bulk/logs gets logs from container on multiple nodes."""
+    """POST /api/v2/docker/bulk/logs gets logs from container on multiple nodes."""
     node = e2e_resources.create_docker_node()
     _docker_pull_alpine(e2e_client, node["id"])
     e2e_client.post(
-        "/api/v1/commands/execute",
+        "/api/v2/commands/execute",
         json={
             "node_id": node["id"],
             "command": (
@@ -1336,7 +1336,7 @@ def test_docker_bulk_logs(
     )
 
     resp = e2e_client.post(
-        "/api/v1/docker/bulk/logs",
+        "/api/v2/docker/bulk/logs",
         json={
             "node_ids": [node["id"]],
             "container_id": "bulk-logs-ctr",
@@ -1353,11 +1353,11 @@ def test_docker_bulk_stats(
     e2e_client,
     e2e_resources: UniqueResourceFactory,
 ):
-    """POST /api/v1/docker/bulk/stats gets stats from container on multiple nodes."""
+    """POST /api/v2/docker/bulk/stats gets stats from container on multiple nodes."""
     node = e2e_resources.create_docker_node()
     _docker_pull_alpine(e2e_client, node["id"])
     e2e_client.post(
-        "/api/v1/commands/execute",
+        "/api/v2/commands/execute",
         json={
             "node_id": node["id"],
             "command": "docker run -d --name bulk-stats-ctr alpine sleep 300",
@@ -1365,7 +1365,7 @@ def test_docker_bulk_stats(
     )
 
     resp = e2e_client.post(
-        "/api/v1/docker/bulk/stats",
+        "/api/v2/docker/bulk/stats",
         json={
             "node_ids": [node["id"]],
             "container_id": "bulk-stats-ctr",
@@ -1390,7 +1390,7 @@ def test_docker_network_create_invalid_driver(
     """POST /nodes/{id}/docker/networks with invalid driver returns 422."""
     node = e2e_resources.create_docker_node()
     resp = e2e_client.post(
-        f"/api/v1/nodes/{node['id']}/docker/networks",
+        f"/api/v2/nodes/{node['id']}/docker/networks",
         json={"name": "test-net", "driver": "bad;driver"},
     )
     assert resp.status_code == 422
@@ -1403,7 +1403,7 @@ def test_docker_volume_create_named(
     """POST /nodes/{id}/docker/volumes with explicit name creates named volume."""
     node = e2e_resources.create_docker_node()
     resp = e2e_client.post(
-        f"/api/v1/nodes/{node['id']}/docker/volumes",
+        f"/api/v2/nodes/{node['id']}/docker/volumes",
         json={"name": "e2e-named-vol", "driver": "local"},
     )
     assert resp.status_code == 201
@@ -1411,12 +1411,12 @@ def test_docker_volume_create_named(
     assert data["name"] == "e2e-named-vol"
 
     # Verify via inspect
-    resp = e2e_client.get(f"/api/v1/nodes/{node['id']}/docker/volumes/e2e-named-vol")
+    resp = e2e_client.get(f"/api/v2/nodes/{node['id']}/docker/volumes/e2e-named-vol")
     assert resp.status_code == 200
     assert resp.json()["name"] == "e2e-named-vol"
 
     # Cleanup
-    e2e_client.delete(f"/api/v1/nodes/{node['id']}/docker/volumes/e2e-named-vol")
+    e2e_client.delete(f"/api/v2/nodes/{node['id']}/docker/volumes/e2e-named-vol")
 
 
 def test_docker_container_rename_validation(
@@ -1427,7 +1427,7 @@ def test_docker_container_rename_validation(
     node = e2e_resources.create_docker_node()
     _docker_pull_alpine(e2e_client, node["id"])
     resp = e2e_client.post(
-        f"/api/v1/nodes/{node['id']}/docker/containers",
+        f"/api/v2/nodes/{node['id']}/docker/containers",
         json={"image": "alpine:latest", "command": "sleep 300"},
     )
     assert resp.status_code == 201
@@ -1435,13 +1435,13 @@ def test_docker_container_rename_validation(
 
     try:
         resp = e2e_client.post(
-            f"/api/v1/nodes/{node['id']}/docker/containers/{container_id}/rename",
+            f"/api/v2/nodes/{node['id']}/docker/containers/{container_id}/rename",
             json={"new_name": ""},
         )
         assert resp.status_code == 422
     finally:
         e2e_client.delete(
-            f"/api/v1/nodes/{node['id']}/docker/containers/{container_id}"
+            f"/api/v2/nodes/{node['id']}/docker/containers/{container_id}"
         )
 
 
@@ -1451,7 +1451,7 @@ def test_docker_system_info_fields(
 ):
     """GET /nodes/{id}/docker/system/info returns all expected fields."""
     node = e2e_resources.create_docker_node()
-    resp = e2e_client.get(f"/api/v1/nodes/{node['id']}/docker/system/info")
+    resp = e2e_client.get(f"/api/v2/nodes/{node['id']}/docker/system/info")
     assert resp.status_code == 200
     data = resp.json()
     expected_fields = [
@@ -1475,7 +1475,7 @@ def test_docker_system_df_fields(
 ):
     """GET /nodes/{id}/docker/system/df returns all expected fields."""
     node = e2e_resources.create_docker_node()
-    resp = e2e_client.get(f"/api/v1/nodes/{node['id']}/docker/system/df")
+    resp = e2e_client.get(f"/api/v2/nodes/{node['id']}/docker/system/df")
     assert resp.status_code == 200
     data = resp.json()
     assert isinstance(data, list)

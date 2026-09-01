@@ -21,7 +21,7 @@ def _create_command(
         "description": "E2E test command",
         **overrides,
     }
-    resp = e2e_client.post("/api/v1/commands/", json=data)
+    resp = e2e_client.post("/api/v2/commands/", json=data)
     assert resp.status_code == 201
     return resp.json()
 
@@ -34,12 +34,12 @@ def test_command_crud_full_cycle(e2e_client: httpx.Client) -> None:
     assert cmd["command"] == "echo test"
 
     # Read
-    resp = e2e_client.get(f"/api/v1/commands/{cmd_id}")
+    resp = e2e_client.get(f"/api/v2/commands/{cmd_id}")
     assert resp.status_code == 200
     assert resp.json()["name"] == "cmd-create"
 
     # Read all
-    resp = e2e_client.get("/api/v1/commands/")
+    resp = e2e_client.get("/api/v2/commands/")
     assert resp.status_code == 200
     data = resp.json()
     assert "items" in data and "total" in data
@@ -47,24 +47,24 @@ def test_command_crud_full_cycle(e2e_client: httpx.Client) -> None:
 
     # Update
     resp = e2e_client.patch(
-        f"/api/v1/commands/{cmd_id}",
+        f"/api/v2/commands/{cmd_id}",
         json={"name": "cmd-updated"},
     )
     assert resp.status_code == 200
     assert resp.json()["name"] == "cmd-updated"
 
     # Delete
-    resp = e2e_client.delete(f"/api/v1/commands/{cmd_id}")
+    resp = e2e_client.delete(f"/api/v2/commands/{cmd_id}")
     assert resp.status_code == 204
 
     # Verify deleted
-    resp = e2e_client.get(f"/api/v1/commands/{cmd_id}")
+    resp = e2e_client.get(f"/api/v2/commands/{cmd_id}")
     assert resp.status_code == 404
 
 
 def test_command_create_with_parameters(e2e_client: httpx.Client) -> None:
     resp = e2e_client.post(
-        "/api/v1/commands/",
+        "/api/v2/commands/",
         json={
             "name": "param-cmd",
             "command": "systemctl restart {service}",
@@ -79,19 +79,19 @@ def test_command_create_with_parameters(e2e_client: httpx.Client) -> None:
 
 
 def test_command_validation_error(e2e_client: httpx.Client) -> None:
-    resp = e2e_client.post("/api/v1/commands/", json={"name": "no-cmd"})
+    resp = e2e_client.post("/api/v2/commands/", json={"name": "no-cmd"})
     assert resp.status_code == 422
 
 
 def test_command_not_found(e2e_client: httpx.Client) -> None:
     fake_id = str(uuid4())
-    resp = e2e_client.get(f"/api/v1/commands/{fake_id}")
+    resp = e2e_client.get(f"/api/v2/commands/{fake_id}")
     assert resp.status_code == 404
 
-    resp = e2e_client.patch(f"/api/v1/commands/{fake_id}", json={"name": "x"})
+    resp = e2e_client.patch(f"/api/v2/commands/{fake_id}", json={"name": "x"})
     assert resp.status_code == 404
 
-    resp = e2e_client.delete(f"/api/v1/commands/{fake_id}")
+    resp = e2e_client.delete(f"/api/v2/commands/{fake_id}")
     assert resp.status_code == 404
 
 
@@ -108,7 +108,7 @@ def test_command_execute_on_node(
     cmd = _create_command(e2e_client, name="cmd-exec", command="echo hello-cmd")
 
     resp = e2e_client.post(
-        f"/api/v1/commands/{cmd['id']}/execute",
+        f"/api/v2/commands/{cmd['id']}/execute",
         json={"node_id": node["id"], "params": {}},
     )
     assert resp.status_code == 200
@@ -123,7 +123,7 @@ def test_command_execute_not_found(
 ) -> None:
     node = e2e_resources.create_ssh_node(name="cmd-nf-node")
     resp = e2e_client.post(
-        f"/api/v1/commands/{uuid4()}/execute",
+        f"/api/v2/commands/{uuid4()}/execute",
         json={"node_id": node["id"], "params": {}},
     )
     assert resp.status_code == 404
@@ -132,7 +132,7 @@ def test_command_execute_not_found(
 def test_command_execute_node_not_found(e2e_client: httpx.Client) -> None:
     cmd = _create_command(e2e_client, name="cmd-no-node")
     resp = e2e_client.post(
-        f"/api/v1/commands/{cmd['id']}/execute",
+        f"/api/v2/commands/{cmd['id']}/execute",
         json={"node_id": str(uuid4()), "params": {}},
     )
     assert resp.status_code == 404
@@ -151,7 +151,7 @@ def test_command_execute_missing_required_param(
     )
 
     resp = e2e_client.post(
-        f"/api/v1/commands/{cmd['id']}/execute",
+        f"/api/v2/commands/{cmd['id']}/execute",
         json={"node_id": node["id"], "params": {}},
     )
     assert resp.status_code == 422
@@ -170,7 +170,7 @@ def test_command_execute_with_params(
     )
 
     resp = e2e_client.post(
-        f"/api/v1/commands/{cmd['id']}/execute",
+        f"/api/v2/commands/{cmd['id']}/execute",
         json={"node_id": node["id"], "params": {"greeting": "world"}},
     )
     assert resp.status_code == 200
@@ -190,7 +190,7 @@ def test_command_pagination(e2e_client: httpx.Client) -> None:
         cmd = _create_command(e2e_client, name=f"page-cmd-{i}")
         created.append(cmd["id"])
 
-    resp = e2e_client.get("/api/v1/commands/?page=1&size=2")
+    resp = e2e_client.get("/api/v2/commands/?page=1&size=2")
     assert resp.status_code == 200
     data = resp.json()
     assert len(data["items"]) == 2
@@ -199,14 +199,14 @@ def test_command_pagination(e2e_client: httpx.Client) -> None:
     assert data["size"] == 2
 
     for cmd_id in created:
-        e2e_client.delete(f"/api/v1/commands/{cmd_id}")
+        e2e_client.delete(f"/api/v2/commands/{cmd_id}")
 
 
 def test_command_partial_update(e2e_client: httpx.Client) -> None:
     cmd = _create_command(e2e_client, name="cmd-partial")
 
     resp = e2e_client.patch(
-        f"/api/v1/commands/{cmd['id']}",
+        f"/api/v2/commands/{cmd['id']}",
         json={"name": "cmd-partial-updated"},
     )
     assert resp.status_code == 200
@@ -223,7 +223,7 @@ def test_bulk_execute_by_ids(
     node2 = e2e_resources.create_ssh_node(name="bulk-2")
 
     resp = e2e_client.post(
-        "/api/v1/commands/bulk/execute",
+        "/api/v2/commands/bulk/execute",
         json={
             "command": "echo bulk-ok",
             "node_ids": [node1["id"], node2["id"]],
@@ -254,7 +254,7 @@ def test_bulk_execute_by_tags(
     e2e_resources.create_ssh_node(name="bulk-tag-other", tags=["other"])
 
     resp = e2e_client.post(
-        "/api/v1/commands/bulk/execute",
+        "/api/v2/commands/bulk/execute",
         json={"command": "echo tagged", "tags": ["bulk-test"]},
     )
     assert resp.status_code == 200
@@ -267,7 +267,7 @@ def test_bulk_execute_by_tags(
 
 def test_bulk_execute_no_nodes(e2e_client: httpx.Client) -> None:
     resp = e2e_client.post(
-        "/api/v1/commands/bulk/execute",
+        "/api/v2/commands/bulk/execute",
         json={"command": "ls", "node_ids": [str(uuid4())]},
     )
     assert resp.status_code == 404
@@ -286,7 +286,7 @@ def test_bulk_execute_partial_failure(
     )
 
     resp = e2e_client.post(
-        "/api/v1/commands/bulk/execute",
+        "/api/v2/commands/bulk/execute",
         json={
             "command": "echo partial",
             "node_ids": [good_node["id"], bad_node["id"]],
@@ -305,7 +305,7 @@ def test_bulk_execute_partial_failure(
 
 def test_bulk_execute_validation_no_targets(e2e_client: httpx.Client) -> None:
     resp = e2e_client.post(
-        "/api/v1/commands/bulk/execute",
+        "/api/v2/commands/bulk/execute",
         json={"command": "ls"},
     )
     assert resp.status_code == 422
@@ -313,7 +313,7 @@ def test_bulk_execute_validation_no_targets(e2e_client: httpx.Client) -> None:
 
 def test_bulk_execute_validation_empty_command(e2e_client: httpx.Client) -> None:
     resp = e2e_client.post(
-        "/api/v1/commands/bulk/execute",
+        "/api/v2/commands/bulk/execute",
         json={"command": "", "node_ids": ["00000000-0000-0000-0000-000000000001"]},
     )
     assert resp.status_code == 422
@@ -328,7 +328,7 @@ def test_command_with_tags(e2e_client: httpx.Client) -> None:
     """Commands can be created with tags and filtered by tag."""
     # Create command with tags
     resp = e2e_client.post(
-        "/api/v1/commands/",
+        "/api/v2/commands/",
         json={
             "name": "tagged-cmd",
             "command": "echo tagged",
@@ -341,11 +341,11 @@ def test_command_with_tags(e2e_client: httpx.Client) -> None:
     cmd_id = cmd["id"]
 
     # Filter by tag
-    resp = e2e_client.get("/api/v1/commands/?tag=deploy")
+    resp = e2e_client.get("/api/v2/commands/?tag=deploy")
     assert resp.status_code == 200
     data = resp.json()
     names = {c["name"] for c in data["items"]}
     assert "tagged-cmd" in names
 
     # Cleanup
-    e2e_client.delete(f"/api/v1/commands/{cmd_id}")
+    e2e_client.delete(f"/api/v2/commands/{cmd_id}")

@@ -4,6 +4,8 @@ import uuid
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
+
 from app.adapters.persistence.script_gateway import SqlAlchemyScriptGateway
 from app.application.dto.script_execution import ScriptExecutionQueryDTO
 from app.application.dto.script_management import (
@@ -212,7 +214,7 @@ async def test_list_executions_maps_history_page() -> None:
     )
 
 
-def test_execution_mapping_normalizes_legacy_terminal_statuses() -> None:
+def test_execution_mapping_rejects_legacy_terminal_statuses() -> None:
     now = datetime.now(UTC)
     execution = ScriptExecutionModel(
         id=uuid.uuid4(),
@@ -221,6 +223,5 @@ def test_execution_mapping_normalizes_legacy_terminal_statuses() -> None:
         started_at=now,
     )
 
-    result = SqlAlchemyScriptGateway._to_execution(execution)
-
-    assert result.status == "success"
+    with pytest.raises(ValueError, match="Stored script execution status is invalid"):
+        SqlAlchemyScriptGateway._to_execution(execution)

@@ -15,7 +15,7 @@ execution; never build an untrusted shell fragment outside the template model.
 ## Create and execute a template
 
 ```bash
-curl --fail-with-body -X POST "${NODE_NEXUS_URL}/api/v1/commands/" \
+curl --fail-with-body -X POST "${NODE_NEXUS_URL}/api/v2/commands/" \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
   -H 'Content-Type: application/json' \
   -d '{
@@ -35,7 +35,7 @@ Save the returned UUID, then execute the template:
 
 ```bash
 curl --fail-with-body -X POST \
-  "${NODE_NEXUS_URL}/api/v1/commands/${COMMAND_ID}/execute" \
+  "${NODE_NEXUS_URL}/api/v2/commands/${COMMAND_ID}/execute" \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
   -H 'Content-Type: application/json' \
   -d "{\"node_id\": \"${NODE_ID}\", \"params\": {\"mount\": \"/\"}}"
@@ -53,7 +53,7 @@ Add the `search` query parameter to filter by name or description:
 curl --fail-with-body --get \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
   --data-urlencode 'search=disk' \
-  "${NODE_NEXUS_URL}/api/v1/commands/"
+  "${NODE_NEXUS_URL}/api/v2/commands/"
 ```
 
 Search matches against the `name` and `description` fields using
@@ -65,7 +65,7 @@ name or description contain the search substring.
 ```bash
 curl --fail-with-body \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
-  "${NODE_NEXUS_URL}/api/v1/commands/tags"
+  "${NODE_NEXUS_URL}/api/v2/commands/tags"
 ```
 
 Returns a sorted list of unique tags used across all command templates. Useful

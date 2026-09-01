@@ -78,7 +78,6 @@ async def export_config(
     return ConfigExport(
         format_version=result.format_version or "1.0",
         application_version=result.application_version or "unknown",
-        version=result.legacy_version or "0.5.0",
         exported_at=cast(datetime, result.exported_at),
         nodes=[
             {
@@ -121,7 +120,6 @@ async def import_config(
         ConfigTransferDTO(
             format_version=data.format_version,
             application_version=data.application_version,
-            legacy_version=data.version,
             nodes=tuple(
                 NodeConfigDTO(
                     name=item.name,

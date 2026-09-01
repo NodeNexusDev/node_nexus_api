@@ -26,11 +26,6 @@ from app.core.types import JsonObject
 from app.models.script import ScriptModel
 from app.models.script_execution import ScriptExecutionModel
 
-_LEGACY_EXECUTION_STATUSES = {
-    "completed": "success",
-    "failed": "error",
-}
-
 
 class ScopedScriptDefinitionReader:
     """Load a script DTO and close its session."""
@@ -210,10 +205,7 @@ class SqlAlchemyScriptGateway:
         step_results = tuple(
             _step_result_from_dict(step) for step in (execution.steps or ())
         )
-        normalized_status = _LEGACY_EXECUTION_STATUSES.get(
-            execution.status, execution.status
-        )
-        if normalized_status not in (
+        if execution.status not in (
             "pending",
             "running",
             "success",
@@ -226,7 +218,7 @@ class SqlAlchemyScriptGateway:
             script_id=execution.script_id,
             node_id=execution.node_id,
             params=tuple((execution.params or {}).items()),
-            status=normalized_status,
+            status=execution.status,
             steps=step_results,
             started_at=execution.started_at,
             finished_at=execution.finished_at,

@@ -6,7 +6,7 @@ from typing import Self
 
 from pydantic import BaseModel, Field, model_validator
 
-from app.application.dto.config import CONFIG_FORMAT_VERSION, LEGACY_CONFIG_VERSION
+from app.application.dto.config import CONFIG_FORMAT_VERSION
 from app.core.docker_validation import validate_docker_host
 from app.core.types import ConnectionType
 from app.schemas.command import CommandParameter
@@ -69,7 +69,6 @@ class ConfigExport(BaseModel):
 
     format_version: str = CONFIG_FORMAT_VERSION
     application_version: str = Field(default_factory=application_version)
-    version: str = LEGACY_CONFIG_VERSION
     exported_at: datetime
     nodes: list[NodeExport] = Field(default_factory=list)
     commands: list[CommandExport] = Field(default_factory=list)
@@ -81,7 +80,6 @@ class ConfigImport(BaseModel):
 
     format_version: str | None = None
     application_version: str | None = None
-    version: str | None = None
     dry_run: bool = False
     nodes: list[NodeExport] = Field(default_factory=list)
     commands: list[CommandExport] = Field(default_factory=list)

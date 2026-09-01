@@ -7,7 +7,7 @@ source_revision: "2026-07-29"
 
 # WebSocket command streaming
 
-Connect to `WS /api/v1/nodes/{node_id}/exec-stream` with `X-API-Key`. The
+Connect to `WS /api/v2/nodes/{node_id}/exec-stream` with `X-API-Key`. The
 legacy `?token=` form is deprecated because URLs can be logged. Managed keys
 need `read-write` scope; the master key follows the same policy as HTTP.
 

@@ -37,7 +37,7 @@ def _wait_for_execution(
     timeout: float = 10.0,
 ) -> list[UnvalidatedJsonObject]:
     def _has_execution() -> bool:
-        response = client.get(f"/api/v1/scripts/{script_id}/executions")
+        response = client.get(f"/api/v2/scripts/{script_id}/executions")
         return bool(response.status_code == 200 and response.json()["total"] > 0)
 
     wait_for_condition(
@@ -46,7 +46,7 @@ def _wait_for_execution(
         pause=0.2,
         description="scheduled execution to appear",
     )
-    return client.get(f"/api/v1/scripts/{script_id}/executions").json()["items"]
+    return client.get(f"/api/v2/scripts/{script_id}/executions").json()["items"]
 
 
 def _wait_for_completed_execution(
@@ -56,7 +56,7 @@ def _wait_for_completed_execution(
     timeout: float = 10.0,
 ) -> list[UnvalidatedJsonObject]:
     def _is_completed() -> bool:
-        response = client.get(f"/api/v1/scripts/{script_id}/executions")
+        response = client.get(f"/api/v2/scripts/{script_id}/executions")
         if response.status_code != 200 or response.json()["total"] == 0:
             return False
         return response.json()["items"][0]["status"] in ("success", "error")
@@ -67,15 +67,15 @@ def _wait_for_completed_execution(
         pause=0.2,
         description="scheduled execution to complete",
     )
-    return client.get(f"/api/v1/scripts/{script_id}/executions").json()["items"]
+    return client.get(f"/api/v2/scripts/{script_id}/executions").json()["items"]
 
 
 def _schedule_url(script_id: str) -> str:
-    return f"/api/v1/scripts/{script_id}/schedule"
+    return f"/api/v2/scripts/{script_id}/schedule"
 
 
 def _executions_url(script_id: str) -> str:
-    return f"/api/v1/scripts/{script_id}/executions"
+    return f"/api/v2/scripts/{script_id}/executions"
 
 
 async def _lock_held_by_another(
@@ -158,7 +158,7 @@ def test_reconciliation_restores_schedule_after_restart(
     assert restored["next_run_at"] is not None
 
     # Trigger execution immediately via the E2E harness.
-    resp = e2e_client.post(f"/api/v1/internal/e2e/scheduler/{script['id']}/trigger-now")
+    resp = e2e_client.post(f"/api/v2/internal/e2e/scheduler/{script['id']}/trigger-now")
     assert resp.status_code == 200
     assert resp.json()["status"] == "triggered"
 
@@ -229,7 +229,7 @@ def test_schedule_replace_removes_old_runtime_job(
     assert schedule["next_run_at"] is not None
 
     # Trigger execution immediately and verify only one run occurs.
-    resp = e2e_client.post(f"/api/v1/internal/e2e/scheduler/{script['id']}/trigger-now")
+    resp = e2e_client.post(f"/api/v2/internal/e2e/scheduler/{script['id']}/trigger-now")
     assert resp.status_code == 200
 
     executions = _wait_for_completed_execution(e2e_client, script["id"])
@@ -277,7 +277,7 @@ def test_persistent_schedule_recovers_after_api_restart(
     assert restored_schedule["cron"] == "0 9 * * *"
     assert restored_schedule["next_run_at"] is not None
 
-    resp = e2e_client.post(f"/api/v1/internal/e2e/scheduler/{script['id']}/trigger-now")
+    resp = e2e_client.post(f"/api/v2/internal/e2e/scheduler/{script['id']}/trigger-now")
     assert resp.status_code == 200
 
     executions = _wait_for_execution(e2e_client, script["id"])

@@ -21,7 +21,7 @@ def ensure_image_pulled(
     decide what to check.
     """
     resp = e2e_client.post(
-        f"/api/v1/nodes/{node_id}/docker/images/pull",
+        f"/api/v2/nodes/{node_id}/docker/images/pull",
         json={"image": image, "timeout": timeout},
     )
     assert resp.status_code == 200, (
@@ -46,7 +46,7 @@ def create_test_container(
     container_name = name or f"e2e-ctr-{uuid.uuid4().hex[:8]}"
     docker_cmd = f"docker run -d --name {container_name} {image} {command}"
     resp = e2e_client.post(
-        "/api/v1/commands/execute",
+        "/api/v2/commands/execute",
         json={"node_id": node_id, "command": docker_cmd},
     )
     assert resp.status_code == 200, (
@@ -65,7 +65,7 @@ def remove_test_container(
     """Remove a container via the Docker HTTP API."""
     force_param = "?force=true" if force else ""
     resp = e2e_client.delete(
-        f"/api/v1/nodes/{node_id}/docker/containers/{container_id}{force_param}"
+        f"/api/v2/nodes/{node_id}/docker/containers/{container_id}{force_param}"
     )
     # 204 = success, 404 = already gone — both acceptable
     assert resp.status_code in (204, 404), (

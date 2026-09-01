@@ -31,7 +31,7 @@ runtime-проекцией. Реплики выбирают одного owner �
 curl --fail-with-body --get \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
   --data-urlencode 'search=deploy' \
-  "${NODE_NEXUS_URL}/api/v1/scripts/"
+  "${NODE_NEXUS_URL}/api/v2/scripts/"
 ```
 
 Поиск выполняется по полям `name` и `description` с помощью case-insensitive
@@ -43,7 +43,7 @@ curl --fail-with-body --get \
 ```bash
 curl --fail-with-body \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
-  "${NODE_NEXUS_URL}/api/v1/scripts/tags"
+  "${NODE_NEXUS_URL}/api/v2/scripts/tags"
 ```
 
 Возвращает отсортированный список уникальных тегов, используемых во всех
@@ -62,7 +62,7 @@ curl --fail-with-body -X POST \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
   -H "Content-Type: application/json" \
   -d '{"node_ids": ["<node-id-1>", "<node-id-2>"], "params": {"branch": "main"}}' \
-  "${NODE_NEXUS_URL}/api/v1/scripts/<script_id>/execute"
+  "${NODE_NEXUS_URL}/api/v2/scripts/<script_id>/execute"
 ```
 
 ### Выполнение по тегам
@@ -72,7 +72,7 @@ curl --fail-with-body -X POST \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
   -H "Content-Type: application/json" \
   -d '{"node_tags": ["web", "production"], "params": {"branch": "main"}}' \
-  "${NODE_NEXUS_URL}/api/v1/scripts/<script_id>/execute"
+  "${NODE_NEXUS_URL}/api/v2/scripts/<script_id>/execute"
 ```
 
 Выполнится на всех нодах, имеющих оба тега `web` И `production`.
@@ -84,7 +84,7 @@ curl --fail-with-body -X POST \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
   -H "Content-Type: application/json" \
   -d '{"node_ids": ["<node-id>"], "node_tags": ["web"], "params": {}}' \
-  "${NODE_NEXUS_URL}/api/v1/scripts/<script_id>/execute"
+  "${NODE_NEXUS_URL}/api/v2/scripts/<script_id>/execute"
 ```
 
 Результат — пересечение: ноды из `node_ids`, которые также имеют все указанные
@@ -115,7 +115,7 @@ curl --fail-with-body -X POST \
 ```bash
 curl --fail-with-body -X POST \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
-  "${NODE_NEXUS_URL}/api/v1/nodes/${NODE_ID}/commands/${EXECUTION_ID}/retry"
+  "${NODE_NEXUS_URL}/api/v2/nodes/${NODE_ID}/commands/${EXECUTION_ID}/retry"
 ```
 
 ### Повтор скрипта
@@ -123,7 +123,7 @@ curl --fail-with-body -X POST \
 ```bash
 curl --fail-with-body -X POST \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
-  "${NODE_NEXUS_URL}/api/v1/scripts/executions/${EXECUTION_ID}/retry"
+  "${NODE_NEXUS_URL}/api/v2/scripts/executions/${EXECUTION_ID}/retry"
 ```
 
 Возвращает новое выполнение с теми же `script_id`, `node_id` и `params`.
@@ -135,7 +135,7 @@ curl --fail-with-body -X POST \
 ```bash
 curl --fail-with-body -X POST \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
-  "${NODE_NEXUS_URL}/api/v1/scripts/executions/${EXECUTION_ID}/cancel"
+  "${NODE_NEXUS_URL}/api/v2/scripts/executions/${EXECUTION_ID}/cancel"
 ```
 
 Отменить можно только выполняющиеся executions. Уже завершённые или упавшие
@@ -148,7 +148,7 @@ curl --fail-with-body -X POST \
 ```bash
 curl --fail-with-body \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
-  "${NODE_NEXUS_URL}/api/v1/scripts/${SCRIPT_ID}/schedule/history?page=1&size=20"
+  "${NODE_NEXUS_URL}/api/v2/scripts/${SCRIPT_ID}/schedule/history?page=1&size=20"
 ```
 
 Необязательный параметр: `trigger` — фильтр по типу триггера (`manual`,

@@ -72,8 +72,8 @@ class UniqueResourceFactory:
             "password": SSH_PASSWORD,
         }
         payload.update(overrides)
-        node = self._assert_created(self._client.post("/api/v1/nodes/", json=payload))
-        self._cleanup.add(lambda: self._client.delete(f"/api/v1/nodes/{node['id']}"))
+        node = self._assert_created(self._client.post("/api/v2/nodes/", json=payload))
+        self._cleanup.add(lambda: self._client.delete(f"/api/v2/nodes/{node['id']}"))
         return node
 
     def create_ssh_node(self, **overrides: object) -> UnvalidatedJsonObject:
@@ -87,8 +87,8 @@ class UniqueResourceFactory:
             "password": SSH_PASSWORD,
         }
         payload.update(overrides)
-        node = self._assert_created(self._client.post("/api/v1/nodes/", json=payload))
-        self._cleanup.add(lambda: self._client.delete(f"/api/v1/nodes/{node['id']}"))
+        node = self._assert_created(self._client.post("/api/v2/nodes/", json=payload))
+        self._cleanup.add(lambda: self._client.delete(f"/api/v2/nodes/{node['id']}"))
         return node
 
     def create_ssh_key_node(
@@ -116,8 +116,8 @@ class UniqueResourceFactory:
         if encrypted:
             payload["passphrase"] = SSH_KEY_PASSPHRASE
         payload.update(overrides)
-        node = self._assert_created(self._client.post("/api/v1/nodes/", json=payload))
-        self._cleanup.add(lambda: self._client.delete(f"/api/v1/nodes/{node['id']}"))
+        node = self._assert_created(self._client.post("/api/v2/nodes/", json=payload))
+        self._cleanup.add(lambda: self._client.delete(f"/api/v2/nodes/{node['id']}"))
         return node
 
     def create_docker_node(self, **overrides: object) -> UnvalidatedJsonObject:
@@ -133,8 +133,8 @@ class UniqueResourceFactory:
             "docker_host": DOCKER_HOST,
         }
         payload.update(overrides)
-        node = self._assert_created(self._client.post("/api/v1/nodes/", json=payload))
-        self._cleanup.add(lambda: self._client.delete(f"/api/v1/nodes/{node['id']}"))
+        node = self._assert_created(self._client.post("/api/v2/nodes/", json=payload))
+        self._cleanup.add(lambda: self._client.delete(f"/api/v2/nodes/{node['id']}"))
         return node
 
     def create_container(
@@ -156,7 +156,7 @@ class UniqueResourceFactory:
         }
         payload.update(overrides)
         response = self._client.post(
-            f"/api/v1/nodes/{node_id}/docker/containers",
+            f"/api/v2/nodes/{node_id}/docker/containers",
             json=payload,
         )
         assert response.status_code == 201, (
@@ -166,7 +166,7 @@ class UniqueResourceFactory:
         container_id = container["id"]
         self._cleanup.add(
             lambda: self._client.delete(
-                f"/api/v1/nodes/{node_id}/docker/containers/{container_id}?force=true"
+                f"/api/v2/nodes/{node_id}/docker/containers/{container_id}?force=true"
             )
         )
         return container
@@ -181,9 +181,9 @@ class UniqueResourceFactory:
         }
         payload.update(overrides)
         item = self._assert_created(
-            self._client.post("/api/v1/commands/", json=payload)
+            self._client.post("/api/v2/commands/", json=payload)
         )
-        self._cleanup.add(lambda: self._client.delete(f"/api/v1/commands/{item['id']}"))
+        self._cleanup.add(lambda: self._client.delete(f"/api/v2/commands/{item['id']}"))
         return item
 
     def create_script(self, **overrides: object) -> UnvalidatedJsonObject:
@@ -199,8 +199,8 @@ class UniqueResourceFactory:
             ],
         }
         payload.update(overrides)
-        item = self._assert_created(self._client.post("/api/v1/scripts/", json=payload))
-        self._cleanup.add(lambda: self._client.delete(f"/api/v1/scripts/{item['id']}"))
+        item = self._assert_created(self._client.post("/api/v2/scripts/", json=payload))
+        self._cleanup.add(lambda: self._client.delete(f"/api/v2/scripts/{item['id']}"))
         return item
 
     def create_api_key(self, **overrides: object) -> UnvalidatedJsonObject:
@@ -211,9 +211,9 @@ class UniqueResourceFactory:
         }
         payload.update(overrides)
         item = self._assert_created(
-            self._client.post("/api/v1/api-keys/", json=payload)
+            self._client.post("/api/v2/api-keys/", json=payload)
         )
-        self._cleanup.add(lambda: self._client.delete(f"/api/v1/api-keys/{item['id']}"))
+        self._cleanup.add(lambda: self._client.delete(f"/api/v2/api-keys/{item['id']}"))
         return item
 
     def create_schedule(
@@ -224,21 +224,21 @@ class UniqueResourceFactory:
     ) -> UnvalidatedJsonObject:
         """Create or replace a script schedule."""
         response = self._client.post(
-            f"/api/v1/scripts/{script_id}/schedule",
+            f"/api/v2/scripts/{script_id}/schedule",
             json={"cron": cron, "node_ids": node_ids},
         )
         assert response.status_code == 200, (
             f"Expected 200, got {response.status_code}: {response.text}"
         )
         self._cleanup.add(
-            lambda: self._client.delete(f"/api/v1/scripts/{script_id}/schedule")
+            lambda: self._client.delete(f"/api/v2/scripts/{script_id}/schedule")
         )
         return response.json()
 
     def trigger_schedule_now(self, script_id: str) -> None:
         """Immediately trigger a scheduled script via the E2E harness endpoint."""
         response = self._client.post(
-            f"/api/v1/internal/e2e/scheduler/{script_id}/trigger-now"
+            f"/api/v2/internal/e2e/scheduler/{script_id}/trigger-now"
         )
         assert response.status_code == 200, (
             f"Expected 200, got {response.status_code}: {response.text}"

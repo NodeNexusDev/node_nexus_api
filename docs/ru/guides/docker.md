@@ -19,7 +19,7 @@ Docker daemon на целевом хосте. Сначала проверьте 
 ```bash
 curl --fail-with-body \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
-  "${NODE_NEXUS_URL}/api/v1/nodes/${NODE_ID}/docker/containers"
+  "${NODE_NEXUS_URL}/api/v2/nodes/${NODE_ID}/docker/containers"
 ```
 
 Список всех контейнеров включая остановленные:
@@ -27,7 +27,7 @@ curl --fail-with-body \
 ```bash
 curl --fail-with-body \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
-  "${NODE_NEXUS_URL}/api/v1/nodes/${NODE_ID}/docker/containers?all=true"
+  "${NODE_NEXUS_URL}/api/v2/nodes/${NODE_ID}/docker/containers?all=true"
 ```
 
 Создание контейнера из image. Строка `command` разбивается на отдельные
@@ -35,7 +35,7 @@ curl --fail-with-body \
 
 ```bash
 curl --fail-with-body -X POST \
-  "${NODE_NEXUS_URL}/api/v1/nodes/${NODE_ID}/docker/containers" \
+  "${NODE_NEXUS_URL}/api/v2/nodes/${NODE_ID}/docker/containers" \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
   -H 'Content-Type: application/json' \
   -d '{
@@ -56,7 +56,7 @@ curl --fail-with-body -X POST \
 ```bash
 curl --fail-with-body \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
-  "${NODE_NEXUS_URL}/api/v1/nodes/${NODE_ID}/docker/containers/${CONTAINER_ID}"
+  "${NODE_NEXUS_URL}/api/v2/nodes/${NODE_ID}/docker/containers/${CONTAINER_ID}"
 ```
 
 Используйте возвращённый ID или имя контейнера в путях `/start`, `/stop`,
@@ -65,7 +65,7 @@ curl --fail-with-body \
 
 ```bash
 curl --fail-with-body -X POST \
-  "${NODE_NEXUS_URL}/api/v1/nodes/${NODE_ID}/docker/containers/${CONTAINER_ID}/exec" \
+  "${NODE_NEXUS_URL}/api/v2/nodes/${NODE_ID}/docker/containers/${CONTAINER_ID}/exec" \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
   -H 'Content-Type: application/json' \
   -d '{"command": "id", "timeout": 30}'
@@ -76,7 +76,7 @@ curl --fail-with-body -X POST \
 ```bash
 curl --fail-with-body -X DELETE \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
-  "${NODE_NEXUS_URL}/api/v1/nodes/${NODE_ID}/docker/containers/${CONTAINER_ID}"
+  "${NODE_NEXUS_URL}/api/v2/nodes/${NODE_ID}/docker/containers/${CONTAINER_ID}"
 ```
 
 Получение логов контейнера:
@@ -84,7 +84,7 @@ curl --fail-with-body -X DELETE \
 ```bash
 curl --fail-with-body \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
-  "${NODE_NEXUS_URL}/api/v1/nodes/${NODE_ID}/docker/containers/${CONTAINER_ID}/logs?tail=100"
+  "${NODE_NEXUS_URL}/api/v2/nodes/${NODE_ID}/docker/containers/${CONTAINER_ID}/logs?tail=100"
 ```
 
 Получение статистики ресурсов контейнера:
@@ -92,7 +92,7 @@ curl --fail-with-body \
 ```bash
 curl --fail-with-body \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
-  "${NODE_NEXUS_URL}/api/v1/nodes/${NODE_ID}/docker/containers/${CONTAINER_ID}/stats"
+  "${NODE_NEXUS_URL}/api/v2/nodes/${NODE_ID}/docker/containers/${CONTAINER_ID}/stats"
 ```
 
 Очистка остановленных контейнеров:
@@ -100,7 +100,7 @@ curl --fail-with-body \
 ```bash
 curl --fail-with-body -X POST \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
-  "${NODE_NEXUS_URL}/api/v1/nodes/${NODE_ID}/docker/containers/prune"
+  "${NODE_NEXUS_URL}/api/v2/nodes/${NODE_ID}/docker/containers/prune"
 ```
 
 ## Images
@@ -110,7 +110,7 @@ Pull, inspect, tag, remove и сборка image:
 ```bash
 ## Pull
 curl --fail-with-body -X POST \
-  "${NODE_NEXUS_URL}/api/v1/nodes/${NODE_ID}/docker/images/pull" \
+  "${NODE_NEXUS_URL}/api/v2/nodes/${NODE_ID}/docker/images/pull" \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
   -H 'Content-Type: application/json' \
   -d '{"image": "alpine:latest", "timeout": 120}'
@@ -118,18 +118,18 @@ curl --fail-with-body -X POST \
 ## Inspect
 curl --fail-with-body \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
-  "${NODE_NEXUS_URL}/api/v1/nodes/${NODE_ID}/docker/images/alpine:latest"
+  "${NODE_NEXUS_URL}/api/v2/nodes/${NODE_ID}/docker/images/alpine:latest"
 
 ## Tag
 curl --fail-with-body -X POST \
-  "${NODE_NEXUS_URL}/api/v1/nodes/${NODE_ID}/docker/images/alpine:latest/tag" \
+  "${NODE_NEXUS_URL}/api/v2/nodes/${NODE_ID}/docker/images/alpine:latest/tag" \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
   -H 'Content-Type: application/json' \
   -d '{"repo": "local/alpine", "tag": "v1.0"}'
 
 ## Сборка из Dockerfile, переданного через stdin
 curl --fail-with-body -X POST \
-  "${NODE_NEXUS_URL}/api/v1/nodes/${NODE_ID}/docker/images/build" \
+  "${NODE_NEXUS_URL}/api/v2/nodes/${NODE_ID}/docker/images/build" \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
   -H 'Content-Type: application/json' \
   -d '{
@@ -142,12 +142,12 @@ curl --fail-with-body -X POST \
 ## Remove
 curl --fail-with-body -X DELETE \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
-  "${NODE_NEXUS_URL}/api/v1/nodes/${NODE_ID}/docker/images/local/alpine:v1.0"
+  "${NODE_NEXUS_URL}/api/v2/nodes/${NODE_ID}/docker/images/local/alpine:v1.0"
 
 ## Очистка неиспользуемых images
 curl --fail-with-body -X POST \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
-  "${NODE_NEXUS_URL}/api/v1/nodes/${NODE_ID}/docker/images/prune"
+  "${NODE_NEXUS_URL}/api/v2/nodes/${NODE_ID}/docker/images/prune"
 ```
 
 ## Сети
@@ -159,11 +159,11 @@ curl --fail-with-body -X POST \
 ## Список сетей
 curl --fail-with-body \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
-  "${NODE_NEXUS_URL}/api/v1/nodes/${NODE_ID}/docker/networks"
+  "${NODE_NEXUS_URL}/api/v2/nodes/${NODE_ID}/docker/networks"
 
 ## Создание bridge-сети
 curl --fail-with-body -X POST \
-  "${NODE_NEXUS_URL}/api/v1/nodes/${NODE_ID}/docker/networks" \
+  "${NODE_NEXUS_URL}/api/v2/nodes/${NODE_ID}/docker/networks" \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
   -H 'Content-Type: application/json' \
   -d '{"name": "my-network", "driver": "bridge"}'
@@ -171,18 +171,18 @@ curl --fail-with-body -X POST \
 ## Инспекция сети
 curl --fail-with-body \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
-  "${NODE_NEXUS_URL}/api/v1/nodes/${NODE_ID}/docker/networks/${NETWORK_ID}"
+  "${NODE_NEXUS_URL}/api/v2/nodes/${NODE_ID}/docker/networks/${NETWORK_ID}"
 
 ## Подключение контейнера к сети
 curl --fail-with-body -X POST \
-  "${NODE_NEXUS_URL}/api/v1/nodes/${NODE_ID}/docker/networks/${NETWORK_ID}/connect" \
+  "${NODE_NEXUS_URL}/api/v2/nodes/${NODE_ID}/docker/networks/${NETWORK_ID}/connect" \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
   -H 'Content-Type: application/json' \
   -d '{"container_id": "${CONTAINER_ID}"}'
 
 ## Отключение контейнера от сети
 curl --fail-with-body -X POST \
-  "${NODE_NEXUS_URL}/api/v1/nodes/${NODE_ID}/docker/networks/${NETWORK_ID}/disconnect" \
+  "${NODE_NEXUS_URL}/api/v2/nodes/${NODE_ID}/docker/networks/${NETWORK_ID}/disconnect" \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
   -H 'Content-Type: application/json' \
   -d '{"container_id": "${CONTAINER_ID}"}'
@@ -190,7 +190,7 @@ curl --fail-with-body -X POST \
 ## Удаление сети
 curl --fail-with-body -X DELETE \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
-  "${NODE_NEXUS_URL}/api/v1/nodes/${NODE_ID}/docker/networks/${NETWORK_ID}"
+  "${NODE_NEXUS_URL}/api/v2/nodes/${NODE_ID}/docker/networks/${NETWORK_ID}"
 ```
 
 ## Volumes
@@ -201,11 +201,11 @@ curl --fail-with-body -X DELETE \
 ## Список volumes
 curl --fail-with-body \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
-  "${NODE_NEXUS_URL}/api/v1/nodes/${NODE_ID}/docker/volumes"
+  "${NODE_NEXUS_URL}/api/v2/nodes/${NODE_ID}/docker/volumes"
 
 ## Создание именованного volume
 curl --fail-with-body -X POST \
-  "${NODE_NEXUS_URL}/api/v1/nodes/${NODE_ID}/docker/volumes" \
+  "${NODE_NEXUS_URL}/api/v2/nodes/${NODE_ID}/docker/volumes" \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
   -H 'Content-Type: application/json' \
   -d '{"name": "my-vol", "driver": "local"}'
@@ -213,17 +213,17 @@ curl --fail-with-body -X POST \
 ## Инспекция volume
 curl --fail-with-body \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
-  "${NODE_NEXUS_URL}/api/v1/nodes/${NODE_ID}/docker/volumes/${VOLUME_NAME}"
+  "${NODE_NEXUS_URL}/api/v2/nodes/${NODE_ID}/docker/volumes/${VOLUME_NAME}"
 
 ## Удаление volume
 curl --fail-with-body -X DELETE \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
-  "${NODE_NEXUS_URL}/api/v1/nodes/${NODE_ID}/docker/volumes/${VOLUME_NAME}"
+  "${NODE_NEXUS_URL}/api/v2/nodes/${NODE_ID}/docker/volumes/${VOLUME_NAME}"
 
 ## Очистка неиспользуемых volumes
 curl --fail-with-body -X POST \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
-  "${NODE_NEXUS_URL}/api/v1/nodes/${NODE_ID}/docker/volumes/prune"
+  "${NODE_NEXUS_URL}/api/v2/nodes/${NODE_ID}/docker/volumes/prune"
 ```
 
 ## Система
@@ -234,17 +234,17 @@ curl --fail-with-body -X POST \
 ## Информация о Docker
 curl --fail-with-body \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
-  "${NODE_NEXUS_URL}/api/v1/nodes/${NODE_ID}/docker/system/info"
+  "${NODE_NEXUS_URL}/api/v2/nodes/${NODE_ID}/docker/system/info"
 
 ## Использование диска
 curl --fail-with-body \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
-  "${NODE_NEXUS_URL}/api/v1/nodes/${NODE_ID}/docker/system/df"
+  "${NODE_NEXUS_URL}/api/v2/nodes/${NODE_ID}/docker/system/df"
 ```
 
 ## Bulk-операции
 
-Bulk endpoints под `/api/v1/docker/bulk/` работают с несколькими нодами. Можно
+Bulk endpoints под `/api/v2/docker/bulk/` работают с несколькими нодами. Можно
 передать явные `node_ids`, `node_tags` или оба варианта. Теги разрешаются в
 Docker-ноды и объединяются с явными ID. Результаты возвращаются по нодам;
 частичная ошибка не откатывает успешные удалённые операции.
@@ -254,7 +254,7 @@ Docker-ноды и объединяются с явными ID. Результа
 
 ```bash
 curl --fail-with-body -X POST \
-  "${NODE_NEXUS_URL}/api/v1/docker/bulk/restart" \
+  "${NODE_NEXUS_URL}/api/v2/docker/bulk/restart" \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
   -H 'Content-Type: application/json' \
   -d '{

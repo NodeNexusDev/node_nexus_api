@@ -24,7 +24,7 @@ curl --get --fail-with-body \
   --data-urlencode 'action=execute_failed' \
   --data-urlencode 'page=1' \
   --data-urlencode 'size=50' \
-  "${NODE_NEXUS_URL}/api/v1/audit/"
+  "${NODE_NEXUS_URL}/api/v2/audit/"
 ```
 
 Основные действия: `create`, `update`, `delete`, `check`, `execute` и
@@ -41,7 +41,7 @@ curl --get --fail-with-body \
   --data-urlencode 'user=admin' \
   --data-urlencode 'date_from=2026-08-01T00:00:00' \
   --data-urlencode 'date_to=2026-08-16T23:59:59' \
-  "${NODE_NEXUS_URL}/api/v1/audit/"
+  "${NODE_NEXUS_URL}/api/v2/audit/"
 ```
 
 Параметры:
@@ -61,7 +61,7 @@ curl --get --fail-with-body \
 ```bash
 curl --fail-with-body \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
-  "${NODE_NEXUS_URL}/api/v1/audit/export?fmt=csv"
+  "${NODE_NEXUS_URL}/api/v2/audit/export?fmt=csv"
 ```
 
 См. [Дашборд, поиск и метрики](dashboard-search-metrics.md) для live SSE-потока
@@ -79,7 +79,7 @@ curl --fail-with-body \
 ```bash
 curl --fail-with-body -X DELETE \
   -H "X-API-Key: ${MASTER_API_KEY}" \
-  "${NODE_NEXUS_URL}/api/v1/audit/?confirm=yes"
+  "${NODE_NEXUS_URL}/api/v2/audit/?confirm=yes"
 ```
 
 Операцию нельзя отменить средствами приложения. Сначала экспортируйте или

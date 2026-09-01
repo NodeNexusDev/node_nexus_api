@@ -16,9 +16,9 @@ for all subsequent operations.
 ## How do I run a command on a node?
 
 Two ways:
-- **Inline:** `POST /api/v1/nodes/{id}/execute/` with `{"command": "..."}`
+- **Inline:** `POST /api/v2/nodes/{id}/execute/` with `{"command": "..."}`
 - **Template:** [create a command template](commands.md), then `POST
-  /api/v1/commands/{id}/execute`
+  /api/v2/commands/{id}/execute`
 
 See the [cheat sheet](../reference/cheat-sheet.md) for copy-paste recipes.
 
@@ -32,7 +32,7 @@ See [scripts](scripts.md).
 ## Why do I get 401?
 
 The API key is missing, unknown, inactive, or expired. Check the
-`X-API-Key` header and the key's state via `GET /api/v1/api-keys/`.
+`X-API-Key` header and the key's state via `GET /api/v2/api-keys/`.
 See [authentication](authentication.md).
 
 ## Why do I get 403?

@@ -16,9 +16,9 @@ source_revision: "2026-07-30"
 ## Как выполнить команду на ноде?
 
 Два способа:
-- **Прямой:** `POST /api/v1/nodes/{id}/execute/` с `{"command": "..."}`
+- **Прямой:** `POST /api/v2/nodes/{id}/execute/` с `{"command": "..."}`
 - **Шаблон:** [создайте шаблон](commands.md), затем `POST
-  /api/v1/commands/{id}/execute`
+  /api/v2/commands/{id}/execute`
 
 Готовые рецепты: [шпаргалка](../reference/cheat-sheet.md).
 
@@ -32,7 +32,7 @@ source_revision: "2026-07-30"
 ## Почему приходит 401?
 
 API-ключ отсутствует, неизвестен, неактивен или просрочен. Проверьте
-заголовок `X-API-Key` и состояние ключа через `GET /api/v1/api-keys/`.
+заголовок `X-API-Key` и состояние ключа через `GET /api/v2/api-keys/`.
 См. [аутентификацию](authentication.md).
 
 ## Почему приходит 403?

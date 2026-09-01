@@ -15,7 +15,7 @@ stdout и stderr. Параметры валидируются до удалён�
 ## Создание и выполнение шаблона
 
 ```bash
-curl --fail-with-body -X POST "${NODE_NEXUS_URL}/api/v1/commands/" \
+curl --fail-with-body -X POST "${NODE_NEXUS_URL}/api/v2/commands/" \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
   -H 'Content-Type: application/json' \
   -d '{
@@ -35,7 +35,7 @@ curl --fail-with-body -X POST "${NODE_NEXUS_URL}/api/v1/commands/" \
 
 ```bash
 curl --fail-with-body -X POST \
-  "${NODE_NEXUS_URL}/api/v1/commands/${COMMAND_ID}/execute" \
+  "${NODE_NEXUS_URL}/api/v2/commands/${COMMAND_ID}/execute" \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
   -H 'Content-Type: application/json' \
   -d "{\"node_id\": \"${NODE_ID}\", \"params\": {\"mount\": \"/\"}}"
@@ -53,7 +53,7 @@ curl --fail-with-body -X POST \
 curl --fail-with-body --get \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
   --data-urlencode 'search=disk' \
-  "${NODE_NEXUS_URL}/api/v1/commands/"
+  "${NODE_NEXUS_URL}/api/v2/commands/"
 ```
 
 Поиск выполняется по полям `name` и `description` с помощью case-insensitive
@@ -65,7 +65,7 @@ curl --fail-with-body --get \
 ```bash
 curl --fail-with-body \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
-  "${NODE_NEXUS_URL}/api/v1/commands/tags"
+  "${NODE_NEXUS_URL}/api/v2/commands/tags"
 ```
 
 Возвращает отсортированный список уникальных тегов, используемых во всех

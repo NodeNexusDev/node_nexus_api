@@ -7,9 +7,9 @@ pytestmark = pytest.mark.docker
 
 
 def test_validate_credentials_success(e2e_client: httpx.Client) -> None:
-    """POST /api/v1/nodes/validate-credentials returns active for valid SSH."""
+    """POST /api/v2/nodes/validate-credentials returns active for valid SSH."""
     resp = e2e_client.post(
-        "/api/v1/nodes/validate-credentials",
+        "/api/v2/nodes/validate-credentials",
         json={
             "host": "ssh-server",
             "port": 2222,
@@ -28,7 +28,7 @@ def test_validate_credentials_failure(
 ) -> None:
     """Returns unreachable for bad credentials."""
     resp = e2e_client.post(
-        "/api/v1/nodes/validate-credentials",
+        "/api/v2/nodes/validate-credentials",
         json={
             "host": "ssh-server",
             "port": 2222,
@@ -46,7 +46,7 @@ def test_validate_credentials_connection_refused(
 ) -> None:
     """Returns unreachable for unreachable host."""
     resp = e2e_client.post(
-        "/api/v1/nodes/validate-credentials",
+        "/api/v2/nodes/validate-credentials",
         json={
             "host": "192.0.2.1",
             "port": 19999,
@@ -61,9 +61,9 @@ def test_validate_credentials_connection_refused(
 
 
 def test_validate_credentials_validation_error(e2e_client: httpx.Client) -> None:
-    """POST /api/v1/nodes/validate-credentials returns 422 for invalid input."""
+    """POST /api/v2/nodes/validate-credentials returns 422 for invalid input."""
     resp = e2e_client.post(
-        "/api/v1/nodes/validate-credentials",
+        "/api/v2/nodes/validate-credentials",
         json={},
     )
     assert resp.status_code == 422
