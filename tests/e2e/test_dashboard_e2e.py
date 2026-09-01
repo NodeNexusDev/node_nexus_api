@@ -6,7 +6,10 @@ import pytest
 from tests.e2e.helpers.nodes import wait_for_audit as _wait_for_audit
 from tests.e2e.helpers.resources import UniqueResourceFactory
 
-pytestmark = pytest.mark.docker
+pytestmark = [
+    pytest.mark.docker,
+    pytest.mark.skip(reason="dashboard removed in 2.0"),
+]
 
 
 def test_dashboard_returns_200(e2e_client: httpx.Client) -> None:

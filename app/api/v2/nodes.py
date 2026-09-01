@@ -113,7 +113,7 @@ async def list_nodes(
     """
     tag_list = [tag] if tag else None
     decoded: tuple[datetime, uuid.UUID] | None = None
-    if cursor is not None:
+    if cursor is not None and cursor != "":
         try:
             decoded = decode_cursor(cursor)
         except ValueError:
@@ -467,7 +467,7 @@ async def get_node_status_history(
         limit=limit,
     )
     offset = 0
-    if cursor is not None:
+    if cursor is not None and cursor != "":
         try:
             offset = _decode_offset(cursor)
         except ValueError:

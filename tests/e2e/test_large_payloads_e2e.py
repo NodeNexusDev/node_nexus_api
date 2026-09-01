@@ -106,11 +106,12 @@ def test_many_nodes_pagination(e2e_client: httpx.Client) -> None:
             assert resp.status_code == 201
             node_ids.append(resp.json()["id"])
 
-        # Verify pagination
-        resp = e2e_client.get("/api/v2/nodes/?size=100")
+        # Verify pagination — CursorPage
+        resp = e2e_client.get("/api/v2/nodes/?limit=100")
         assert resp.status_code == 200
         data = resp.json()
-        assert data["total"] >= 50
+        assert len(data["items"]) >= 50
+        assert data["limit"] == 100
         # All created nodes should be findable
         names = {n["name"] for n in data["items"]}
         for i in range(50):

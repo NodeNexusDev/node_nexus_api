@@ -35,17 +35,18 @@ def test_crud_full_cycle(e2e_client: httpx.Client) -> None:
     assert resp.status_code == 200
     assert resp.json()["name"] == "e2e-node"
 
-    # Read all — verify PaginatedResponse structure
+    # Read all — verify CursorPage structure
     resp = e2e_client.get("/api/v2/nodes/")
     assert resp.status_code == 200
     data = resp.json()
     assert "items" in data
-    assert "total" in data
-    assert "page" in data
-    assert "size" in data
+    assert "next_cursor" in data
+    assert "has_more" in data
+    assert "limit" in data
     assert isinstance(data["items"], list)
-    assert isinstance(data["total"], int)
-    assert data["total"] >= 1
+    assert isinstance(data["has_more"], bool)
+    assert len(data["items"]) >= 1
+    assert data["limit"] >= 1
 
     # Update
     resp = e2e_client.patch(
@@ -295,13 +296,14 @@ def test_pagination_page2(e2e_client: httpx.Client) -> None:
         )
         created.append(resp.json()["id"])
 
-    resp = e2e_client.get("/api/v2/nodes/?page=1&size=2")
+    resp = e2e_client.get("/api/v2/nodes/?cursor=&limit=2")
     assert resp.status_code == 200
     data = resp.json()
     assert len(data["items"]) == 2
-    assert data["total"] >= 3
-    assert data["page"] == 1
-    assert data["size"] == 2
+    assert "has_more" in data
+    assert "next_cursor" in data
+    assert data["has_more"] is True
+    assert data["limit"] == 2
 
     for node_id in created:
         e2e_client.delete(f"/api/v2/nodes/{node_id}")
@@ -588,7 +590,9 @@ def test_node_filter_empty_result(
 
     resp = e2e_client.get("/api/v2/nodes/?search=nonexistent")
     assert resp.status_code == 200
-    assert resp.json()["total"] == 0
+    data = resp.json()
+    assert len(data["items"]) == 0
+    assert data["has_more"] is False
 
 
 # ---------------------------------------------------------------------------

@@ -28,7 +28,7 @@ class TestRequestIdAndErrors:
 
     def test_request_id_in_422_body(self, e2e_client: httpx.Client) -> None:
         """Validation errors include the request id in the body."""
-        resp = e2e_client.post("/api/v2/nodes/", json={"name": "x"})
+        resp = e2e_client.post("/api/v2/nodes/", json={"items": [{"name": "x"}]})
         assert resp.status_code == 422
         assert "x-request-id" in resp.headers
         body = resp.json()
@@ -168,22 +168,31 @@ class TestDockerNegativePaths:
 
 @pytest.mark.e2e_slow
 class TestDockerBulk:
-    """Edge cases for bulk Docker operations."""
+    """Edge cases for bulk Docker operations (vert bulk)."""
 
-    def test_docker_bulk_start_empty_request(self, e2e_client: httpx.Client) -> None:
-        """Bulk start with no nodes/tags is rejected with 422."""
+    def test_docker_bulk_start_empty_request(
+        self,
+        e2e_client: httpx.Client,
+        e2e_resources: UniqueResourceFactory,
+    ) -> None:
+        """Vert bulk start with empty container_ids is rejected with 422."""
+        node = e2e_resources.create_docker_node()
         resp = e2e_client.post(
-            "/api/v2/docker/bulk/start",
-            json={"node_ids": [], "container_id": "ctr"},
+            f"/api/v2/nodes/{node['id']}/docker/containers/starts",
+            json={"container_ids": []},
         )
         assert resp.status_code == 422
-        assert "node_ids or node_tags" in resp.text
 
-    def test_docker_bulk_exec_requires_command(self, e2e_client: httpx.Client) -> None:
-        """Bulk exec without a command is rejected."""
+    def test_docker_bulk_exec_requires_command(
+        self,
+        e2e_client: httpx.Client,
+        e2e_resources: UniqueResourceFactory,
+    ) -> None:
+        """Vert bulk exec without container_ids is rejected."""
+        node = e2e_resources.create_docker_node()
         resp = e2e_client.post(
-            "/api/v2/docker/bulk/exec",
-            json={"node_ids": [], "container_id": "ctr"},
+            f"/api/v2/nodes/{node['id']}/docker/containers/executions",
+            json={"container_ids": [], "command": ""},
         )
         assert resp.status_code == 422
 
@@ -192,7 +201,7 @@ class TestDockerBulk:
         e2e_client: httpx.Client,
         e2e_resources: UniqueResourceFactory,
     ) -> None:
-        """Bulk start resolves only nodes with matching tags."""
+        """Vert bulk start resolves container via container_ids (not tags)."""
         n1 = e2e_resources.create_docker_node(name="bulk-tag-1", tags=["bulk-zone"])
         n2 = e2e_resources.create_docker_node(name="bulk-tag-2", tags=["other-zone"])
         try:
@@ -219,18 +228,16 @@ class TestDockerBulk:
             )
 
             resp = e2e_client.post(
-                "/api/v2/docker/bulk/start",
+                f"/api/v2/nodes/{n1['id']}/docker/containers/starts",
                 json={
-                    "node_ids": [],
-                    "container_id": container_name,
-                    "node_tags": ["bulk-zone"],
+                    "container_ids": [container_name],
                 },
             )
-            assert resp.status_code == 200, resp.text
+            assert resp.status_code in (200, 207), resp.text
             data = resp.json()
             assert data["total"] == 1
             assert data["succeeded"] == 1
-            assert data["results"][0]["node_id"] == n1["id"]
+            assert data["results"][0]["container_id"] == container_name
 
             e2e_client.delete(
                 f"/api/v2/nodes/{n1['id']}/docker/containers/{container_name}?force=true"

@@ -135,7 +135,7 @@ async def list_commands(
     """
     tag_list = [tag] if tag else None
     offset = 0
-    if cursor is not None:
+    if cursor is not None and cursor != "":
         try:
             offset = _decode_offset(cursor)
         except ValueError:
@@ -224,7 +224,7 @@ async def get_command_history(
         "api.v2.commands.history", node_id=str(node_id), cursor=cursor, limit=limit
     )  # noqa: E501
     offset = 0
-    if cursor is not None:
+    if cursor is not None and cursor != "":
         try:
             offset = _decode_offset(cursor)
         except ValueError:
@@ -513,7 +513,7 @@ async def get_executions_history(
         limit=limit,
     )  # noqa: E501
     offset = 0
-    if cursor is not None:
+    if cursor is not None and cursor != "":
         try:
             offset = _decode_offset(cursor)
         except ValueError:

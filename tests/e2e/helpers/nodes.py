@@ -35,14 +35,52 @@ def _deprecation_warning(function_name: str) -> None:
     )
 
 
+def _unwrap_node_bulk(
+    response: httpx.Response,
+    payload: dict[str, object],
+) -> UnvalidatedJsonObject:
+    """Unwrap bulk-first node creation (201/207) with legacy single fallback."""
+    assert response.status_code in (200, 201, 207), (
+        f"Expected 200/201/207, got {response.status_code}: {response.text}"
+    )
+    data = response.json()
+    if isinstance(data, dict) and "results" in data:
+        results = data["results"]
+        assert isinstance(results, list) and results, f"Empty results: {data}"
+        first = results[0]
+        assert isinstance(first, dict), f"Expected dict, got {first}"
+        if first.get("status") == "error":
+            raise AssertionError(f"Bulk create failed: {first.get('error')} {data}")
+        raw_id = first.get("node_id") or first.get("id")
+        assert raw_id is not None, f"Missing id in {first}"
+        nid = str(raw_id)
+        compat: UnvalidatedJsonObject = dict(payload)
+        compat["id"] = nid
+        for k, v in first.items():
+            if k not in compat:
+                compat[k] = v
+        compat["id"] = nid
+        if "node_id" not in compat:
+            compat["node_id"] = nid
+        return compat
+    assert response.status_code == 201, (
+        f"Expected 201, got {response.status_code}: {response.text}"
+    )
+    assert isinstance(data, dict)
+    return data  # type: ignore[return-value]
+
+
 def create_node(e2e_client: httpx.Client, **overrides: object) -> UnvalidatedJsonObject:
     """Create a basic node for tests."""
     _deprecation_warning("create_node")
     data = {**_NODE_PAYLOAD, **overrides}
     data.setdefault("name", f"e2e-node-{uuid4().hex[:8]}")
-    resp = e2e_client.post("/api/v2/nodes/", json=data)
-    assert resp.status_code == 201
-    return resp.json()
+    resp = e2e_client.post("/api/v2/nodes/", json={"items": [data]})
+    if resp.status_code == 422:
+        alt = e2e_client.post("/api/v2/nodes/", json=data)
+        if alt.status_code in (200, 201, 207):
+            resp = alt
+    return _unwrap_node_bulk(resp, data)
 
 
 def create_ssh_node(
@@ -70,9 +108,12 @@ def create_ssh_node(
         "password": SSH_PASSWORD,
     }
     data.update(overrides)
-    resp = e2e_client.post("/api/v2/nodes/", json=data)
-    assert resp.status_code == 201
-    return resp.json()
+    resp = e2e_client.post("/api/v2/nodes/", json={"items": [data]})
+    if resp.status_code == 422:
+        alt = e2e_client.post("/api/v2/nodes/", json=data)
+        if alt.status_code in (200, 201, 207):
+            resp = alt
+    return _unwrap_node_bulk(resp, data)
 
 
 def create_docker_node(
@@ -94,9 +135,12 @@ def create_docker_node(
         "docker_host": DOCKER_HOST,
     }
     data.update(overrides)
-    resp = e2e_client.post("/api/v2/nodes/", json=data)
-    assert resp.status_code == 201
-    return resp.json()
+    resp = e2e_client.post("/api/v2/nodes/", json={"items": [data]})
+    if resp.status_code == 422:
+        alt = e2e_client.post("/api/v2/nodes/", json=data)
+        if alt.status_code in (200, 201, 207):
+            resp = alt
+    return _unwrap_node_bulk(resp, data)
 
 
 def wait_for_audit(
@@ -113,22 +157,82 @@ def wait_for_audit(
     Never filters by *action* server-side — fetches all records (optionally
     scoped to *node_id*) and checks *action* locally so ``data["total"]``
     reflects the full count the caller expects.
+
+    Supports cursor pagination (``CursorPage`` with ``items``, ``next_cursor``,
+    ``has_more``, ``limit``) and falls back to legacy ``total``/``page``/``size``.
     """
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
-        params: dict[str, str | int] = {"page": 1, "size": 100}
-        if node_id:
-            params["node_id"] = node_id
-        if query:
-            response = client.get(f"/api/v2/audit/{query}", params=params)
-        else:
-            response = client.get("/api/v2/audit/", params=params)
-        assert response.status_code == 200
-        data = response.json()
-        if data["total"] >= minimum_total:
-            items = data["items"]
-            if action is None or any(i["action"] == action for i in items):
-                return data
+        # Collect all pages via cursor pagination
+        all_items: list[UnvalidatedJsonObject] = []
+        cursor: str | None = None
+        has_more = True
+        next_cursor: str | None = None
+        limit = 100
+        # Legacy total seen (if API still returns it)
+        legacy_total: int | None = None
+        # Paginate until exhausted or early exit condition met
+        while has_more:
+            params: dict[str, str | int] = {"limit": limit}
+            if cursor is not None:
+                params["cursor"] = cursor
+            if node_id:
+                params["node_id"] = node_id
+            if query:
+                response = client.get(f"/api/v2/audit/{query}", params=params)
+            else:
+                response = client.get("/api/v2/audit/", params=params)
+            assert response.status_code == 200
+            data = response.json()
+            # Legacy shape: PaginatedResponse with total/page/size
+            if "has_more" not in data and "next_cursor" not in data:
+                # Single-page legacy fallback
+                items = data.get("items", [])
+                if isinstance(items, list):
+                    all_items.extend(items)  # type: ignore[arg-type]
+                legacy_total = int(data.get("total", len(all_items)))
+                has_more = False
+                next_cursor = None
+                break
+            items = data.get("items", [])
+            if isinstance(items, list):
+                all_items.extend(items)  # type: ignore[arg-type]
+            next_cursor = data.get("next_cursor")
+            has_more = bool(data.get("has_more", False))
+            limit = int(data.get("limit", limit))
+            if not has_more or not next_cursor:
+                has_more = False
+                break
+            cursor = str(next_cursor)
+            # Early exit if we already satisfy condition to avoid extra pages
+            if len(all_items) >= minimum_total and (
+                action is None or any(i.get("action") == action for i in all_items)
+            ):
+                # Collecting enough items already, but ensure we break pagination
+                # only if caller won't need total count beyond this page.
+                # Keep current has_more/next_cursor for synthesis.
+                break
+            # Safety guard
+            if len(all_items) > 10000:
+                has_more = False
+                break
+
+        # Use collected length for minimum_total check;
+        # for legacy keep original total semantics.
+        effective_total = len(all_items) if legacy_total is None else legacy_total
+        if effective_total >= minimum_total:
+            if action is None or any(i.get("action") == action for i in all_items):
+                # Synthesize backward-compatible response for tests expecting
+                # ``total``/``page``/``size`` plus cursor fields.
+                return {
+                    "items": all_items,
+                    "total": effective_total,
+                    "page": 1,
+                    "size": len(all_items),
+                    "has_more": has_more,
+                    "next_cursor": next_cursor,
+                    "limit": limit,
+                }
         time.sleep(0.2)
     raise AssertionError(
         f"audit event was not delivered: action={action}, query={query}"

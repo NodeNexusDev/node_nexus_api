@@ -75,7 +75,7 @@ async def list_audit_logs(
 ) -> CursorPage[AuditLogResponse]:
     """List audit logs with cursor pagination and optional filters."""
     offset = 0
-    if cursor is not None:
+    if cursor is not None and cursor != "":
         try:
             offset = _decode_offset(cursor)
         except ValueError:
@@ -190,7 +190,7 @@ async def export_audit(
     )
     rows = await exporter.export_audit(query)
     offset = 0
-    if cursor is not None:
+    if cursor is not None and cursor != "":
         try:
             offset = _decode_offset(cursor)
         except ValueError:

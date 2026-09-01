@@ -35,7 +35,7 @@ def test_mutating_request_creates_audit_log(
     e2e_resources: UniqueResourceFactory,
 ) -> None:
     """A mutating request produces both an outbox record and an audit log."""
-    total_before = e2e_client.get("/api/v2/audit/").json()["total"]
+    total_before = len(e2e_client.get("/api/v2/audit/?limit=100").json()["items"])
     node = e2e_resources.create_ssh_node()
 
     data = _wait_for_audit(e2e_client, action="create", minimum_total=total_before + 1)
@@ -334,9 +334,10 @@ def test_audit_log_endpoint(
     e2e_resources.create_node(name="audit-probe")
     data = _wait_for_audit(e2e_client)
 
-    assert "items" in data and "total" in data
-    assert "page" in data and "size" in data
-    assert data["total"] >= 1
+    assert "items" in data
+    assert "next_cursor" in data and "has_more" in data
+    assert "limit" in data
+    assert len(data["items"]) >= 1
 
     log = data["items"][0]
     assert "id" in log
@@ -365,7 +366,7 @@ def test_audit_logs_track_crud_operations(
 
     # delete action recorded — ON DELETE SET NULL nullifies node_id,
     # so query by action instead of node_id.
-    total_before = e2e_client.get("/api/v2/audit/").json()["total"]
+    total_before = len(e2e_client.get("/api/v2/audit/?limit=100").json()["items"])
     e2e_client.delete(f"/api/v2/nodes/{node_id}")
     data = _wait_for_audit(e2e_client, action="delete", minimum_total=total_before + 1)
     all_actions = [log["action"] for log in data["items"]]
@@ -380,7 +381,7 @@ def test_delete_creates_audit_log_and_removes_node(
     node = e2e_resources.create_node(name="audit-fk-regression")
     node_id = node["id"]
 
-    total_before = e2e_client.get("/api/v2/audit/").json()["total"]
+    total_before = len(e2e_client.get("/api/v2/audit/?limit=100").json()["items"])
     resp = e2e_client.delete(f"/api/v2/nodes/{node_id}")
     assert resp.status_code == 204
 
@@ -402,9 +403,9 @@ def test_audit_log_filter_by_action(
     e2e_resources.create_node(name="audit-filter")
     _wait_for_audit(e2e_client, action="create")
 
-    resp = e2e_client.get("/api/v2/audit/?action=create")
+    resp = e2e_client.get("/api/v2/audit/?action=create&limit=100")
     assert resp.status_code == 200
-    assert resp.json()["total"] >= 1
+    assert len(resp.json()["items"]) >= 1
     for log in resp.json()["items"]:
         assert log["action"] == "create"
 
@@ -418,14 +419,15 @@ def test_audit_log_pagination(
         e2e_resources.create_node(name=f"audit-page-{i}")
 
     data = _wait_for_audit(e2e_client, minimum_total=3)
-    assert data["total"] >= 3
+    assert len(data["items"]) >= 3
 
-    resp = e2e_client.get("/api/v2/audit/?page=1&size=2")
+    resp = e2e_client.get("/api/v2/audit/?cursor=&limit=2")
     assert resp.status_code == 200
     data = resp.json()
     assert len(data["items"]) == 2
-    assert data["page"] == 1
-    assert data["size"] == 2
+    assert data["limit"] == 2
+    assert "has_more" in data
+    assert "next_cursor" in data
 
 
 def test_audit_log_combined_filters(
@@ -440,7 +442,7 @@ def test_audit_log_combined_filters(
         node_id=node_id,
         action="create",
     )
-    assert data["total"] >= 1
+    assert len(data["items"]) >= 1
     for log in data["items"]:
         assert log["action"] == "create"
         # node_id may be null for deleted nodes, but for existing ones it matches
@@ -461,7 +463,7 @@ def test_audit_log_filter_by_user(
     # Create nodes to generate audit entries with user info
     e2e_resources.create_node(name="audit-user-filter")
     data = _wait_for_audit(e2e_client, action="create")
-    assert data["total"] >= 1
+    assert len(data["items"]) >= 1
 
     # Filter by user — audit events have user set from the API key
     resp = e2e_client.get("/api/v2/audit/?user=e2e-master-key-12345")
@@ -481,17 +483,18 @@ def test_audit_log_filter_by_date_range(
 
     # Filter with a wide date range that includes all records
     resp = e2e_client.get(
-        "/api/v2/audit/?date_from=2020-01-01T00:00:00&date_to=2030-12-31T23:59:59"
+        "/api/v2/audit/?date_from=2020-01-01T00:00:00&date_to=2030-12-31T23:59:59&limit=100"
     )
     assert resp.status_code == 200
-    assert resp.json()["total"] >= 1
+    assert len(resp.json()["items"]) >= 1
 
     # Filter with a narrow range that excludes everything
     resp = e2e_client.get(
-        "/api/v2/audit/?date_from=2099-01-01T00:00:00&date_to=2099-12-31T23:59:59"
+        "/api/v2/audit/?date_from=2099-01-01T00:00:00&date_to=2099-12-31T23:59:59&limit=100"
     )
     assert resp.status_code == 200
-    assert resp.json()["total"] == 0
+    assert len(resp.json()["items"]) == 0
+    assert resp.json()["has_more"] is False
 
 
 def test_audit_log_filter_by_action_and_date(
@@ -504,10 +507,10 @@ def test_audit_log_filter_by_action_and_date(
 
     resp = e2e_client.get(
         "/api/v2/audit/?action=create"
-        "&date_from=2020-01-01T00:00:00&date_to=2030-12-31T23:59:59"
+        "&date_from=2020-01-01T00:00:00&date_to=2030-12-31T23:59:59&limit=100"
     )
     assert resp.status_code == 200
-    assert resp.json()["total"] >= 1
+    assert len(resp.json()["items"]) >= 1
     for log in resp.json()["items"]:
         assert log["action"] == "create"
 

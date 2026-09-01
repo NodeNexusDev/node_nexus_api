@@ -6,12 +6,29 @@ import pytest
 pytestmark = pytest.mark.docker
 
 
+def _unwrap_node_id(resp: httpx.Response) -> str:
+    data = resp.json()
+    if isinstance(data, dict) and "results" in data:
+        first = data["results"][0]
+        return str(first.get("node_id") or first.get("id"))
+    return str(data["id"])
+
+
+def _unwrap_command_id(resp: httpx.Response) -> str:
+    data = resp.json()
+    if isinstance(data, dict) and "results" in data:
+        first = data["results"][0]
+        return str(first.get("id") or first.get("node_id"))
+    return str(data["id"])
+
+
 def test_config_export(e2e_client: httpx.Client) -> None:
     """GET /api/v2/config/export returns all data."""
     resp = e2e_client.get("/api/v2/config/export")
     assert resp.status_code == 200
     data = resp.json()
-    assert "version" in data
+    assert "format_version" in data
+    assert "application_version" in data
     assert "exported_at" in data
     assert isinstance(data["nodes"], list)
     assert isinstance(data["commands"], list)
@@ -23,15 +40,19 @@ def test_config_export_excludes_secrets(e2e_client: httpx.Client) -> None:
     resp = e2e_client.post(
         "/api/v2/nodes/",
         json={
-            "name": "export-secret-node",
-            "host": "10.0.0.99",
-            "port": 22,
-            "connection_type": "ssh",
-            "password": "secret123",
+            "items": [
+                {
+                    "name": "export-secret-node",
+                    "host": "10.0.0.99",
+                    "port": 22,
+                    "connection_type": "ssh",
+                    "password": "secret123",
+                }
+            ]
         },
     )
-    assert resp.status_code == 201
-    node_id = resp.json()["id"]
+    assert resp.status_code in (200, 201, 207)
+    node_id = _unwrap_node_id(resp)
 
     try:
         resp = e2e_client.get("/api/v2/config/export")
@@ -70,11 +91,11 @@ def test_config_import(e2e_client: httpx.Client) -> None:
     assert result["commands_created"] >= 1
 
     # Cleanup — export doesn't include id, use list endpoints instead
-    resp = e2e_client.get("/api/v2/nodes/")
+    resp = e2e_client.get("/api/v2/nodes/?limit=100")
     for n in resp.json()["items"]:
         if n["name"] == "imported-e2e":
             e2e_client.delete(f"/api/v2/nodes/{n['id']}")
-    resp = e2e_client.get("/api/v2/commands/")
+    resp = e2e_client.get("/api/v2/commands/?limit=100")
     for c in resp.json()["items"]:
         if c["name"] == "imported-cmd-e2e":
             e2e_client.delete(f"/api/v2/commands/{c['id']}")
@@ -84,10 +105,10 @@ def test_config_import_skips_duplicates(e2e_client: httpx.Client) -> None:
     """Import skips items that already exist by name."""
     resp = e2e_client.post(
         "/api/v2/commands/",
-        json={"name": "dup-e2e-cmd", "command": "echo dup"},
+        json={"items": [{"name": "dup-e2e-cmd", "command": "echo dup"}]},
     )
-    assert resp.status_code == 201
-    cmd_id = resp.json()["id"]
+    assert resp.status_code in (200, 201, 207)
+    cmd_id = _unwrap_command_id(resp)
 
     try:
         resp = e2e_client.post(
@@ -108,21 +129,27 @@ def test_config_roundtrip_export_import(e2e_client: httpx.Client) -> None:
     node_resp = e2e_client.post(
         "/api/v2/nodes/",
         json={
-            "name": "rt-node",
-            "host": "10.0.0.200",
-            "port": 22,
-            "connection_type": "ssh",
+            "items": [
+                {
+                    "name": "rt-node",
+                    "host": "10.0.0.200",
+                    "port": 22,
+                    "connection_type": "ssh",
+                }
+            ]
         },
     )
-    assert node_resp.status_code == 201
-    node = node_resp.json()
+    assert node_resp.status_code in (200, 201, 207)
+    node_id = _unwrap_node_id(node_resp)
+    node = {"id": node_id}
 
     cmd_resp = e2e_client.post(
         "/api/v2/commands/",
-        json={"name": "rt-cmd", "command": "echo rt"},
+        json={"items": [{"name": "rt-cmd", "command": "echo rt"}]},
     )
-    assert cmd_resp.status_code == 201
-    cmd = cmd_resp.json()
+    assert cmd_resp.status_code in (200, 201, 207)
+    cmd_id = _unwrap_command_id(cmd_resp)
+    cmd = {"id": cmd_id}
 
     try:
         # 2. Export
@@ -152,21 +179,21 @@ def test_config_roundtrip_export_import(e2e_client: httpx.Client) -> None:
         assert any(c["name"] == "rt-cmd" for c in export2["commands"])
 
         # 6. Cleanup re-imported data
-        nodes_resp = e2e_client.get("/api/v2/nodes/")
+        nodes_resp = e2e_client.get("/api/v2/nodes/?limit=100")
         for n in nodes_resp.json()["items"]:
             if n["name"] == "rt-node":
                 e2e_client.delete(f"/api/v2/nodes/{n['id']}")
-        cmds_resp = e2e_client.get("/api/v2/commands/")
+        cmds_resp = e2e_client.get("/api/v2/commands/?limit=100")
         for c in cmds_resp.json()["items"]:
             if c["name"] == "rt-cmd":
                 e2e_client.delete(f"/api/v2/commands/{c['id']}")
     finally:
         # Ensure cleanup in case of mid-test failure
-        nodes_resp = e2e_client.get("/api/v2/nodes/")
+        nodes_resp = e2e_client.get("/api/v2/nodes/?limit=100")
         for n in nodes_resp.json()["items"]:
             if n["name"] == "rt-node":
                 e2e_client.delete(f"/api/v2/nodes/{n['id']}")
-        cmds_resp = e2e_client.get("/api/v2/commands/")
+        cmds_resp = e2e_client.get("/api/v2/commands/?limit=100")
         for c in cmds_resp.json()["items"]:
             if c["name"] == "rt-cmd":
                 e2e_client.delete(f"/api/v2/commands/{c['id']}")
@@ -175,7 +202,7 @@ def test_config_roundtrip_export_import(e2e_client: httpx.Client) -> None:
 def test_config_import_atomic_rollback(e2e_client: httpx.Client) -> None:
     """Invalid item in import payload causes atomic rollback — no partial data."""
     # Count existing nodes before import
-    before = e2e_client.get("/api/v2/nodes/").json()["total"]
+    before = len(e2e_client.get("/api/v2/nodes/?limit=100").json()["items"])
 
     # Payload: one valid node, one invalid (missing required fields)
     resp = e2e_client.post(
@@ -198,13 +225,13 @@ def test_config_import_atomic_rollback(e2e_client: httpx.Client) -> None:
     )
 
     # Verify no nodes were created
-    after = e2e_client.get("/api/v2/nodes/").json()["total"]
+    after = len(e2e_client.get("/api/v2/nodes/?limit=100").json()["items"])
     assert after == before, (
         f"Atomicity violation: {after - before} nodes leaked despite import error"
     )
 
     # Also verify "atomic-good" was NOT created
-    nodes = e2e_client.get("/api/v2/nodes/").json()["items"]
+    nodes = e2e_client.get("/api/v2/nodes/?limit=100").json()["items"]
     assert not any(n["name"] == "atomic-good" for n in nodes), (
         "Partial import: 'atomic-good' node was created despite payload error"
     )
@@ -234,7 +261,7 @@ def test_config_import_invalid_uuid(e2e_client: httpx.Client) -> None:
     )
 
     # Cleanup if node was created
-    after = e2e_client.get("/api/v2/nodes/").json()
+    after = e2e_client.get("/api/v2/nodes/?limit=100").json()
     for n in after["items"]:
         if n["name"] == "bad-uuid-node":
             e2e_client.delete(f"/api/v2/nodes/{n['id']}")
@@ -242,13 +269,13 @@ def test_config_import_invalid_uuid(e2e_client: httpx.Client) -> None:
 
 def test_config_import_unsupported_version(e2e_client: httpx.Client) -> None:
     """Import with unsupported version does not change DB."""
-    before_nodes = e2e_client.get("/api/v2/nodes/").json()["total"]
-    before_cmds = e2e_client.get("/api/v2/commands/").json()["total"]
+    before_nodes = len(e2e_client.get("/api/v2/nodes/?limit=100").json()["items"])
+    before_cmds = len(e2e_client.get("/api/v2/commands/?limit=100").json()["items"])
 
     resp = e2e_client.post(
         "/api/v2/config/import",
         json={
-            "version": 999,
+            "format_version": "99.0",
             "nodes": [
                 {
                     "name": "v999-node",
@@ -264,8 +291,8 @@ def test_config_import_unsupported_version(e2e_client: httpx.Client) -> None:
         f"Expected error for unsupported version, got {resp.status_code}: {resp.text}"
     )
 
-    after_nodes = e2e_client.get("/api/v2/nodes/").json()["total"]
-    after_cmds = e2e_client.get("/api/v2/commands/").json()["total"]
+    after_nodes = len(e2e_client.get("/api/v2/nodes/?limit=100").json()["items"])
+    after_cmds = len(e2e_client.get("/api/v2/commands/?limit=100").json()["items"])
     assert after_nodes == before_nodes, "Nodes changed despite unsupported version"
     assert after_cmds == before_cmds, "Commands changed despite unsupported version"
 
@@ -277,7 +304,7 @@ def test_config_import_unsupported_version(e2e_client: httpx.Client) -> None:
 
 def test_config_import_dry_run(e2e_client: httpx.Client) -> None:
     """POST /api/v2/config/import with dry_run=true returns preview without writing."""
-    before_nodes = e2e_client.get("/api/v2/nodes/").json()["total"]
+    before_nodes = len(e2e_client.get("/api/v2/nodes/?limit=100").json()["items"])
 
     resp = e2e_client.post(
         "/api/v2/config/import",
@@ -308,7 +335,7 @@ def test_config_import_dry_run(e2e_client: httpx.Client) -> None:
     assert data["errors"] == []
 
     # Verify nothing was actually created
-    after_nodes = e2e_client.get("/api/v2/nodes/").json()["total"]
+    after_nodes = len(e2e_client.get("/api/v2/nodes/?limit=100").json()["items"])
     assert after_nodes == before_nodes
 
 
@@ -318,14 +345,18 @@ def test_config_import_dry_run_reports_duplicates(e2e_client: httpx.Client) -> N
     resp = e2e_client.post(
         "/api/v2/nodes/",
         json={
-            "name": "dry-dup-node",
-            "host": "10.0.0.61",
-            "port": 22,
-            "connection_type": "ssh",
+            "items": [
+                {
+                    "name": "dry-dup-node",
+                    "host": "10.0.0.61",
+                    "port": 22,
+                    "connection_type": "ssh",
+                }
+            ]
         },
     )
-    assert resp.status_code == 201
-    node_id = resp.json()["id"]
+    assert resp.status_code in (200, 201, 207)
+    node_id = _unwrap_node_id(resp)
 
     try:
         resp = e2e_client.post(
@@ -391,16 +422,20 @@ def test_config_export_includes_docker_host(e2e_client: httpx.Client) -> None:
     resp = e2e_client.post(
         "/api/v2/nodes/",
         json={
-            "name": "docker-host-export",
-            "host": "10.0.0.99",
-            "port": 22,
-            "connection_type": "ssh",
-            "has_docker": True,
-            "docker_host": "tcp://192.168.1.100:2375",
+            "items": [
+                {
+                    "name": "docker-host-export",
+                    "host": "10.0.0.99",
+                    "port": 22,
+                    "connection_type": "ssh",
+                    "has_docker": True,
+                    "docker_host": "tcp://192.168.1.100:2375",
+                }
+            ]
         },
     )
-    assert resp.status_code == 201
-    node_id = resp.json()["id"]
+    assert resp.status_code in (200, 201, 207)
+    node_id = _unwrap_node_id(resp)
 
     try:
         export = e2e_client.get("/api/v2/config/export").json()
@@ -420,16 +455,20 @@ def test_config_round_trip_preserves_docker_host(
     resp = e2e_client.post(
         "/api/v2/nodes/",
         json={
-            "name": "docker-host-rt",
-            "host": "10.0.0.99",
-            "port": 22,
-            "connection_type": "ssh",
-            "has_docker": True,
-            "docker_host": "tcp://dind:2375",
+            "items": [
+                {
+                    "name": "docker-host-rt",
+                    "host": "10.0.0.99",
+                    "port": 22,
+                    "connection_type": "ssh",
+                    "has_docker": True,
+                    "docker_host": "tcp://dind:2375",
+                }
+            ]
         },
     )
-    assert resp.status_code == 201
-    node_id = resp.json()["id"]
+    assert resp.status_code in (200, 201, 207)
+    node_id = _unwrap_node_id(resp)
 
     try:
         export1 = e2e_client.get("/api/v2/config/export").json()
@@ -451,7 +490,7 @@ def test_config_round_trip_preserves_docker_host(
         reimported = next(n for n in export2["nodes"] if n["name"] == "docker-host-rt")
         assert reimported["docker_host"] == "tcp://dind:2375"
     finally:
-        nodes_resp = e2e_client.get("/api/v2/nodes/")
+        nodes_resp = e2e_client.get("/api/v2/nodes/?limit=100")
         for n in nodes_resp.json()["items"]:
             if n["name"] == "docker-host-rt":
                 e2e_client.delete(f"/api/v2/nodes/{n['id']}")

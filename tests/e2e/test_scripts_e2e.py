@@ -95,12 +95,14 @@ def test_script_crud_full_cycle(e2e_client: httpx.Client) -> None:
     assert resp.status_code == 200
     assert resp.json()["name"] == "script-create"
 
-    # Read all
+    # Read all — CursorPage
     resp = e2e_client.get("/api/v2/scripts/")
     assert resp.status_code == 200
     data = resp.json()
-    assert "items" in data and "total" in data
-    assert data["total"] >= 1
+    assert "items" in data and "has_more" in data
+    assert "next_cursor" in data
+    assert "limit" in data
+    assert len(data["items"]) >= 1
 
     # Update
     resp = e2e_client.patch(
@@ -217,11 +219,14 @@ def test_script_executions_history(
         json={"node_ids": [node["id"]], "params": {}},
     )
 
-    # Check history
+    # Check history — CursorPage
     resp = e2e_client.get(f"/api/v2/scripts/{script['id']}/executions")
     assert resp.status_code == 200
     data = resp.json()
-    assert data["total"] >= 1
+    assert len(data["items"]) >= 1
+    assert "has_more" in data
+    assert "next_cursor" in data
+    assert "limit" in data
     execution = data["items"][0]
     assert execution["status"] == "success"
     assert execution["node_id"] == node["id"]
@@ -243,13 +248,14 @@ def test_script_pagination(e2e_client: httpx.Client) -> None:
         script = _create_script(e2e_client, name=f"page-script-{i}")
         created.append(script["id"])
 
-    resp = e2e_client.get("/api/v2/scripts/?page=1&size=2")
+    resp = e2e_client.get("/api/v2/scripts/?cursor=&limit=2")
     assert resp.status_code == 200
     data = resp.json()
     assert len(data["items"]) == 2
-    assert data["total"] >= 3
-    assert data["page"] == 1
-    assert data["size"] == 2
+    assert "has_more" in data
+    assert "next_cursor" in data
+    assert data["has_more"] is True
+    assert data["limit"] == 2
 
     for script_id in created:
         e2e_client.delete(f"/api/v2/scripts/{script_id}")
@@ -677,7 +683,7 @@ def test_scheduler_executes_script_on_cron(e2e_client: httpx.Client) -> None:
             if resp.status_code != 200:
                 return False
             data = resp.json()
-            if data.get("total", 0) == 0:
+            if len(data.get("items", [])) == 0:
                 return False
             exec_item = data["items"][0]
             return bool(exec_item["status"] == "success")
@@ -692,7 +698,7 @@ def test_scheduler_executes_script_on_cron(e2e_client: httpx.Client) -> None:
         history = e2e_client.get(f"/api/v2/scripts/{script['id']}/executions")
         assert history.status_code == 200
         data = history.json()
-        assert data["total"] == 1
+        assert len(data["items"]) == 1
         exec_item = data["items"][0]
         assert exec_item["started_at"] is not None
         assert exec_item["finished_at"] is not None
@@ -759,7 +765,7 @@ def test_scheduler_records_failed_execution(e2e_client: httpx.Client) -> None:
             resp = e2e_client.get(f"/api/v2/scripts/{script['id']}/executions")
             if resp.status_code != 200:
                 return False
-            return bool(resp.json().get("total", 0) > 0)
+            return bool(len(resp.json().get("items", [])) > 0)
 
         wait_for_condition(
             _execution_recorded,

@@ -432,7 +432,7 @@ async def list_scripts(
     """
     tag_list = [tag] if tag else None
     offset = 0
-    if cursor is not None:
+    if cursor is not None and cursor != "":
         try:
             offset = _decode_offset(cursor)
         except ValueError:
@@ -525,7 +525,7 @@ async def get_executions(
         limit=limit,
     )
     offset = 0
-    if cursor is not None:
+    if cursor is not None and cursor != "":
         try:
             offset = _decode_offset(cursor)
         except ValueError:
@@ -563,7 +563,7 @@ async def get_scheduled_execution_history(
         limit=limit,
     )
     offset = 0
-    if cursor is not None:
+    if cursor is not None and cursor != "":
         try:
             offset = _decode_offset(cursor)
         except ValueError:
