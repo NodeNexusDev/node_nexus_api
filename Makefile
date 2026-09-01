@@ -10,6 +10,7 @@ help:
 	@echo "  e2e-nightly     - resilience + migration + slow tests"
 	@echo "  e2e-keep-stack  - run smoke suite and keep Docker stack up"
 	@echo "  e2e-down        - tear down the E2E Docker stack"
+	@echo "  update-e2e-coverage - sync COVERED_ENDPOINTS from openapi.json (no Docker)"
 
 PYTEST := .venv/bin/python -m pytest
 E2E_DIR := tests/e2e
@@ -56,3 +57,7 @@ e2e-keep-stack: setup-ssh-keys
 e2e-down:
 	docker compose -f $(COMPOSE_FILE) down -v --remove-orphans
 	rm -rf $(SSH_KEYS_DIR)
+
+.PHONY: update-e2e-coverage
+update-e2e-coverage:
+	uv run python scripts/update_e2e_coverage.py

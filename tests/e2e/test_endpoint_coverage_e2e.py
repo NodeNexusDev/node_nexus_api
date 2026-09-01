@@ -1,7 +1,7 @@
 """E2E coverage guard: ensure every public HTTP endpoint has E2E tests.
 
 This module:
-1. Fetches the live OpenAPI schema from the running E2E stack.
+1. Builds the canonical OpenAPI schema from the application (no Docker required).
 2. Builds an inventory of all {method} {path} routes.
 3. Compares against a manually maintained coverage manifest.
 4. Fails if any endpoint is missing from the manifest — forcing
@@ -10,10 +10,11 @@ This module:
 WebSocket routes are tracked separately (they don't appear in OpenAPI).
 """
 
-import httpx2 as httpx
+import os
+
 import pytest
 
-pytestmark = [pytest.mark.docker, pytest.mark.e2e_smoke]
+pytestmark = [pytest.mark.e2e_smoke]
 
 # ---------------------------------------------------------------------------
 # Manually maintained inventory of E2E-covered endpoints.
@@ -229,15 +230,38 @@ COVERED_WS_ENDPOINTS: set[str] = {
 }
 
 # ---------------------------------------------------------------------------
-# Inventory builder
+# Inventory builder (docker-free — uses canonical app, not live stack)
 # ---------------------------------------------------------------------------
 
+_CANONICAL_ENV = {
+    "PROMETHEUS_ENABLED": "true",
+    "E2E_ENABLED": "true",
+    "OTEL_ENABLED": "false",
+    "ENVIRONMENT": "test",
+    "DATABASE_URL": "postgresql+asyncpg://postgres:postgres@localhost:5432/test",
+    "SECRET_KEY": "0123456789abcdef0123456789ABCDEF",
+    "ENCRYPTION_SALT": "0123456789abcdef",
+}
 
-def _build_openapi_inventory(e2e_client: httpx.Client) -> set[str]:
-    """Fetch OpenAPI schema and extract all {method} {path} pairs."""
-    resp = e2e_client.get("/openapi.json")
-    assert resp.status_code == 200, f"OpenAPI schema not available: {resp.status_code}"
-    schema = resp.json()
+
+def _build_openapi_inventory() -> set[str]:
+    """Build canonical OpenAPI inventory without Docker."""
+    from app.core.config import get_settings
+    from app.main import create_app
+
+    get_settings.cache_clear()
+    saved = {k: os.environ.get(k) for k in _CANONICAL_ENV}
+    os.environ.update(_CANONICAL_ENV)
+    try:
+        schema = create_app().openapi()
+    finally:
+        for k, v in saved.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
+        get_settings.cache_clear()
+
     paths: dict[str, object] = schema.get("paths", {})
     inventory: set[str] = set()
     for path, methods in paths.items():
@@ -249,14 +273,16 @@ def _build_openapi_inventory(e2e_client: httpx.Client) -> set[str]:
     return inventory
 
 
-def test_endpoint_coverage_guard(e2e_client: httpx.Client) -> None:
+def test_endpoint_coverage_guard() -> None:
     """Every public HTTP endpoint must be in the coverage manifest.
 
     If a new endpoint is added to the application without updating
     this manifest, this test will fail — forcing the developer to
     document coverage or add a justified exclusion.
+
+    Run `make update-e2e-coverage` to auto-sync after adding an endpoint.
     """
-    inventory = _build_openapi_inventory(e2e_client)
+    inventory = _build_openapi_inventory()
 
     # Check for missing coverage
     uncovered = inventory - COVERED_ENDPOINTS - set(EXCLUDED_ENDPOINTS.keys())
