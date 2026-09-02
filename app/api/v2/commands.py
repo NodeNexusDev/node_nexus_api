@@ -14,6 +14,7 @@ from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
 from fastapi import APIRouter, HTTPException, Query, Response, Security
 
 from app.api.deps import Principal, get_current_principal, require_write_or_jwt_scope
+from app.api.v2._bulk import set_bulk_status
 from app.application.dto.command_execution import BulkCommandRequestDTO
 from app.application.dto.command_management import (
     CommandCreateDTO,
@@ -195,8 +196,7 @@ async def bulk_create_commands(
     results = await asyncio.gather(*(_create_one(item) for item in data.items))
     succeeded = sum(1 for r in results if r.status == "success")
     failed = len(results) - succeeded
-    if failed > 0 and succeeded > 0:
-        response.status_code = 207
+    set_bulk_status(response, succeeded, failed)
     return BulkResult[CommandBulkCreateResult](
         total=len(results),
         succeeded=succeeded,
@@ -404,8 +404,7 @@ async def bulk_executions(
     flat: list[BulkExecutionItem] = [it for sub in nested for it in sub]
     succeeded = sum(1 for r in flat if r.status == "success")
     failed = len(flat) - succeeded
-    if failed > 0 and succeeded > 0:
-        response.status_code = 207
+    set_bulk_status(response, succeeded, failed)
     return BulkExecutionBatchResponse(
         batch_id=batch_id,
         total=len(flat),
@@ -481,8 +480,7 @@ async def bulk_raw_executions(
     flat: list[BulkExecutionItem] = [it for sub in nested for it in sub]
     succeeded = sum(1 for r in flat if r.status == "success")
     failed = len(flat) - succeeded
-    if failed > 0 and succeeded > 0:
-        response.status_code = 207
+    set_bulk_status(response, succeeded, failed)
     return BulkExecutionBatchResponse(
         batch_id=batch_id,
         total=len(flat),
@@ -582,8 +580,7 @@ async def bulk_retry_executions(
     )  # noqa: E501
     succeeded = sum(1 for r in results if r.status == "retry_scheduled")
     failed = len(results) - succeeded
-    if failed > 0 and succeeded > 0:
-        response.status_code = 207
+    set_bulk_status(response, succeeded, failed)
     return BulkResult[BulkRetryCommandResult](
         total=len(results),
         succeeded=succeeded,
@@ -624,8 +621,7 @@ async def bulk_cancel_executions(
     )  # noqa: E501
     succeeded = sum(1 for r in results if r.status == "cancelled")
     failed = len(results) - succeeded
-    if failed > 0 and succeeded > 0:
-        response.status_code = 207
+    set_bulk_status(response, succeeded, failed)
     return BulkResult[BulkCancelCommandResult](
         total=len(results),
         succeeded=succeeded,

@@ -92,6 +92,7 @@ markers = [
 ]
 filterwarnings = [
     "ignore::DeprecationWarning:starlette",
+    "ignore::RuntimeWarning",
 ]
 
 [tool.coverage.run]

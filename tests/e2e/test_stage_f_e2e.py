@@ -160,7 +160,7 @@ class TestExecutionStats:
         assert data["total"] >= 1, f"executions failed: {data}"
         assert data["succeeded"] >= 1, f"executions not succeeded: {data}"
 
-        # Poll stats until available (execution writes async, command_id now stored)
+        # Poll stats until available (execution writes async, command_id now indexed)
         stats = None
         for _ in range(10):
             resp = e2e_client.get(f"/api/v2/commands/{cmd['id']}/stats")
@@ -169,22 +169,6 @@ class TestExecutionStats:
             if stats["total"] >= 1:
                 break
             time.sleep(1)
-        # Fallback: verify via node stats if command_id stats still lagging
-        if stats is None or stats["total"] < 1:
-            for _ in range(5):
-                resp = e2e_client.get(
-                    "/api/v2/commands/stats", params={"node_id": node["id"]}
-                )
-                assert resp.status_code == 200, f"{resp.status_code} {resp.text}"
-                node_stats = resp.json()
-                if node_stats["total"] >= 1:
-                    # At least node stats shows execution, command stats may be delayed
-                    # Re-check command stats once more before failing
-                    resp = e2e_client.get(f"/api/v2/commands/{cmd['id']}/stats")
-                    stats = resp.json()
-                    if stats["total"] >= 1:
-                        break
-                time.sleep(1)
         assert stats is not None
         assert stats["total"] >= 1, f"stats not updated: {stats}"
         assert stats["successful"] >= 1, f"stats: {stats}"

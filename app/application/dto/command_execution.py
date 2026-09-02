@@ -31,6 +31,7 @@ class BulkCommandRequestDTO:
     node_ids: tuple[UUID, ...] = ()
     tags: tuple[str, ...] = ()
     command_id: UUID | None = None
+    timeout: int | None = None
 
 
 @dataclass(frozen=True, slots=True)

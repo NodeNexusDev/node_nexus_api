@@ -8,6 +8,8 @@ import uuid
 
 import httpx2 as httpx
 
+from tests.e2e.helpers.polling import wait_for_condition
+
 
 def ensure_image_pulled(
     e2e_client: httpx.Client,
@@ -70,4 +72,37 @@ def remove_test_container(
     # 204 = success, 404 = already gone — both acceptable
     assert resp.status_code in (204, 404), (
         f"Failed to remove container '{container_id}': {resp.status_code} {resp.text}"
+    )
+
+
+def wait_for_container_running(
+    e2e_client: httpx.Client,
+    node_id: str,
+    container_id: str,
+    timeout: float = 15.0,
+) -> None:
+    """Wait until container State.status == running."""
+
+    def _is_running() -> bool:
+        resp = e2e_client.get(
+            f"/api/v2/nodes/{node_id}/docker/containers/{container_id}"
+        )
+        if resp.status_code != 200:
+            return False
+        try:
+            data = resp.json()
+            if not isinstance(data, dict):
+                return False
+            state = data.get("State")
+            if not isinstance(state, dict):
+                return False
+            status = state.get("status")
+            if status == "running":
+                return True
+            return False
+        except Exception:
+            return False
+
+    wait_for_condition(
+        _is_running, timeout=timeout, description=f"{container_id} running"
     )

@@ -14,7 +14,8 @@ import os
 
 import pytest
 
-pytestmark = [pytest.mark.e2e_smoke]
+# No e2e marker — guard is docker-free and must not trigger DB isolation
+pytestmark: list[pytest.MarkDecorator] = []
 
 # ---------------------------------------------------------------------------
 # Manually maintained inventory of E2E-covered endpoints.
@@ -245,26 +246,51 @@ _CANONICAL_ENV = {
 
 
 def _build_openapi_inventory() -> set[str]:
-    """Build canonical OpenAPI inventory without Docker."""
-    from app.core.config import get_settings
-    from app.main import create_app
+    """Build canonical OpenAPI inventory without Docker.
 
-    get_settings.cache_clear()
-    saved = {k: os.environ.get(k) for k in _CANONICAL_ENV}
-    os.environ.update(_CANONICAL_ENV)
-    try:
-        schema = create_app().openapi()
-    finally:
-        for k, v in saved.items():
-            if v is None:
-                os.environ.pop(k, None)
-            else:
-                os.environ[k] = v
+    Uses cached openapi.snapshot.json if present (generated via
+    `make generate-openapi` or `uv run python scripts/generate_openapi_snapshot.py`),
+    otherwise builds via create_app().openapi() and caches.
+    """
+    import json
+    from pathlib import Path
+
+    snapshot = Path("scripts/openapi.snapshot.json")
+    schema: dict[str, object] | None = None
+    if snapshot.exists():
+        try:
+            schema = json.loads(snapshot.read_text(encoding="utf-8"))
+        except Exception:
+            schema = None
+    if schema is None:
+        from app.core.config import get_settings
+        from app.main import create_app
+
         get_settings.cache_clear()
+        saved = {k: os.environ.get(k) for k in _CANONICAL_ENV}
+        os.environ.update(_CANONICAL_ENV)
+        try:
+            schema = create_app().openapi()
+            # cache for next run
+            try:
+                snapshot.write_text(
+                    json.dumps(schema, indent=2, ensure_ascii=False),
+                    encoding="utf-8",
+                )
+            except Exception:
+                pass
+        finally:
+            for k, v in saved.items():
+                if v is None:
+                    os.environ.pop(k, None)
+                else:
+                    os.environ[k] = v
+            get_settings.cache_clear()
 
-    paths: dict[str, object] = schema.get("paths", {})
+    assert schema is not None
+    paths: dict[str, object] = schema.get("paths", {})  # type: ignore[assignment]
     inventory: set[str] = set()
-    for path, methods in paths.items():
+    for path, methods in paths.items():  # type: ignore[assignment]
         assert isinstance(methods, dict)
         for method in methods:
             if method in ("parameters", "servers", "description", "summary"):

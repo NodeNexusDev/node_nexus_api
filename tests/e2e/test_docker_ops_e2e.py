@@ -4,6 +4,7 @@ from datetime import UTC
 
 import pytest
 
+from tests.e2e.helpers.docker_test import wait_for_container_running
 from tests.e2e.helpers.polling import wait_for_condition
 from tests.e2e.helpers.resources import UniqueResourceFactory
 
@@ -584,30 +585,7 @@ def test_docker_container_exec_timeout_boundary(
             json={"node_ids": [node["id"]], "commands": [cmd]},
         )
 
-        # Wait for container to be running before exec (flaky in full suite)
-        def _is_running() -> bool:
-            resp = e2e_client.get(
-                f"/api/v2/nodes/{node['id']}/docker/containers/e2e-exec-t1"
-            )
-            if resp.status_code != 200:
-                return False
-            try:
-                data = resp.json()
-                if not isinstance(data, dict):
-                    return False
-                state = data.get("State")
-                if not isinstance(state, dict):
-                    return False
-                status = state.get("status")
-                if status == "running":
-                    return True
-                return False
-            except Exception:
-                return False
-
-        wait_for_condition(
-            _is_running, timeout=15.0, description="e2e-exec-t1 running"
-        )
+        wait_for_container_running(e2e_client, node["id"], "e2e-exec-t1", timeout=15.0)
 
         resp = e2e_client.post(
             f"/api/v2/nodes/{node['id']}/docker/containers/e2e-exec-t1/exec",

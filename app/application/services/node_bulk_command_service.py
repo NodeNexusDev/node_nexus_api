@@ -78,7 +78,10 @@ class NodeBulkCommandService:
                 )
 
         results = await asyncio.gather(
-            *(self._execute_on_single_node(node, data.command) for node in target_nodes)
+            *(
+                self._execute_on_single_node(node, data.command, timeout=data.timeout)
+                for node in target_nodes
+            )
         )
 
         finished_at = datetime.now(UTC)
@@ -173,11 +176,15 @@ class NodeBulkCommandService:
         self,
         node: NodeConnectionDTO,
         command: str,
+        timeout: int | None = None,
     ) -> CommandExecutionDTO:
         """Execute on one node and always return a result."""
         async with self._semaphore:
             connector = build_ssh_connector(
-                node, self._credential_cipher, self._connector_factory
+                node,
+                self._credential_cipher,
+                self._connector_factory,
+                timeout=timeout,
             )
 
             try:
