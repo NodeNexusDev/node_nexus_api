@@ -275,9 +275,7 @@ async def e2e_db_isolation(
     paused before truncation and resumed afterwards so that their concurrent
     locks cannot deadlock with the TRUNCATE statement.
     """
-    is_e2e = any(
-        request.node.get_closest_marker(marker) for marker in _E2E_MARKERS
-    )
+    is_e2e = any(request.node.get_closest_marker(marker) for marker in _E2E_MARKERS)
     if not is_e2e:
         yield
         return
