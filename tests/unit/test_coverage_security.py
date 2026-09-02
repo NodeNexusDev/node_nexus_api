@@ -166,3 +166,150 @@ class TestConfigServiceCoverage:
             dry_run=True,
         )
         importer.preview_import.assert_awaited_once()
+
+
+class TestJWTHandlerCoverage:
+    def test_encode_and_decode_access(self) -> None:
+        from app.adapters.security.jwt_handler import JWTHandlerAdapter
+
+        handler = JWTHandlerAdapter()
+        # Use test settings: SECRET_KEY len 32+
+        token = handler.encode_access_token(
+            user_id=str(uuid.uuid4()), email="test@example.com", is_superuser=True
+        )
+        payload = handler.decode_token(token, expected_type="access")
+        assert payload["email"] == "test@example.com"
+        assert payload["is_superuser"] is True
+        assert payload["type"] == "access"
+
+    def test_encode_and_decode_refresh(self) -> None:
+        from app.adapters.security.jwt_handler import JWTHandlerAdapter
+
+        handler = JWTHandlerAdapter()
+        token = handler.encode_refresh_token(user_id=str(uuid.uuid4()))
+        payload = handler.decode_token(token, expected_type="refresh")
+        assert payload["type"] == "refresh"
+
+    def test_decode_wrong_type_raises(self) -> None:
+        import jwt
+
+        from app.adapters.security.jwt_handler import JWTHandlerAdapter
+
+        handler = JWTHandlerAdapter()
+        token = handler.encode_access_token(
+            user_id=str(uuid.uuid4()), email="a@a.com", is_superuser=False
+        )
+        with pytest.raises(jwt.InvalidTokenError):
+            handler.decode_token(token, expected_type="refresh")
+
+    def test_hash_token(self) -> None:
+        from app.adapters.security.jwt_handler import JWTHandlerAdapter
+
+        handler = JWTHandlerAdapter()
+        h = handler.hash_token("mytoken")
+        assert len(h) == 64
+
+    def test_decode_unsupported_claim(self) -> None:
+        import jwt
+
+        from app.adapters.security.jwt_handler import JWTHandlerAdapter
+
+        handler = JWTHandlerAdapter()
+        # create token with unsupported claim type (list)
+        import datetime
+
+        settings = MagicMock()
+        settings.SECRET_KEY = "0123456789abcdef0123456789ABCDEF"
+        payload = {
+            "sub": str(uuid.uuid4()),
+            "type": "access",
+            "exp": datetime.datetime.now(datetime.UTC) + datetime.timedelta(minutes=5),
+            "iat": datetime.datetime.now(datetime.UTC),
+            "iss": "node-nexus-api",
+            "bad": ["unsupported"],
+        }
+        token = jwt.encode(payload, settings.SECRET_KEY, algorithm="HS256")
+        with patch(
+            "app.adapters.security.jwt_handler.get_settings", return_value=settings
+        ):
+            with pytest.raises(jwt.InvalidTokenError):
+                handler.decode_token(token, expected_type="access")
+
+
+class TestKnownHostsCoverage:
+    @pytest.mark.asyncio
+    async def test_ensure_directory_creates(self, tmp_path) -> None:
+        from app.adapters.runtime.known_hosts import FileKnownHostsManager
+
+        settings = MagicMock()
+        settings.SSH_KNOWN_HOSTS_PATH = str(tmp_path / ".ssh" / "known_hosts")
+        settings.SSH_KNOWN_HOSTS_FETCH_TIMEOUT = 10
+        settings.SSH_KNOWN_HOSTS_AUTO_ADD = False
+        mgr = FileKnownHostsManager(settings)
+        await mgr.ensure_directory()
+        assert (tmp_path / ".ssh" / "known_hosts").exists()
+
+    @pytest.mark.asyncio
+    async def test_is_present_no_file(self, tmp_path) -> None:
+        from app.adapters.runtime.known_hosts import FileKnownHostsManager
+
+        settings = MagicMock()
+        settings.SSH_KNOWN_HOSTS_PATH = str(tmp_path / "missing" / "known_hosts")
+        settings.SSH_KNOWN_HOSTS_FETCH_TIMEOUT = 10
+        settings.SSH_KNOWN_HOSTS_AUTO_ADD = True
+        mgr = FileKnownHostsManager(settings)
+        # no file
+        result = await mgr._is_present("10.0.0.1", 22)
+        assert result is False
+
+    @pytest.mark.asyncio
+    async def test_is_present_with_content(self, tmp_path) -> None:
+        from app.adapters.runtime.known_hosts import FileKnownHostsManager
+
+        p = tmp_path / "known_hosts"
+        p.write_text("example.com ssh-rsa AAAAB3", encoding="utf-8")
+        settings = MagicMock()
+        settings.SSH_KNOWN_HOSTS_PATH = str(p)
+        settings.SSH_KNOWN_HOSTS_FETCH_TIMEOUT = 5
+        settings.SSH_KNOWN_HOSTS_AUTO_ADD = True
+        mgr = FileKnownHostsManager(settings)
+        # mock shutil.which to avoid ssh-keygen
+        with patch("app.adapters.runtime.known_hosts.shutil.which", return_value=None):
+            result = await mgr._is_present("example.com", 22)
+            assert result is True
+            result2 = await mgr._is_present("other.com", 22)
+            assert result2 is False
+
+    @pytest.mark.asyncio
+    async def test_ensure_host_auto_add_disabled(self, tmp_path) -> None:
+        from app.adapters.runtime.known_hosts import FileKnownHostsManager
+
+        settings = MagicMock()
+        settings.SSH_KNOWN_HOSTS_PATH = str(tmp_path / "known_hosts")
+        settings.SSH_KNOWN_HOSTS_FETCH_TIMEOUT = 5
+        settings.SSH_KNOWN_HOSTS_AUTO_ADD = False
+        mgr = FileKnownHostsManager(settings)
+        result = await mgr.ensure_host("1.2.3.4", 22)
+        assert result is False
+
+    @pytest.mark.asyncio
+    async def test_refresh_host_no_ssh_keygen(self, tmp_path) -> None:
+        from app.adapters.runtime.known_hosts import FileKnownHostsManager
+
+        p = tmp_path / "known_hosts"
+        p.write_text("", encoding="utf-8")
+        settings = MagicMock()
+        settings.SSH_KNOWN_HOSTS_PATH = str(p)
+        settings.SSH_KNOWN_HOSTS_FETCH_TIMEOUT = 5
+        settings.SSH_KNOWN_HOSTS_AUTO_ADD = True
+        mgr = FileKnownHostsManager(settings)
+        # mock fetch to avoid actual ssh-keyscan
+        with patch.object(
+            mgr, "_fetch_and_append", new=AsyncMock(return_value=True)
+        ) as mock_fetch:
+            with patch(
+                "app.adapters.runtime.known_hosts.shutil.which", return_value=None
+            ):
+                result = await mgr.refresh_host("1.2.3.4", 22)
+                assert result is True
+                mock_fetch.assert_awaited_once()
