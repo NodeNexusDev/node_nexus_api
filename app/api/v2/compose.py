@@ -102,7 +102,8 @@ def _to_response(dto: object) -> ComposeResponse:
     # dto is ComposeViewDTO
     from app.application.dto.compose import ComposeViewDTO as _Dto  # noqa: N814
 
-    assert isinstance(dto, _Dto)
+    if not isinstance(dto, _Dto):
+        raise TypeError(f"Expected ComposeViewDTO, got {type(dto).__name__}")
     return ComposeResponse(
         id=dto.id,
         node_id=dto.node_id,
@@ -125,7 +126,8 @@ def _bulk_to_response(
         ComposeBulkResultDTO as _BulkDto,  # noqa: N814
     )
 
-    assert isinstance(bulk, _BulkDto)
+    if not isinstance(bulk, _BulkDto):
+        raise TypeError(f"Expected ComposeBulkResultDTO, got {type(bulk).__name__}")
     results = [
         ComposeServiceBulkResult(
             service=r.service,

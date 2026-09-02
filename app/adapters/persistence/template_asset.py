@@ -9,11 +9,14 @@ import tarfile
 import uuid
 from datetime import UTC, datetime
 
+import structlog
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.application.dto.template_pack import PackAssetCreateDTO, PackAssetDTO
 from app.models.template_asset import TemplateAssetModel
+
+logger = structlog.get_logger(__name__)
 
 
 class SqlAlchemyTemplateAssetGateway:
@@ -111,9 +114,18 @@ class SqlAlchemyTemplateAssetGateway:
                                 decoded = base64.b64decode(m.content, validate=True)
                                 if len(decoded) == m.size:
                                     raw = decoded
-                            except Exception:
-                                pass
-                    except Exception:
+                            except Exception as exc:
+                                logger.debug(
+                                    "template_asset.base64_fallback_failed",
+                                    path=m.path,
+                                    error=str(exc),
+                                )
+                    except Exception as exc:
+                        logger.warning(
+                            "template_asset.content_encode_failed",
+                            path=m.path,
+                            error=str(exc),
+                        )
                         raw = b""
                     info = tarfile.TarInfo(name=m.path)
                     info.size = len(raw)

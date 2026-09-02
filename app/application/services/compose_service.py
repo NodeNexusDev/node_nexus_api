@@ -40,8 +40,12 @@ def _validate_project_name(name: str) -> str:
 
 def _compose_file_path(project_name: str) -> str:
     """Safe temp compose file path for a project."""
+    import tempfile
+    from pathlib import Path
+
     safe = "".join(c if c.isalnum() else "_" for c in project_name)
-    return f"/tmp/nn-compose-{safe}.yml"
+    tmpdir = Path(tempfile.gettempdir())
+    return str(tmpdir / f"nn-compose-{safe}.yml")
 
 
 def _env_prefix(env: dict[str, str] | None) -> str:
