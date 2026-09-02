@@ -2,6 +2,8 @@ AGENTS.md
 *.db
 coverage.json
 openapi.json
+scripts/openapi.snapshot.json
+.plans/2.0-bulk-first.md
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
