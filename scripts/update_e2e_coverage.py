@@ -94,27 +94,22 @@ def _parse_existing_manifest(text: str) -> tuple[set[str], set[str], int, int]:
         target = node.target
         if not isinstance(target, ast.Name):
             continue
-        if target.id == "COVERED_ENDPOINTS" and isinstance(
-            node.value, ast.Set
-        ):
+        if target.id == "COVERED_ENDPOINTS" and isinstance(node.value, ast.Set):
             covered = {
                 elt.value  # type: ignore[attr-defined]
                 for elt in node.value.elts  # type: ignore[attr-defined]
-                if isinstance(elt, ast.Constant)
-                and isinstance(elt.value, str)
+                if isinstance(elt, ast.Constant) and isinstance(elt.value, str)
             }
             # lineno is 1-indexed
             covered_start = node.lineno - 1  # type: ignore[attr-defined]
             end = getattr(node, "end_lineno", None)
             covered_end = int(end) if end is not None else -1
-        if target.id == "EXCLUDED_ENDPOINTS" and isinstance(
-            node.value, ast.Dict
-        ):
-                excluded = {
-                    k.value  # type: ignore[attr-defined]
-                    for k in node.value.keys  # type: ignore[attr-defined]
-                    if isinstance(k, ast.Constant) and isinstance(k.value, str)
-                }
+        if target.id == "EXCLUDED_ENDPOINTS" and isinstance(node.value, ast.Dict):
+            excluded = {
+                k.value  # type: ignore[attr-defined]
+                for k in node.value.keys  # type: ignore[attr-defined]
+                if isinstance(k, ast.Constant) and isinstance(k.value, str)
+            }
     # Fallback to regex if AST didn't find (e.g., old formatting)
     if not covered or covered_start == -1:
         # regex fallback
