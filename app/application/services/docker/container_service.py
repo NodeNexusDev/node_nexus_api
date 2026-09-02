@@ -254,6 +254,22 @@ class DockerContainerService:
         state = _json_object(data.get("State"))
         config = _json_object(data.get("Config"))
         network_settings = _json_object(data.get("NetworkSettings"))
+        health_raw = state.get("Health")
+        health_obj = _json_object(health_raw) if isinstance(health_raw, dict) else {}
+        health_status = _optional_string(health_obj.get("Status"))
+        health_failing = health_obj.get("FailingStreak")
+        health_failing_streak: int | None = (
+            health_failing
+            if isinstance(health_failing, int) and not isinstance(health_failing, bool)
+            else None
+        )
+        health_log_raw = health_obj.get("Log")
+        if isinstance(health_log_raw, list):
+            health_log: tuple[object, ...] = tuple(
+                item for item in health_log_raw if isinstance(item, dict)
+            )
+        else:
+            health_log = ()
         audit.info(
             "docker.container.inspect",
             node_id=str(node_id),
@@ -274,6 +290,9 @@ class DockerContainerService:
                 oom_killed=(
                     _boolean(state["OOMKilled"]) if "OOMKilled" in state else None
                 ),
+                health=health_status,
+                health_failing_streak=health_failing_streak,
+                health_log=health_log,
             ),
             config=DockerContainerConfigDTO(
                 image=_optional_string(config.get("Image")),
@@ -524,3 +543,169 @@ class DockerContainerService:
             titles=titles,
             processes=tuple(processes),
         )
+
+    async def kill_container(
+        self, node_id: UUID, container_id: str, signal: str = "SIGTERM"
+    ) -> None:
+        """Kill a container with a signal via ``docker kill``."""
+        validated_id = validate_container_id(container_id)
+        node = await self._runner.get_target(node_id)
+        cmd = self._runner.build_command(
+            node, f"kill --signal {shlex.quote(signal)} {validated_id}"
+        )
+        await self._log_required(
+            "docker.container.kill.requested",
+            node_id,
+            {"container_id": validated_id, "signal": signal},
+        )
+        _, stderr, exit_code = await self._runner.execute(node, cmd)
+        raise_for_docker_error(stderr, exit_code)
+        audit.info(
+            "docker.container.kill",
+            node_id=str(node_id),
+            container_id=validated_id,
+            signal=signal,
+        )
+        await self._log(
+            "docker.container.kill",
+            node_id,
+            {"container_id": validated_id, "signal": signal},
+        )
+
+    async def update_container(
+        self,
+        node_id: UUID,
+        container_id: str,
+        *,
+        memory: str | None = None,
+        cpus: str | None = None,
+        restart_policy: str | None = None,
+    ) -> None:
+        """Update a container via ``docker update``."""
+        validated_id = validate_container_id(container_id)
+        parts: list[str] = []
+        if memory is not None:
+            parts.append(f"--memory {shlex.quote(memory)}")
+        if cpus is not None:
+            parts.append(f"--cpus {shlex.quote(cpus)}")
+        if restart_policy is not None:
+            validated_policy = validate_restart_policy(restart_policy)
+            parts.append(f"--restart {shlex.quote(validated_policy)}")
+        if not parts:
+            raise DockerValidationError("No update fields provided")
+        node = await self._runner.get_target(node_id)
+        args = f"update {' '.join(parts)} {validated_id}"
+        cmd = self._runner.build_command(node, args)
+        await self._log_required(
+            "docker.container.update.requested",
+            node_id,
+            {"container_id": validated_id},
+        )
+        _, stderr, exit_code = await self._runner.execute(node, cmd)
+        raise_for_docker_error(stderr, exit_code)
+        audit.info(
+            "docker.container.update",
+            node_id=str(node_id),
+            container_id=validated_id,
+        )
+        await self._log(
+            "docker.container.update",
+            node_id,
+            {"container_id": validated_id},
+        )
+
+    async def get_archive(self, node_id: UUID, container_id: str, path: str) -> str:
+        """Copy a file from a container via ``docker cp``."""
+        validated_id = validate_container_id(container_id)
+        node = await self._runner.get_target(node_id)
+        cmd = self._runner.build_command(
+            node, f"cp {validated_id}:{shlex.quote(path)} -"
+        )
+        stdout, stderr, exit_code = await self._runner.execute(node, cmd)
+        raise_for_docker_error(stderr, exit_code)
+        audit.info(
+            "docker.container.archive.get",
+            node_id=str(node_id),
+            container_id=validated_id,
+            path=path,
+        )
+        await self._log(
+            "docker.container.archive.get",
+            node_id,
+            {"container_id": validated_id, "path": path},
+        )
+        return stdout
+
+    async def put_archive(
+        self, node_id: UUID, container_id: str, path: str, data: str
+    ) -> None:
+        """Copy data into a container via ``docker cp``."""
+        validated_id = validate_container_id(container_id)
+        node = await self._runner.get_target(node_id)
+        quoted = shlex.quote(data)
+        base_cmd = self._runner.build_command(
+            node, f"cp - {validated_id}:{shlex.quote(path)}"
+        )
+        cmd = f"printf %s {quoted} | {base_cmd}"
+        _, stderr, exit_code = await self._runner.execute(node, cmd)
+        raise_for_docker_error(stderr, exit_code)
+        audit.info(
+            "docker.container.archive.put",
+            node_id=str(node_id),
+            container_id=validated_id,
+            path=path,
+        )
+        await self._log(
+            "docker.container.archive.put",
+            node_id,
+            {"container_id": validated_id, "path": path},
+        )
+
+    async def get_port(
+        self, node_id: UUID, container_id: str, private_port: str | None = None
+    ) -> str:
+        """Return port bindings via ``docker port``."""
+        validated_id = validate_container_id(container_id)
+        node = await self._runner.get_target(node_id)
+        port_arg = f" {shlex.quote(private_port)}" if private_port else ""
+        cmd = self._runner.build_command(node, f"port {validated_id}{port_arg}")
+        stdout, stderr, exit_code = await self._runner.execute(node, cmd)
+        raise_for_docker_error(stderr, exit_code)
+        audit.info(
+            "docker.container.port",
+            node_id=str(node_id),
+            container_id=validated_id,
+        )
+        await self._log(
+            "docker.container.port",
+            node_id,
+            {"container_id": validated_id},
+        )
+        return stdout.strip()
+
+    async def wait_container(
+        self, node_id: UUID, container_id: str, timeout: int | None = None
+    ) -> int:
+        """Wait for a container via ``docker wait``."""
+        validated_id = validate_container_id(container_id)
+        node = await self._runner.get_target(node_id)
+        cmd = self._runner.build_command(node, f"wait {validated_id}")
+        exec_timeout = timeout if timeout is not None else 60
+        stdout, stderr, exit_code = await self._runner.execute(
+            node, cmd, timeout=exec_timeout
+        )
+        raise_for_docker_error(stderr, exit_code)
+        audit.info(
+            "docker.container.wait",
+            node_id=str(node_id),
+            container_id=validated_id,
+        )
+        await self._log(
+            "docker.container.wait",
+            node_id,
+            {"container_id": validated_id},
+        )
+        try:
+            return int(stdout.strip().splitlines()[-1].strip()) if stdout.strip() else 0
+        except ValueError:
+            return 0

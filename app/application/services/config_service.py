@@ -6,7 +6,6 @@ from importlib.metadata import PackageNotFoundError, version
 
 from app.application.dto.config import (
     CONFIG_FORMAT_VERSION,
-    LEGACY_CONFIG_VERSION,
     ConfigImportResultDTO,
     ConfigTransferDTO,
     DryRunPreviewDTO,
@@ -36,7 +35,6 @@ class ConfigService:
             snapshot,
             format_version=CONFIG_FORMAT_VERSION,
             application_version=_application_version(),
-            legacy_version=LEGACY_CONFIG_VERSION,
             exported_at=datetime.now(UTC),
         )
 

@@ -30,6 +30,8 @@ nav:
       - Commands: guides/commands.md
       - Scripts: guides/scripts.md
       - Docker: guides/docker.md
+      - Compose: guides/compose.md
+      - Templates: guides/templates.md
       - Audit log: guides/audit-log.md
       - WebSocket: guides/websocket.md
       - Import and export: guides/configuration-import-export.md

@@ -285,18 +285,18 @@ async def e2e_db_isolation(
         timeout=30.0,
         headers={"X-API-Key": _MASTER_API_KEY},
     ) as client:
-        await client.post("/api/v1/internal/e2e/pause-background")
+        await client.post("/api/v2/internal/e2e/pause-background")
         try:
             await postgres_connection.execute(
                 """
                 TRUNCATE audit_logs, audit_outbox, script_executions,
                          command_executions, script_schedules, scripts, commands,
-                         nodes, node_status_history, api_keys, notes, favorites
+                         nodes, node_status_history, api_keys, favorites
                 RESTART IDENTITY CASCADE
                 """
             )
         finally:
-            await client.post("/api/v1/internal/e2e/resume-background")
+            await client.post("/api/v2/internal/e2e/resume-background")
 
 
 @pytest.fixture(scope="session", autouse=True)

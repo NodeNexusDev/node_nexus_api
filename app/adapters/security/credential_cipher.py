@@ -1,7 +1,6 @@
 """AES-GCM credential cipher adapter."""
 
 import base64
-import binascii
 import os
 from functools import lru_cache
 
@@ -37,7 +36,9 @@ def encrypt(plaintext: str) -> str:
 
 
 def decrypt(token: str) -> str:
-    """Decrypt current or legacy unprefixed AES-256-GCM ciphertext."""
+    """Decrypt AES-256-GCM ciphertext (enc:v1:)."""
+    if not token.startswith(ENCRYPTION_PREFIX):
+        raise ValueError("Missing encryption prefix")
     payload = token.removeprefix(ENCRYPTION_PREFIX)
     raw = base64.b64decode(payload, validate=True)
     if len(raw) < 28:
@@ -46,29 +47,12 @@ def decrypt(token: str) -> str:
     return AESGCM(_derive_key()).decrypt(nonce, ciphertext, None).decode()
 
 
-def _looks_like_legacy_ciphertext(value: str) -> bool:
-    try:
-        raw = base64.b64decode(value, validate=True)
-    except (binascii.Error, ValueError):
-        return False
-    return len(raw) >= 28
-
-
 def decrypt_value(value: str | None) -> str | None:
-    """Decrypt credentials while retaining legacy plaintext support."""
+    """Decrypt credentials — only enc:v1: format is accepted."""
     if not value:
         return value
-    encrypted = value.startswith(ENCRYPTION_PREFIX) or _looks_like_legacy_ciphertext(
-        value
-    )
-    if not encrypted:
-        import structlog
-
-        structlog.get_logger("security").warning(
-            "credential.legacy_plaintext_detected",
-            hint="Re-encrypt credentials via API key rotation",
-        )
-        return value
+    if not value.startswith(ENCRYPTION_PREFIX):
+        raise CredentialDecryptionError("Credential decryption failed")
     try:
         return decrypt(value)
     except (ValueError, UnicodeDecodeError) as exc:
@@ -85,5 +69,5 @@ class AesGcmCredentialCipher:
         return encrypt(plaintext)
 
     def decrypt(self, value: str | None) -> str | None:
-        """Decrypt encrypted credentials with legacy plaintext compatibility."""
+        """Decrypt encrypted credentials (enc:v1: only)."""
         return decrypt_value(value)

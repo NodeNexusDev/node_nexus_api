@@ -320,3 +320,16 @@ class DockerResourceService:
                 action="docker.volumes.prune", node_id=node_id, details={}
             )
         return stdout.strip()
+
+    async def prune_networks(self, node_id: UUID) -> str:
+        """Prune unused Docker networks and return the output."""
+        node = await self._runner.get_target(node_id)
+        cmd = self._runner.build_command(node, "network prune -f")
+        stdout, stderr, exit_code = await self._runner.execute(node, cmd)
+        raise_for_docker_error(stderr, exit_code)
+        audit.info("docker.networks.prune", node_id=str(node_id))
+        if self._audit:
+            await self._audit.log(
+                action="docker.networks.prune", node_id=node_id, details={}
+            )
+        return stdout.strip()

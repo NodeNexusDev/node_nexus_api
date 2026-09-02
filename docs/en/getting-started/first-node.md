@@ -10,7 +10,7 @@ source_revision: "2026-07-29"
 With the API running, create a node:
 
 ```bash
-curl -X POST http://localhost:8000/api/v1/nodes/ \
+curl -X POST http://localhost:8000/api/v2/nodes/ \
   -H 'Content-Type: application/json' \
   -H 'X-API-Key: your-master-key' \
   -d '{"name":"server-1","host":"192.0.2.10","port":22,"username":"ops","password":"change-me","connection_type":"ssh"}'

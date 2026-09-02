@@ -14,6 +14,14 @@ from tests.e2e.conftest import ServicePorts
 from tests.e2e.settings import DEFAULT_TIMEOUT, MASTER_API_KEY
 
 
+def _unwrap_node_id(resp) -> str:
+    data = resp.json()
+    if isinstance(data, dict) and "results" in data:
+        first = data["results"][0]
+        return str(first.get("node_id") or first.get("id"))
+    return str(data["id"])
+
+
 @pytest.fixture
 async def client(service_ports: ServicePorts) -> AsyncIterator[httpx.AsyncClient]:
     async with httpx.AsyncClient(
@@ -39,16 +47,28 @@ class TestDockerAPIValidation:
             "username": "testuser",
             "password": "testpass",
         }
-        response = await client.post("/api/v1/nodes/", json=node_data)
-        assert response.status_code == 201
+        response = await client.post("/api/v2/nodes/", json={"items": [node_data]})
+        assert response.status_code in (200, 201, 207)
         data = response.json()
-        assert data["connection_type"] == "ssh"
-        assert data["has_docker"] is True
-        assert data["name"] == node_data["name"]
-        node_id = data["id"]
+        # BulkResult or single
+        if "results" in data:
+            assert data["results"][0]["status"] == "success"
+            node_id = data["results"][0]["node_id"]
+            # Fetch full node for assertions
+            get_resp = await client.get(f"/api/v2/nodes/{node_id}")
+            assert get_resp.status_code == 200
+            fetched = get_resp.json()
+            assert fetched["connection_type"] == "ssh"
+            assert fetched["has_docker"] is True
+            assert fetched["name"] == node_data["name"]
+        else:
+            assert data["connection_type"] == "ssh"
+            assert data["has_docker"] is True
+            assert data["name"] == node_data["name"]
+            node_id = data["id"]
 
         # Cleanup
-        await client.delete(f"/api/v1/nodes/{node_id}")
+        await client.delete(f"/api/v2/nodes/{node_id}")
 
     async def test_invalid_container_id_rejected(
         self, client: httpx.AsyncClient
@@ -62,17 +82,19 @@ class TestDockerAPIValidation:
             "connection_type": "ssh",
             "has_docker": True,
         }
-        create_response = await client.post("/api/v1/nodes/", json=node_data)
-        node_id = create_response.json()["id"]
+        create_response = await client.post(
+            "/api/v2/nodes/", json={"items": [node_data]}
+        )
+        node_id = _unwrap_node_id(create_response)
 
         try:
             # Try to get container with invalid ID (contains pipe - command injection)
             response = await client.get(
-                f"/api/v1/nodes/{node_id}/docker/containers/invalid|id"
+                f"/api/v2/nodes/{node_id}/docker/containers/invalid|id"
             )
             assert response.status_code == 422
         finally:
-            await client.delete(f"/api/v1/nodes/{node_id}")
+            await client.delete(f"/api/v2/nodes/{node_id}")
 
     async def test_invalid_image_name_rejected(self, client: httpx.AsyncClient) -> None:
         """Test that invalid image name is rejected at API level."""
@@ -84,18 +106,20 @@ class TestDockerAPIValidation:
             "connection_type": "ssh",
             "has_docker": True,
         }
-        create_response = await client.post("/api/v1/nodes/", json=node_data)
-        node_id = create_response.json()["id"]
+        create_response = await client.post(
+            "/api/v2/nodes/", json={"items": [node_data]}
+        )
+        node_id = _unwrap_node_id(create_response)
 
         try:
             # Try to pull image with invalid name (semicolon = injection attempt)
             response = await client.post(
-                f"/api/v1/nodes/{node_id}/docker/images/pull",
+                f"/api/v2/nodes/{node_id}/docker/images/pull",
                 json={"image": "nginx;rm -rf /"},
             )
             assert response.status_code == 422
         finally:
-            await client.delete(f"/api/v1/nodes/{node_id}")
+            await client.delete(f"/api/v2/nodes/{node_id}")
 
     async def test_docker_node_validation(self, client: httpx.AsyncClient) -> None:
         """Test that non-docker nodes are rejected for Docker operations."""
@@ -108,22 +132,24 @@ class TestDockerAPIValidation:
             "username": "testuser",
             "password": "testpass",
         }
-        create_response = await client.post("/api/v1/nodes/", json=ssh_node_data)
-        node_id = create_response.json()["id"]
+        create_response = await client.post(
+            "/api/v2/nodes/", json={"items": [ssh_node_data]}
+        )
+        node_id = _unwrap_node_id(create_response)
 
         try:
             # Try Docker operations on SSH node - should return 502
-            response = await client.get(f"/api/v1/nodes/{node_id}/docker/containers")
+            response = await client.get(f"/api/v2/nodes/{node_id}/docker/containers")
             assert response.status_code == 502
         finally:
-            await client.delete(f"/api/v1/nodes/{node_id}")
+            await client.delete(f"/api/v2/nodes/{node_id}")
 
     async def test_nonexistent_node_returns_404(
         self, client: httpx.AsyncClient
     ) -> None:
         """Test that nonexistent node returns 404."""
         fake_id = str(uuid.uuid4())
-        response = await client.get(f"/api/v1/nodes/{fake_id}/docker/containers")
+        response = await client.get(f"/api/v2/nodes/{fake_id}/docker/containers")
         assert response.status_code == 404
 
     async def test_docker_endpoints_exist(self, client: httpx.AsyncClient) -> None:
@@ -136,17 +162,19 @@ class TestDockerAPIValidation:
             "connection_type": "ssh",
             "has_docker": True,
         }
-        create_response = await client.post("/api/v1/nodes/", json=node_data)
-        node_id = create_response.json()["id"]
+        create_response = await client.post(
+            "/api/v2/nodes/", json={"items": [node_data]}
+        )
+        node_id = _unwrap_node_id(create_response)
 
         try:
             # Check that endpoints exist (will return 502 because no Docker daemon,
             # but not 404 or 405)
             endpoints = [
-                f"/api/v1/nodes/{node_id}/docker/containers",
-                f"/api/v1/nodes/{node_id}/docker/images",
-                f"/api/v1/nodes/{node_id}/docker/networks",
-                f"/api/v1/nodes/{node_id}/docker/volumes",
+                f"/api/v2/nodes/{node_id}/docker/containers",
+                f"/api/v2/nodes/{node_id}/docker/images",
+                f"/api/v2/nodes/{node_id}/docker/networks",
+                f"/api/v2/nodes/{node_id}/docker/volumes",
             ]
             for endpoint in endpoints:
                 response = await client.get(endpoint)
@@ -155,7 +183,7 @@ class TestDockerAPIValidation:
                     f"Endpoint {endpoint} returned {response.status_code}"
                 )
         finally:
-            await client.delete(f"/api/v1/nodes/{node_id}")
+            await client.delete(f"/api/v2/nodes/{node_id}")
 
     async def test_exec_empty_command_rejected(self, client: httpx.AsyncClient) -> None:
         """Test that empty command is rejected."""
@@ -167,18 +195,20 @@ class TestDockerAPIValidation:
             "connection_type": "ssh",
             "has_docker": True,
         }
-        create_response = await client.post("/api/v1/nodes/", json=node_data)
-        node_id = create_response.json()["id"]
+        create_response = await client.post(
+            "/api/v2/nodes/", json={"items": [node_data]}
+        )
+        node_id = _unwrap_node_id(create_response)
 
         try:
             # Try to exec with empty command
             response = await client.post(
-                f"/api/v1/nodes/{node_id}/docker/containers/abc123/exec",
+                f"/api/v2/nodes/{node_id}/docker/containers/abc123/exec",
                 json={"command": ""},
             )
             assert response.status_code == 422
         finally:
-            await client.delete(f"/api/v1/nodes/{node_id}")
+            await client.delete(f"/api/v2/nodes/{node_id}")
 
     async def test_exec_long_command_rejected(self, client: httpx.AsyncClient) -> None:
         """Test that too long command is rejected."""
@@ -190,19 +220,21 @@ class TestDockerAPIValidation:
             "connection_type": "ssh",
             "has_docker": True,
         }
-        create_response = await client.post("/api/v1/nodes/", json=node_data)
-        node_id = create_response.json()["id"]
+        create_response = await client.post(
+            "/api/v2/nodes/", json={"items": [node_data]}
+        )
+        node_id = _unwrap_node_id(create_response)
 
         try:
             # Try to exec with command longer than 4096 chars
             long_command = "a" * 4097
             response = await client.post(
-                f"/api/v1/nodes/{node_id}/docker/containers/abc123/exec",
+                f"/api/v2/nodes/{node_id}/docker/containers/abc123/exec",
                 json={"command": long_command},
             )
             assert response.status_code == 422
         finally:
-            await client.delete(f"/api/v1/nodes/{node_id}")
+            await client.delete(f"/api/v2/nodes/{node_id}")
 
 
 def _make_docker_node_data() -> dict[str, object]:
@@ -228,7 +260,7 @@ def _make_ssh_node_data() -> dict[str, object]:
     }
 
 
-CONTAINER_BASE = "/api/v1/nodes/{node_id}/docker/containers"
+CONTAINER_BASE = "/api/v2/nodes/{node_id}/docker/containers"
 FAKE_CONTAINER_ID = "abc123def456"
 INJECT_CONTAINER_ID = "invalid|id"
 
@@ -244,14 +276,16 @@ class TestDockerContainerLifecycle:
 
     async def test_start_invalid_container_id(self, client: httpx.AsyncClient) -> None:
         node_data = _make_docker_node_data()
-        node_id = (await client.post("/api/v1/nodes/", json=node_data)).json()["id"]
+        node_id = _unwrap_node_id(
+            await client.post("/api/v2/nodes/", json={"items": [node_data]})
+        )
         try:
             resp = await client.post(
                 f"{CONTAINER_BASE.format(node_id=node_id)}/{INJECT_CONTAINER_ID}/start"
             )
             assert resp.status_code == 422
         finally:
-            await client.delete(f"/api/v1/nodes/{node_id}")
+            await client.delete(f"/api/v2/nodes/{node_id}")
 
     async def test_start_nonexistent_node(self, client: httpx.AsyncClient) -> None:
         fake_id = str(uuid.uuid4())
@@ -262,27 +296,31 @@ class TestDockerContainerLifecycle:
 
     async def test_start_docker_node_no_daemon(self, client: httpx.AsyncClient) -> None:
         node_data = _make_docker_node_data()
-        node_id = (await client.post("/api/v1/nodes/", json=node_data)).json()["id"]
+        node_id = _unwrap_node_id(
+            await client.post("/api/v2/nodes/", json={"items": [node_data]})
+        )
         try:
             resp = await client.post(
                 f"{CONTAINER_BASE.format(node_id=node_id)}/{FAKE_CONTAINER_ID}/start"
             )
             assert resp.status_code in (502, 503)
         finally:
-            await client.delete(f"/api/v1/nodes/{node_id}")
+            await client.delete(f"/api/v2/nodes/{node_id}")
 
     # --- POST .../stop ---
 
     async def test_stop_invalid_container_id(self, client: httpx.AsyncClient) -> None:
         node_data = _make_docker_node_data()
-        node_id = (await client.post("/api/v1/nodes/", json=node_data)).json()["id"]
+        node_id = _unwrap_node_id(
+            await client.post("/api/v2/nodes/", json={"items": [node_data]})
+        )
         try:
             resp = await client.post(
                 f"{CONTAINER_BASE.format(node_id=node_id)}/{INJECT_CONTAINER_ID}/stop"
             )
             assert resp.status_code == 422
         finally:
-            await client.delete(f"/api/v1/nodes/{node_id}")
+            await client.delete(f"/api/v2/nodes/{node_id}")
 
     async def test_stop_nonexistent_node(self, client: httpx.AsyncClient) -> None:
         fake_id = str(uuid.uuid4())
@@ -293,25 +331,29 @@ class TestDockerContainerLifecycle:
 
     async def test_stop_docker_node_no_daemon(self, client: httpx.AsyncClient) -> None:
         node_data = _make_docker_node_data()
-        node_id = (await client.post("/api/v1/nodes/", json=node_data)).json()["id"]
+        node_id = _unwrap_node_id(
+            await client.post("/api/v2/nodes/", json={"items": [node_data]})
+        )
         try:
             resp = await client.post(
                 f"{CONTAINER_BASE.format(node_id=node_id)}/{FAKE_CONTAINER_ID}/stop"
             )
             assert resp.status_code in (502, 503)
         finally:
-            await client.delete(f"/api/v1/nodes/{node_id}")
+            await client.delete(f"/api/v2/nodes/{node_id}")
 
     async def test_stop_invalid_timeout(self, client: httpx.AsyncClient) -> None:
         node_data = _make_docker_node_data()
-        node_id = (await client.post("/api/v1/nodes/", json=node_data)).json()["id"]
+        node_id = _unwrap_node_id(
+            await client.post("/api/v2/nodes/", json={"items": [node_data]})
+        )
         try:
             resp = await client.post(
                 f"{CONTAINER_BASE.format(node_id=node_id)}/{FAKE_CONTAINER_ID}/stop?timeout=0"
             )
             assert resp.status_code == 422
         finally:
-            await client.delete(f"/api/v1/nodes/{node_id}")
+            await client.delete(f"/api/v2/nodes/{node_id}")
 
     # --- POST .../restart ---
 
@@ -319,14 +361,16 @@ class TestDockerContainerLifecycle:
         self, client: httpx.AsyncClient
     ) -> None:
         node_data = _make_docker_node_data()
-        node_id = (await client.post("/api/v1/nodes/", json=node_data)).json()["id"]
+        node_id = _unwrap_node_id(
+            await client.post("/api/v2/nodes/", json={"items": [node_data]})
+        )
         try:
             resp = await client.post(
                 f"{CONTAINER_BASE.format(node_id=node_id)}/{INJECT_CONTAINER_ID}/restart"
             )
             assert resp.status_code == 422
         finally:
-            await client.delete(f"/api/v1/nodes/{node_id}")
+            await client.delete(f"/api/v2/nodes/{node_id}")
 
     async def test_restart_nonexistent_node(self, client: httpx.AsyncClient) -> None:
         fake_id = str(uuid.uuid4())
@@ -339,38 +383,44 @@ class TestDockerContainerLifecycle:
         self, client: httpx.AsyncClient
     ) -> None:
         node_data = _make_docker_node_data()
-        node_id = (await client.post("/api/v1/nodes/", json=node_data)).json()["id"]
+        node_id = _unwrap_node_id(
+            await client.post("/api/v2/nodes/", json={"items": [node_data]})
+        )
         try:
             resp = await client.post(
                 f"{CONTAINER_BASE.format(node_id=node_id)}/{FAKE_CONTAINER_ID}/restart"
             )
             assert resp.status_code in (502, 503)
         finally:
-            await client.delete(f"/api/v1/nodes/{node_id}")
+            await client.delete(f"/api/v2/nodes/{node_id}")
 
     async def test_restart_invalid_timeout(self, client: httpx.AsyncClient) -> None:
         node_data = _make_docker_node_data()
-        node_id = (await client.post("/api/v1/nodes/", json=node_data)).json()["id"]
+        node_id = _unwrap_node_id(
+            await client.post("/api/v2/nodes/", json={"items": [node_data]})
+        )
         try:
             resp = await client.post(
                 f"{CONTAINER_BASE.format(node_id=node_id)}/{FAKE_CONTAINER_ID}/restart?timeout=0"
             )
             assert resp.status_code == 422
         finally:
-            await client.delete(f"/api/v1/nodes/{node_id}")
+            await client.delete(f"/api/v2/nodes/{node_id}")
 
     # --- DELETE .../ ---
 
     async def test_remove_invalid_container_id(self, client: httpx.AsyncClient) -> None:
         node_data = _make_docker_node_data()
-        node_id = (await client.post("/api/v1/nodes/", json=node_data)).json()["id"]
+        node_id = _unwrap_node_id(
+            await client.post("/api/v2/nodes/", json={"items": [node_data]})
+        )
         try:
             resp = await client.delete(
                 f"{CONTAINER_BASE.format(node_id=node_id)}/{INJECT_CONTAINER_ID}"
             )
             assert resp.status_code == 422
         finally:
-            await client.delete(f"/api/v1/nodes/{node_id}")
+            await client.delete(f"/api/v2/nodes/{node_id}")
 
     async def test_remove_nonexistent_node(self, client: httpx.AsyncClient) -> None:
         fake_id = str(uuid.uuid4())
@@ -383,38 +433,44 @@ class TestDockerContainerLifecycle:
         self, client: httpx.AsyncClient
     ) -> None:
         node_data = _make_docker_node_data()
-        node_id = (await client.post("/api/v1/nodes/", json=node_data)).json()["id"]
+        node_id = _unwrap_node_id(
+            await client.post("/api/v2/nodes/", json={"items": [node_data]})
+        )
         try:
             resp = await client.delete(
                 f"{CONTAINER_BASE.format(node_id=node_id)}/{FAKE_CONTAINER_ID}"
             )
             assert resp.status_code in (502, 503)
         finally:
-            await client.delete(f"/api/v1/nodes/{node_id}")
+            await client.delete(f"/api/v2/nodes/{node_id}")
 
     async def test_remove_wrong_node_type(self, client: httpx.AsyncClient) -> None:
         node_data = _make_ssh_node_data()
-        node_id = (await client.post("/api/v1/nodes/", json=node_data)).json()["id"]
+        node_id = _unwrap_node_id(
+            await client.post("/api/v2/nodes/", json={"items": [node_data]})
+        )
         try:
             resp = await client.delete(
                 f"{CONTAINER_BASE.format(node_id=node_id)}/{FAKE_CONTAINER_ID}"
             )
             assert resp.status_code == 502
         finally:
-            await client.delete(f"/api/v1/nodes/{node_id}")
+            await client.delete(f"/api/v2/nodes/{node_id}")
 
     # --- GET .../logs ---
 
     async def test_logs_invalid_container_id(self, client: httpx.AsyncClient) -> None:
         node_data = _make_docker_node_data()
-        node_id = (await client.post("/api/v1/nodes/", json=node_data)).json()["id"]
+        node_id = _unwrap_node_id(
+            await client.post("/api/v2/nodes/", json={"items": [node_data]})
+        )
         try:
             resp = await client.get(
                 f"{CONTAINER_BASE.format(node_id=node_id)}/{INJECT_CONTAINER_ID}/logs"
             )
             assert resp.status_code == 422
         finally:
-            await client.delete(f"/api/v1/nodes/{node_id}")
+            await client.delete(f"/api/v2/nodes/{node_id}")
 
     async def test_logs_nonexistent_node(self, client: httpx.AsyncClient) -> None:
         fake_id = str(uuid.uuid4())
@@ -425,38 +481,44 @@ class TestDockerContainerLifecycle:
 
     async def test_logs_docker_node_no_daemon(self, client: httpx.AsyncClient) -> None:
         node_data = _make_docker_node_data()
-        node_id = (await client.post("/api/v1/nodes/", json=node_data)).json()["id"]
+        node_id = _unwrap_node_id(
+            await client.post("/api/v2/nodes/", json={"items": [node_data]})
+        )
         try:
             resp = await client.get(
                 f"{CONTAINER_BASE.format(node_id=node_id)}/{FAKE_CONTAINER_ID}/logs"
             )
             assert resp.status_code in (502, 503)
         finally:
-            await client.delete(f"/api/v1/nodes/{node_id}")
+            await client.delete(f"/api/v2/nodes/{node_id}")
 
     async def test_logs_invalid_tail(self, client: httpx.AsyncClient) -> None:
         node_data = _make_docker_node_data()
-        node_id = (await client.post("/api/v1/nodes/", json=node_data)).json()["id"]
+        node_id = _unwrap_node_id(
+            await client.post("/api/v2/nodes/", json={"items": [node_data]})
+        )
         try:
             resp = await client.get(
                 f"{CONTAINER_BASE.format(node_id=node_id)}/{FAKE_CONTAINER_ID}/logs?tail=10001"
             )
             assert resp.status_code == 422
         finally:
-            await client.delete(f"/api/v1/nodes/{node_id}")
+            await client.delete(f"/api/v2/nodes/{node_id}")
 
     # --- GET .../stats ---
 
     async def test_stats_invalid_container_id(self, client: httpx.AsyncClient) -> None:
         node_data = _make_docker_node_data()
-        node_id = (await client.post("/api/v1/nodes/", json=node_data)).json()["id"]
+        node_id = _unwrap_node_id(
+            await client.post("/api/v2/nodes/", json={"items": [node_data]})
+        )
         try:
             resp = await client.get(
                 f"{CONTAINER_BASE.format(node_id=node_id)}/{INJECT_CONTAINER_ID}/stats"
             )
             assert resp.status_code == 422
         finally:
-            await client.delete(f"/api/v1/nodes/{node_id}")
+            await client.delete(f"/api/v2/nodes/{node_id}")
 
     async def test_stats_nonexistent_node(self, client: httpx.AsyncClient) -> None:
         fake_id = str(uuid.uuid4())
@@ -467,14 +529,16 @@ class TestDockerContainerLifecycle:
 
     async def test_stats_docker_node_no_daemon(self, client: httpx.AsyncClient) -> None:
         node_data = _make_docker_node_data()
-        node_id = (await client.post("/api/v1/nodes/", json=node_data)).json()["id"]
+        node_id = _unwrap_node_id(
+            await client.post("/api/v2/nodes/", json={"items": [node_data]})
+        )
         try:
             resp = await client.get(
                 f"{CONTAINER_BASE.format(node_id=node_id)}/{FAKE_CONTAINER_ID}/stats"
             )
             assert resp.status_code in (502, 503)
         finally:
-            await client.delete(f"/api/v1/nodes/{node_id}")
+            await client.delete(f"/api/v2/nodes/{node_id}")
 
 
 # ---------------------------------------------------------------------------
@@ -503,91 +567,92 @@ class TestDockerBulkByTags:
 
     async def _pull_alpine(self, client: httpx.AsyncClient, node_id: str) -> None:
         resp = await client.post(
-            f"/api/v1/nodes/{node_id}/docker/images/pull",
+            f"/api/v2/nodes/{node_id}/docker/images/pull",
             json={"image": "alpine:latest", "timeout": 120},
         )
         assert resp.status_code == 200
 
     async def test_docker_bulk_by_tags(self, client: httpx.AsyncClient) -> None:
-        """Create a tagged Docker node → bulk start by tag."""
+        """Create a tagged Docker node → vert bulk starts by container_ids."""
         node_data = self._make_docker_node_data(["zone-a", "env-e2e"])
-        node = (await client.post("/api/v1/nodes/", json=node_data)).json()
+        raw = (await client.post("/api/v2/nodes/", json={"items": [node_data]})).json()
+        node = {"id": raw["results"][0]["node_id"], **raw["results"][0]}
         container_name = f"bulk-tag-ctr-{uuid.uuid4().hex[:8]}"
         try:
             await self._pull_alpine(client, node["id"])
-            # Run a container via SSH exec so we can bulk-start it
             run_cmd = f"docker run -d --name {container_name} alpine sleep 300"
             resp = await client.post(
-                "/api/v1/commands/execute",
-                json={"node_id": node["id"], "command": run_cmd},
+                "/api/v2/commands/raw-executions",
+                json={"commands": [run_cmd], "node_ids": [node["id"]]},
             )
-            assert resp.status_code == 200
-            # Stop it first
+            assert resp.status_code in (200, 207)
             await client.post(
-                f"/api/v1/nodes/{node['id']}/docker/containers/{container_name}/stop"
+                f"/api/v2/nodes/{node['id']}/docker/containers/{container_name}/stop"
             )
 
             resp = await client.post(
-                "/api/v1/docker/bulk/start",
+                f"/api/v2/nodes/{node['id']}/docker/containers/starts",
                 json={
-                    "node_tags": ["env-e2e"],
-                    "container_id": container_name,
+                    "container_ids": [container_name],
                 },
             )
-            assert resp.status_code == 200
+            assert resp.status_code in (200, 207)
             data = resp.json()
-            assert data["action"] == "start"
             assert data["total"] == 1
             assert data["succeeded"] == 1
         finally:
             await client.delete(
-                f"/api/v1/nodes/{node['id']}/docker/containers/{container_name}?force=true"
+                f"/api/v2/nodes/{node['id']}/docker/containers/{container_name}?force=true"
             )
-            await client.delete(f"/api/v1/nodes/{node['id']}")
+            await client.delete(f"/api/v2/nodes/{node['id']}")
 
     async def test_docker_bulk_mixed_ids_and_tags(
         self, client: httpx.AsyncClient
     ) -> None:
-        """Both node_ids and node_tags provided → deduplicate."""
+        """Vert bulk with multiple container_ids."""
         node_data = self._make_docker_node_data(["zone-a", "env-e2e"])
-        node = (await client.post("/api/v1/nodes/", json=node_data)).json()
+        raw = (await client.post("/api/v2/nodes/", json={"items": [node_data]})).json()
+        node = {"id": raw["results"][0]["node_id"], **raw["results"][0]}
         container_name = f"bulk-mixed-ctr-{uuid.uuid4().hex[:8]}"
         try:
             await self._pull_alpine(client, node["id"])
             cmd = f"docker run -d --name {container_name} alpine sleep 300"
             await client.post(
-                "/api/v1/commands/execute",
-                json={"node_id": node["id"], "command": cmd},
+                "/api/v2/commands/raw-executions",
+                json={"commands": [cmd], "node_ids": [node["id"]]},
             )
             await client.post(
-                f"/api/v1/nodes/{node['id']}/docker/containers/{container_name}/stop"
+                f"/api/v2/nodes/{node['id']}/docker/containers/{container_name}/stop"
             )
 
             resp = await client.post(
-                "/api/v1/docker/bulk/start",
+                f"/api/v2/nodes/{node['id']}/docker/containers/starts",
                 json={
-                    "node_ids": [node["id"]],
-                    "node_tags": ["env-e2e"],
-                    "container_id": container_name,
+                    "container_ids": [container_name],
                 },
             )
-            assert resp.status_code == 200
+            assert resp.status_code in (200, 207)
             data = resp.json()
-            # Deduplicated to exactly one node
             assert data["total"] == 1
             assert data["succeeded"] == 1
         finally:
             await client.delete(
-                f"/api/v1/nodes/{node['id']}/docker/containers/{container_name}?force=true"
+                f"/api/v2/nodes/{node['id']}/docker/containers/{container_name}?force=true"
             )
-            await client.delete(f"/api/v1/nodes/{node['id']}")
+            await client.delete(f"/api/v2/nodes/{node['id']}")
 
     async def test_docker_bulk_no_targets_validation_error(
         self, client: httpx.AsyncClient
     ) -> None:
-        """Empty node_ids and node_tags → 422."""
-        resp = await client.post(
-            "/api/v1/docker/bulk/start",
-            json={"container_id": "any-ctr"},
-        )
-        assert resp.status_code == 422
+        """Empty container_ids → 422."""
+        node_data = self._make_docker_node_data(["tmp"])
+        raw = (await client.post("/api/v2/nodes/", json={"items": [node_data]})).json()
+        node = {"id": raw["results"][0]["node_id"], **raw["results"][0]}
+        try:
+            resp = await client.post(
+                f"/api/v2/nodes/{node['id']}/docker/containers/starts",
+                json={"container_ids": []},
+            )
+            assert resp.status_code == 422
+        finally:
+            await client.delete(f"/api/v2/nodes/{node['id']}")

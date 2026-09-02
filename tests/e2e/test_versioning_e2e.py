@@ -1,4 +1,7 @@
-"""E2E tests for X-API-Version header-based API versioning."""
+"""E2E tests for X-API-Version header-based API versioning.
+
+Versioning middleware removed in 2.0 (a3f2326) — header is now ignored.
+"""
 
 import httpx2 as httpx
 import pytest
@@ -7,25 +10,26 @@ pytestmark = [pytest.mark.docker, pytest.mark.e2e_smoke]
 
 
 def test_no_version_header_defaults(e2e_client: httpx.Client) -> None:
-    """Missing X-API-Version defaults to version 1."""
-    resp = e2e_client.get("/api/v1/nodes/")
+    """Missing X-API-Version is accepted (versioning removed in 2.0)."""
+    resp = e2e_client.get("/api/v2/nodes/")
     assert resp.status_code == 200
-    assert resp.headers["X-API-Version"] == "1"
+    # X-API-Version header no longer set; accept absent or legacy value
+    assert resp.headers.get("X-API-Version") in (None, "1")
 
 
 def test_explicit_version_header_accepted(e2e_client: httpx.Client) -> None:
-    """Explicit X-API-Version: 1 is accepted."""
-    resp = e2e_client.get("/api/v1/nodes/", headers={"X-API-Version": "1"})
+    """Explicit X-API-Version is ignored in 2.0."""
+    resp = e2e_client.get("/api/v2/nodes/", headers={"X-API-Version": "1"})
     assert resp.status_code == 200
-    assert resp.headers["X-API-Version"] == "1"
+    assert resp.headers.get("X-API-Version") in (None, "1")
 
 
 def test_unsupported_version_rejected(e2e_client: httpx.Client) -> None:
-    """Unsupported X-API-Version returns 400."""
-    resp = e2e_client.get("/api/v1/nodes/", headers={"X-API-Version": "99"})
-    assert resp.status_code == 400
-    assert resp.headers["X-API-Version"] == "1"
-    assert "Unsupported API version: 99" in resp.json()["detail"]
+    """Unsupported X-API-Version is no longer rejected (middleware removed)."""
+    resp = e2e_client.get("/api/v2/nodes/", headers={"X-API-Version": "99"})
+    # Previously 400, now 200 after removal
+    assert resp.status_code == 200
+    assert resp.headers.get("X-API-Version") in (None, "1")
 
 
 def test_version_excluded_from_health(e2e_client: httpx.Client) -> None:

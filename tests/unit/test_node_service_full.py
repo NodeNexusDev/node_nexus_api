@@ -241,10 +241,12 @@ class TestDecryptValue:
         token = encrypt("secret")
         assert decrypt_value(token) == "secret"
 
-    def test_non_encrypted_value_returns_as_is(self) -> None:
+    def test_non_encrypted_value_raises(self) -> None:
         from app.adapters.security.credential_cipher import decrypt_value
+        from app.core.exceptions import CredentialDecryptionError
 
-        assert decrypt_value("plain-text") == "plain-text"
+        with pytest.raises(CredentialDecryptionError):
+            decrypt_value("plain-text")
 
     def test_tampered_ciphertext_fails_closed(self) -> None:
         from app.adapters.security.credential_cipher import decrypt_value

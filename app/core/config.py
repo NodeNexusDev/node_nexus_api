@@ -68,9 +68,6 @@ class Settings(BaseSettings):
     OTEL_ENDPOINT: str = "http://localhost:4317"
     OTEL_SERVICE_NAME: str = "node-nexus-api"
 
-    # API versioning
-    SUPPORTED_API_VERSIONS: list[str] = Field(default=["1"])
-
     # E2E test harness endpoints (disable in production)
     E2E_ENABLED: bool = False
 

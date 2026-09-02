@@ -10,9 +10,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from app.adapters.persistence.audit_export import SqlAlchemyAuditExporter
-from app.adapters.persistence.dao.dashboard_metrics import (
-    DashboardMetricsRepository,
-)
 from app.adapters.persistence.dao.execution_stats import ExecutionStatsRepository
 from app.adapters.persistence.dao.node_status_history import (
     NodeStatusHistoryRepository,
@@ -26,7 +23,6 @@ from app.adapters.persistence.global_search import SqlAlchemyGlobalSearchGateway
 from app.adapters.persistence.node_status_history import (
     SqlAlchemyNodeStatusHistoryGateway,
 )
-from app.adapters.persistence.note import SqlAlchemyNoteGateway
 from app.application.dto.execution_stats import (
     CommandStatsQueryDTO,
     ExecutionStatsDTO,
@@ -44,10 +40,8 @@ from app.application.dto.node_status_history import (
     NodeStatusHistoryPageDTO,
     NodeStatusHistoryQueryDTO,
 )
-from app.application.dto.note import NoteCreateDTO, NoteDTO, NoteUpdateDTO
 from app.models.favorite import FavoriteModel
 from app.models.node_status_history import NodeStatusHistoryModel
-from app.models.note import NoteModel
 
 # ─── Favorite adapter ───
 
@@ -167,138 +161,6 @@ class TestFavoriteGateway:
         items, total = await gw.list_favorites(None, 0, 10)
         assert total == 0
         assert len(items) == 0
-
-
-# ─── Note adapter ───
-
-
-class TestNoteGateway:
-    @pytest.mark.asyncio
-    async def test_create_note(self) -> None:
-        session = AsyncMock()
-        session.add = MagicMock()
-        gw = SqlAlchemyNoteGateway(session)
-        data = NoteCreateDTO(
-            target_type="node",
-            target_id=uuid.uuid4(),
-            content="Check this",
-        )
-        result = await gw.create_note(data)
-        assert isinstance(result, NoteDTO)
-        assert result.content == "Check this"
-        session.add.assert_called_once()
-
-    @pytest.mark.asyncio
-    async def test_get_note_found(self) -> None:
-        session = AsyncMock()
-        gw = SqlAlchemyNoteGateway(session)
-        model = NoteModel(
-            id=uuid.uuid4(),
-            target_type="node",
-            target_id=uuid.uuid4(),
-            content="Hello",
-            created_at=datetime.now(UTC),
-            updated_at=datetime.now(UTC),
-        )
-        mock_result = MagicMock()
-        mock_result.scalar_one_or_none.return_value = model
-        session.execute.return_value = mock_result
-
-        result = await gw.get_note(model.id)
-        assert result is not None
-        assert result.content == "Hello"
-
-    @pytest.mark.asyncio
-    async def test_get_note_not_found(self) -> None:
-        session = AsyncMock()
-        gw = SqlAlchemyNoteGateway(session)
-        mock_result = MagicMock()
-        mock_result.scalar_one_or_none.return_value = None
-        session.execute.return_value = mock_result
-
-        result = await gw.get_note(uuid.uuid4())
-        assert result is None
-
-    @pytest.mark.asyncio
-    async def test_update_note_found(self) -> None:
-        session = AsyncMock()
-        gw = SqlAlchemyNoteGateway(session)
-        model = NoteModel(
-            id=uuid.uuid4(),
-            target_type="node",
-            target_id=uuid.uuid4(),
-            content="old",
-            created_at=datetime.now(UTC),
-            updated_at=datetime.now(UTC),
-        )
-        mock_result = MagicMock()
-        mock_result.scalar_one_or_none.return_value = model
-        session.execute.return_value = mock_result
-
-        result = await gw.update_note(model.id, NoteUpdateDTO(content="new"))
-        assert result is not None
-        assert model.content == "new"
-
-    @pytest.mark.asyncio
-    async def test_update_note_not_found(self) -> None:
-        session = AsyncMock()
-        gw = SqlAlchemyNoteGateway(session)
-        mock_result = MagicMock()
-        mock_result.scalar_one_or_none.return_value = None
-        session.execute.return_value = mock_result
-
-        result = await gw.update_note(uuid.uuid4(), NoteUpdateDTO(content="x"))
-        assert result is None
-
-    @pytest.mark.asyncio
-    async def test_delete_note_found(self) -> None:
-        session = AsyncMock()
-        gw = SqlAlchemyNoteGateway(session)
-        model = NoteModel(
-            id=uuid.uuid4(),
-            target_type="node",
-            target_id=uuid.uuid4(),
-            content="del",
-            created_at=datetime.now(UTC),
-            updated_at=datetime.now(UTC),
-        )
-        mock_result = MagicMock()
-        mock_result.scalar_one_or_none.return_value = model
-        session.execute.return_value = mock_result
-
-        result = await gw.delete_note(model.id)
-        assert result is True
-        session.delete.assert_awaited_once_with(model)
-
-    @pytest.mark.asyncio
-    async def test_delete_note_not_found(self) -> None:
-        session = AsyncMock()
-        gw = SqlAlchemyNoteGateway(session)
-        mock_result = MagicMock()
-        mock_result.scalar_one_or_none.return_value = None
-        session.execute.return_value = mock_result
-
-        result = await gw.delete_note(uuid.uuid4())
-        assert result is False
-
-    @pytest.mark.asyncio
-    async def test_list_notes(self) -> None:
-        session = AsyncMock()
-        gw = SqlAlchemyNoteGateway(session)
-        model = NoteModel(
-            id=uuid.uuid4(),
-            target_type="command",
-            target_id=uuid.uuid4(),
-            content="note",
-            created_at=datetime.now(UTC),
-            updated_at=datetime.now(UTC),
-        )
-        mock_result = MagicMock()
-        mock_result.scalars.return_value.all.return_value = [model]
-        session.execute.return_value = mock_result
-
-        result = await gw.list_notes("command", model.target_id)
-        assert len(result) == 1
 
 
 # ─── Execution stats gateway ───
@@ -559,35 +421,6 @@ class TestAuditExportGateway:
         )
         assert isinstance(result, list)
         assert session.execute.called
-
-
-class TestDashboardMetricsDAO:
-    @pytest.mark.asyncio
-    async def test_command_metrics_empty(self) -> None:
-        session = AsyncMock()
-        repo = DashboardMetricsRepository(session)
-        mock_result = MagicMock()
-        mock_result.all.return_value = []
-        session.execute.return_value = mock_result
-
-        from app.application.dto.dashboard_metrics import MetricsQueryDTO
-
-        result = await repo.command_metrics(MetricsQueryDTO(group_by="day"))
-        assert isinstance(result, list)
-        assert len(result) == 0
-
-    @pytest.mark.asyncio
-    async def test_script_metrics_empty(self) -> None:
-        session = AsyncMock()
-        repo = DashboardMetricsRepository(session)
-        mock_result = MagicMock()
-        mock_result.all.return_value = []
-        session.execute.return_value = mock_result
-
-        from app.application.dto.dashboard_metrics import MetricsQueryDTO
-
-        result = await repo.script_metrics(MetricsQueryDTO(group_by="hour"))
-        assert isinstance(result, list)
 
 
 # ─── Execution stats DAO ───

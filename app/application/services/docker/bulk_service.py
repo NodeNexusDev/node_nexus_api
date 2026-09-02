@@ -16,7 +16,12 @@ from app.application.dto.docker import (
     BulkDockerResultDTO,
 )
 from app.application.services.docker.command_runner import DockerCommandRunner
-from app.core.docker_validation import validate_container_id
+from app.core.docker_validation import (
+    validate_build_arg_key,
+    validate_container_id,
+    validate_image_name,
+    validate_image_tag,
+)
 from app.core.exceptions import DockerError, NodeNotFoundError
 
 audit = structlog.get_logger("audit")
@@ -239,7 +244,8 @@ class DockerBulkService:
             node_id_str: str, node: NodeConnectionDTO
         ) -> BulkDockerPullResultDTO:
             try:
-                args = f"pull {image}"
+                validated_image = validate_image_name(image)
+                args = f"pull {shlex.quote(validated_image)}"
                 cmd = self._runner.build_command(node, args)
                 exec_timeout = timeout if timeout is not None else 300
                 stdout, stderr, exit_code = await self._runner.execute(
@@ -329,7 +335,8 @@ class DockerBulkService:
             node_id_str: str, node: NodeConnectionDTO
         ) -> BulkDockerPullResultDTO:
             try:
-                args = f"rmi -f {image_id}"
+                validated_image_id = validate_image_tag(image_id)
+                args = f"rmi -f {shlex.quote(validated_image_id)}"
                 cmd = self._runner.build_command(node, args)
                 stdout, stderr, exit_code = await self._runner.execute(node, cmd)
                 if exit_code != 0 and stderr:
@@ -420,13 +427,20 @@ class DockerBulkService:
             node_id_str: str, node: NodeConnectionDTO
         ) -> BulkDockerPullResultDTO:
             try:
+                validated_tag = validate_image_tag(tag)
                 build_args_str = ""
                 if build_args:
                     for key, value in build_args.items():
-                        build_args_str += f" --build-arg {key}={value}"
+                        validated_key = validate_build_arg_key(key)
+                        build_args_str += (
+                            f" --build-arg {shlex.quote(f'{validated_key}={value}')}"
+                        )
 
                 cache_flag = " --no-cache" if no_cache else ""
-                args = f"build{cache_flag}{build_args_str} -t {tag} -"
+                args = (
+                    f"build{cache_flag}{build_args_str}"
+                    f" -t {shlex.quote(validated_tag)} -"
+                )
                 base_cmd = self._runner.build_command(node, args)
                 quoted_stdin = shlex.quote(dockerfile)
                 cmd = f"printf %s {quoted_stdin} | {base_cmd}"

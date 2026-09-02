@@ -24,7 +24,7 @@ class ExecutionStatsDTO:
     total: int
     successful: int
     failed: int
-    cancelled: int
+    cancelled: int  # 0 for commands (no cancelled), tracked for scripts
     success_rate: float
     avg_duration_ms: float | None
     min_duration_ms: float | None

@@ -99,7 +99,7 @@ def test_api_does_not_construct_services_or_repositories() -> None:
 
 def test_docker_router_delegates_domain_errors_to_global_handler() -> None:
     """Docker endpoints must not maintain a second error-to-HTTP registry."""
-    path = APP_ROOT / "api" / "v1" / "docker.py"
+    path = APP_ROOT / "api" / "v2" / "docker.py"
     tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
     caught_names = {
         getattr(handler.type, "id", "")
@@ -182,7 +182,7 @@ def test_legacy_repository_namespace_is_removed() -> None:
 
 @pytest.mark.parametrize(
     "relative_path",
-    ["api/v1/websocket.py", "adapters/runtime/apscheduler_runtime.py"],
+    ["api/v2/websocket.py", "adapters/runtime/apscheduler_runtime.py"],
 )
 def test_runtime_orchestration_does_not_import_global_container(
     relative_path: str,

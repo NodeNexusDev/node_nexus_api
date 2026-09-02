@@ -2,19 +2,21 @@
 title: Каталог ошибок
 status: stable
 translation_key: reference.error-catalog
-source_revision: "2026-08-25"
+source_revision: "2026-09-02"
 ---
 
 # Каталог ошибок
 
 | Status | Значение |
 |---|---|
+| `207` | Multi-Status — bulk-операция частично успешна (`succeeded>0 && failed>0`) |
 | `400` | Некорректный или неподдерживаемый request |
 | `401` | API key отсутствует, невалиден, истёк или отозван |
 | `403` | API key не имеет write scope |
-| `404` | Node, command, script, execution, container, network, volume, image, tag, schedule, favorite, note или API key не найден |
+| `404` | Node, command, script, execution, container, network, volume, image, tag, schedule, favorite или API key не найден |
 | `409` | Конфликт имени ноды |
-| `422` | Ошибка schema, template, Docker, schedule, config format или domain validation |
+| `410` | Gone — удалённый префикс v1 `/api/v1` (используйте `/api/v2`) |
+| `422` | Ошибка schema, template, Docker, schedule, config format или domain validation (включая неверный cursor, `M×N>100`, неподдерживаемый `format_version`) |
 | `429` | Превышен process-local rate limit |
 | `502` | Ошибка удалённой Docker operation |
 | `503` | Недоступен SSH connection, Docker daemon, credential decryption, audit persistence или scheduler |
@@ -33,11 +35,30 @@ Domain failures используют стабильный JSON-конверт:
 
 - `code` — machine-readable тип ошибки (имя класса domain exception)
 - `message` — human-readable описание
-- `request_id` — correlation id из request middleware (`null` если недоступен)
-- `detail` — то же, что и `message`, для обратной совместимости
+- `request_id` — correlation id из request middleware (`string|null`, `null` если недоступен)
+- `detail` — то же, что и `message`, для обратной совместимости (`Json|null`)
 
 Клиентская логика должна опираться на HTTP status и `code`, а не на текст
 `message` или `detail`.
+
+Bulk-операции используют конверт `BulkResult<T>`:
+
+```json
+{
+  "total": 3,
+  "succeeded": 2,
+  "failed": 1,
+  "results": [
+    {"id": "...", "status": "success"},
+    {"id": "...", "status": "error", "error": "..."}
+  ]
+}
+```
+
+Маппинг статусов: `200` все успешны, `207 Multi-Status` частично
+(`succeeded>0 && failed>0`), `422` все с ошибкой. `BulkCommandRequestDTO.timeout`
+валидируется как опциональный `int` и прокидывается в SSH-выполнение для каждой
+ноды.
 
 ## Коды domain-ошибок
 
@@ -61,7 +82,6 @@ Domain failures используют стабильный JSON-конверт:
 | `NodeNameConflictError` | `409` | Нода с таким именем уже существует |
 | `NodeNotFoundError` | `404` | Нода не найдена |
 | `NetworkNotFoundError` | `404` | Docker-сеть не найдена |
-| `NoteNotFoundError` | `404` | Заметка не найдена |
 | `RequestTimeoutError` | `504` | Запрос превысил глобальный timeout |
 | `ScheduleNotFoundError` | `404` | Расписание не найдено |
 | `SchedulePersistenceError` | `503` | Не удалось обновить runtime-состояние расписания |

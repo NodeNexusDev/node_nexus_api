@@ -8,7 +8,6 @@ from app.application.types import JsonObject
 from app.core.types import NodeName, TagList
 
 CONFIG_FORMAT_VERSION = "1.0"
-LEGACY_CONFIG_VERSION = "0.5.0"
 
 
 @dataclass(frozen=True, slots=True)
@@ -63,7 +62,6 @@ class ConfigTransferDTO:
     scripts: tuple[ScriptConfigDTO, ...] = ()
     format_version: str | None = None
     application_version: str | None = None
-    legacy_version: str | None = None
     exported_at: datetime | None = None
 
 

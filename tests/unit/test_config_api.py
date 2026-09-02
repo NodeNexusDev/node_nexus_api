@@ -10,7 +10,7 @@ from dishka.integrations.fastapi import setup_dishka
 from fastapi import FastAPI
 from httpx2 import ASGITransport, AsyncClient
 
-from app.api.v1.config import router as config_router
+from app.api.v2.config import router as config_router
 from app.application.dto.config import ConfigImportResultDTO, ConfigTransferDTO
 from app.application.services.config_service import ConfigService
 from tests.unit.conftest import MockAuthServiceProvider, _mock_settings
@@ -18,7 +18,7 @@ from tests.unit.conftest import MockAuthServiceProvider, _mock_settings
 
 def _create_test_app(service: ConfigService) -> FastAPI:
     app = FastAPI()
-    app.include_router(config_router, prefix="/api/v1")
+    app.include_router(config_router, prefix="/api/v2")
 
     class MockServiceProvider(Provider):
         @provide(scope=Scope.REQUEST)
@@ -51,29 +51,27 @@ async def client(mock_service: AsyncMock) -> AsyncGenerator[AsyncClient]:
 @pytest.mark.asyncio
 class TestConfigExportAPI:
     async def test_export_config(self, client: AsyncClient, mock_service: AsyncMock):
-        """GET /api/v1/config/export returns export data."""
+        """GET /api/v2/config/export returns export data."""
         mock_service.export_all.return_value = ConfigTransferDTO(
             exported_at=datetime(2026, 1, 1, tzinfo=UTC),
             format_version="1.0",
             application_version="test",
-            legacy_version="0.5.0",
         )
-        resp = await client.get("/api/v1/config/export")
+        resp = await client.get("/api/v2/config/export")
         assert resp.status_code == 200
         data = resp.json()
         assert data["format_version"] == "1.0"
         assert data["application_version"]
-        assert data["version"] == "0.5.0"
         assert "exported_at" in data
 
 
 @pytest.mark.asyncio
 class TestConfigImportAPI:
     async def test_import_config(self, client: AsyncClient, mock_service: AsyncMock):
-        """POST /api/v1/config/import imports data."""
+        """POST /api/v2/config/import imports data."""
         mock_service.import_config.return_value = ConfigImportResultDTO(nodes_created=2)
         resp = await client.post(
-            "/api/v1/config/import",
+            "/api/v2/config/import",
             json={"nodes": [], "commands": [], "scripts": []},
         )
         assert resp.status_code == 200
@@ -83,10 +81,10 @@ class TestConfigImportAPI:
     async def test_import_empty_payload(
         self, client: AsyncClient, mock_service: AsyncMock
     ):
-        """POST /api/v1/config/import with empty payload."""
+        """POST /api/v2/config/import with empty payload."""
         mock_service.import_config.return_value = ConfigImportResultDTO()
         resp = await client.post(
-            "/api/v1/config/import",
+            "/api/v2/config/import",
             json={},
         )
         assert resp.status_code == 200

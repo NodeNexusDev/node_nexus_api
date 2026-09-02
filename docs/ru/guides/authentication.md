@@ -27,7 +27,7 @@ export NODE_NEXUS_API_KEY='replace-with-your-key'
 
 curl --fail-with-body \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
-  "${NODE_NEXUS_URL}/api/v1/nodes/"
+  "${NODE_NEXUS_URL}/api/v2/nodes/"
 ```
 
 Мастер-ключ из `MASTER_API_KEY` всегда имеет права на чтение и запись.
@@ -58,7 +58,7 @@ curl --fail-with-body \
   -X POST \
   -H "Content-Type: application/json" \
   -d '{"email": "user@example.com", "password": "secret"}' \
-  "${NODE_NEXUS_URL}/api/v1/auth/login"
+  "${NODE_NEXUS_URL}/api/v2/auth/login"
 ```
 
 Ответ:
@@ -78,7 +78,7 @@ curl --fail-with-body \
 ```bash
 curl --fail-with-body \
   -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIs..." \
-  "${NODE_NEXUS_URL}/api/v1/auth/me"
+  "${NODE_NEXUS_URL}/api/v2/auth/me"
 ```
 
 ### Обновление токена
@@ -92,13 +92,13 @@ curl --fail-with-body \
   -b cookies.txt \
   -c cookies.txt \
   -X POST \
-  "${NODE_NEXUS_URL}/api/v1/auth/refresh"
+  "${NODE_NEXUS_URL}/api/v2/auth/refresh"
 ```
 
 ### Выход из системы
 
 ```bash
-curl -b cookies.txt -X POST "${NODE_NEXUS_URL}/api/v1/auth/logout"
+curl -b cookies.txt -X POST "${NODE_NEXUS_URL}/api/v2/auth/logout"
 ```
 
 Очищает cookie refresh token и инвалидирует refresh token на сервере.
@@ -112,13 +112,13 @@ curl -b cookies.txt -X POST "${NODE_NEXUS_URL}/api/v1/auth/logout"
 
 ## Endpoints только для суперпользователя
 
-Endpoints в `/api/v1/users/` требуют JWT с claim `is_superuser`. API keys
+Endpoints в `/api/v2/users/` требуют JWT с claim `is_superuser`. API keys
 **не могут** быть использованы для этих endpoints — сервер возвращает `401` с
 сообщением "Master key cannot be used for user authentication".
 
 Первый суперпользователь создаётся автоматически при startup, если заданы
 `INITIAL_SUPERUSER_EMAIL` и `INITIAL_SUPERUSER_PASSWORD`. Все остальные
-пользователи создаются через `POST /api/v1/users/` существующим
+пользователи создаются через `POST /api/v2/users/` существующим
 суперпользователем.
 
 ## Приоритет аутентификации
@@ -133,7 +133,7 @@ dependency проверяет в следующем порядке:
 Сервер не скрывает ошибку Bearer token через fallback на второй credential из
 того же запроса.
 
-Для endpoints суперпользователя (`/api/v1/users/*`) принимается только JWT.
+Для endpoints суперпользователя (`/api/v2/users/*`) принимается только JWT.
 API keys отклоняются с `401`.
 
 ## Ограничение частоты запросов

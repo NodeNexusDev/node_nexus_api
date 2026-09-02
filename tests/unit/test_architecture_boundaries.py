@@ -75,15 +75,22 @@ def test_application_depends_only_on_inward_contracts() -> None:
 
 def test_api_does_not_access_persistence_or_concrete_connectors() -> None:
     """Transport adapters must delegate persistence and remote operations."""
-    _assert_no_imports(
-        "api",
-        (
-            "app.adapters",
-            "app.adapters.runtime.ssh",
-            "app.di",
-            "app.models",
-            "app.repositories",
-        ),
+    violations = [
+        f"{path.relative_to(APP_ROOT.parent)} -> {module}"
+        for path, module in _imports_in("api")
+        if any(
+            module == prefix or module.startswith(f"{prefix}.")
+            for prefix in (
+                "app.adapters",
+                "app.adapters.runtime.ssh",
+                "app.di",
+                "app.models",
+                "app.repositories",
+            )
+        )
+    ]
+    assert not violations, "Forbidden architecture dependencies:\n" + "\n".join(
+        violations
     )
 
 

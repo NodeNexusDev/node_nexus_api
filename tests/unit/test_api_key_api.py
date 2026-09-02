@@ -12,7 +12,7 @@ from fastapi import FastAPI
 from httpx2 import ASGITransport, AsyncClient
 
 from app.api.error_mapping import domain_error_handler
-from app.api.v1.api_keys import router as api_keys_router
+from app.api.v2.api_keys import router as api_keys_router
 from app.application.dto.api_key import (
     APIKeyCreateResultDTO,
     APIKeyPageDTO,

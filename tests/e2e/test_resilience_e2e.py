@@ -94,12 +94,12 @@ class TestRateLimit:
 
     def test_remaining_header_decrements(self, rate_limit_client: httpx.Client) -> None:
         """Each request decrements X-RateLimit-Remaining."""
-        resp = rate_limit_client.get("/api/v1/nodes/")
+        resp = rate_limit_client.get("/api/v2/nodes/")
         assert resp.status_code == 200
         remaining = int(resp.headers["X-RateLimit-Remaining"])
         assert remaining >= 0
 
-        resp2 = rate_limit_client.get("/api/v1/nodes/")
+        resp2 = rate_limit_client.get("/api/v2/nodes/")
         assert resp2.status_code == 200
         remaining2 = int(resp2.headers["X-RateLimit-Remaining"])
         assert remaining2 < remaining
@@ -108,10 +108,10 @@ class TestRateLimit:
         """After exceeding the limit, 429 is returned."""
         # Drain the limit (5 requests)
         for _ in range(5):
-            rate_limit_client.get("/api/v1/nodes/")
+            rate_limit_client.get("/api/v2/nodes/")
 
         # Next request should be 429
-        resp = rate_limit_client.get("/api/v1/nodes/")
+        resp = rate_limit_client.get("/api/v2/nodes/")
         assert resp.status_code == 429
         body = resp.json()
         assert "Rate limit exceeded" in body["detail"]
@@ -120,9 +120,9 @@ class TestRateLimit:
         """429 response includes Retry-After header."""
         # Drain the limit
         for _ in range(5):
-            rate_limit_client.get("/api/v1/nodes/")
+            rate_limit_client.get("/api/v2/nodes/")
 
-        resp = rate_limit_client.get("/api/v1/nodes/")
+        resp = rate_limit_client.get("/api/v2/nodes/")
         assert resp.status_code == 429
         retry_after = resp.headers.get("Retry-After")
         assert retry_after is not None
@@ -134,7 +134,7 @@ class TestRateLimit:
         """/health and /ready are not rate limited."""
         # Drain the limit
         for _ in range(5):
-            rate_limit_client.get("/api/v1/nodes/")
+            rate_limit_client.get("/api/v2/nodes/")
 
         # /health should still work
         resp = rate_limit_client.get("/health")
@@ -151,10 +151,10 @@ class TestRateLimit:
         """After the rate-limit window expires, requests succeed again."""
         # Drain the limit
         for _ in range(5):
-            rate_limit_client.get("/api/v1/nodes/")
+            rate_limit_client.get("/api/v2/nodes/")
 
         # Confirm rate limited
-        resp = rate_limit_client.get("/api/v1/nodes/")
+        resp = rate_limit_client.get("/api/v2/nodes/")
         assert resp.status_code == 429
 
         # Wait for window to expire by polling until request succeeds
@@ -162,7 +162,7 @@ class TestRateLimit:
         time.sleep(4)
 
         def _rate_limit_reset() -> bool:
-            resp = rate_limit_client.get("/api/v1/nodes/")
+            resp = rate_limit_client.get("/api/v2/nodes/")
             return resp.status_code == 200
 
         wait_for_condition(
@@ -170,7 +170,7 @@ class TestRateLimit:
         )
 
         # Should succeed again
-        resp = rate_limit_client.get("/api/v1/nodes/")
+        resp = rate_limit_client.get("/api/v2/nodes/")
         assert resp.status_code == 200
         assert "X-RateLimit-Remaining" in resp.headers
 
@@ -197,14 +197,14 @@ class TestRequestTimeout:
         self, timeout_client: httpx.Client
     ) -> None:
         """A fast request completes without timeout."""
-        resp = timeout_client.get("/api/v1/nodes/")
+        resp = timeout_client.get("/api/v2/nodes/")
         assert resp.status_code == 200
 
     def test_node_survives_after_timeout(self, timeout_client: httpx.Client) -> None:
         """After a timeout, subsequent requests to the same resource work."""
         # Create a node (fast)
         resp = timeout_client.post(
-            "/api/v1/nodes/",
+            "/api/v2/nodes/",
             json={
                 "name": "e2e-timeout-test",
                 "connection_type": "ssh",
@@ -219,7 +219,7 @@ class TestRequestTimeout:
         assert resp.status_code in (201, 400, 409, 500)
 
         # Subsequent request should still work
-        resp2 = timeout_client.get("/api/v1/nodes/")
+        resp2 = timeout_client.get("/api/v2/nodes/")
         assert resp2.status_code == 200
 
 
@@ -233,7 +233,7 @@ class TestSecurityMiddleware:
 
     def test_security_headers_on_success(self, e2e_client: httpx.Client) -> None:
         """Security headers are present on successful responses."""
-        resp = e2e_client.get("/api/v1/nodes/")
+        resp = e2e_client.get("/api/v2/nodes/")
         assert resp.status_code == 200
         assert resp.headers["X-Content-Type-Options"] == "nosniff"
         assert resp.headers["X-Frame-Options"] == "DENY"
@@ -242,7 +242,7 @@ class TestSecurityMiddleware:
 
     def test_security_headers_on_error(self, e2e_client: httpx.Client) -> None:
         """Security headers are present on error responses."""
-        resp = e2e_client.get("/api/v1/nodes/00000000-0000-0000-0000-000000000000")
+        resp = e2e_client.get("/api/v2/nodes/00000000-0000-0000-0000-000000000000")
         assert resp.status_code == 404
         assert resp.headers["X-Content-Type-Options"] == "nosniff"
         assert resp.headers["X-Frame-Options"] == "DENY"
@@ -251,7 +251,7 @@ class TestSecurityMiddleware:
         """Internal errors do not expose traceback or secrets."""
         # A malformed request that triggers a 500 should not leak internals
         resp = e2e_client.post(
-            "/api/v1/nodes/",
+            "/api/v2/nodes/",
             json={"invalid": True},
         )
         if resp.status_code == 500:
@@ -263,7 +263,7 @@ class TestSecurityMiddleware:
     def test_cors_allowed_origin(self, api_base_url: str) -> None:
         """Requests from allowed origins pass CORS preflight."""
         resp = httpx.options(
-            f"{api_base_url}/api/v1/nodes/",
+            f"{api_base_url}/api/v2/nodes/",
             headers={
                 "Origin": "http://localhost:3000",
                 "Access-Control-Request-Method": "GET",
@@ -278,7 +278,7 @@ class TestSecurityMiddleware:
     def test_cors_disallowed_origin(self, api_base_url: str) -> None:
         """Requests from disallowed origins are blocked by CORS."""
         resp = httpx.options(
-            f"{api_base_url}/api/v1/nodes/",
+            f"{api_base_url}/api/v2/nodes/",
             headers={
                 "Origin": "http://evil.example.com",
                 "Access-Control-Request-Method": "GET",
@@ -292,7 +292,7 @@ class TestSecurityMiddleware:
 
     def test_rate_limit_headers_present(self, e2e_client: httpx.Client) -> None:
         """Rate limit headers are present on responses."""
-        resp = e2e_client.get("/api/v1/nodes/")
+        resp = e2e_client.get("/api/v2/nodes/")
         assert resp.status_code == 200
         assert "X-RateLimit-Limit" in resp.headers
         assert "X-RateLimit-Remaining" in resp.headers
@@ -319,12 +319,13 @@ class TestNetworkFailures:
         docker_service_controller.stop("ssh-server")
         try:
             resp = e2e_client.post(
-                f"/api/v1/nodes/{node['id']}/check",
+                "/api/v2/nodes/credential-validations",
+                json={"ids": [node["id"]]},
             )
-            # The check endpoint returns 200 but marks node as unreachable
-            assert resp.status_code == 200
+            assert resp.status_code in (200, 207)
             data = resp.json()
-            assert data["status"] == "unreachable"
+            assert data["failed"] == 1
+            assert data["results"][0]["status"] == "error"
         finally:
             docker_service_controller.start("ssh-server")
 
@@ -341,20 +342,24 @@ class TestNetworkFailures:
         docker_service_controller.stop("ssh-server")
         docker_service_controller.start("ssh-server")
 
-        # Wait for SSH to be healthy by polling the check endpoint
+        # Wait for SSH to be healthy by polling credential-validations
         def _ssh_healthy() -> bool:
-            resp = e2e_client.post(f"/api/v1/nodes/{node['id']}/check")
-            return resp.status_code == 200
+            resp = e2e_client.post(
+                "/api/v2/nodes/credential-validations",
+                json={"ids": [node["id"]]},
+            )
+            return resp.status_code in (200, 207)
 
         wait_for_condition(
             _ssh_healthy, timeout=10.0, description="SSH healthy after restart"
         )
 
-        # Connectivity check should work again
+        # Connectivity check should work again — credential validation succeeds
         resp = e2e_client.post(
-            f"/api/v1/nodes/{node['id']}/check",
+            "/api/v2/nodes/credential-validations",
+            json={"ids": [node["id"]]},
         )
-        assert resp.status_code in (200, 503)  # 503 if SSH not fully ready yet
+        assert resp.status_code in (200, 207, 503)  # 503 if SSH not fully ready yet
 
     def test_db_pause_makes_ready_return_503(
         self,
@@ -457,7 +462,7 @@ class TestNetworkFailures:
                 pass
             time.sleep(1)
 
-        resp = e2e_client.get(f"/api/v1/nodes/{node_id}")
+        resp = e2e_client.get(f"/api/v2/nodes/{node_id}")
         assert resp.status_code == 200
         assert resp.json()["id"] == node_id
 
@@ -482,7 +487,7 @@ class TestNetworkFailures:
                 pass
             time.sleep(1)
 
-        resp = e2e_client.get("/api/v1/nodes/")
+        resp = e2e_client.get("/api/v2/nodes/")
         assert resp.status_code == 200
 
     def test_network_disconnect_reconnect_api_to_db(
@@ -506,7 +511,7 @@ class TestNetworkFailures:
             # Wait for network disconnect to take effect by polling
             def _network_down() -> bool:
                 try:
-                    resp = e2e_client.get("/api/v1/nodes/")
+                    resp = e2e_client.get("/api/v2/nodes/")
                     return resp.status_code in (500, 503)
                 except httpx.HTTPError:
                     return True  # Connection error — also acceptable
@@ -521,7 +526,7 @@ class TestNetworkFailures:
         deadline = time.monotonic() + 30.0
         while time.monotonic() < deadline:
             try:
-                resp = e2e_client.get("/api/v1/nodes/")
+                resp = e2e_client.get("/api/v2/nodes/")
                 if resp.status_code == 200:
                     break
             except httpx.HTTPError:

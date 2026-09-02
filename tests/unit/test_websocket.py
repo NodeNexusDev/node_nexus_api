@@ -5,7 +5,7 @@ from uuid import uuid4
 
 import pytest
 
-from app.api.v1.websocket import _validate_ws_token
+from app.api.v2.websocket import _validate_ws_token
 from app.application.services.api_key_authentication import AuthenticatedPrincipal
 
 
@@ -97,7 +97,7 @@ class TestWebSocketStreaming:
 
     def test_websocket_router_registered(self):
         """WebSocket router is importable with DishkaRoute."""
-        from app.api.v1.websocket import router
+        from app.api.v2.websocket import router
 
         assert router is not None
         routes = [getattr(route, "path", None) for route in router.routes]

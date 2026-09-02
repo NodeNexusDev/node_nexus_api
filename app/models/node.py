@@ -45,6 +45,7 @@ class NodeModel(Base):
     tags: Mapped[list[str] | None] = mapped_column(
         ARRAY(String(100)).with_variant(JSON(), "sqlite"), nullable=True, default=list
     )
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_utcnow
     )

@@ -16,8 +16,17 @@ class ScriptStep(BaseModel):
     type: Literal["inline", "command"]
     command: str | None = Field(default=None, max_length=4096)
     command_id: uuid.UUID | None = None
+    command_name: str | None = Field(default=None, max_length=255)
     params: JsonObject = Field(default_factory=dict)
     on_failure: Literal["stop", "continue"] = Field(default="stop")
+
+    @model_validator(mode="after")
+    def check_command_ref(self) -> Self:
+        if self.type == "command" and not self.command_id and not self.command_name:
+            raise ValueError("command step requires command_id or command_name")
+        if self.command_id and self.command_name:
+            raise ValueError("Provide only one of command_id or command_name")
+        return self
 
 
 class ScriptCreate(BaseModel):
@@ -143,3 +152,27 @@ class ScriptCancelResponse(BaseModel):
     execution_id: str
     status: str
     message: str
+
+
+class ScriptBulkCreateRequest(BaseModel):
+    """Bulk create scripts (1..20)."""
+
+    items: list[ScriptCreate] = Field(min_length=1, max_length=20)
+
+
+class ScriptBulkCreateResult(BaseModel):
+    """Result of creating a single script."""
+
+    id: uuid.UUID | None = None
+    name: str | None = None
+    status: Literal["success", "error"]
+    error: str = ""
+
+
+class ScriptExecutionsRequest(BaseModel):
+    """M×N script executions (script_ids × nodes)."""
+
+    script_ids: list[uuid.UUID] = Field(min_length=1, max_length=20)
+    node_ids: list[uuid.UUID] = Field(default_factory=list)
+    node_tags: list[str] = Field(default_factory=list)
+    params: dict[str, JsonObject] = Field(default_factory=dict)

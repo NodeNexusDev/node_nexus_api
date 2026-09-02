@@ -121,10 +121,6 @@ class FavoriteNotFoundError(DomainError):
     """Raised when a favorite is not found."""
 
 
-class NoteNotFoundError(DomainError):
-    """Raised when a note is not found."""
-
-
 class InvalidCredentialsError(DomainError):
     """Raised when login credentials are invalid."""
 
@@ -151,3 +147,19 @@ class InsufficientPermissionsError(DomainError):
 
 class HostKeyFetchError(DomainError):
     """Raised when SSH host key cannot be fetched or verified."""
+
+
+class ComposeProjectNotFoundError(DomainError):
+    """Raised when a compose project is not found."""
+
+
+class ComposeProjectAlreadyExistsError(DomainError):
+    """Raised when a compose project violates unique node/project constraint."""
+
+
+class PackNotFoundError(DomainError):
+    """Raised when a template pack is not found."""
+
+
+class PackConflictError(DomainError):
+    """Raised when a template pack name conflicts (409)."""

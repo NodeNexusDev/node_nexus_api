@@ -1197,7 +1197,7 @@ wheels = [
 
 [[package]]
 name = "node-nexus-api"
-version = "1.7.2"
+version = "2.0.0"
 source = { editable = "." }
 dependencies = [
     { name = "alembic" },

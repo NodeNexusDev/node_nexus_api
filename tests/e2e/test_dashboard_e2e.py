@@ -6,12 +6,15 @@ import pytest
 from tests.e2e.helpers.nodes import wait_for_audit as _wait_for_audit
 from tests.e2e.helpers.resources import UniqueResourceFactory
 
-pytestmark = pytest.mark.docker
+pytestmark = [
+    pytest.mark.docker,
+    pytest.mark.skip(reason="dashboard removed in 2.0"),
+]
 
 
 def test_dashboard_returns_200(e2e_client: httpx.Client) -> None:
-    """GET /api/v1/dashboard/ returns a valid response."""
-    resp = e2e_client.get("/api/v1/dashboard/")
+    """GET /api/v2/dashboard/ returns a valid response."""
+    resp = e2e_client.get("/api/v2/dashboard/")
     assert resp.status_code == 200
     data = resp.json()
     assert "nodes" in data
@@ -26,11 +29,11 @@ def test_dashboard_counts_nodes(
     e2e_resources: UniqueResourceFactory,
 ) -> None:
     """Dashboard reflects the actual node count."""
-    total_before = e2e_client.get("/api/v1/dashboard/").json()["nodes"]["total"]
+    total_before = e2e_client.get("/api/v2/dashboard/").json()["nodes"]["total"]
     e2e_resources.create_node(name="dash-node-1")
     e2e_resources.create_node(name="dash-node-2")
 
-    resp = e2e_client.get("/api/v1/dashboard/")
+    resp = e2e_client.get("/api/v2/dashboard/")
     assert resp.status_code == 200
     data = resp.json()
     assert data["nodes"]["total"] >= total_before + 2
@@ -41,11 +44,11 @@ def test_dashboard_counts_scripts(
     e2e_resources: UniqueResourceFactory,
 ) -> None:
     """Dashboard reflects the actual script count."""
-    total_before = e2e_client.get("/api/v1/dashboard/").json()["scripts"]["total"]
+    total_before = e2e_client.get("/api/v2/dashboard/").json()["scripts"]["total"]
     e2e_resources.create_script()
     e2e_resources.create_script()
 
-    resp = e2e_client.get("/api/v1/dashboard/")
+    resp = e2e_client.get("/api/v2/dashboard/")
     assert resp.status_code == 200
     data = resp.json()
     assert data["scripts"]["total"] >= total_before + 2
@@ -56,11 +59,11 @@ def test_dashboard_counts_commands(
     e2e_resources: UniqueResourceFactory,
 ) -> None:
     """Dashboard reflects the actual command count."""
-    total_before = e2e_client.get("/api/v1/dashboard/").json()["commands"]["total"]
+    total_before = e2e_client.get("/api/v2/dashboard/").json()["commands"]["total"]
     e2e_resources.create_command()
     e2e_resources.create_command()
 
-    resp = e2e_client.get("/api/v1/dashboard/")
+    resp = e2e_client.get("/api/v2/dashboard/")
     assert resp.status_code == 200
     data = resp.json()
     assert data["commands"]["total"] >= total_before + 2
@@ -74,7 +77,7 @@ def test_dashboard_recent_activity(
     e2e_resources.create_node(name="dash-activity")
     _wait_for_audit(e2e_client, action="create")
 
-    resp = e2e_client.get("/api/v1/dashboard/")
+    resp = e2e_client.get("/api/v2/dashboard/")
     assert resp.status_code == 200
     data = resp.json()
     assert len(data["recent_activity"]) >= 1

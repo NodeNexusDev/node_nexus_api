@@ -19,6 +19,7 @@ class CommandExecutionModel(Base):
         Index("ix_command_executions_created_at", "created_at"),
         Index("ix_command_executions_fingerprint", "command_fingerprint"),
         Index("ix_command_executions_batch_id", "batch_id"),
+        Index("ix_command_executions_command_id", "command_id"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)

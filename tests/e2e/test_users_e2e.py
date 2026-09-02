@@ -15,7 +15,7 @@ def _superuser_client(base_url: str) -> httpx.Client:
     """Login as superuser and return a Bearer-authenticated client."""
     with httpx.Client(base_url=base_url, timeout=30.0) as tmp:
         resp = tmp.post(
-            "/api/v1/auth/login",
+            "/api/v2/auth/login",
             json={"email": _SUPERUSER_EMAIL, "password": _SUPERUSER_PASSWORD},
         )
         assert resp.status_code == 200, f"Login failed: {resp.text}"
@@ -34,14 +34,14 @@ def _non_superuser_client(base_url: str) -> httpx.Client:
     # Create user via superuser client
     with _superuser_client(base_url) as sc:
         create_resp = sc.post(
-            "/api/v1/users/",
+            "/api/v2/users/",
             json={"email": email, "password": password, "is_superuser": False},
         )
         assert create_resp.status_code == 201
     # Login as the new user
     with httpx.Client(base_url=base_url, timeout=30.0) as tmp:
         resp = tmp.post(
-            "/api/v1/auth/login",
+            "/api/v2/auth/login",
             json={"email": email, "password": password},
         )
         assert resp.status_code == 200, f"Login failed: {resp.text}"
@@ -58,7 +58,7 @@ class TestListUsers:
         self, e2e_client: httpx.Client, api_base_url: str
     ) -> None:
         with _superuser_client(api_base_url) as sc:
-            result = sc.get("/api/v1/users/")
+            result = sc.get("/api/v2/users/")
         assert result.status_code == 200
         body = result.json()
         assert "items" in body
@@ -73,12 +73,12 @@ class TestListUsers:
         self, e2e_client: httpx.Client, api_base_url: str
     ) -> None:
         with _non_superuser_client(api_base_url) as nc:
-            result = nc.get("/api/v1/users/")
+            result = nc.get("/api/v2/users/")
         assert result.status_code == 403
 
     def test_list_users_no_auth(self, api_base_url: str) -> None:
         with httpx.Client(base_url=api_base_url, timeout=30.0) as client:
-            result = client.get("/api/v1/users/")
+            result = client.get("/api/v2/users/")
         assert result.status_code == 401
 
 
@@ -87,7 +87,7 @@ class TestCreateUser:
         email = f"new-{uuid4().hex[:8]}@test.com"
         with _superuser_client(api_base_url) as sc:
             result = sc.post(
-                "/api/v1/users/",
+                "/api/v2/users/",
                 json={"email": email, "password": "secure-pass-123"},
             )
         assert result.status_code == 201
@@ -101,7 +101,7 @@ class TestCreateUser:
         email = f"super-{uuid4().hex[:8]}@test.com"
         with _superuser_client(api_base_url) as sc:
             result = sc.post(
-                "/api/v1/users/",
+                "/api/v2/users/",
                 json={
                     "email": email,
                     "password": "secure-pass-123",
@@ -115,11 +115,11 @@ class TestCreateUser:
         email = f"dup-{uuid4().hex[:8]}@test.com"
         with _superuser_client(api_base_url) as sc:
             sc.post(
-                "/api/v1/users/",
+                "/api/v2/users/",
                 json={"email": email, "password": "duplicate-pass-1"},
             )
             result = sc.post(
-                "/api/v1/users/",
+                "/api/v2/users/",
                 json={"email": email, "password": "duplicate-pass-2"},
             )
         assert result.status_code == 409
@@ -128,7 +128,7 @@ class TestCreateUser:
         email = f"blocked-{uuid4().hex[:8]}@test.com"
         with _non_superuser_client(api_base_url) as nc:
             result = nc.post(
-                "/api/v1/users/",
+                "/api/v2/users/",
                 json={"email": email, "password": "forbidden-pass-123"},
             )
         assert result.status_code == 403
@@ -139,33 +139,33 @@ class TestDeleteUser:
         email = f"del-{uuid4().hex[:8]}@test.com"
         with _superuser_client(api_base_url) as sc:
             create_resp = sc.post(
-                "/api/v1/users/",
+                "/api/v2/users/",
                 json={"email": email, "password": "delete-pass-123"},
             )
             user_id = create_resp.json()["id"]
-            result = sc.delete(f"/api/v1/users/{user_id}")
+            result = sc.delete(f"/api/v2/users/{user_id}")
         assert result.status_code == 204
 
         # Verify user is gone
         with _superuser_client(api_base_url) as sc:
-            list_resp = sc.get("/api/v1/users/")
+            list_resp = sc.get("/api/v2/users/")
         emails = [u["email"] for u in list_resp.json()["items"]]
         assert email not in emails
 
     def test_delete_nonexistent_user(self, api_base_url: str) -> None:
         fake_id = str(uuid4())
         with _superuser_client(api_base_url) as sc:
-            result = sc.delete(f"/api/v1/users/{fake_id}")
+            result = sc.delete(f"/api/v2/users/{fake_id}")
         assert result.status_code == 404
 
     def test_delete_user_non_superuser_forbidden(self, api_base_url: str) -> None:
         email = f"protected-{uuid4().hex[:8]}@test.com"
         with _superuser_client(api_base_url) as sc:
             create_resp = sc.post(
-                "/api/v1/users/",
+                "/api/v2/users/",
                 json={"email": email, "password": "protected-pass-123"},
             )
             user_id = create_resp.json()["id"]
         with _non_superuser_client(api_base_url) as nc:
-            result = nc.delete(f"/api/v1/users/{user_id}")
+            result = nc.delete(f"/api/v2/users/{user_id}")
         assert result.status_code == 403

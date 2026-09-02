@@ -78,14 +78,22 @@ class NodeBulkCommandService:
                 )
 
         results = await asyncio.gather(
-            *(self._execute_on_single_node(node, data.command) for node in target_nodes)
+            *(
+                self._execute_on_single_node(node, data.command, timeout=data.timeout)
+                for node in target_nodes
+            )
         )
 
         finished_at = datetime.now(UTC)
 
         if self._history_writer:
             await self._save_history(
-                data.command, results, batch_id, started_at, finished_at
+                data.command,
+                results,
+                batch_id,
+                started_at,
+                finished_at,
+                command_id=data.command_id,
             )
 
         # Audit uses the request-scoped session and therefore remains outside
@@ -168,11 +176,15 @@ class NodeBulkCommandService:
         self,
         node: NodeConnectionDTO,
         command: str,
+        timeout: int | None = None,
     ) -> CommandExecutionDTO:
         """Execute on one node and always return a result."""
         async with self._semaphore:
             connector = build_ssh_connector(
-                node, self._credential_cipher, self._connector_factory
+                node,
+                self._credential_cipher,
+                self._connector_factory,
+                timeout=timeout,
             )
 
             try:
@@ -227,6 +239,7 @@ class NodeBulkCommandService:
         batch_id: uuid.UUID,
         started_at: datetime,
         finished_at: datetime,
+        command_id: uuid.UUID | None = None,
     ) -> None:
         """Persist each node execution result as a history record."""
         writer = self._history_writer
@@ -250,6 +263,7 @@ class NodeBulkCommandService:
                     batch_id=batch_id,
                     started_at=started_at,
                     finished_at=finished_at,
+                    command_id=command_id,
                 )
             )
 

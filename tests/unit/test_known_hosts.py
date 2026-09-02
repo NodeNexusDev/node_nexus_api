@@ -135,7 +135,7 @@ class TestKnownHostsManager:
         ):
             with patch(
                 "app.adapters.runtime.known_hosts.asyncio.create_subprocess_exec",
-                side_effect=TimeoutError,
+                side_effect=TimeoutError("timeout"),
             ):
                 assert await m._is_present("myhost", 22) is True
 

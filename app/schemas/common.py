@@ -30,12 +30,21 @@ class CursorPage[T](BaseModel):
 
 
 class ErrorResponse(BaseModel):
-    """Unified error response schema."""
+    """Unified error response schema — always 4 fields."""
 
     code: str
     message: str
     request_id: str | None = None
-    detail: JsonValue = None
+    detail: JsonValue | None = None
+
+
+class BulkResult[T](BaseModel):
+    """Unified bulk envelope for 2.0 (207 Multi-Status)."""
+
+    total: int
+    succeeded: int
+    failed: int
+    results: list[T]
 
 
 AUTHENTICATED_ERROR_RESPONSES: dict[int | str, dict[str, Any]] = {
@@ -46,10 +55,6 @@ AUTHENTICATED_ERROR_RESPONSES: dict[int | str, dict[str, Any]] = {
     403: {
         "model": ErrorResponse,
         "description": "The authenticated principal lacks the required permission.",
-    },
-    429: {
-        "model": ErrorResponse,
-        "description": "The configured request rate limit was exceeded.",
     },
     404: {
         "model": ErrorResponse,
@@ -63,9 +68,21 @@ AUTHENTICATED_ERROR_RESPONSES: dict[int | str, dict[str, Any]] = {
         "model": ErrorResponse,
         "description": "The request or a domain value failed validation.",
     },
+    429: {
+        "model": ErrorResponse,
+        "description": "The configured request rate limit was exceeded.",
+    },
+    502: {
+        "model": ErrorResponse,
+        "description": "Upstream Docker daemon returned a bad gateway.",
+    },
     503: {
         "model": ErrorResponse,
         "description": "A required backend or remote service is unavailable.",
+    },
+    504: {
+        "model": ErrorResponse,
+        "description": "Remote operation timed out.",
     },
 }
 

@@ -53,6 +53,6 @@ class TestMiddlewareExclusions:
     def test_metrics_not_excluded_from_health_router(self):
         """/metrics is separate from /health in health router."""
         # /metrics endpoint is exposed by instrumentator, not the health router
-        from app.api.v1 import health
+        from app.api.v2 import health
 
         assert hasattr(health, "router")

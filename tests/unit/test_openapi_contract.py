@@ -13,7 +13,7 @@ from app.main import app
 from tests.types import UnvalidatedJsonObject
 
 OPENAPI_CONTRACT_SHA256 = (
-    "0e392059724dfba005dcc38ef0feb291286d5d7cc6a7778c29a503a10b189ce1"
+    "34b90988ae6791d8131c5c059afb99e04dfaaa9078fb4cff88ccc27c4b9db839"
 )
 
 _CANONICAL_ENV = {
@@ -104,11 +104,11 @@ def test_openapi_auth_and_sse_contracts_are_explicit() -> None:
     """Keep auth alternatives and the streaming media type visible in OpenAPI."""
     schema = app.openapi()
 
-    events_get = schema["paths"]["/api/v1/events/stream"]["get"]
+    events_get = schema["paths"]["/api/v2/events/stream"]["get"]
     assert events_get["security"] == [{"HTTPBearer": []}, {"APIKeyHeader": []}]
     assert set(events_get["responses"]["200"]["content"]) == {"text/event-stream"}
 
-    auth_me_get = schema["paths"]["/api/v1/auth/me"]["get"]
+    auth_me_get = schema["paths"]["/api/v2/auth/me"]["get"]
     assert auth_me_get["security"] == [{"HTTPBearer": []}]
 
 

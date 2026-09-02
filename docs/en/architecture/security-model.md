@@ -14,14 +14,14 @@ programmatic access and **JWT Bearer tokens** for browser/SPA clients.
 write operations. Managed keys are stored as SHA-256 hashes. The master key
 configured through `MASTER_API_KEY` always has read-write access.
 
-**JWT tokens** are obtained by POSTing credentials to `/api/v1/auth/login`.
+**JWT tokens** are obtained by POSTing credentials to `/api/v2/auth/login`.
 The response contains an access token (short-lived, default 15 minutes) and sets
 a refresh token as an `HttpOnly`, `Secure`, `SameSite=Lax` cookie. The access
 token is sent as `Authorization: Bearer <token>`. Refresh tokens are rotated on
 each use; old tokens are immediately invalidated. JWT is signed with HS256 using
 `SECRET_KEY`.
 
-Endpoints that require superuser privileges (`/api/v1/users/*`) check the JWT
+Endpoints that require superuser privileges (`/api/v2/users/*`) check the JWT
 `is_superuser` claim. API keys cannot be used for these endpoints — a JWT token
 is required.
 

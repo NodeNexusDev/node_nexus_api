@@ -9,7 +9,7 @@ from dishka.integrations.fastapi import setup_dishka
 from fastapi import FastAPI
 from httpx2 import ASGITransport, AsyncClient
 
-from app.api.v1.internal import router as internal_router
+from app.api.v2.internal import router as internal_router
 from app.application.ports.audit_outbox_controller import AuditOutboxController
 from app.application.ports.schedule import JobSchedulerPort, ScheduleReader
 from app.application.services.scheduled_script_executor import ScheduledScriptExecutor

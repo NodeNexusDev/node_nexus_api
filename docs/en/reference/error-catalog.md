@@ -2,19 +2,21 @@
 title: Error catalog
 status: stable
 translation_key: reference.error-catalog
-source_revision: "2026-08-25"
+source_revision: "2026-09-02"
 ---
 
 # Error catalog
 
 | Status | Meaning |
 |---|---|
+| `207` | Multi-Status — bulk operation partially succeeded (`succeeded>0 && failed>0`) |
 | `400` | Malformed or unsupported request |
 | `401` | Missing, invalid, expired, or revoked API key |
 | `403` | API key lacks write scope |
-| `404` | Node, command, script, execution, container, network, volume, image, tag, schedule, favorite, note, or API key not found |
+| `404` | Node, command, script, execution, container, network, volume, image, tag, schedule, favorite, or API key not found |
 | `409` | Node name conflict |
-| `422` | Schema, template, Docker, schedule, config format, or domain validation failed |
+| `410` | Gone — removed v1 prefix `/api/v1` (use `/api/v2`) |
+| `422` | Schema, template, Docker, schedule, config format, or domain validation failed (including invalid cursor, `M×N>100`, unsupported `format_version`) |
 | `429` | Process-local rate limit exceeded |
 | `502` | Remote Docker operation failed |
 | `503` | SSH connection, Docker daemon, credential decryption, audit persistence, or scheduler unavailable |
@@ -33,10 +35,28 @@ Domain failures use a stable JSON envelope:
 
 - `code` — machine-readable error type (the domain exception class name)
 - `message` — human-readable description
-- `request_id` — correlation id from the request middleware (`null` if unavailable)
-- `detail` — same as `message`, for backward compatibility
+- `request_id` — correlation id from the request middleware (`string|null`, `null` if unavailable)
+- `detail` — same as `message` for backward compatibility (`Json|null`)
 
 Do not branch client logic on `message` or `detail`; use HTTP status and `code`.
+
+Bulk operations use a `BulkResult<T>` envelope:
+
+```json
+{
+  "total": 3,
+  "succeeded": 2,
+  "failed": 1,
+  "results": [
+    {"id": "...", "status": "success"},
+    {"id": "...", "status": "error", "error": "..."}
+  ]
+}
+```
+
+Status mapping: `200` all succeeded, `207 Multi-Status` partial
+(`succeeded>0 && failed>0`), `422` all failed. `BulkCommandRequestDTO.timeout`
+is validated as optional `int` and wired to per-node SSH execution.
 
 ## Domain error codes
 
@@ -60,7 +80,6 @@ Do not branch client logic on `message` or `detail`; use HTTP status and `code`.
 | `NodeNameConflictError` | `409` | Node name already exists |
 | `NodeNotFoundError` | `404` | Node does not exist |
 | `NetworkNotFoundError` | `404` | Docker network does not exist |
-| `NoteNotFoundError` | `404` | Note does not exist |
 | `RequestTimeoutError` | `504` | Request exceeded the global timeout |
 | `ScheduleNotFoundError` | `404` | Schedule does not exist |
 | `SchedulePersistenceError` | `503` | Schedule runtime state update failed |

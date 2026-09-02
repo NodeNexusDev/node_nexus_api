@@ -11,6 +11,11 @@ _SUPPRESSION_RE = re.compile(
 )
 _ALLOWED_PRODUCTION = {
     ("app/core/config.py", "type:", "call-arg"),
+    ("app/adapters/persistence/compose.py", "type:", "assignment"),
+    ("app/api/v2/audit.py", "type:", "assignment"),
+    ("app/api/v2/commands.py", "type:", "arg-type"),
+    ("app/api/v2/scripts.py", "type:", "arg-type"),
+    ("app/api/v2/scripts.py", "type:", "assignment"),
 }
 
 

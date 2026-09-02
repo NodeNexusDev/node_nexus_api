@@ -14,14 +14,14 @@ Node Nexus поддерживает два метода аутентификац
 и write operations. Managed keys хранятся как SHA-256 hashes. Мастер-ключ из
 `MASTER_API_KEY` всегда имеет права на чтение и запись.
 
-**JWT токены** получаются POST-запросом к `/api/v1/auth/login`. Ответ содержит
+**JWT токены** получаются POST-запросом к `/api/v2/auth/login`. Ответ содержит
 access token (короткоживущий, по умолчанию 15 минут) и устанавливает refresh
 token в `HttpOnly`, `Secure`, `SameSite=Lax` cookie. Access token передаётся как
 `Authorization: Bearer <token>`. Refresh tokens ротируются при каждом
 использовании; старые токены немедленно инвалидируются. JWT подписывается HS256
 с использованием `SECRET_KEY`.
 
-Endpoints, требующие привилегии суперпользователя (`/api/v1/users/*`),
+Endpoints, требующие привилегии суперпользователя (`/api/v2/users/*`),
 проверяют claim `is_superuser` в JWT. API keys не могут быть использованы для
 этих endpoints — необходим JWT токен.
 

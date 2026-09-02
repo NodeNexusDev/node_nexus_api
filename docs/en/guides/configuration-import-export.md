@@ -2,7 +2,7 @@
 title: Import and export configuration
 status: stable
 translation_key: guides.configuration-import-export
-source_revision: "2026-08-16"
+source_revision: "2026-09-02"
 ---
 
 # Import and export configuration
@@ -14,8 +14,10 @@ created, updated, and skipped counts.
 
 The envelope contains independent `format_version` and `application_version`
 fields. Imports validate the format before writing anything and reject an
-unknown major version. The legacy `version` field remains temporarily for
-backward compatibility.
+unknown major version with `422` (`UnsupportedConfigFormatError`). Only
+`format_version` is accepted — an import payload with an old or unsupported
+version (for example the legacy `version` field or a mismatched major) fails
+with `422`.
 
 ## Dry-run mode
 
@@ -29,7 +31,7 @@ without writing to the database. The response includes:
 Request example:
 
 ```json
-POST /api/v1/config/import
+POST /api/v2/config/import
 {
   "dry_run": true,
   "nodes": [

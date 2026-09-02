@@ -2,7 +2,7 @@
 title: Импорт и экспорт конфигурации
 status: stable
 translation_key: guides.configuration-import-export
-source_revision: "2026-08-16"
+source_revision: "2026-09-02"
 ---
 
 # Импорт и экспорт конфигурации
@@ -14,7 +14,9 @@ source_revision: "2026-08-16"
 
 Envelope содержит независимые поля `format_version` и `application_version`.
 Перед любыми записями импорт проверяет формат и отклоняет неизвестную major
-version. Legacy-поле `version` временно сохранено для обратной совместимости.
+version с `422` (`UnsupportedConfigFormatError`). Принимается только
+`format_version` — payload импорта со старой или неподдерживаемой версией
+(например legacy-поле `version` или несовместимый major) завершается `422`.
 
 ## Dry-run режим
 
@@ -28,7 +30,7 @@ version. Legacy-поле `version` временно сохранено для о
 Пример запроса:
 
 ```json
-POST /api/v1/config/import
+POST /api/v2/config/import
 {
   "dry_run": true,
   "nodes": [

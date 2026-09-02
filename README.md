@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/NodeNexusDev/node_nexus_api/actions/workflows/ci.yml/badge.svg)](https://github.com/NodeNexusDev/node_nexus_api/actions/workflows/ci.yml)
 [![Coverage](https://img.shields.io/badge/coverage-95%25-brightgreen)](.agents/workflow.md)
-[![Version](https://img.shields.io/badge/version-1.0.0-blue)](https://github.com/NodeNexusDev/node_nexus_api)
+[![Version](https://img.shields.io/badge/version-2.0.0-blue)](https://github.com/NodeNexusDev/node_nexus_api)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 REST API for centrally managing server nodes, SSH commands, reusable scripts,
@@ -21,16 +21,18 @@ encrypted credentials, audit logging, and fine-grained API keys.
 
 ## Features
 
-- Node inventory, tags, search, pagination, SSH checks, and system metrics
+- Node inventory, tags, search, cursor pagination, SSH checks, and system metrics
 - Parameterized command templates and multi-node script pipelines
-- Remote Docker container, image, network, and volume operations
+- Remote Docker container, image, network, and volume operations with vertical bulk and 9 new operations
 - API key scopes, audit log, encrypted SSH credentials, and rate limiting
 - WebSocket command output, Prometheus metrics, and OpenTelemetry tracing
 - Configuration import/export without secret material
-- Favorites, notes, tag management, command/script cloning
-- Dashboard metrics with time-based grouping and global search
-- Execution statistics with success rate and average duration
+- Favorites, tag management, command/script cloning
+- Execution statistics with unified stats (snapshot and buckets) and success rate
 - Audit export (JSON/CSV) and SSE metrics stream
+- Bulk-first operations with BulkResult 207 Multi-Status (`{total,succeeded,failed,results}`)
+- Docker Compose project lifecycle (persistent `compose_projects`)
+- Template registries, packs, and installations with versioned assets
 
 ## Quick start
 
@@ -39,7 +41,7 @@ git clone https://github.com/NodeNexusDev/node_nexus_api.git && cd node_nexus_ap
 
 cp .env.example .env
 docker compose pull && docker compose up -d
-# pin version: IMAGE_TAG=1.7.1 docker compose up -d
+# pin version: IMAGE_TAG=2.0.0 docker compose up -d
 # build from source: docker compose -f docker-compose.build.yml up -d --build
 ```
 
@@ -51,14 +53,20 @@ Explore the API at `http://localhost:8000/docs` (Swagger UI) or
 ## API at a glance
 
 ```bash
-# List nodes
-curl -H 'X-API-Key: your-key' 'http://localhost:8000/api/v1/nodes/'
+# List nodes (cursor pagination)
+curl -H 'X-API-Key: your-key' 'http://localhost:8000/api/v2/nodes/?cursor=&limit=20'
 
-# Execute a command on a node
+# Bulk create nodes
 curl -X POST -H 'X-API-Key: your-key' \
   -H 'Content-Type: application/json' \
-  -d '{"command": "uptime"}' \
-  'http://localhost:8000/api/v1/nodes/{id}/execute/'
+  -d '{"items": [{"name": "srv", "host": "192.0.2.10", "port": 22, "connection_type": "ssh", "username": "ops", "password": "..."}]}' \
+  'http://localhost:8000/api/v2/nodes/'
+
+# Execute commands on nodes (M×N)
+curl -X POST -H 'X-API-Key: your-key' \
+  -H 'Content-Type: application/json' \
+  -d '{"command_ids": ["<cmd-id>"], "node_ids": ["<node-id>"]}' \
+  'http://localhost:8000/api/v2/commands/executions'
 ```
 
 ## Architecture
@@ -70,6 +78,8 @@ database session. See the
 [architecture guide](https://nodenexusdev.github.io/node_nexus_api/en/architecture/).
 
 ## Development
+
+Dependencies are pinned via `uv.lock` (committed).
 
 ```bash
 uv sync

@@ -70,12 +70,13 @@ class ExecutionStatsRepository:
 
         where_sql = " AND ".join(where_clauses) if where_clauses else "TRUE"
         dur = "GREATEST(0, EXTRACT(EPOCH FROM (ce.finished_at - ce.started_at)) * 1000)"
+        # command_executions: no cancelled status — always 0 (unlike scripts)
         sql = text(  # nosec B608: false positive – dur/where_sql built from whitelisted constants
             "SELECT "
             "  COUNT(*)::int AS total, "
             "  COUNT(*) FILTER (WHERE ce.exit_code = 0)::int AS successful, "  # noqa: E501
             "  COUNT(*) FILTER (WHERE ce.exit_code != 0)::int AS failed, "  # noqa: E501
-            "  0::int AS cancelled, "
+            "  0::int AS cancelled, "  # noqa: E501 — no cancelled for commands
             f"  AVG({dur}) FILTER (WHERE ce.finished_at IS NOT NULL) AS avg_duration_ms, "  # noqa: E501  # nosec B608
             f"  MIN({dur}) FILTER (WHERE ce.finished_at IS NOT NULL) AS min_duration_ms, "  # noqa: E501  # nosec B608
             f"  MAX({dur}) FILTER (WHERE ce.finished_at IS NOT NULL) AS max_duration_ms, "  # noqa: E501  # nosec B608

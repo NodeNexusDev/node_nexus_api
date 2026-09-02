@@ -2,7 +2,7 @@
 title: Deployment and rollback
 status: stable
 translation_key: operations.deployment
-source_revision: "2026-07-30"
+source_revision: "2026-09-02"
 ---
 
 # Deployment and rollback
@@ -11,13 +11,20 @@ source_revision: "2026-07-30"
 
 - Terminate TLS at a trusted reverse proxy and expose only the API port.
 - Keep PostgreSQL and telemetry receivers on private networks.
-- Store environment values in the deployment platform's secret store.
+- Store environment values in the deployment platform's secret store
+  (`DATABASE_URL`, `SECRET_KEY` 32 chars, `ENCRYPTION_SALT` 16 chars,
+  `MASTER_API_KEY` 32 chars, `REQUEST_TIMEOUT`, `PROMETHEUS_ENABLED`,
+  `PROMETHEUS_PATH`, `SCHEDULER_ENABLED`, `AUTO_MIGRATE`, etc. — see
+  `.env.example` and `app/core/config.py`).
 - Generate independent, high-entropy `SECRET_KEY` and `MASTER_API_KEY` values.
 - Persist PostgreSQL data and verify backups before rollout.
 - Set `AUTO_MIGRATE=false` when migrations are release-managed.
 
 The Compose file is a useful baseline, but its example database credentials and
-published database port are not production defaults.
+published database port are not production defaults. Compose projects
+(`compose_projects`) and template registries/packs/assets/installations are
+optional 2.0 features — they are not required for a basic deployment and can be
+enabled later.
 
 ## Release sequence
 
@@ -26,7 +33,14 @@ published database port are not production defaults.
 3. Build an immutable image from the reviewed commit and scan dependencies.
 4. Apply `uv run alembic upgrade head` as one controlled job.
 5. Start one instance and wait for both `/health` and `/ready`.
-6. Request `/api/v1/nodes/?page=1&size=1` with a valid key.
+6. Smoke-check with cursor pagination and API key:
+
+   ```bash
+   curl --fail-with-body \
+     -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
+     "${NODE_NEXUS_URL}/api/v2/nodes/?cursor=&limit=1"
+   ```
+
 7. Shift traffic gradually while monitoring errors, timeouts, and database health.
 
 Keep `SCHEDULER_ENABLED=true` on eligible replicas. PostgreSQL persists
@@ -40,5 +54,6 @@ verification in production.
 Before routing traffic to the previous image, confirm that it supports the
 upgraded schema. Do not run `alembic downgrade` until its data-loss implications
 have been reviewed and a fresh backup exists. After rollback, verify `/ready`,
-repeat the authenticated smoke request, and record the failed version, migration
-revision, and observed symptoms.
+repeat the authenticated smoke request
+(`GET /api/v2/nodes/?cursor=&limit=1` with `X-API-Key`), and record the failed
+version, migration revision, and observed symptoms.

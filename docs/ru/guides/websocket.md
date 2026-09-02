@@ -7,7 +7,7 @@ source_revision: "2026-07-29"
 
 # WebSocket streaming команд
 
-Подключитесь к `WS /api/v1/nodes/{node_id}/exec-stream` с `X-API-Key`.
+Подключитесь к `WS /api/v2/nodes/{node_id}/exec-stream` с `X-API-Key`.
 Legacy-вариант `?token=` deprecated, поскольку URL может попасть в логи.
 Managed key должен иметь scope `read-write`; master key обрабатывается так же,
 как в HTTP.

@@ -2,7 +2,7 @@
 title: Обзор архитектуры
 status: stable
 translation_key: architecture.overview
-source_revision: "2026-08-26"
+source_revision: "2026-09-02"
 ---
 
 # Обзор архитектуры
@@ -70,6 +70,7 @@ erDiagram
         text ssh_key
         string docker_host
         list tags
+        text description
         datetime created_at
         datetime updated_at
     }
@@ -81,6 +82,7 @@ erDiagram
         text command
         list parameters
         list tags
+        uuid template_pack_id FK
         datetime created_at
         datetime updated_at
     }
@@ -91,8 +93,79 @@ erDiagram
         text description
         json steps
         list tags
+        uuid template_pack_id FK
         datetime created_at
         datetime updated_at
+    }
+
+    COMPOSE_PROJECTS {
+        uuid id PK
+        uuid node_id FK
+        string project_name
+        text compose
+        json env
+        uuid template_pack_id FK
+        datetime created_at
+        datetime updated_at
+    }
+
+    TEMPLATE_REGISTRIES {
+        uuid id PK
+        string owner
+        string name
+        text github_token_encrypted
+        string default_branch
+        datetime last_synced_at
+        datetime created_at
+        datetime updated_at
+    }
+
+    TEMPLATE_PACKS {
+        uuid id PK
+        uuid registry_id FK
+        string pack_id
+        string name
+        text description
+        string version
+        string author
+        list tags
+        string manifest_sha
+        text readme
+        datetime created_at
+        datetime updated_at
+    }
+
+    TEMPLATE_ASSETS {
+        uuid id PK
+        uuid pack_id FK
+        string path
+        text content
+        int size
+        string sha
+        datetime created_at
+        datetime updated_at
+    }
+
+    TEMPLATE_INSTALLATIONS {
+        uuid id PK
+        uuid pack_id FK
+        string entity_type
+        uuid entity_id FK
+        datetime created_at
+    }
+
+    COMMAND_EXECUTION {
+        uuid id PK
+        uuid batch_id
+        uuid node_id FK
+        uuid command_id FK
+        string command_fingerprint
+        int exit_code
+        text stdout
+        text stderr
+        datetime started_at
+        datetime finished_at
+        datetime created_at
     }
 
     SCRIPT_SCHEDULE {
@@ -180,9 +253,43 @@ erDiagram
     NODE ||--o{ SCRIPT_EXECUTION : "targets"
     NODE ||--o{ AUDIT_LOG : "tracks"
     USER ||--o{ REFRESH_TOKEN : "has"
+    NODE ||--o{ COMPOSE_PROJECTS : "hosts"
+    TEMPLATE_REGISTRIES ||--o{ TEMPLATE_PACKS : "provides"
+    TEMPLATE_PACKS ||--o{ TEMPLATE_ASSETS : "contains"
+    TEMPLATE_PACKS ||--o{ TEMPLATE_INSTALLATIONS : "installed as"
+    COMMAND ||--o{ COMMAND_EXECUTION : "executed as"
+    NODE ||--o{ COMMAND_EXECUTION : "runs on"
 ```
 
 `COMMAND`, `AUDIT_OUTBOX`, `API_KEY` и `USER` — независимые сущности. Учётные
-записи пользователей управляются через `/api/v1/users/` (только для
+записи пользователей управляются через `/api/v2/users/` (только для
 суперпользователя). Refresh tokens хранятся как SHA-256 hashes и используются
 для ротации JWT токенов.
+
+Таблица `NOTES` удалена в 2.0 (миграция `b1c2d3e4f5g6`); используйте
+`NODE.description`. `COMMAND` и `SCRIPT` теперь содержат `template_pack_id` для
+связи с паком шаблонов. `COMPOSE_PROJECTS` имеет ключ `(node_id, project_name)` и
+хранит `compose`, `env` и опциональный `template_pack_id`. Подсистема шаблонов
+использует `TEMPLATE_REGISTRIES`, `TEMPLATE_PACKS`, `TEMPLATE_ASSETS` и
+`TEMPLATE_INSTALLATIONS`.
+
+Индексы и миграции:
+
+- `ix_command_executions_command_id` на `command_executions.command_id`
+  (миграция `90156a878bb9`).
+- `ix_nodes_name` уникален на `nodes.name`, `ix_commands_name` на `commands.name`,
+  GIN-индексы на массивах `tags`.
+
+Bulk и пагинация (v2):
+
+- Bulk-операции возвращают конверт `BulkResult<T>`
+  `{total, succeeded, failed, results:[{id,status:"success"|"error",error?,output?}]}`
+  с `200` при полном успехе, `207 Multi-Status` когда `succeeded>0 && failed>0`,
+  и `422` когда все завершились ошибкой.
+- Списки используют cursor-пагинацию
+  `GET /api/v2/nodes/?cursor=<base64>&limit=20 → {items,next_cursor,has_more,limit}`
+  (`cursor` кодирует `{"offset": n}` или `{"ts": "...", "id": "..."}`); неверный cursor
+  → `422`.
+- `BulkCommandRequestDTO.timeout` (опциональный `int`) прокидывается из API-запроса
+  через `NodeBulkCommandService.execute(..., timeout=data.timeout)` в SSH executor
+  для каждой ноды.

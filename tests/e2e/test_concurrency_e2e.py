@@ -45,7 +45,7 @@ async def _release_on_event(event: asyncio.Event, coro):
 async def test_concurrent_create_same_name(
     service_ports: ServicePorts,
 ) -> None:
-    """Two concurrent POST /nodes with same name: one 201, one 409."""
+    """Two concurrent POST /nodes with same name: one succeeds, one fails."""
     base = _base_url(service_ports)
     name = f"concurrent-{uuid4().hex[:8]}"
     barrier = asyncio.Event()
@@ -57,12 +57,16 @@ async def test_concurrent_create_same_name(
             # Wait for barrier before sending
             await barrier.wait()
             return await client.post(
-                "/api/v1/nodes/",
+                "/api/v2/nodes/",
                 json={
-                    "name": name,
-                    "host": "10.0.0.1",
-                    "port": 22,
-                    "connection_type": "ssh",
+                    "items": [
+                        {
+                            "name": name,
+                            "host": "10.0.0.1",
+                            "port": 22,
+                            "connection_type": "ssh",
+                        }
+                    ]
                 },
             )
 
@@ -73,23 +77,49 @@ async def test_concurrent_create_same_name(
     barrier.set()  # Release both
     resp_a, resp_b = await asyncio.gather(task_a, task_b)
 
-    # One must succeed, the other must fail with 409
-    statuses = {resp_a.status_code, resp_b.status_code}
-    assert 201 in statuses, (
-        f"Neither request succeeded: {resp_a.status_code}, {resp_b.status_code}"
+    # Bulk-first: one succeeds (succeeded=1), the other fails (failed=1)
+    def _succeeded(resp: httpx.Response) -> bool:
+        try:
+            data = resp.json()
+            if isinstance(data, dict) and "results" in data:
+                return bool(data.get("succeeded") == 1)
+            return resp.status_code == 201
+        except Exception:
+            return False
+
+    succeeded = sum(1 for r in (resp_a, resp_b) if _succeeded(r))
+    failed = 2 - succeeded
+    assert succeeded == 1, (
+        f"Expected one success, got {resp_a.status_code} {resp_a.text[:200]} "
+        f"and {resp_b.status_code} {resp_b.text[:200]}"
     )
-    assert 409 in statuses, (
-        f"Expected one 409, got {resp_a.status_code}, {resp_b.status_code}"
-    )
+    assert failed == 1
 
     # Cleanup the created node
     for resp in (resp_a, resp_b):
-        if resp.status_code == 201:
-            node_id = resp.json()["id"]
-            async with httpx.AsyncClient(
-                base_url=base, timeout=30.0, headers=_auth_headers()
-            ) as client:
-                await client.delete(f"/api/v1/nodes/{node_id}")
+        try:
+            data = resp.json()
+            if isinstance(data, dict) and "results" in data:
+                first = data["results"][0]
+                is_ok = data.get("succeeded") == 1 and first.get("status") == "success"
+                if is_ok:
+                    node_id = first.get("node_id") or first.get("id")
+                    if node_id:
+                        async with httpx.AsyncClient(
+                            base_url=base,
+                            timeout=30.0,
+                            headers=_auth_headers(),
+                        ) as client:
+                            await client.delete(f"/api/v2/nodes/{node_id}")
+            elif resp.status_code == 201:
+                node_id = data.get("id")
+                if node_id:
+                    async with httpx.AsyncClient(
+                        base_url=base, timeout=30.0, headers=_auth_headers()
+                    ) as client:
+                        await client.delete(f"/api/v2/nodes/{node_id}")
+        except Exception:
+            continue
 
 
 @pytest.mark.asyncio
@@ -104,29 +134,34 @@ async def test_repeat_delete_idempotent(
     ) as client:
         # Create node
         resp = await client.post(
-            "/api/v1/nodes/",
+            "/api/v2/nodes/",
             json={
-                "name": f"idempotent-del-{uuid4().hex[:8]}",
-                "host": "10.0.0.1",
-                "port": 22,
-                "connection_type": "ssh",
+                "items": [
+                    {
+                        "name": f"idempotent-del-{uuid4().hex[:8]}",
+                        "host": "10.0.0.1",
+                        "port": 22,
+                        "connection_type": "ssh",
+                    }
+                ]
             },
         )
-        assert resp.status_code == 201
-        node_id = resp.json()["id"]
+        assert resp.status_code in (200, 201, 207)
+        data = resp.json()
+        node_id = data["results"][0]["node_id"] if "results" in data else data["id"]
 
         # First delete — should succeed
-        resp1 = await client.delete(f"/api/v1/nodes/{node_id}")
+        resp1 = await client.delete(f"/api/v2/nodes/{node_id}")
         assert resp1.status_code == 204, f"First delete: {resp1.status_code}"
 
         # Second delete — should be 404
-        resp2 = await client.delete(f"/api/v1/nodes/{node_id}")
+        resp2 = await client.delete(f"/api/v2/nodes/{node_id}")
         assert resp2.status_code == 404, (
             f"Second delete: expected 404, got {resp2.status_code}"
         )
 
         # Third delete — still 404, never 500
-        resp3 = await client.delete(f"/api/v1/nodes/{node_id}")
+        resp3 = await client.delete(f"/api/v2/nodes/{node_id}")
         assert resp3.status_code == 404, (
             f"Third delete: expected 404, got {resp3.status_code}"
         )
@@ -144,7 +179,7 @@ async def test_concurrent_patch_api_key(
     ) as client:
         # Create API key
         resp = await client.post(
-            "/api/v1/api-keys/",
+            "/api/v2/api-keys/",
             json={"name": "concurrent-patch-key"},
         )
         assert resp.status_code == 201
@@ -159,7 +194,7 @@ async def test_concurrent_patch_api_key(
                 ) as c:
                     await barrier.wait()
                     return await c.patch(
-                        f"/api/v1/api-keys/{key_id}",
+                        f"/api/v2/api-keys/{key_id}",
                         json={"name": new_name},
                     )
 
@@ -174,7 +209,7 @@ async def test_concurrent_patch_api_key(
             assert resp_b.status_code == 200
 
             # Final name should be one of the two (consistent state)
-            resp = await client.get("/api/v1/api-keys/")
+            resp = await client.get("/api/v2/api-keys/")
             assert resp.status_code == 200
             items = resp.json()["items"]
             key_data = [k for k in items if k["id"] == key_id]
@@ -184,7 +219,7 @@ async def test_concurrent_patch_api_key(
                 f"Unexpected final name: {final_name}"
             )
         finally:
-            await client.delete(f"/api/v1/api-keys/{key_id}")
+            await client.delete(f"/api/v2/api-keys/{key_id}")
 
 
 @pytest.mark.asyncio
@@ -202,7 +237,7 @@ async def test_concurrent_config_imports(
         ) as client:
             await barrier.wait()
             return await client.post(
-                "/api/v1/config/import",
+                "/api/v2/config/import",
                 json={
                     "nodes": [
                         {
@@ -229,10 +264,10 @@ async def test_concurrent_config_imports(
     async with httpx.AsyncClient(
         base_url=base, timeout=30.0, headers=_auth_headers()
     ) as client:
-        resp = await client.get("/api/v1/nodes/")
+        resp = await client.get("/api/v2/nodes/?limit=100")
         for n in resp.json()["items"]:
             if n["name"].startswith("cc-import-"):
-                await client.delete(f"/api/v1/nodes/{n['id']}")
+                await client.delete(f"/api/v2/nodes/{n['id']}")
 
 
 @pytest.mark.asyncio
@@ -249,18 +284,24 @@ async def test_concurrent_bulk_commands(
         nodes = []
         for i in range(2):
             resp = await client.post(
-                "/api/v1/nodes/",
+                "/api/v2/nodes/",
                 json={
-                    "name": f"cc-bulk-{uuid4().hex[:8]}",
-                    "host": "ssh-server",
-                    "port": 2222,
-                    "connection_type": "ssh",
-                    "username": "testuser",
-                    "password": "testpass",
+                    "items": [
+                        {
+                            "name": f"cc-bulk-{uuid4().hex[:8]}",
+                            "host": "ssh-server",
+                            "port": 2222,
+                            "connection_type": "ssh",
+                            "username": "testuser",
+                            "password": "testpass",
+                        }
+                    ]
                 },
             )
-            assert resp.status_code == 201
-            nodes.append(resp.json())
+            assert resp.status_code in (200, 201, 207)
+            data = resp.json()
+            nid = data["results"][0]["node_id"] if "results" in data else data["id"]
+            nodes.append({"id": nid})
 
         try:
             barrier = asyncio.Event()
@@ -271,10 +312,10 @@ async def test_concurrent_bulk_commands(
                 ) as c:
                     await barrier.wait()
                     return await c.post(
-                        "/api/v1/commands/bulk/execute",
+                        "/api/v2/commands/raw-executions",
                         json={
                             "node_ids": [n["id"] for n in nodes],
-                            "command": "echo bulk-ok",
+                            "commands": ["echo bulk-ok"],
                         },
                     )
 
@@ -293,4 +334,4 @@ async def test_concurrent_bulk_commands(
             )
         finally:
             for n in nodes:
-                await client.delete(f"/api/v1/nodes/{n['id']}")
+                await client.delete(f"/api/v2/nodes/{n['id']}")
