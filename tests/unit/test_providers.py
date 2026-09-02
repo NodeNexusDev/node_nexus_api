@@ -326,7 +326,10 @@ async def test_audit_worker_provider_lifecycle() -> None:
     provider = SchedulerProvider()
     worker = MagicMock()
     worker.stop = AsyncMock()
-    with patch("app.di.providers_modules.scheduler.AuditOutboxWorker", return_value=worker):
+    with patch(
+        "app.di.providers_modules.scheduler.AuditOutboxWorker",  # noqa: E501
+        return_value=worker,
+    ):
         resource = provider.get_audit_outbox_worker(MagicMock())
         assert await anext(resource) is worker
         await resource.aclose()

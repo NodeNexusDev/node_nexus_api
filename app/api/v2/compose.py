@@ -9,9 +9,11 @@ from app.api.pagination import decode_offset as _decode_offset
 from app.api.pagination import encode_offset as _encode_offset
 from app.api.pagination import paginate_offset as _paginate_offset
 from app.api.v2.compose_handlers.bulk import router as bulk_router
-from app.api.v2.compose_handlers.projects import _bulk_to_response
-from app.api.v2.compose_handlers.projects import _to_response
-from app.api.v2.compose_handlers.projects import _validate_project_name
+from app.api.v2.compose_handlers.projects import (
+    _bulk_to_response,
+    _to_response,
+    _validate_project_name,
+)
 from app.api.v2.compose_handlers.projects import router as projects_router
 from app.api.v2.compose_handlers.query import router as query_router
 from app.api.v2.compose_handlers.updown import router as updown_router
