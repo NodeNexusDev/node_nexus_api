@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import uuid
 from dataclasses import asdict
 from typing import Literal
@@ -641,14 +640,7 @@ async def bulk_restarts(
         except Exception as exc:  # noqa: BLE001
             return ContainerBulkResult(container_id=cid, status="error", error=str(exc))
 
-    results = await asyncio.gather(*(_one(cid) for cid in data.container_ids))
-    succeeded = sum(1 for r in results if r.status == "success")
-    failed = len(results) - succeeded
-    if failed > 0 and succeeded > 0:
-        response.status_code = 207
-    return BulkResult[ContainerBulkResult](
-        total=len(results), succeeded=succeeded, failed=failed, results=list(results)
-    )
+    return await execute_vert_bulk(data.container_ids, _one, response)
 
 
 @router.post("/containers/removals", response_model=BulkResult[ContainerBulkResult])
@@ -676,14 +668,7 @@ async def bulk_removals(
         except Exception as exc:  # noqa: BLE001
             return ContainerBulkResult(container_id=cid, status="error", error=str(exc))
 
-    results = await asyncio.gather(*(_one(cid) for cid in data.container_ids))
-    succeeded = sum(1 for r in results if r.status == "success")
-    failed = len(results) - succeeded
-    if failed > 0 and succeeded > 0:
-        response.status_code = 207
-    return BulkResult[ContainerBulkResult](
-        total=len(results), succeeded=succeeded, failed=failed, results=list(results)
-    )
+    return await execute_vert_bulk(data.container_ids, _one, response)
 
 
 @router.post("/containers/pauses", response_model=BulkResult[ContainerBulkResult])
@@ -710,14 +695,7 @@ async def bulk_pauses(
         except Exception as exc:  # noqa: BLE001
             return ContainerBulkResult(container_id=cid, status="error", error=str(exc))
 
-    results = await asyncio.gather(*(_one(cid) for cid in data.container_ids))
-    succeeded = sum(1 for r in results if r.status == "success")
-    failed = len(results) - succeeded
-    if failed > 0 and succeeded > 0:
-        response.status_code = 207
-    return BulkResult[ContainerBulkResult](
-        total=len(results), succeeded=succeeded, failed=failed, results=list(results)
-    )
+    return await execute_vert_bulk(data.container_ids, _one, response)
 
 
 @router.post("/containers/unpauses", response_model=BulkResult[ContainerBulkResult])
@@ -744,14 +722,7 @@ async def bulk_unpauses(
         except Exception as exc:  # noqa: BLE001
             return ContainerBulkResult(container_id=cid, status="error", error=str(exc))
 
-    results = await asyncio.gather(*(_one(cid) for cid in data.container_ids))
-    succeeded = sum(1 for r in results if r.status == "success")
-    failed = len(results) - succeeded
-    if failed > 0 and succeeded > 0:
-        response.status_code = 207
-    return BulkResult[ContainerBulkResult](
-        total=len(results), succeeded=succeeded, failed=failed, results=list(results)
-    )
+    return await execute_vert_bulk(data.container_ids, _one, response)
 
 
 @router.post("/containers/kills", response_model=BulkResult[ContainerBulkResult])
@@ -779,14 +750,7 @@ async def bulk_kills(
         except Exception as exc:  # noqa: BLE001
             return ContainerBulkResult(container_id=cid, status="error", error=str(exc))
 
-    results = await asyncio.gather(*(_one(cid) for cid in data.container_ids))
-    succeeded = sum(1 for r in results if r.status == "success")
-    failed = len(results) - succeeded
-    if failed > 0 and succeeded > 0:
-        response.status_code = 207
-    return BulkResult[ContainerBulkResult](
-        total=len(results), succeeded=succeeded, failed=failed, results=list(results)
-    )
+    return await execute_vert_bulk(data.container_ids, _one, response)
 
 
 @router.post("/containers/updates", response_model=BulkResult[ContainerBulkResult])
@@ -819,14 +783,7 @@ async def bulk_updates(
         except Exception as exc:  # noqa: BLE001
             return ContainerBulkResult(container_id=cid, status="error", error=str(exc))
 
-    results = await asyncio.gather(*(_one(cid) for cid in data.container_ids))
-    succeeded = sum(1 for r in results if r.status == "success")
-    failed = len(results) - succeeded
-    if failed > 0 and succeeded > 0:
-        response.status_code = 207
-    return BulkResult[ContainerBulkResult](
-        total=len(results), succeeded=succeeded, failed=failed, results=list(results)
-    )
+    return await execute_vert_bulk(data.container_ids, _one, response)
 
 
 @router.post(
@@ -870,14 +827,7 @@ async def bulk_executions(
                 container_id=cid, status="error", error=str(exc)
             )
 
-    results = await asyncio.gather(*(_one(cid) for cid in data.container_ids))
-    succeeded = sum(1 for r in results if r.status == "success")
-    failed = len(results) - succeeded
-    if failed > 0 and succeeded > 0:
-        response.status_code = 207
-    return BulkResult[ContainerExecBulkResult](
-        total=len(results), succeeded=succeeded, failed=failed, results=list(results)
-    )
+    return await execute_vert_bulk(data.container_ids, _one, response)
 
 
 @router.post(
@@ -913,14 +863,7 @@ async def bulk_inspections(
                 container_id=cid, status="error", error=str(exc)
             )
 
-    results = await asyncio.gather(*(_one(cid) for cid in data.container_ids))
-    succeeded = sum(1 for r in results if r.status == "success")
-    failed = len(results) - succeeded
-    if failed > 0 and succeeded > 0:
-        response.status_code = 207
-    return BulkResult[ContainerInspectBulkResult](
-        total=len(results), succeeded=succeeded, failed=failed, results=list(results)
-    )
+    return await execute_vert_bulk(data.container_ids, _one, response)
 
 
 @router.post("/containers/logs", response_model=BulkResult[ContainerLogsBulkResult])
@@ -953,14 +896,7 @@ async def bulk_logs(
                 container_id=cid, status="error", error=str(exc)
             )
 
-    results = await asyncio.gather(*(_one(cid) for cid in data.container_ids))
-    succeeded = sum(1 for r in results if r.status == "success")
-    failed = len(results) - succeeded
-    if failed > 0 and succeeded > 0:
-        response.status_code = 207
-    return BulkResult[ContainerLogsBulkResult](
-        total=len(results), succeeded=succeeded, failed=failed, results=list(results)
-    )
+    return await execute_vert_bulk(data.container_ids, _one, response)
 
 
 @router.post("/containers/stats", response_model=BulkResult[ContainerStatsBulkResult])
@@ -992,14 +928,7 @@ async def bulk_stats(
                 container_id=cid, status="error", error=str(exc)
             )
 
-    results = await asyncio.gather(*(_one(cid) for cid in data.container_ids))
-    succeeded = sum(1 for r in results if r.status == "success")
-    failed = len(results) - succeeded
-    if failed > 0 and succeeded > 0:
-        response.status_code = 207
-    return BulkResult[ContainerStatsBulkResult](
-        total=len(results), succeeded=succeeded, failed=failed, results=list(results)
-    )
+    return await execute_vert_bulk(data.container_ids, _one, response)
 
 
 # ---------------------------------------------------------------------------
@@ -1095,14 +1024,7 @@ async def bulk_pulls(
         except Exception as exc:  # noqa: BLE001
             return ImageBulkResult(image=image, status="error", error=str(exc))
 
-    results = await asyncio.gather(*(_one(img) for img in data.images))
-    succeeded = sum(1 for r in results if r.status == "success")
-    failed = len(results) - succeeded
-    if failed > 0 and succeeded > 0:
-        response.status_code = 207
-    return BulkResult[ImageBulkResult](
-        total=len(results), succeeded=succeeded, failed=failed, results=list(results)
-    )
+    return await execute_vert_bulk(data.images, _one, response)
 
 
 @router.post("/images/removals", response_model=BulkResult[ImageBulkResult])
@@ -1126,14 +1048,7 @@ async def bulk_image_removals(
         except Exception as exc:  # noqa: BLE001
             return ImageBulkResult(image=image_id, status="error", error=str(exc))
 
-    results = await asyncio.gather(*(_one(iid) for iid in data.image_ids))
-    succeeded = sum(1 for r in results if r.status == "success")
-    failed = len(results) - succeeded
-    if failed > 0 and succeeded > 0:
-        response.status_code = 207
-    return BulkResult[ImageBulkResult](
-        total=len(results), succeeded=succeeded, failed=failed, results=list(results)
-    )
+    return await execute_vert_bulk(data.image_ids, _one, response)
 
 
 @router.get(
@@ -1318,14 +1233,7 @@ async def bulk_network_removals(
         except Exception as exc:  # noqa: BLE001
             return NetworkBulkResult(network_id=nid, status="error", error=str(exc))
 
-    results = await asyncio.gather(*(_one(nid) for nid in data.network_ids))
-    succeeded = sum(1 for r in results if r.status == "success")
-    failed = len(results) - succeeded
-    if failed > 0 and succeeded > 0:
-        response.status_code = 207
-    return BulkResult[NetworkBulkResult](
-        total=len(results), succeeded=succeeded, failed=failed, results=list(results)
-    )
+    return await execute_vert_bulk(data.network_ids, _one, response)
 
 
 @router.post("/networks/prune", response_model=DockerVolumePruneResponse)
@@ -1522,14 +1430,7 @@ async def bulk_volume_removals(
         except Exception as exc:  # noqa: BLE001
             return VolumeBulkResult(volume_name=vname, status="error", error=str(exc))
 
-    results = await asyncio.gather(*(_one(v) for v in data.volume_names))
-    succeeded = sum(1 for r in results if r.status == "success")
-    failed = len(results) - succeeded
-    if failed > 0 and succeeded > 0:
-        response.status_code = 207
-    return BulkResult[VolumeBulkResult](
-        total=len(results), succeeded=succeeded, failed=failed, results=list(results)
-    )
+    return await execute_vert_bulk(data.volume_names, _one, response)
 
 
 @router.get("/volumes/{volume_name}", response_model=VolumeInspectResponse)

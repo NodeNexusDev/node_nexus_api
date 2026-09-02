@@ -41,7 +41,7 @@ async def test_db_provider_disposes_engine() -> None:
     engine.dispose = AsyncMock()
     provider = DbProvider()
 
-    with patch("app.di.providers.create_async_engine", return_value=engine):
+    with patch("app.di.providers_modules.db.create_async_engine", return_value=engine):
         resource = provider.get_engine(settings)
         provided_engine = await anext(resource)
         assert provided_engine is engine
@@ -326,7 +326,7 @@ async def test_audit_worker_provider_lifecycle() -> None:
     provider = SchedulerProvider()
     worker = MagicMock()
     worker.stop = AsyncMock()
-    with patch("app.di.providers.AuditOutboxWorker", return_value=worker):
+    with patch("app.di.providers_modules.scheduler.AuditOutboxWorker", return_value=worker):
         resource = provider.get_audit_outbox_worker(MagicMock())
         assert await anext(resource) is worker
         await resource.aclose()
@@ -336,7 +336,7 @@ async def test_audit_worker_provider_lifecycle() -> None:
 
 def test_config_provider_returns_cached_settings() -> None:
     expected = MagicMock()
-    with patch("app.di.providers.get_settings", return_value=expected):
+    with patch("app.di.providers_modules.config.get_settings", return_value=expected):
         assert ConfigProvider().get_settings() is expected
 
 
