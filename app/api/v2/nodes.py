@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import base64
-import json
 import uuid
 from datetime import datetime
 
@@ -13,6 +11,7 @@ from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
 from fastapi import APIRouter, HTTPException, Query, Response, Security
 
 from app.api.deps import Principal, get_current_principal, require_write_or_jwt_scope
+from app.api.pagination import decode_offset, encode_offset
 from app.application.dto.bulk_node_operation import BulkNodeDeleteDTO
 from app.application.dto.node_management import NodeCreateDTO, NodeUpdateDTO
 from app.application.dto.node_status_history import NodeStatusHistoryQueryDTO
@@ -53,6 +52,10 @@ from app.schemas.node import (
 
 audit = structlog.get_logger("audit")
 
+# Compatibility aliases for tests importing private helpers
+_encode_offset = encode_offset  # noqa: N816
+_decode_offset = decode_offset  # noqa: N816
+
 router = APIRouter(prefix="/nodes", tags=["nodes"], route_class=DishkaRoute)
 
 
@@ -72,22 +75,6 @@ def _node_response(node: NodeViewDTO) -> NodeResponse:
         created_at=node.created_at,
         updated_at=node.updated_at,
     )
-
-
-def _encode_offset(offset: int) -> str:
-    """Encode an offset cursor for status-history pagination."""
-    payload = json.dumps({"offset": offset})
-    return base64.urlsafe_b64encode(payload.encode()).decode()
-
-
-def _decode_offset(cursor: str) -> int:
-    """Decode an offset cursor, raising ValueError on invalid input."""
-    try:
-        raw = base64.urlsafe_b64decode(cursor.encode())
-        data = json.loads(raw)
-        return int(data["offset"])
-    except Exception as exc:
-        raise ValueError(f"Invalid cursor: {cursor}") from exc
 
 
 # ---------------------------------------------------------------------------
@@ -469,7 +456,7 @@ async def get_node_status_history(
     offset = 0
     if cursor is not None and cursor != "":
         try:
-            offset = _decode_offset(cursor)
+            offset = decode_offset(cursor)
         except ValueError:
             try:
                 _ = decode_cursor(cursor)
@@ -494,7 +481,7 @@ async def get_node_status_history(
         for item in result.items
     ]
     has_more = (offset + len(items)) < result.total
-    next_cursor = _encode_offset(offset + limit) if has_more else None
+    next_cursor = encode_offset(offset + limit) if has_more else None
     return CursorPage[NodeStatusHistoryItem](
         items=items,
         next_cursor=next_cursor,

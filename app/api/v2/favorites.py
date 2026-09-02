@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import base64
-import json
 import uuid
 
 import structlog
@@ -11,6 +9,7 @@ from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
 from fastapi import APIRouter, HTTPException, Query, Security
 
 from app.api.deps import Principal, get_current_principal, require_write_or_jwt_scope
+from app.api.pagination import decode_offset, encode_offset
 from app.application.dto.favorite import FavoriteCreateDTO, FavoriteDTO
 from app.application.services.favorite_service import FavoriteService
 from app.schemas.common import CursorPage
@@ -18,23 +17,11 @@ from app.schemas.favorite import FavoriteCreate, FavoriteResponse
 
 audit = structlog.get_logger("audit")
 
+# Compatibility aliases for tests importing private helpers
+_encode_offset = encode_offset  # noqa: N816
+_decode_offset = decode_offset  # noqa: N816
+
 router = APIRouter(prefix="/favorites", tags=["favorites"], route_class=DishkaRoute)
-
-
-def _encode_offset(offset: int) -> str:
-    """Encode an offset cursor for pagination."""
-    payload = json.dumps({"offset": offset})
-    return base64.urlsafe_b64encode(payload.encode()).decode()
-
-
-def _decode_offset(cursor: str) -> int:
-    """Decode an offset cursor, raising ValueError on invalid input."""
-    try:
-        raw = base64.urlsafe_b64decode(cursor.encode())
-        data = json.loads(raw)
-        return int(data["offset"])
-    except Exception as exc:
-        raise ValueError(f"Invalid cursor: {cursor}") from exc
 
 
 def _favorite_response(dto: FavoriteDTO) -> FavoriteResponse:
@@ -65,7 +52,7 @@ async def list_favorites(
     offset = 0
     if cursor is not None:
         try:
-            offset = _decode_offset(cursor)
+            offset = decode_offset(cursor)
         except ValueError:
             raise HTTPException(status_code=422, detail="Invalid cursor") from None
     page = offset // limit + 1 if limit else 1
@@ -76,7 +63,7 @@ async def list_favorites(
         target_type=target_type, page=page, size=limit
     )
     has_more = (offset + len(items)) < total
-    next_cursor = _encode_offset(offset + limit) if has_more else None
+    next_cursor = encode_offset(offset + limit) if has_more else None
     return CursorPage[FavoriteResponse](
         items=[_favorite_response(item) for item in items],
         next_cursor=next_cursor,

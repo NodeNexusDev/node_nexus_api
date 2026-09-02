@@ -2,9 +2,7 @@
 
 from __future__ import annotations
 
-import base64
 import io
-import json
 import uuid
 from typing import Annotated, Any, Literal, cast
 
@@ -14,6 +12,7 @@ from fastapi import APIRouter, HTTPException, Query, Response, Security
 from fastapi.responses import StreamingResponse
 
 from app.api.deps import Principal, get_current_principal, require_write_or_jwt_scope
+from app.api.pagination import decode_offset, encode_offset
 from app.application.dto.template_pack import (
     PackAssetCreateDTO,
     PackCreateDTO,
@@ -51,28 +50,11 @@ from app.schemas.template_registry import (
 
 audit = structlog.get_logger("audit")
 
+# Compatibility aliases for tests importing private helpers
+_encode_offset = encode_offset  # noqa: N816
+_decode_offset = decode_offset  # noqa: N816
+
 router = APIRouter(prefix="/templates", tags=["templates"], route_class=DishkaRoute)
-
-
-# ---------------------------------------------------------------------------
-# Cursor helpers (offset)
-# ---------------------------------------------------------------------------
-
-
-def _encode_offset(offset: int) -> str:
-    """Encode an offset cursor."""
-    payload = json.dumps({"offset": offset})
-    return base64.urlsafe_b64encode(payload.encode()).decode()
-
-
-def _decode_offset(cursor: str) -> int:
-    """Decode an offset cursor."""
-    try:
-        raw = base64.urlsafe_b64decode(cursor.encode())
-        data = json.loads(raw)
-        return int(data["offset"])
-    except Exception as exc:
-        raise ValueError(f"Invalid cursor: {cursor}") from exc
 
 
 # ---------------------------------------------------------------------------
@@ -190,13 +172,13 @@ async def list_registries(
     offset = 0
     if cursor is not None:
         try:
-            offset = _decode_offset(cursor)
+            offset = decode_offset(cursor)
         except ValueError:
             raise HTTPException(status_code=422, detail="Invalid cursor") from None
     page_dto = await service.list_registries(offset=offset, limit=limit)
     items = [_registry_response(v) for v in page_dto.items]
     has_more = (offset + len(items)) < page_dto.total
-    next_cursor = _encode_offset(offset + limit) if has_more else None
+    next_cursor = encode_offset(offset + limit) if has_more else None
     return CursorPage[RegistryResponse](
         items=items,
         next_cursor=next_cursor,
@@ -405,7 +387,7 @@ async def list_packs(
     offset = 0
     if cursor is not None:
         try:
-            offset = _decode_offset(cursor)
+            offset = decode_offset(cursor)
         except ValueError:
             raise HTTPException(status_code=422, detail="Invalid cursor") from None
     page_dto = await service.list_packs(
@@ -420,7 +402,7 @@ async def list_packs(
     )
     items = [_pack_response(v) for v in page_dto.items]
     has_more = (offset + len(items)) < page_dto.total
-    next_cursor = _encode_offset(offset + limit) if has_more else None
+    next_cursor = encode_offset(offset + limit) if has_more else None
     return CursorPage[PackResponse](
         items=items,
         next_cursor=next_cursor,
@@ -654,7 +636,7 @@ async def list_installations(
     offset = 0
     if cursor is not None:
         try:
-            offset = _decode_offset(cursor)
+            offset = decode_offset(cursor)
         except ValueError:
             raise HTTPException(status_code=422, detail="Invalid cursor") from None
     try:
@@ -672,7 +654,7 @@ async def list_installations(
         for item in page_dto.items
     ]
     has_more = (offset + len(items)) < page_dto.total
-    next_cursor = _encode_offset(offset + limit) if has_more else None
+    next_cursor = encode_offset(offset + limit) if has_more else None
     return CursorPage[PackInstallationResponse](
         items=items,
         next_cursor=next_cursor,

@@ -2,6 +2,7 @@
 
 import uuid
 
+import structlog
 from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
 from fastapi import APIRouter, HTTPException, Security, status
 
@@ -10,6 +11,8 @@ from app.application.ports.audit_outbox_controller import AuditOutboxController
 from app.application.ports.schedule import JobSchedulerPort, ScheduleReader
 from app.application.services.scheduled_script_executor import ScheduledScriptExecutor
 from app.core.config import Settings
+
+logger = structlog.get_logger(__name__)
 
 router = APIRouter(
     prefix="/internal/e2e",
@@ -83,7 +86,12 @@ async def trigger_scheduled_script_now(
             params,
             schedule_id=schedule.id,
         )
-    except Exception:
+    except Exception as exc:  # noqa: BLE001
+        logger.warning(
+            "internal.trigger_failed",
+            script_id=str(script_id),
+            error=str(exc),
+        )
         # The executor records the failed execution itself; we only need to
         # signal that the trigger was processed so E2E tests can poll history.
         return {"status": "failed"}

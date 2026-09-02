@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import base64
-import json
 import uuid
 from datetime import datetime
 from typing import Any, Literal
@@ -14,6 +12,7 @@ from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
 from fastapi import APIRouter, HTTPException, Query, Response, Security
 
 from app.api.deps import Principal, get_current_principal, require_write_or_jwt_scope
+from app.api.pagination import decode_offset, encode_offset
 from app.application.dto.execution_lifecycle import CancelExecutionDTO, RetryScriptDTO
 from app.application.dto.schedule import ScheduleRequestDTO, ScheduleViewDTO
 from app.application.dto.script_execution import (
@@ -63,6 +62,10 @@ from app.schemas.script_execution import (
 )
 
 audit = structlog.get_logger("audit")
+
+# Compatibility aliases for tests importing private helpers
+_encode_offset = encode_offset  # noqa: N816
+_decode_offset = decode_offset  # noqa: N816
 
 router = APIRouter(prefix="/scripts", tags=["scripts"], route_class=DishkaRoute)
 
@@ -148,22 +151,6 @@ def _scheduled_job(schedule: ScheduleViewDTO) -> ScheduledJob:
         last_failure_at=schedule.last_failure_at,
         next_run_at=schedule.next_run_at,
     )
-
-
-def _encode_offset(offset: int) -> str:
-    """Encode an offset cursor for pagination."""
-    payload = json.dumps({"offset": offset})
-    return base64.urlsafe_b64encode(payload.encode()).decode()
-
-
-def _decode_offset(cursor: str) -> int:
-    """Decode an offset cursor, raising ValueError on invalid input."""
-    try:
-        raw = base64.urlsafe_b64decode(cursor.encode())
-        data = json.loads(raw)
-        return int(data["offset"])
-    except Exception as exc:
-        raise ValueError(f"Invalid cursor: {cursor}") from exc
 
 
 # ---------------------------------------------------------------------------
@@ -434,7 +421,7 @@ async def list_scripts(
     offset = 0
     if cursor is not None and cursor != "":
         try:
-            offset = _decode_offset(cursor)
+            offset = decode_offset(cursor)
         except ValueError:
             raise HTTPException(status_code=422, detail="Invalid cursor") from None
     page = offset // limit + 1 if limit else 1
@@ -446,7 +433,7 @@ async def list_scripts(
     )
     items = [_script_response(s) for s in scripts]
     has_more = (offset + len(items)) < total
-    next_cursor = _encode_offset(offset + limit) if has_more else None
+    next_cursor = encode_offset(offset + limit) if has_more else None
     return CursorPage[ScriptResponse](
         items=items,
         next_cursor=next_cursor,
@@ -527,14 +514,14 @@ async def get_executions(
     offset = 0
     if cursor is not None and cursor != "":
         try:
-            offset = _decode_offset(cursor)
+            offset = decode_offset(cursor)
         except ValueError:
             raise HTTPException(status_code=422, detail="Invalid cursor") from None
     page = offset // limit + 1 if limit else 1
     executions, total = await service.get_executions(script_id, page=page, size=limit)
     items = [_execution_response(e) for e in executions]
     has_more = (offset + len(items)) < total
-    next_cursor = _encode_offset(offset + limit) if has_more else None
+    next_cursor = encode_offset(offset + limit) if has_more else None
     return CursorPage[ScriptExecutionResponse](
         items=items,
         next_cursor=next_cursor,
@@ -565,7 +552,7 @@ async def get_scheduled_execution_history(
     offset = 0
     if cursor is not None and cursor != "":
         try:
-            offset = _decode_offset(cursor)
+            offset = decode_offset(cursor)
         except ValueError:
             raise HTTPException(status_code=422, detail="Invalid cursor") from None
     page = offset // limit + 1 if limit else 1
@@ -574,7 +561,7 @@ async def get_scheduled_execution_history(
     )
     items = [_execution_response(e) for e in executions]
     has_more = (offset + len(items)) < total
-    next_cursor = _encode_offset(offset + limit) if has_more else None
+    next_cursor = encode_offset(offset + limit) if has_more else None
     return CursorPage[ScriptExecutionResponse](
         items=items,
         next_cursor=next_cursor,

@@ -1,6 +1,6 @@
 repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.15.21
+    rev: v0.16.2
     hooks:
       - id: ruff
         args: [--fix]
@@ -27,6 +27,18 @@ repos:
       - id: ty-check
         name: Type check with ty
         entry: uv run ty check .
+        language: system
+        pass_filenames: false
+        stages: [pre-commit]
+      - id: bandit-check
+        name: Security lint with bandit
+        entry: uv run bandit -r app/ -c pyproject.toml
+        language: system
+        pass_filenames: false
+        stages: [pre-commit]
+      - id: check-suppressions
+        name: Check suppression budget
+        entry: uv run python scripts/check_suppressions.py
         language: system
         pass_filenames: false
         stages: [pre-commit]

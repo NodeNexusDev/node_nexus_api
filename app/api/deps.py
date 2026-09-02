@@ -157,8 +157,8 @@ def _decode_access_token(
         return uuid.UUID(sub), payload
     except HTTPException:
         raise
-    except Exception:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
+    except Exception as exc:
+        raise HTTPException(status_code=401, detail="Invalid or expired token") from exc
 
 
 @inject

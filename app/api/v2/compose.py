@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import base64
-import json
 import re
 import uuid
 from typing import Literal
@@ -13,6 +11,7 @@ from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
 from fastapi import APIRouter, HTTPException, Query, Response, Security, status
 
 from app.api.deps import Principal, get_current_principal, require_write_or_jwt_scope
+from app.api.pagination import decode_offset, encode_offset, paginate_offset
 from app.application.dto.compose import ComposeCreateDTO, ComposeUpdateDTO
 from app.application.services.compose_service import ComposeService
 from app.core.exceptions import (
@@ -44,6 +43,11 @@ from app.schemas.compose import (
 )
 
 audit = structlog.get_logger("audit")
+
+# Compatibility aliases for tests importing private helpers
+_encode_offset = encode_offset  # noqa: N816
+_decode_offset = decode_offset  # noqa: N816
+_paginate_offset = paginate_offset  # noqa: N816
 router = APIRouter(
     prefix="/nodes/{node_id}/docker/compose",
     tags=["docker-compose"],
@@ -51,43 +55,6 @@ router = APIRouter(
 )
 
 _PROJECT_NAME_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9_.-]*$")
-
-
-# ---------------------------------------------------------------------------
-# Cursor helpers (offset-based)
-# ---------------------------------------------------------------------------
-
-
-def _encode_offset(offset: int) -> str:
-    """Encode an offset cursor for pagination."""
-    payload = json.dumps({"offset": offset})
-    return base64.urlsafe_b64encode(payload.encode()).decode()
-
-
-def _decode_offset(cursor: str) -> int:
-    """Decode an offset cursor, raising ValueError on invalid input."""
-    try:
-        raw = base64.urlsafe_b64decode(cursor.encode())
-        data = json.loads(raw)
-        return int(data["offset"])
-    except Exception as exc:
-        raise ValueError(f"Invalid cursor: {cursor}") from exc
-
-
-def _paginate_offset[T](
-    items: list[T], cursor: str | None, limit: int
-) -> tuple[list[T], str | None, bool]:
-    """Slice items by offset cursor."""
-    offset = 0
-    if cursor is not None:
-        try:
-            offset = _decode_offset(cursor)
-        except ValueError:
-            raise HTTPException(status_code=422, detail="Invalid cursor") from None
-    sliced = items[offset : offset + limit]
-    has_more = (offset + len(sliced)) < len(items)
-    next_cursor = _encode_offset(offset + limit) if has_more else None
-    return sliced, next_cursor, has_more
 
 
 def _validate_project_name(name: str) -> str:
@@ -193,7 +160,7 @@ async def list_projects(
     audit.info("api.v2.compose.projects.list", node_id=str(node_id), limit=limit)
     all_items = await service.list_all_projects(node_id)
     mapped = [_to_response(m) for m in all_items]
-    paged, next_cursor, has_more = _paginate_offset(mapped, cursor, limit)
+    paged, next_cursor, has_more = paginate_offset(mapped, cursor, limit)
     return CursorPage[ComposeResponse](
         items=paged, next_cursor=next_cursor, has_more=has_more, limit=limit
     )

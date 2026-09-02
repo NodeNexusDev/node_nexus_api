@@ -3,17 +3,17 @@
 from __future__ import annotations
 
 import asyncio
-import base64
-import json
 import uuid
 from dataclasses import asdict
 from typing import Literal
 
 import structlog
 from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
-from fastapi import APIRouter, HTTPException, Query, Response, Security, status
+from fastapi import APIRouter, Query, Response, Security, status
 
 from app.api.deps import Principal, get_current_principal, require_write_or_jwt_scope
+from app.api.pagination import decode_offset, encode_offset, paginate_offset
+from app.api.v2._bulk import execute_vert_bulk
 from app.application.command_policy import command_fingerprint
 from app.application.dto.docker import (
     ContainerCreateRequestDTO,
@@ -100,46 +100,14 @@ from app.schemas.docker import (
 )
 
 audit = structlog.get_logger("audit")
+
+# Compatibility aliases for tests importing private helpers
+_encode_offset = encode_offset  # noqa: N816
+_decode_offset = decode_offset  # noqa: N816
+_paginate_offset = paginate_offset  # noqa: N816
 router = APIRouter(
     prefix="/nodes/{node_id}/docker", tags=["docker"], route_class=DishkaRoute
 )
-
-
-# ---------------------------------------------------------------------------
-# Cursor helpers (offset-based for Docker lists)
-# ---------------------------------------------------------------------------
-
-
-def _encode_offset(offset: int) -> str:
-    """Encode an offset cursor for pagination."""
-    payload = json.dumps({"offset": offset})
-    return base64.urlsafe_b64encode(payload.encode()).decode()
-
-
-def _decode_offset(cursor: str) -> int:
-    """Decode an offset cursor, raising ValueError on invalid input."""
-    try:
-        raw = base64.urlsafe_b64decode(cursor.encode())
-        data = json.loads(raw)
-        return int(data["offset"])
-    except Exception as exc:
-        raise ValueError(f"Invalid cursor: {cursor}") from exc
-
-
-def _paginate_offset[T](
-    items: list[T], cursor: str | None, limit: int
-) -> tuple[list[T], str | None, bool]:
-    """Slice items by offset cursor."""
-    offset = 0
-    if cursor is not None:
-        try:
-            offset = _decode_offset(cursor)
-        except ValueError:
-            raise HTTPException(status_code=422, detail="Invalid cursor") from None
-    sliced = items[offset : offset + limit]
-    has_more = (offset + len(sliced)) < len(items)
-    next_cursor = _encode_offset(offset + limit) if has_more else None
-    return sliced, next_cursor, has_more
 
 
 # ---------------------------------------------------------------------------
@@ -198,7 +166,7 @@ async def list_containers(
         DockerContainer.model_validate(item, from_attributes=True)
         for item in await service.list_containers(node_id, all=all)
     ]
-    sliced, next_cursor, has_more = _paginate_offset(items, cursor, limit)
+    sliced, next_cursor, has_more = paginate_offset(items, cursor, limit)
     return CursorPage[DockerContainer](
         items=sliced, next_cursor=next_cursor, has_more=has_more, limit=limit
     )
@@ -617,14 +585,7 @@ async def bulk_starts(
         except Exception as exc:  # noqa: BLE001
             return ContainerBulkResult(container_id=cid, status="error", error=str(exc))
 
-    results = await asyncio.gather(*(_one(cid) for cid in data.container_ids))
-    succeeded = sum(1 for r in results if r.status == "success")
-    failed = len(results) - succeeded
-    if failed > 0 and succeeded > 0:
-        response.status_code = 207
-    return BulkResult[ContainerBulkResult](
-        total=len(results), succeeded=succeeded, failed=failed, results=list(results)
-    )
+    return await execute_vert_bulk(data.container_ids, _one, response)
 
 
 @router.post("/containers/stops", response_model=BulkResult[ContainerBulkResult])
@@ -652,14 +613,7 @@ async def bulk_stops(
         except Exception as exc:  # noqa: BLE001
             return ContainerBulkResult(container_id=cid, status="error", error=str(exc))
 
-    results = await asyncio.gather(*(_one(cid) for cid in data.container_ids))
-    succeeded = sum(1 for r in results if r.status == "success")
-    failed = len(results) - succeeded
-    if failed > 0 and succeeded > 0:
-        response.status_code = 207
-    return BulkResult[ContainerBulkResult](
-        total=len(results), succeeded=succeeded, failed=failed, results=list(results)
-    )
+    return await execute_vert_bulk(data.container_ids, _one, response)
 
 
 @router.post("/containers/restarts", response_model=BulkResult[ContainerBulkResult])
@@ -1068,7 +1022,7 @@ async def list_images(
         DockerImage.model_validate(item, from_attributes=True)
         for item in await service.list_images(node_id)
     ]
-    sliced, next_cursor, has_more = _paginate_offset(items, cursor, limit)
+    sliced, next_cursor, has_more = paginate_offset(items, cursor, limit)
     return CursorPage[DockerImage](
         items=sliced, next_cursor=next_cursor, has_more=has_more, limit=limit
     )
@@ -1308,7 +1262,7 @@ async def list_networks(
         DockerNetwork.model_validate(item, from_attributes=True)
         for item in await service.list_networks(node_id)
     ]
-    sliced, next_cursor, has_more = _paginate_offset(items, cursor, limit)
+    sliced, next_cursor, has_more = paginate_offset(items, cursor, limit)
     return CursorPage[DockerNetwork](
         items=sliced, next_cursor=next_cursor, has_more=has_more, limit=limit
     )
@@ -1514,7 +1468,7 @@ async def list_volumes(
         DockerVolume.model_validate(item, from_attributes=True)
         for item in await service.list_volumes(node_id)
     ]
-    sliced, next_cursor, has_more = _paginate_offset(items, cursor, limit)
+    sliced, next_cursor, has_more = paginate_offset(items, cursor, limit)
     return CursorPage[DockerVolume](
         items=sliced, next_cursor=next_cursor, has_more=has_more, limit=limit
     )

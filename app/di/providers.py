@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import (
     async_sessionmaker,
     create_async_engine,
 )
+from sqlalchemy.pool import NullPool
 
 from app.adapters.lifecycle.application_startup import ApplicationStartup
 from app.adapters.lifecycle.migration_runner import MigrationRunner
@@ -187,7 +188,20 @@ class DbProvider(Provider):
     @provide(scope=Scope.APP)
     async def get_engine(self, settings: Settings) -> AsyncIterable[AsyncEngine]:
         """Get the application engine and dispose its pool on shutdown."""
-        engine = create_async_engine(settings.DATABASE_URL)
+        if settings.DATABASE_URL.startswith("sqlite"):
+            engine = create_async_engine(settings.DATABASE_URL, poolclass=NullPool)
+        else:
+            engine = create_async_engine(
+                settings.DATABASE_URL,
+                pool_pre_ping=True,
+                pool_size=5,
+                max_overflow=10,
+                pool_recycle=3600,
+                connect_args={
+                    "server_settings": {"statement_timeout": "30000"},
+                    "command_timeout": 30,
+                },
+            )
         try:
             yield engine
         finally:

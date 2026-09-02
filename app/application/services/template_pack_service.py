@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import hashlib
 import io
@@ -215,19 +216,25 @@ class TemplatePackService:
         their stored paths. Empty tar if no assets.
         """
         detail = await self.get_pack_detail(pack_id)
-        raw_map = _ASSET_RAW.get(pack_id, {})
-        buf = io.BytesIO()
-        with tarfile.open(fileobj=buf, mode="w") as tar:
-            for asset in detail.assets:
-                content = raw_map.get(asset.path, b"")
-                # Fallback: if no raw stored (e.g. legacy pack), use empty
-                info = tarfile.TarInfo(name=asset.path)
-                info.size = len(content)
-                info.mtime = int(asset.created_at.timestamp())
-                info.mode = 0o644
-                tar.addfile(info, io.BytesIO(content))
-        buf.seek(0)
-        return buf.getvalue()
+        raw_map = dict(_ASSET_RAW.get(pack_id, {}))
+        snapshot = [
+            (a.path, raw_map.get(a.path, b""), a.created_at.timestamp())
+            for a in detail.assets
+        ]
+
+        def _build() -> bytes:
+            buf = io.BytesIO()
+            with tarfile.open(fileobj=buf, mode="w") as tar:
+                for path, content, mtime in snapshot:
+                    info = tarfile.TarInfo(name=path)
+                    info.size = len(content)
+                    info.mtime = int(mtime)
+                    info.mode = 0o644
+                    tar.addfile(info, io.BytesIO(content))
+            buf.seek(0)
+            return buf.getvalue()
+
+        return await asyncio.to_thread(_build)
 
     async def stream_assets_tar(self, pack_id: uuid.UUID) -> bytes:
         """Alias for get_assets_tar (streaming compat)."""
