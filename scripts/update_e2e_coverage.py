@@ -142,7 +142,10 @@ def _parse_existing_manifest(text: str) -> tuple[set[str], set[str], int, int]:
 
 
 def main() -> None:
-    target = Path("tests/e2e/test_endpoint_coverage_e2e.py")
+    # Guard moved from tests/e2e to tests/architecture in 2.0 for docker-free
+    target = Path("tests/architecture/test_endpoint_coverage.py")
+    if not target.exists():
+        target = Path("tests/e2e/test_endpoint_coverage_e2e.py")
     text = target.read_text(encoding="utf-8")
 
     old_eps, excluded_keys, start_line, end_line = _parse_existing_manifest(text)

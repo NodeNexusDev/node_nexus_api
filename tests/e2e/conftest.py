@@ -268,6 +268,8 @@ _E2E_MARKERS = frozenset(
 @pytest.fixture(autouse=True)
 async def e2e_db_isolation(
     request: pytest.FixtureRequest,
+    postgres_connection: asyncpg.Connection,
+    api_base_url: str,
 ) -> AsyncGenerator[None]:
     """Truncate mutable tables after each E2E test for full DB isolation.
 
@@ -275,17 +277,9 @@ async def e2e_db_isolation(
     paused before truncation and resumed afterwards so that their concurrent
     locks cannot deadlock with the TRUNCATE statement.
     """
-    is_e2e = any(request.node.get_closest_marker(marker) for marker in _E2E_MARKERS)
-    if not is_e2e:
-        yield
-        return
-    # Eagerly resolve before yield to keep fixtures alive during teardown
-    # (avoids deprecated getfixturevalue during teardown and keeps guard docker-free)
-    postgres_connection: asyncpg.Connection = request.getfixturevalue(
-        "postgres_connection"
-    )
-    api_base_url: str = request.getfixturevalue("api_base_url")
     yield
+    if not any(request.node.get_closest_marker(marker) for marker in _E2E_MARKERS):
+        return
     async with httpx.AsyncClient(
         base_url=api_base_url,
         timeout=30.0,
