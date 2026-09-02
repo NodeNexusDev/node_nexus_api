@@ -67,13 +67,19 @@ def test_content_type_json_with_charset(e2e_client: httpx.Client) -> None:
     }
     resp = e2e_client.post(
         "/api/v2/nodes/",
-        content=json.dumps(payload),
+        content=json.dumps({"items": [payload]}),
         headers={"Content-Type": "application/json; charset=utf-8"},
     )
-    assert resp.status_code == 201, f"Expected 201, got {resp.status_code}: {resp.text}"
+    assert resp.status_code in (200, 201, 207), (
+        f"Expected 201, got {resp.status_code}: {resp.text}"
+    )
     # Cleanup
-    node = resp.json()
-    e2e_client.delete(f"/api/v2/nodes/{node['id']}")
+    data = resp.json()
+    if "results" in data:
+        node_id = data["results"][0].get("node_id") or data["results"][0].get("id")
+    else:
+        node_id = data.get("id")
+    e2e_client.delete(f"/api/v2/nodes/{node_id}")
 
 
 def test_content_type_multipart_rejected(e2e_client: httpx.Client) -> None:
@@ -139,14 +145,23 @@ def test_method_not_allowed_post_resource(e2e_client: httpx.Client) -> None:
     node = e2e_client.post(
         "/api/v2/nodes/",
         json={
-            "name": "test-405-resource",
-            "host": "10.0.0.101",
-            "port": 22,
-            "connection_type": "ssh",
+            "items": [
+                {
+                    "name": "test-405-resource",
+                    "host": "10.0.0.101",
+                    "port": 22,
+                    "connection_type": "ssh",
+                }
+            ]
         },
     )
-    assert node.status_code == 201
-    node_id = node.json()["id"]
+    assert node.status_code in (200, 201, 207)
+    data = node.json()
+    node_id = (
+        data["results"][0].get("node_id") or data["results"][0].get("id")
+        if "results" in data
+        else data.get("id")
+    )
 
     try:
         resp = e2e_client.post(f"/api/v2/nodes/{node_id}", json={})
@@ -173,10 +188,14 @@ def test_oversized_string_field_rejected(e2e_client: httpx.Client) -> None:
     resp = e2e_client.post(
         "/api/v2/nodes/",
         json={
-            "name": "A" * 10_000,
-            "host": "10.0.0.102",
-            "port": 22,
-            "connection_type": "ssh",
+            "items": [
+                {
+                    "name": "A" * 10_000,
+                    "host": "10.0.0.102",
+                    "port": 22,
+                    "connection_type": "ssh",
+                }
+            ]
         },
     )
     assert_http_error(resp, 422)
@@ -207,7 +226,7 @@ def test_deeply_nested_json_not_500(e2e_client: httpx.Client) -> None:
     current["port"] = 22
     current["connection_type"] = "ssh"
 
-    resp = e2e_client.post("/api/v2/nodes/", json=nested)
+    resp = e2e_client.post("/api/v2/nodes/", json={"items": [nested]})
     # Must NOT be 500 — should be 4xx validation or 200 (if fields found)
     assert resp.status_code < 500, (
         f"Got 5xx ({resp.status_code}) on deeply nested JSON. Body: {resp.text[:500]}"

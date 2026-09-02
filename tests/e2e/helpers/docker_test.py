@@ -38,20 +38,20 @@ def create_test_container(
 ) -> str:
     """Run a container via SSH docker run and return container_id.
 
-    The container is started via SSH exec (docker run -d) since the
-    HTTP API does not expose a dedicated container-create endpoint yet.
-
-    Returns the container name/ID as passed or auto-generated.
+    The container is started via SSH exec (docker run -d) via
+    bulk raw-executions.
     """
     container_name = name or f"e2e-ctr-{uuid.uuid4().hex[:8]}"
     docker_cmd = f"docker run -d --name {container_name} {image} {command}"
     resp = e2e_client.post(
-        "/api/v2/commands/execute",
-        json={"node_id": node_id, "command": docker_cmd},
+        "/api/v2/commands/raw-executions",
+        json={"node_ids": [node_id], "commands": [docker_cmd]},
     )
-    assert resp.status_code == 200, (
+    assert resp.status_code in (200, 207), (
         f"Failed to create container '{container_name}': {resp.status_code} {resp.text}"
     )
+    data = resp.json()
+    assert data["succeeded"] == 1, f"Container start failed: {data}"
     return container_name
 
 

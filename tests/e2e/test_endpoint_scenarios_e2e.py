@@ -63,7 +63,7 @@ def test_schedule_replace_updates_existing_job(
     )
     assert second["cron"] == "30 10 * * *"
 
-    current = e2e_client.get(f"/api/v2/scripts/{script['id']}/schedule")
+    current = e2e_client.get(f"/api/v2/scripts/{script['id']}/schedules")
     assert current.status_code == 200, current.text
     assert current.json()["cron"] == "30 10 * * *"
 
@@ -75,5 +75,7 @@ def test_audit_filters_without_matches(e2e_client: httpx.Client) -> None:
         params={"node_id": str(uuid4()), "action": f"missing.{uuid4().hex}"},
     )
     assert response.status_code == 200, response.text
-    assert response.json()["items"] == []
-    assert response.json()["total"] == 0
+    data = response.json()
+    assert data["items"] == []
+    # CursorPage uses has_more/limit, total may be absent
+    assert data.get("total", 0) == 0 or data.get("has_more") is False

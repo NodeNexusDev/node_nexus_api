@@ -38,7 +38,12 @@ def _wait_for_execution(
 ) -> list[UnvalidatedJsonObject]:
     def _has_execution() -> bool:
         response = client.get(f"/api/v2/scripts/{script_id}/executions")
-        return bool(response.status_code == 200 and response.json()["total"] > 0)
+        if response.status_code != 200:
+            return False
+        data = response.json()
+        items = data.get("items", [])
+        total = data.get("total", len(items) if isinstance(items, list) else 0)
+        return bool(total > 0 or (isinstance(items, list) and len(items) > 0))
 
     wait_for_condition(
         _has_execution,
@@ -57,9 +62,15 @@ def _wait_for_completed_execution(
 ) -> list[UnvalidatedJsonObject]:
     def _is_completed() -> bool:
         response = client.get(f"/api/v2/scripts/{script_id}/executions")
-        if response.status_code != 200 or response.json()["total"] == 0:
+        if response.status_code != 200:
             return False
-        return response.json()["items"][0]["status"] in ("success", "error")
+        data = response.json()
+        items = data.get("items", [])
+        total = data.get("total", len(items) if isinstance(items, list) else 0)
+        if total == 0 and not items:
+            return False
+        first = items[0] if items else None
+        return bool(first and first.get("status") in ("success", "error"))
 
     wait_for_condition(
         _is_completed,
@@ -71,7 +82,7 @@ def _wait_for_completed_execution(
 
 
 def _schedule_url(script_id: str) -> str:
-    return f"/api/v2/scripts/{script_id}/schedule"
+    return f"/api/v2/scripts/{script_id}/schedules"
 
 
 def _executions_url(script_id: str) -> str:
@@ -173,7 +184,10 @@ def test_reconciliation_restores_schedule_after_restart(
 
     # Confirm no duplicate execution
     final_resp = e2e_client.get(_executions_url(script["id"]))
-    assert final_resp.json()["total"] == 1
+    data = final_resp.json()
+    total = data.get("total", len(data.get("items", [])))
+    assert total == 1
+    assert len(data.get("items", [])) == 1
 
     # Verify schedule metadata after execution
     resp = e2e_client.get(_schedule_url(script["id"]))
@@ -239,7 +253,7 @@ def test_schedule_replace_removes_old_runtime_job(
 
     # No duplicate executions from the old far-future cron.
     final = e2e_client.get(_executions_url(script["id"])).json()
-    assert final["total"] == 1
+    assert final.get("total", len(final.get("items", []))) == 1
 
 
 def test_persistent_schedule_recovers_after_api_restart(

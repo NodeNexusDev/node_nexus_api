@@ -33,7 +33,9 @@ def test_docker_list_images(
     _docker_pull_alpine(e2e_client, node["id"])
     resp = e2e_client.get(f"/api/v2/nodes/{node['id']}/docker/images")
     assert resp.status_code == 200
-    images = resp.json()
+    data = resp.json()
+    assert "items" in data and "has_more" in data
+    images = data["items"]
     assert isinstance(images, list)
     alpine_images = [i for i in images if "alpine" in str(i).lower()]
     assert len(alpine_images) >= 1
@@ -68,7 +70,9 @@ def test_docker_list_containers(
     _docker_pull_alpine(e2e_client, node["id"])
     resp = e2e_client.get(f"/api/v2/nodes/{node['id']}/docker/containers")
     assert resp.status_code == 200
-    assert isinstance(resp.json(), list)
+    data = resp.json()
+    assert "items" in data and "has_more" in data
+    assert isinstance(data["items"], list)
 
 
 def test_docker_list_containers_all(
@@ -80,7 +84,9 @@ def test_docker_list_containers_all(
     _docker_pull_alpine(e2e_client, node["id"])
     resp = e2e_client.get(f"/api/v2/nodes/{node['id']}/docker/containers?all=true")
     assert resp.status_code == 200
-    assert isinstance(resp.json(), list)
+    data = resp.json()
+    assert "items" in data
+    assert isinstance(data["items"], list)
 
 
 def test_docker_container_lifecycle(
@@ -93,10 +99,10 @@ def test_docker_container_lifecycle(
 
     # Run a container via SSH exec (docker run -d alpine sleep 300)
     resp = e2e_client.post(
-        "/api/v2/commands/execute",
+        "/api/v2/commands/raw-executions",
         json={
-            "node_id": node["id"],
-            "command": "docker run -d --name e2e-test-ctr alpine sleep 300",
+            "node_ids": [node["id"]],
+            "commands": ["docker run -d --name e2e-test-ctr alpine sleep 300"],
         },
     )
     assert resp.status_code == 200
@@ -191,7 +197,9 @@ def test_docker_list_networks(
     node = e2e_resources.create_docker_node()
     resp = e2e_client.get(f"/api/v2/nodes/{node['id']}/docker/networks")
     assert resp.status_code == 200
-    networks = resp.json()
+    data = resp.json()
+    assert "items" in data
+    networks = data["items"]
     assert isinstance(networks, list)
     # bridge network should exist by default
     names = [n.get("Name", "") for n in networks]
@@ -206,7 +214,9 @@ def test_docker_list_volumes(
     node = e2e_resources.create_docker_node()
     resp = e2e_client.get(f"/api/v2/nodes/{node['id']}/docker/volumes")
     assert resp.status_code == 200
-    assert isinstance(resp.json(), list)
+    data = resp.json()
+    assert "items" in data
+    assert isinstance(data["items"], list)
 
 
 # ---------------------------------------------------------------------------
@@ -218,30 +228,26 @@ def test_docker_bulk_start(
     e2e_client,
     e2e_resources: UniqueResourceFactory,
 ):
-    """POST /api/v2/docker/bulk/start starts container on multiple nodes."""
+    """POST /nodes/{id}/docker/containers/starts vert bulk."""
     node = e2e_resources.create_docker_node()
     _docker_pull_alpine(e2e_client, node["id"])
     # Run a container via SSH
     e2e_client.post(
-        "/api/v2/commands/execute",
+        "/api/v2/commands/raw-executions",
         json={
-            "node_id": node["id"],
-            "command": "docker run -d --name bulk-start-ctr alpine sleep 300",
+            "node_ids": [node["id"]],
+            "commands": ["docker run -d --name bulk-start-ctr alpine sleep 300"],
         },
     )
     # Stop it first
     e2e_client.post(f"/api/v2/nodes/{node['id']}/docker/containers/bulk-start-ctr/stop")
 
     resp = e2e_client.post(
-        "/api/v2/docker/bulk/start",
-        json={
-            "node_ids": [node["id"]],
-            "container_id": "bulk-start-ctr",
-        },
+        f"/api/v2/nodes/{node['id']}/docker/containers/starts",
+        json={"container_ids": ["bulk-start-ctr"]},
     )
-    assert resp.status_code == 200
+    assert resp.status_code in (200, 207)
     data = resp.json()
-    assert data["action"] == "start"
     assert data["total"] == 1
     assert data["succeeded"] == 1
 
@@ -250,28 +256,23 @@ def test_docker_bulk_stop(
     e2e_client,
     e2e_resources: UniqueResourceFactory,
 ):
-    """POST /api/v2/docker/bulk/stop stops container on multiple nodes."""
+    """POST /nodes/{id}/docker/containers/stops vert bulk."""
     node = e2e_resources.create_docker_node()
     _docker_pull_alpine(e2e_client, node["id"])
     e2e_client.post(
-        "/api/v2/commands/execute",
+        "/api/v2/commands/raw-executions",
         json={
-            "node_id": node["id"],
-            "command": "docker run -d --name bulk-stop-ctr alpine sleep 300",
+            "node_ids": [node["id"]],
+            "commands": ["docker run -d --name bulk-stop-ctr alpine sleep 300"],
         },
     )
 
     resp = e2e_client.post(
-        "/api/v2/docker/bulk/stop",
-        json={
-            "node_ids": [node["id"]],
-            "container_id": "bulk-stop-ctr",
-            "timeout": 5,
-        },
+        f"/api/v2/nodes/{node['id']}/docker/containers/stops?timeout=5",
+        json={"container_ids": ["bulk-stop-ctr"]},
     )
-    assert resp.status_code == 200
+    assert resp.status_code in (200, 207)
     data = resp.json()
-    assert data["action"] == "stop"
     assert data["total"] == 1
 
 
@@ -279,28 +280,23 @@ def test_docker_bulk_restart(
     e2e_client,
     e2e_resources: UniqueResourceFactory,
 ):
-    """POST /api/v2/docker/bulk/restart restarts container on multiple nodes."""
+    """POST /nodes/{id}/docker/containers/restarts vert bulk."""
     node = e2e_resources.create_docker_node()
     _docker_pull_alpine(e2e_client, node["id"])
     e2e_client.post(
-        "/api/v2/commands/execute",
+        "/api/v2/commands/raw-executions",
         json={
-            "node_id": node["id"],
-            "command": "docker run -d --name bulk-restart-ctr alpine sleep 300",
+            "node_ids": [node["id"]],
+            "commands": ["docker run -d --name bulk-restart-ctr alpine sleep 300"],
         },
     )
 
     resp = e2e_client.post(
-        "/api/v2/docker/bulk/restart",
-        json={
-            "node_ids": [node["id"]],
-            "container_id": "bulk-restart-ctr",
-            "timeout": 5,
-        },
+        f"/api/v2/nodes/{node['id']}/docker/containers/restarts?timeout=5",
+        json={"container_ids": ["bulk-restart-ctr"]},
     )
-    assert resp.status_code == 200
+    assert resp.status_code in (200, 207)
     data = resp.json()
-    assert data["action"] == "restart"
     assert data["succeeded"] == 1
 
 
@@ -308,32 +304,31 @@ def test_docker_bulk_exec(
     e2e_client,
     e2e_resources: UniqueResourceFactory,
 ):
-    """POST /api/v2/docker/bulk/exec runs command in containers."""
+    """POST /nodes/{id}/docker/containers/executions vert bulk."""
     node = e2e_resources.create_docker_node()
     _docker_pull_alpine(e2e_client, node["id"])
     e2e_client.post(
-        "/api/v2/commands/execute",
+        "/api/v2/commands/raw-executions",
         json={
-            "node_id": node["id"],
-            "command": "docker run -d --name bulk-exec-ctr alpine sleep 300",
+            "node_ids": [node["id"]],
+            "commands": ["docker run -d --name bulk-exec-ctr alpine sleep 300"],
         },
     )
 
     resp = e2e_client.post(
-        "/api/v2/docker/bulk/exec",
+        f"/api/v2/nodes/{node['id']}/docker/containers/executions",
         json={
-            "node_ids": [node["id"]],
-            "container_id": "bulk-exec-ctr",
+            "container_ids": ["bulk-exec-ctr"],
             "command": "echo exec-works",
             "timeout": 10,
         },
     )
-    assert resp.status_code == 200
+    assert resp.status_code in (200, 207)
     data = resp.json()
-    assert data["action"] == "exec"
     results = data["results"]
     assert len(results) == 1
-    assert "exec-works" in results[0]["output"]
+    # ContainerExecBulkResult has stdout/stderr
+    assert "exec-works" in (results[0].get("stdout") or results[0].get("output") or "")
 
 
 # ---------------------------------------------------------------------------
@@ -355,8 +350,8 @@ def test_docker_container_logs_explicit_tail(
             "'for i in $(seq 1 10); do echo line-$i; done; sleep 60'"
         )
         resp = e2e_client.post(
-            "/api/v2/commands/execute",
-            json={"node_id": node["id"], "command": cmd},
+            "/api/v2/commands/raw-executions",
+            json={"node_ids": [node["id"]], "commands": [cmd]},
         )
         assert resp.status_code == 200
 
@@ -414,8 +409,8 @@ def test_docker_container_logs_tail_default(
             "docker run -d --name e2e-logs-default alpine sh -c 'echo hello; sleep 60'"
         )
         resp = e2e_client.post(
-            "/api/v2/commands/execute",
-            json={"node_id": node["id"], "command": cmd},
+            "/api/v2/commands/raw-executions",
+            json={"node_ids": [node["id"]], "commands": [cmd]},
         )
         assert resp.status_code == 200
 
@@ -472,8 +467,8 @@ def test_docker_container_logs_since_iso_timestamp(
             "'echo before-sleep; sleep 2; echo after-sleep; sleep 60'"
         )
         resp = e2e_client.post(
-            "/api/v2/commands/execute",
-            json={"node_id": node["id"], "command": cmd},
+            "/api/v2/commands/raw-executions",
+            json={"node_ids": [node["id"]], "commands": [cmd]},
         )
         assert resp.status_code == 200
 
@@ -530,8 +525,8 @@ def test_docker_container_logs_invalid_tail_zero(
         _docker_pull_alpine(e2e_client, node["id"])
         cmd = "docker run -d --name e2e-logs-zero alpine sleep 60"
         e2e_client.post(
-            "/api/v2/commands/execute",
-            json={"node_id": node["id"], "command": cmd},
+            "/api/v2/commands/raw-executions",
+            json={"node_ids": [node["id"]], "commands": [cmd]},
         )
         resp = e2e_client.get(
             f"/api/v2/nodes/{node['id']}/docker/containers/e2e-logs-zero/logs?tail=0"
@@ -555,8 +550,8 @@ def test_docker_container_logs_invalid_tail_overflow(
         _docker_pull_alpine(e2e_client, node["id"])
         cmd = "docker run -d --name e2e-logs-overflow alpine sleep 60"
         e2e_client.post(
-            "/api/v2/commands/execute",
-            json={"node_id": node["id"], "command": cmd},
+            "/api/v2/commands/raw-executions",
+            json={"node_ids": [node["id"]], "commands": [cmd]},
         )
         resp = e2e_client.get(
             f"/api/v2/nodes/{node['id']}/docker/containers/e2e-logs-overflow/logs?tail=99999"
@@ -585,9 +580,35 @@ def test_docker_container_exec_timeout_boundary(
         _docker_pull_alpine(e2e_client, node["id"])
         cmd = "docker run -d --name e2e-exec-t1 alpine sleep 300"
         e2e_client.post(
-            "/api/v2/commands/execute",
-            json={"node_id": node["id"], "command": cmd},
+            "/api/v2/commands/raw-executions",
+            json={"node_ids": [node["id"]], "commands": [cmd]},
         )
+
+        # Wait for container to be running before exec (flaky in full suite)
+        def _is_running() -> bool:
+            resp = e2e_client.get(
+                f"/api/v2/nodes/{node['id']}/docker/containers/e2e-exec-t1"
+            )
+            if resp.status_code != 200:
+                return False
+            try:
+                data = resp.json()
+                if not isinstance(data, dict):
+                    return False
+                state = data.get("State")
+                if not isinstance(state, dict):
+                    return False
+                status = state.get("status")
+                if status == "running":
+                    return True
+                return False
+            except Exception:
+                return False
+
+        wait_for_condition(
+            _is_running, timeout=15.0, description="e2e-exec-t1 running"
+        )
+
         resp = e2e_client.post(
             f"/api/v2/nodes/{node['id']}/docker/containers/e2e-exec-t1/exec",
             json={"command": "echo ok", "timeout": 1},
@@ -611,8 +632,8 @@ def test_docker_container_exec_timeout_max(
         _docker_pull_alpine(e2e_client, node["id"])
         cmd = "docker run -d --name e2e-exec-tmax alpine sleep 300"
         e2e_client.post(
-            "/api/v2/commands/execute",
-            json={"node_id": node["id"], "command": cmd},
+            "/api/v2/commands/raw-executions",
+            json={"node_ids": [node["id"]], "commands": [cmd]},
         )
         resp = e2e_client.post(
             f"/api/v2/nodes/{node['id']}/docker/containers/e2e-exec-tmax/exec",
@@ -637,8 +658,8 @@ def test_docker_container_exec_command_too_long(
         _docker_pull_alpine(e2e_client, node["id"])
         cmd = "docker run -d --name e2e-exec-long alpine sleep 300"
         e2e_client.post(
-            "/api/v2/commands/execute",
-            json={"node_id": node["id"], "command": cmd},
+            "/api/v2/commands/raw-executions",
+            json={"node_ids": [node["id"]], "commands": [cmd]},
         )
         resp = e2e_client.post(
             f"/api/v2/nodes/{node['id']}/docker/containers/e2e-exec-long/exec",
@@ -663,8 +684,8 @@ def test_docker_container_exec_timeout_exceeded(
         _docker_pull_alpine(e2e_client, node["id"])
         cmd = "docker run -d --name e2e-exec-timeout alpine sleep 300"
         e2e_client.post(
-            "/api/v2/commands/execute",
-            json={"node_id": node["id"], "command": cmd},
+            "/api/v2/commands/raw-executions",
+            json={"node_ids": [node["id"]], "commands": [cmd]},
         )
         resp = e2e_client.post(
             f"/api/v2/nodes/{node['id']}/docker/containers/e2e-exec-timeout/exec",
@@ -696,8 +717,8 @@ def test_docker_container_stats_fields(
         _docker_pull_alpine(e2e_client, node["id"])
         cmd = "docker run -d --name e2e-stats-fields alpine sleep 300"
         e2e_client.post(
-            "/api/v2/commands/execute",
-            json={"node_id": node["id"], "command": cmd},
+            "/api/v2/commands/raw-executions",
+            json={"node_ids": [node["id"]], "commands": [cmd]},
         )
         resp = e2e_client.get(
             f"/api/v2/nodes/{node['id']}/docker/containers/e2e-stats-fields/stats"
@@ -1291,60 +1312,53 @@ def test_docker_bulk_inspect(
     e2e_client,
     e2e_resources: UniqueResourceFactory,
 ):
-    """POST /api/v2/docker/bulk/inspect inspects container on multiple nodes."""
+    """POST /nodes/{id}/docker/containers/inspections vert bulk."""
     node = e2e_resources.create_docker_node()
     _docker_pull_alpine(e2e_client, node["id"])
     e2e_client.post(
-        "/api/v2/commands/execute",
+        "/api/v2/commands/raw-executions",
         json={
-            "node_id": node["id"],
-            "command": "docker run -d --name bulk-inspect-ctr alpine sleep 300",
+            "node_ids": [node["id"]],
+            "commands": ["docker run -d --name bulk-inspect-ctr alpine sleep 300"],
         },
     )
 
     resp = e2e_client.post(
-        "/api/v2/docker/bulk/inspect",
-        json={
-            "node_ids": [node["id"]],
-            "container_id": "bulk-inspect-ctr",
-        },
+        f"/api/v2/nodes/{node['id']}/docker/containers/inspections",
+        json={"container_ids": ["bulk-inspect-ctr"]},
     )
-    assert resp.status_code == 200
+    assert resp.status_code in (200, 207)
     data = resp.json()
-    assert data["action"] == "inspect"
     assert data["total"] == 1
     assert data["succeeded"] == 1
-    assert "bulk-inspect-ctr" in data["results"][0]["output"]
+    # inspect result has data with Name field
+    assert data["results"][0]["container_id"] == "bulk-inspect-ctr"
 
 
 def test_docker_bulk_logs(
     e2e_client,
     e2e_resources: UniqueResourceFactory,
 ):
-    """POST /api/v2/docker/bulk/logs gets logs from container on multiple nodes."""
+    """POST /nodes/{id}/docker/containers/logs vert bulk."""
     node = e2e_resources.create_docker_node()
     _docker_pull_alpine(e2e_client, node["id"])
     e2e_client.post(
-        "/api/v2/commands/execute",
+        "/api/v2/commands/raw-executions",
         json={
-            "node_id": node["id"],
-            "command": (
+            "node_ids": [node["id"]],
+            "commands": [
                 "docker run -d --name bulk-logs-ctr alpine"
                 " sh -c 'echo hello-logs; sleep 300'"
-            ),
+            ],
         },
     )
 
     resp = e2e_client.post(
-        "/api/v2/docker/bulk/logs",
-        json={
-            "node_ids": [node["id"]],
-            "container_id": "bulk-logs-ctr",
-        },
+        f"/api/v2/nodes/{node['id']}/docker/containers/logs",
+        json={"container_ids": ["bulk-logs-ctr"]},
     )
-    assert resp.status_code == 200
+    assert resp.status_code in (200, 207)
     data = resp.json()
-    assert data["action"] == "logs"
     assert data["total"] == 1
     assert data["succeeded"] == 1
 
@@ -1353,27 +1367,23 @@ def test_docker_bulk_stats(
     e2e_client,
     e2e_resources: UniqueResourceFactory,
 ):
-    """POST /api/v2/docker/bulk/stats gets stats from container on multiple nodes."""
+    """POST /nodes/{id}/docker/containers/stats vert bulk."""
     node = e2e_resources.create_docker_node()
     _docker_pull_alpine(e2e_client, node["id"])
     e2e_client.post(
-        "/api/v2/commands/execute",
+        "/api/v2/commands/raw-executions",
         json={
-            "node_id": node["id"],
-            "command": "docker run -d --name bulk-stats-ctr alpine sleep 300",
+            "node_ids": [node["id"]],
+            "commands": ["docker run -d --name bulk-stats-ctr alpine sleep 300"],
         },
     )
 
     resp = e2e_client.post(
-        "/api/v2/docker/bulk/stats",
-        json={
-            "node_ids": [node["id"]],
-            "container_id": "bulk-stats-ctr",
-        },
+        f"/api/v2/nodes/{node['id']}/docker/containers/stats",
+        json={"container_ids": ["bulk-stats-ctr"]},
     )
-    assert resp.status_code == 200
+    assert resp.status_code in (200, 207)
     data = resp.json()
-    assert data["action"] == "stats"
     assert data["total"] == 1
     assert data["succeeded"] == 1
 

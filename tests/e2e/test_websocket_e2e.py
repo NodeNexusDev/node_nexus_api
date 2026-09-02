@@ -475,28 +475,35 @@ async def test_ws_disconnect_terminates_remote_process(
         deadline = asyncio.get_running_loop().time() + 10
         while True:
             response = e2e_client.post(
-                "/api/v2/commands/execute",
+                "/api/v2/commands/raw-executions",
                 json={
-                    "node_id": node["id"],
-                    "command": (
+                    "node_ids": [node["id"]],
+                    "commands": [
                         f"pid=$(cat {pid_file}) && "
                         f"{{ ! kill -0 $pid 2>/dev/null || "
                         f"[ \"$(awk '{{print $3}}' /proc/$pid/stat "
                         f'2>/dev/null)" = Z ]; }}'
-                    ),
+                    ],
                 },
             )
-            if response.status_code == 200 and response.json()["exit_code"] == 0:
+            _exit_ok = False
+            if response.status_code in (200, 207):
+                try:
+                    _bulk = response.json()
+                    _exit_ok = _bulk["results"][0].get("exit_code") == 0
+                except Exception:
+                    _exit_ok = False
+            if _exit_ok:
                 break
             if asyncio.get_running_loop().time() >= deadline:
                 process_state = e2e_client.post(
-                    "/api/v2/commands/execute",
+                    "/api/v2/commands/raw-executions",
                     json={
-                        "node_id": node["id"],
-                        "command": (
+                        "node_ids": [node["id"]],
+                        "commands": [
                             f"pid=$(cat {pid_file}); "
                             f"sed -n '1,8p' /proc/$pid/status 2>/dev/null"
-                        ),
+                        ],
                     },
                 )
                 pytest.fail(
@@ -506,8 +513,8 @@ async def test_ws_disconnect_terminates_remote_process(
             await asyncio.sleep(0.2)
     finally:
         e2e_client.post(
-            "/api/v2/commands/execute",
-            json={"node_id": node["id"], "command": f"rm -f {pid_file}"},
+            "/api/v2/commands/raw-executions",
+            json={"node_ids": [node["id"]], "commands": [f"rm -f {pid_file}"]},
         )
 
 
@@ -543,9 +550,14 @@ async def test_ws_ssh_auth_failure_internal_error(
         "username": "wronguser",
         "password": "wrongpass",
     }
-    resp = e2e_client.post("/api/v2/nodes/", json=data)
-    assert resp.status_code == 201
-    node = resp.json()
+    resp = e2e_client.post("/api/v2/nodes/", json={"items": [data]})
+    assert resp.status_code in (200, 201, 207)
+    body = resp.json()
+    node = (
+        {"id": body["results"][0].get("node_id") or body["results"][0].get("id")}
+        if "results" in body
+        else body
+    )
 
     try:
         url = _ws_url(service_ports, node["id"])

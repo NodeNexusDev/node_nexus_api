@@ -70,9 +70,7 @@ def main() -> None:
     )
     excluded_keys: set[str] = set()
     if excluded_match:
-        excluded_keys = set(
-            re.findall(r'"([^"]+)"\s*:', excluded_match.group(0))
-        )
+        excluded_keys = set(re.findall(r'"([^"]+)"\s*:', excluded_match.group(0)))
         excluded_keys = {
             k for k in excluded_keys if " " in k and k.split()[0].isupper()
         }

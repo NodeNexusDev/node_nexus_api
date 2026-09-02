@@ -364,6 +364,7 @@ async def bulk_executions(
                     command=rendered,
                     node_ids=tuple(data.node_ids),
                     tags=tuple(data.node_tags),
+                    command_id=command_id,
                 )
             )
             items: list[BulkExecutionItem] = []

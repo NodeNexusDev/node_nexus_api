@@ -320,14 +320,18 @@ def test_revoked_key_rejected_on_all_endpoints(
         f"Expected 401 for revoked key on GET, got {resp.status_code}"
     )
 
-    # Should fail on POST
+    # Should fail on POST (bulk-first)
     resp = e2e_client.post(
         "/api/v2/nodes/",
         json={
-            "name": "should-fail-revoked",
-            "host": "1.1.1.1",
-            "port": 22,
-            "connection_type": "ssh",
+            "items": [
+                {
+                    "name": "should-fail-revoked",
+                    "host": "1.1.1.1",
+                    "port": 22,
+                    "connection_type": "ssh",
+                }
+            ]
         },
         headers={"X-API-Key": revoked_key},
     )
@@ -346,19 +350,30 @@ def test_master_key_always_accepted(e2e_client: httpx.Client) -> None:
     )
     assert resp.status_code == 200
 
-    # Master key can write
+    # Master key can write (bulk-first)
     resp = e2e_client.post(
         "/api/v2/nodes/",
         json={
-            "name": "master-key-test-node",
-            "host": "10.0.0.210",
-            "port": 22,
-            "connection_type": "ssh",
+            "items": [
+                {
+                    "name": "master-key-test-node",
+                    "host": "10.0.0.210",
+                    "port": 22,
+                    "connection_type": "ssh",
+                }
+            ]
         },
         headers={"X-API-Key": master_key},
     )
-    assert resp.status_code == 201
-    node_id = resp.json()["id"]
+    assert resp.status_code in (200, 201, 207)
+    data = resp.json()
+    if "results" in data:
+        # BulkResult
+        assert data["succeeded"] >= 1
+        first = [r for r in data["results"] if r["status"] == "success"][0]
+        node_id = first.get("node_id") or first.get("id")
+    else:
+        node_id = data["id"]
 
     try:
         # Master key can access audit
@@ -368,7 +383,7 @@ def test_master_key_always_accepted(e2e_client: httpx.Client) -> None:
         )
         assert resp.status_code == 200
     finally:
-        e2e_client.delete(f"/api/v2/nodes/{node_id}")
+        e2e_client.delete(f"/api/v2/nodes/{node_id}", headers={"X-API-Key": master_key})
 
 
 # ---------------------------------------------------------------------------
@@ -389,14 +404,18 @@ def test_read_only_key_rejected_on_write(e2e_client):
     key_id = resp.json()["id"]
 
     try:
-        # POST with read-only key should return 403
+        # POST with read-only key should return 403 (bulk-first)
         resp = e2e_client.post(
             "/api/v2/nodes/",
             json={
-                "name": "should-fail",
-                "host": "1.1.1.1",
-                "port": 22,
-                "connection_type": "ssh",
+                "items": [
+                    {
+                        "name": "should-fail",
+                        "host": "1.1.1.1",
+                        "port": 22,
+                        "connection_type": "ssh",
+                    }
+                ]
             },
             headers={"X-API-Key": ro_key},
         )

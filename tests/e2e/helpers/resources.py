@@ -361,7 +361,7 @@ class UniqueResourceFactory:
     ) -> UnvalidatedJsonObject:
         """Create or replace a script schedule."""
         response = self._client.post(
-            f"/api/v2/scripts/{script_id}/schedule",
+            f"/api/v2/scripts/{script_id}/schedules",
             json={"cron": cron, "node_ids": node_ids},
         )
         assert response.status_code == 200, (
@@ -369,7 +369,7 @@ class UniqueResourceFactory:
         )
         self._cleanup.add(
             lambda sid=script_id: self._client.delete(  # type: ignore[misc]
-                f"/api/v2/scripts/{sid}/schedule"
+                f"/api/v2/scripts/{sid}/schedules"
             )
         )
         return response.json()

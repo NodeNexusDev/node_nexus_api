@@ -319,12 +319,13 @@ class TestNetworkFailures:
         docker_service_controller.stop("ssh-server")
         try:
             resp = e2e_client.post(
-                f"/api/v2/nodes/{node['id']}/check",
+                "/api/v2/nodes/credential-validations",
+                json={"ids": [node["id"]]},
             )
-            # The check endpoint returns 200 but marks node as unreachable
-            assert resp.status_code == 200
+            assert resp.status_code in (200, 207)
             data = resp.json()
-            assert data["status"] == "unreachable"
+            assert data["failed"] == 1
+            assert data["results"][0]["status"] == "error"
         finally:
             docker_service_controller.start("ssh-server")
 
@@ -341,20 +342,24 @@ class TestNetworkFailures:
         docker_service_controller.stop("ssh-server")
         docker_service_controller.start("ssh-server")
 
-        # Wait for SSH to be healthy by polling the check endpoint
+        # Wait for SSH to be healthy by polling credential-validations
         def _ssh_healthy() -> bool:
-            resp = e2e_client.post(f"/api/v2/nodes/{node['id']}/check")
-            return resp.status_code == 200
+            resp = e2e_client.post(
+                "/api/v2/nodes/credential-validations",
+                json={"ids": [node["id"]]},
+            )
+            return resp.status_code in (200, 207)
 
         wait_for_condition(
             _ssh_healthy, timeout=10.0, description="SSH healthy after restart"
         )
 
-        # Connectivity check should work again
+        # Connectivity check should work again — credential validation succeeds
         resp = e2e_client.post(
-            f"/api/v2/nodes/{node['id']}/check",
+            "/api/v2/nodes/credential-validations",
+            json={"ids": [node["id"]]},
         )
-        assert resp.status_code in (200, 503)  # 503 if SSH not fully ready yet
+        assert resp.status_code in (200, 207, 503)  # 503 if SSH not fully ready yet
 
     def test_db_pause_makes_ready_return_503(
         self,
