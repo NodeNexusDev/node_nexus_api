@@ -2,7 +2,7 @@
 title: Configuration reference
 status: stable
 translation_key: reference.configuration
-source_revision: "2026-08-26"
+source_revision: "2026-09-02"
 ---
 
 # Configuration reference
@@ -38,7 +38,6 @@ source_revision: "2026-08-26"
 | `OTEL_ENABLED` | `false` | Enable OpenTelemetry |
 | `OTEL_ENDPOINT` | `http://localhost:4317` | OTLP gRPC collector |
 | `OTEL_SERVICE_NAME` | `node-nexus-api` | Trace service name |
-| `SUPPORTED_API_VERSIONS` | `["1"]` | Accepted API versions |
 | `E2E_ENABLED` | `false` | Enable E2E test harness endpoints |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | `15` | JWT access token TTL in minutes |
 | `REFRESH_TOKEN_EXPIRE_DAYS` | `7` | JWT refresh token TTL in days |
@@ -49,3 +48,6 @@ source_revision: "2026-08-26"
 Production configuration fails fast when required secret-length constraints are
 not met. Override every placeholder secret and environment-specific URL before
 starting the service.
+
+> **Note:** `X-API-Version` header removed in 2.0; versioning is via URL prefix `/api/v2` only.
+> `ENCRYPTION_SALT` (min 16 chars in production) and `SECRET_KEY` (min 32 chars) remain required.

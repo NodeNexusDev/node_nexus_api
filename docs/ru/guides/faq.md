@@ -2,23 +2,25 @@
 title: Частые вопросы
 status: stable
 translation_key: guides.faq
-source_revision: "2026-07-30"
+source_revision: "2026-09-02"
 ---
 
 # Частые вопросы
 
 ## Как добавить ноду?
 
-[Создайте ноду](nodes.md) с SSH-учётными данными, затем
-[проверьте подключение](nodes.md). Используйте
-возвращённый UUID для всех последующих операций.
+[Создайте ноду](nodes.md#create-nodes-bulk) с SSH-данными (`POST
+/api/v2/nodes/ {"items": [{"name","host","port"}]}` → `201|207
+BulkResult`), затем [проверьте подключение](nodes.md#verify-connectivity-single).
+Используйте возвращённый UUID.
 
 ## Как выполнить команду на ноде?
 
 Два способа:
-- **Прямой:** `POST /api/v2/nodes/{id}/execute/` с `{"command": "..."}`
+- **Прямой:** `POST /api/v2/commands/raw-executions` с `{"commands":
+  ["..."],"node_ids":["<uuid>"]}` (M×N, `207`)
 - **Шаблон:** [создайте шаблон](commands.md), затем `POST
-  /api/v2/commands/{id}/execute`
+  /api/v2/commands/executions {"command_ids":[],"node_ids":[]}`
 
 Готовые рецепты: [шпаргалка](../reference/cheat-sheet.md).
 

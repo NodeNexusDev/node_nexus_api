@@ -35,6 +35,8 @@ nav:
       - Команды: guides/commands.md
       - Скрипты: guides/scripts.md
       - Docker: guides/docker.md
+      - Compose: guides/compose.md
+      - Шаблоны: guides/templates.md
       - Журнал аудита: guides/audit-log.md
       - WebSocket: guides/websocket.md
       - Импорт и экспорт: guides/configuration-import-export.md

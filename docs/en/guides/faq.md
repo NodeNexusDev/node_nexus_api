@@ -2,23 +2,25 @@
 title: FAQ
 status: stable
 translation_key: guides.faq
-source_revision: "2026-07-30"
+source_revision: "2026-09-02"
 ---
 
 # Frequently asked questions
 
 ## How do I add a node?
 
-[Create a node](nodes.md#create-a-node) with SSH credentials, then
-[verify connectivity](nodes.md#verify-connectivity). Use the returned UUID
-for all subsequent operations.
+[Create a node](nodes.md#create-nodes-bulk) with SSH credentials (`POST
+/api/v2/nodes/ {"items": [{"name","host","port"}]}` → `201|207
+BulkResult`), then [verify connectivity](nodes.md#verify-connectivity-single).
+Use the returned UUID for all subsequent operations.
 
 ## How do I run a command on a node?
 
 Two ways:
-- **Inline:** `POST /api/v2/nodes/{id}/execute/` with `{"command": "..."}`
+- **Inline:** `POST /api/v2/commands/raw-executions` with `{"commands":
+  ["..."],"node_ids":["<uuid>"]}` (M×N, `207`)
 - **Template:** [create a command template](commands.md), then `POST
-  /api/v2/commands/{id}/execute`
+  /api/v2/commands/executions {"command_ids":[],"node_ids":[]}`
 
 See the [cheat sheet](../reference/cheat-sheet.md) for copy-paste recipes.
 

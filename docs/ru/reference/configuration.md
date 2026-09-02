@@ -2,7 +2,7 @@
 title: Справочник конфигурации
 status: stable
 translation_key: reference.configuration
-source_revision: "2026-08-26"
+source_revision: "2026-09-02"
 ---
 
 # Справочник конфигурации
@@ -38,7 +38,6 @@ source_revision: "2026-08-26"
 | `OTEL_ENABLED` | `false` | Включить OpenTelemetry |
 | `OTEL_ENDPOINT` | `http://localhost:4317` | OTLP gRPC collector |
 | `OTEL_SERVICE_NAME` | `node-nexus-api` | Trace service name |
-| `SUPPORTED_API_VERSIONS` | `["1"]` | Поддерживаемые версии API |
 | `E2E_ENABLED` | `false` | Включить endpoints E2E test harness |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | `15` | TTL access token JWT (минуты) |
 | `REFRESH_TOKEN_EXPIRE_DAYS` | `7` | TTL refresh token JWT (дни) |
@@ -49,3 +48,6 @@ source_revision: "2026-08-26"
 Production-конфигурация завершается с ошибкой, если требования к длине secrets
 не выполнены. До запуска сервиса замените все placeholder secrets и
 environment-specific URLs.
+
+> **Примечание:** Заголовок `X-API-Version` удалён в 2.0; версионирование только через prefix URL `/api/v2`.
+> `ENCRYPTION_SALT` (минимум 16 символов в production) и `SECRET_KEY` (минимум 32 символа) остаются обязательными.

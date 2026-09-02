@@ -2,7 +2,7 @@
 title: Совместимость и поддержка
 status: stable
 translation_key: reference.compatibility
-source_revision: "2026-08-25"
+source_revision: "2026-09-02"
 ---
 
 # Совместимость и поддержка
@@ -17,14 +17,14 @@ OpenAPI artifact конкретного release.
 
 ## Версионирование API
 
-API поддерживает версионирование через заголовок `X-API-Version`. Версия по
-умолчанию — `1`. Неподдерживаемые версии возвращают `400 Bad Request`. Endpoints
-health, readiness и metrics исключены из проверки версии.
+Версионирование — только через prefix URL `/api/v2`. Заголовок `X-API-Version`
+удалён в 2.0. Endpoints health, readiness и metrics остаются вне версионирования.
 
 ## Changelog
 
 | Версия | Дата | Тип | Основные изменения |
 |--------|------|-----|--------------------|
+| 2.0.0 | 2026-09-02 | Major | Breaking bulk-first: BulkResult 207 `{total,succeeded,failed,results}` (200 все ок, 207 частично, 422 все неуспешно), `{items}` bulk-создание (1..20), cursor pagination (`cursor`/`limit` + `next_cursor`/`has_more`), docker vert-bulk + 9 операций (kill, update, archive, port, wait, system/version, system/prune, networks/prune, images/history, images/push), compose (persistent `compose_projects`), templates (registries, packs, installations), notes→description, unified stats (`/stats` snapshot и buckets), ErrorResponse `request_id` всегда присутствует, удалён `X-API-Version` |
 | 1.0.0 | 2026-08-25 | Major | Первый стабильный релиз: полный Docker CRUD (контейнеры, образы, сети, volumes, система, bulk), полная документация (bilingual), production CI/CD, 95% покрытие тестами |
 | 0.17.1 | 2026-08-25 | Patch | Исправление CPU метрик (всегда возвращал 100% из-за неверного столбца vmstat), удаление Any из application layer |
 | 0.17.0 | 2026-08-25 | Minor | Bulk операции (execute, check, delete, tags), реструктуризация API endpoints, извлечение bulk node operations, выравнивание статуса выполнения скриптов, улучшение type safety |

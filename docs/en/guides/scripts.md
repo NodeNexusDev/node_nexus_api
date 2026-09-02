@@ -2,7 +2,7 @@
 title: Scripts and schedules
 status: stable
 translation_key: guides.scripts
-source_revision: "2026-08-16"
+source_revision: "2026-09-02"
 ---
 
 # Scripts and schedules
@@ -22,20 +22,60 @@ All target nodes are validated before execution. Nodes run with bounded
 concurrency. History stores command fingerprints instead of rendered commands,
 does not persist parameters, and truncates oversized output with byte counts.
 
-## Search scripts
+## Create scripts (bulk-first)
 
-Add the `search` query parameter to filter by name or description:
+`POST /api/v2/scripts/` is bulk-first without the `bulk` keyword. Send an
+envelope `{items: [ScriptCreate, ...]}` (1..20 items) and receive a `BulkResult`
+with `201` when all succeed or `207 Multi-Status` on partial success. Each
+`ScriptCreate` carries `name`, `description`, `steps` (array of `{label, type:"command"|"command_id", command?, command_id?, params?, on_failure:"stop"|"continue"}`), and `tags`. Single creation is `items` with one element.
 
 ```bash
-curl --fail-with-body --get \
+curl --fail-with-body -X POST "${NODE_NEXUS_URL}/api/v2/scripts/" \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
-  --data-urlencode 'search=deploy' \
-  "${NODE_NEXUS_URL}/api/v2/scripts/"
+  -H 'Content-Type: application/json' \
+  -d '{
+    "items": [
+      {
+        "name": "deploy",
+        "description": "Deploy main branch",
+        "tags": ["deploy"],
+        "steps": [
+          {"label": "pull", "type": "command", "command": "git pull", "params": {}, "on_failure": "stop"},
+          {"label": "restart", "type": "command_id", "command_id": "<command-uuid>", "params": {"branch": "main"}, "on_failure": "stop"}
+        ]
+      }
+    ]
+  }'
+  # -> 201|207 {total,succeeded,failed,results:[{id?,name,status:"success"|"error",error}]}
 ```
 
-Search matches against the `name` and `description` fields using
-case-insensitive comparison (ILIKE). The response returns only scripts whose
-name or description contain the search substring.
+`201` when `failed==0`, `207` when `succeeded>0 && failed>0`. Inspect `results[]`.
+
+## List scripts (cursor pagination)
+
+Cursor pagination only. Use `cursor` + `limit` → `{items,next_cursor,has_more,limit}`. Supports `?tag=` (single tag) and `?search=` (ILIKE over `name`/`description`).
+
+```bash
+  # First page
+curl --fail-with-body \
+  -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
+  "${NODE_NEXUS_URL}/api/v2/scripts/?limit=20"
+
+  # Next page
+curl --fail-with-body \
+  -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
+  "${NODE_NEXUS_URL}/api/v2/scripts/?cursor=eyJvZmZzZXQiOjIwfQ==&limit=20"
+
+  # Filter by tag and search
+curl --fail-with-body --get \
+  -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
+  --data-urlencode 'tag=deploy' \
+  --data-urlencode 'search=deploy' \
+  "${NODE_NEXUS_URL}/api/v2/scripts/?limit=20&tag=deploy&search=deploy"
+  # -> {items:[{id,name,description,steps,tags,created_at,updated_at}], next_cursor, has_more, limit}
+```
+
+Cursor encodes `{"offset": N}` as base64url JSON; `422` on invalid cursor. Iterate while `has_more` is true. `search` matches `name` and `description` (ILIKE).
 
 ## Global script tags
 
@@ -48,97 +88,141 @@ curl --fail-with-body \
 Returns a sorted list of unique tags used across all scripts. Useful for
 building autocomplete and filter UIs.
 
-## Execute by tags
+## Execute scripts
 
-A script can be executed on nodes filtered by tags instead of listing IDs.
-The `node_ids` and `node_tags` parameters can be combined — the result is the
-intersection (AND).
+### Single execution (per script)
 
-### Execute by IDs (as before)
+A script can be executed on nodes filtered by IDs and/or tags (intersection AND). At least one of `node_ids` or `node_tags` is required.
 
 ```bash
+  # By IDs
 curl --fail-with-body -X POST \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
   -H "Content-Type: application/json" \
   -d '{"node_ids": ["<node-id-1>", "<node-id-2>"], "params": {"branch": "main"}}' \
   "${NODE_NEXUS_URL}/api/v2/scripts/<script_id>/execute"
-```
 
-### Execute by tags
-
-```bash
+  # By tags (all nodes that have both tags)
 curl --fail-with-body -X POST \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
   -H "Content-Type: application/json" \
   -d '{"node_tags": ["web", "production"], "params": {"branch": "main"}}' \
   "${NODE_NEXUS_URL}/api/v2/scripts/<script_id>/execute"
-```
 
-Runs on all nodes that have both tags `web` AND `production`.
-
-### Mixed mode
-
-```bash
+  # Mixed (intersection: nodes from node_ids that also have tags)
 curl --fail-with-body -X POST \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
   -H "Content-Type: application/json" \
   -d '{"node_ids": ["<node-id>"], "node_tags": ["web"], "params": {}}' \
   "${NODE_NEXUS_URL}/api/v2/scripts/<script_id>/execute"
+  # -> {script_id, total_nodes, results:[{node_id, node_name, exit_code, stdout, stderr}]}
 ```
 
-The result is the intersection: nodes from `node_ids` that also have all
-specified tags. At least one of `node_ids` or `node_tags` is required.
+Per-step `exit_code`, `stdout`, `stderr` are present inside `steps` of `GET /scripts/{id}/executions` history; the `execute` response aggregates per node.
 
-### Response
+### Bulk executions M×N (recommended)
 
-```json
-{
-  "script_id": "...",
-  "total_nodes": 3,
-  "results": [
-    {"node_id": "...", "node_name": "web-1", "exit_code": 0, "stdout": "...", "stderr": ""},
-    {"node_id": "...", "node_name": "web-2", "exit_code": 0, "stdout": "...", "stderr": ""}
-  ]
-}
-```
-
-Fields `exit_code`, `stdout`, `stderr` are present per step, but the batch
-response `results` contains aggregated per-node data.
-
-## Retry execution
-
-Re-run a failed command or script execution with the same parameters.
-
-### Retry a command execution
+Execute multiple scripts on multiple nodes in one call (`M×N ≤100`) with `207` handling.
 
 ```bash
 curl --fail-with-body -X POST \
+  "${NODE_NEXUS_URL}/api/v2/scripts/executions" \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
-  "${NODE_NEXUS_URL}/api/v2/nodes/${NODE_ID}/commands/${EXECUTION_ID}/retry"
+  -H 'Content-Type: application/json' \
+  -d '{
+    "script_ids": ["<script-1>", "<script-2>"],
+    "node_ids": ["<node-1>", "<node-2>"],
+    "node_tags": [],
+    "params": {
+      "<script-1>": {"branch": "main"},
+      "<script-2>": {}
+    }
+  }'
+  # -> {batch_id, total, succeeded, failed, results:[{script_id,execution_id,node_id,node_name,status:"success"|"error",steps:[{step_index,label,command_fingerprint,stdout,stderr,stdout_bytes,stderr_bytes,truncated,exit_code}],error}]}
+  # 200 all ok, 207 partial
+
+  # With tag filtering
+curl --fail-with-body -X POST \
+  "${NODE_NEXUS_URL}/api/v2/scripts/executions" \
+  -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "script_ids": ["<script-1>"],
+    "node_ids": [],
+    "node_tags": ["production"],
+    "params": {}
+  }'
 ```
 
-### Retry a script execution
+`M×N` guard: `len(script_ids) * max(len(node_ids), len(node_tags) or 1) ≤100`, else `422`. Inspect `results[]` per `status`; partial failures do not roll back successful executions.
+
+Execution history for a script (cursor pagination):
 
 ```bash
-curl --fail-with-body -X POST \
+curl --fail-with-body \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
-  "${NODE_NEXUS_URL}/api/v2/scripts/executions/${EXECUTION_ID}/retry"
+  "${NODE_NEXUS_URL}/api/v2/scripts/${SCRIPT_ID}/executions?cursor=eyJvZmZzZXQiOjIwfQ==&limit=20"
+  # -> {items:[{id, script_id, node_id, params, status, steps:[...], started_at, finished_at}], next_cursor, has_more, limit}
 ```
 
-Returns a new execution with the same `script_id`, `node_id`, and `params`.
+## Retries and cancels (bulk)
 
-## Cancel execution
-
-Cancel a still-running script execution:
+Retries re-execute with the same `script_id`, `node_id`, and `params`. Cancels abort still-running executions. Both are bulk-first with `207` and accept an optional `?timeout=` query (1..600 seconds, default 30/60) to bound the wait.
 
 ```bash
+  # Bulk retry executions (with timeout)
 curl --fail-with-body -X POST \
+  "${NODE_NEXUS_URL}/api/v2/scripts/executions/retries?timeout=30" \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
-  "${NODE_NEXUS_URL}/api/v2/scripts/executions/${EXECUTION_ID}/cancel"
+  -H 'Content-Type: application/json' \
+  -d '{"execution_ids": ["<exec-1>", "<exec-2>"]}'
+  # -> {total,succeeded,failed,results:[{execution_id,status:"retry_scheduled"|"error",message}]}
+
+  # Bulk cancel executions (with timeout)
+curl --fail-with-body -X POST \
+  "${NODE_NEXUS_URL}/api/v2/scripts/executions/cancels?timeout=30" \
+  -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
+  -H 'Content-Type: application/json' \
+  -d '{"execution_ids": ["<exec-1>"]}'
+  # -> {total,succeeded,failed,results:[{execution_id,status:"cancelled"|"error",message}]}
 ```
 
-Only running executions can be cancelled. Already completed or failed executions
-return an error.
+Single-execution compat endpoints also exist (`POST /scripts/executions/{id}/retry?timeout=30`, `/cancel?timeout=30` and `POST /nodes/{id}/commands/{id}/retry` for commands) but prefer bulk. Only `running` executions can be cancelled.
+
+## Stats
+
+Unified stats without `group_by` return a snapshot `ExecutionStatsResponse`; with `group_by` return `{buckets: [{period,total,successful,failed,cancelled,avg_duration_ms}]}`.
+
+```bash
+  # Snapshot — all scripts
+curl --fail-with-body \
+  -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
+  "${NODE_NEXUS_URL}/api/v2/scripts/stats"
+  # -> {total, successful, failed, cancelled, avg_duration_ms}
+
+  # Snapshot filtered by node and date range
+curl --fail-with-body \
+  -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
+  "${NODE_NEXUS_URL}/api/v2/scripts/stats?node_id=${NODE_ID}&date_from=2026-08-01T00:00:00Z&date_to=2026-09-02T00:00:00Z"
+
+  # Buckets (grouped)
+curl --fail-with-body \
+  -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
+  "${NODE_NEXUS_URL}/api/v2/scripts/stats?node_id=${NODE_ID}&group_by=day"
+  # -> {buckets:[{period,total,successful,failed,cancelled,avg_duration_ms}]}
+
+  # Per-script snapshot and buckets
+curl --fail-with-body \
+  -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
+  "${NODE_NEXUS_URL}/api/v2/scripts/${SCRIPT_ID}/stats"
+
+curl --fail-with-body \
+  -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
+  "${NODE_NEXUS_URL}/api/v2/scripts/${SCRIPT_ID}/stats?group_by=hour&date_from=2026-09-01T00:00:00Z"
+  # -> {buckets:[...]} when group_by present
+```
+
+`group_by` accepts `hour|day|week|month`; `date_from`/`date_to` are ISO 8601 UTC.
 
 ## Schedule history
 
@@ -147,10 +231,11 @@ View the execution history of a specific schedule (cron-triggered runs):
 ```bash
 curl --fail-with-body \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
-  "${NODE_NEXUS_URL}/api/v2/scripts/${SCRIPT_ID}/schedule/history?page=1&size=20"
+  "${NODE_NEXUS_URL}/api/v2/scripts/${SCRIPT_ID}/schedule/history?cursor=eyJvZmZzZXQiOjIwfQ==&limit=20"
+  # cursor pagination (CursorPage[ScriptExecutionResponse])
 ```
 
 Optional query: `trigger` — filter by trigger type (`manual`, `scheduled`,
-`api`). Returns a paginated list of script executions with `trigger` and
+`api`). Returns a cursor-paginated list of script executions with `trigger` and
 `schedule_id` fields. Only executions created by `execute` or the scheduler are
-included (command executions are not).
+included (command executions are not). Legacy `?page`/`size` alias is no longer the canonical pagination for schedules — use `cursor`/`limit`.
