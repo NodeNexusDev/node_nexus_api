@@ -209,5 +209,3 @@ async def remove_network(
         network_id=validated_id,
     )
     await service.remove_network(node_id, validated_id)
-
-

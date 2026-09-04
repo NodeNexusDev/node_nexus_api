@@ -217,5 +217,3 @@ async def compose_restarts(
     if result.failed > 0 and result.succeeded > 0:
         response.status_code = 207
     return result
-
-

@@ -242,5 +242,3 @@ async def rename_container(
         )
     )
     return DockerContainerRenameResponse(status="renamed", new_name=new_name)
-
-

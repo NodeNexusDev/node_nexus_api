@@ -183,7 +183,6 @@ from app.application.services.user_service import UserService
 from app.core.config import Settings, get_settings
 
 
-
 class ServiceProvider(Provider):
     """Service providers."""
 
@@ -643,4 +642,3 @@ class ServiceProvider(Provider):
     ) -> ComposeService:
         """Get compose project orchestration."""
         return ComposeService(reader=reader, writer=writer, runner=runner)
-

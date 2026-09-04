@@ -183,7 +183,6 @@ from app.application.services.user_service import UserService
 from app.core.config import Settings, get_settings
 
 
-
 class ConnectorProvider(Provider):
     """Connector providers."""
 
@@ -251,4 +250,3 @@ class ConnectorProvider(Provider):
     ) -> NodeCredentialValidator:
         """Bind credential validation to the SSH adapter."""
         return SshCredentialValidator(connector_factory, known_hosts)
-

@@ -183,7 +183,6 @@ from app.application.services.user_service import UserService
 from app.core.config import Settings, get_settings
 
 
-
 class DbProvider(Provider):
     """Database session provider."""
 
@@ -227,4 +226,3 @@ class DbProvider(Provider):
         async with sessionmaker() as session:
             async with session.begin():
                 yield session
-

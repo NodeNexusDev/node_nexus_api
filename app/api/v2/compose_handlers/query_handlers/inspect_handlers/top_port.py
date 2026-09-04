@@ -190,5 +190,3 @@ async def compose_version(
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     return ComposeVersionResponse(version=ver, output=out)
-
-

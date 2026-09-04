@@ -242,5 +242,3 @@ async def put_archive(
     )
     await service.put_archive(node_id, validated_id, path, data)
     return DockerActionResponse(status="copied")
-
-

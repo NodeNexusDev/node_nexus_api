@@ -249,5 +249,3 @@ async def bulk_pauses(
             return ContainerBulkResult(container_id=cid, status="error", error=str(exc))
 
     return await execute_vert_bulk(data.container_ids, _one, response)
-
-

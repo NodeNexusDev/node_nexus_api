@@ -183,7 +183,6 @@ from app.application.services.user_service import UserService
 from app.core.config import Settings, get_settings
 
 
-
 class SchedulerProvider(Provider):
     """Scheduler providers."""
 
@@ -302,4 +301,3 @@ class SchedulerProvider(Provider):
             user_reader=user_reader,
             user_writer=user_writer,
         )
-

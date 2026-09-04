@@ -264,5 +264,3 @@ async def bulk_executions(
         failed=failed,
         results=flat,
     )
-
-

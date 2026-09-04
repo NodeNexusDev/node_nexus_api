@@ -1,4 +1,5 @@
 """Bulk node operation service."""
+
 from __future__ import annotations
 
 import asyncio
@@ -150,6 +151,14 @@ class NodeBulkOperationService:
             result = await self._operator.bulk_check(node_ids)
             return result
 
+        assert self._node_reader is not None
+        assert self._credential_cipher is not None
+        assert self._connector_factory is not None
+
+        node_reader = self._node_reader
+        credential_cipher = self._credential_cipher
+        connector_factory = self._connector_factory
+
         # Lazy import to avoid circular deps
         from app.application.dto.node_status_history import NodeStatusChangeDTO
         from app.application.services.ssh_executor import build_ssh_connector
@@ -161,12 +170,12 @@ class NodeBulkOperationService:
             except ValueError:
                 return (node_id_str, False, "Invalid node id")
 
-            node = await self._node_reader.get_connection(node_uuid)  # type: ignore[union-attr]
+            node = await node_reader.get_connection(node_uuid)
             if node is None:
                 return (node_id_str, False, "Node not found")
 
             connector = build_ssh_connector(
-                node, self._credential_cipher, self._connector_factory  # type: ignore[arg-type]
+                node, credential_cipher, connector_factory
             )
 
             try:

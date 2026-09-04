@@ -203,5 +203,3 @@ async def unpause_container(
     )
     await service.unpause_container(node_id, validated_id)
     return DockerActionResponse(status="unpaused")
-
-
