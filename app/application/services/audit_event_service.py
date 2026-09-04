@@ -2,11 +2,15 @@
 
 from uuid import UUID
 
+import structlog
+
 from app.application.dto.audit import AuditEventDTO
 from app.application.policies.audit import sanitize_audit_details
 from app.application.ports.audit_log import AuditOutboxPort
 from app.application.types import JsonObject
 from app.core.exceptions import AuditWriteError
+
+logger = structlog.get_logger("audit")
 
 
 class AuditEventService:
@@ -32,6 +36,13 @@ class AuditEventService:
                 self._event(action, node_id, user, details)
             )
         except Exception as exc:
+            logger.warning(
+                "audit.event.persist_failed",
+                action=action,
+                node_id=str(node_id) if node_id else None,
+                error_type=type(exc).__name__,
+                exc_info=exc,
+            )
             raise AuditWriteError("Audit event could not be persisted") from exc
 
     async def log_required(
@@ -45,6 +56,13 @@ class AuditEventService:
                 self._event(action, node_id, None, details)
             )
         except Exception as exc:
+            logger.warning(
+                "audit.event.required_failed",
+                action=action,
+                node_id=str(node_id) if node_id else None,
+                error_type=type(exc).__name__,
+                exc_info=exc,
+            )
             raise AuditWriteError(
                 "Required audit event could not be committed"
             ) from exc

@@ -33,7 +33,11 @@ from app.application.services.ssh_executor import (
     execute_ssh,
 )
 from app.application.types import JsonObject
-from app.core.exceptions import ConnectionFailedError, NodeNotFoundError
+from app.core.exceptions import (
+    AuditWriteError,
+    ConnectionFailedError,
+    NodeNotFoundError,
+)
 
 audit = structlog.get_logger("audit")
 
@@ -97,7 +101,10 @@ class NodeBulkCommandService:
             )
 
         # Audit uses the request-scoped session and therefore remains outside
-        # concurrent workers.
+        # concurrent workers. Optional audit is best-effort: a single outbox
+        # flush must not turn a successful SSH execution into a per-item 503.
+        # Keep required audit (bulk_execute.requested before SSH) fail-closed,
+        # but bulk result audit is fail-open with savepoint in RequestAuditOutbox.
         for result in results:
             succeeded = result.exit_code == 0
             details: JsonObject = {
@@ -107,11 +114,19 @@ class NodeBulkCommandService:
             if not succeeded:
                 details["error"] = result.stderr
             if self._audit:
-                await self._audit.log(
-                    action="bulk_execute" if succeeded else "bulk_execute_failed",
-                    node_id=result.node_id,
-                    details=details,
-                )
+                try:
+                    await self._audit.log(
+                        action="bulk_execute" if succeeded else "bulk_execute_failed",
+                        node_id=result.node_id,
+                        details=details,
+                    )
+                except AuditWriteError:
+                    audit.warning(
+                        "audit.bulk_result_skipped",
+                        node_id=str(result.node_id),
+                        action="bulk_execute" if succeeded else "bulk_execute_failed",
+                    )
+                    continue
 
         succeeded = sum(1 for result in results if result.exit_code == 0)
         return BulkCommandResultDTO(
