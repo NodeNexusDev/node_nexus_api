@@ -19,6 +19,7 @@ from app.application.ports.node_bulk_operator import NodeBulkOperator
 if TYPE_CHECKING:
     from app.application.ports.audit_sink import AuditEventSink
     from app.application.ports.credential_cipher import CredentialCipher
+    from app.application.ports.node_management import NodeManagementReader
     from app.application.ports.node_reader import NodeConnectionReader, NodeStatusWriter
     from app.application.ports.node_status_history import NodeStatusHistoryWriter
     from app.application.ports.remote_command import RemoteConnectorFactory
@@ -40,6 +41,7 @@ class NodeBulkOperationService:
         credential_cipher: CredentialCipher | None = None,
         connector_factory: RemoteConnectorFactory | None = None,
         status_history_writer: NodeStatusHistoryWriter | None = None,
+        node_view_reader: NodeManagementReader | None = None,
     ) -> None:
         self._operator = operator
         self._audit = audit_service
@@ -48,6 +50,7 @@ class NodeBulkOperationService:
         self._credential_cipher = credential_cipher
         self._connector_factory = connector_factory
         self._status_history_writer = status_history_writer
+        self._node_view_reader = node_view_reader
         self._check_semaphore = asyncio.Semaphore(_DEFAULT_CHECK_CONCURRENCY)
 
     async def bulk_delete(self, data: BulkNodeDeleteDTO) -> BulkNodeOperationResultDTO:
@@ -174,9 +177,7 @@ class NodeBulkOperationService:
             if node is None:
                 return (node_id_str, False, "Node not found")
 
-            connector = build_ssh_connector(
-                node, credential_cipher, connector_factory
-            )
+            connector = build_ssh_connector(node, credential_cipher, connector_factory)
 
             try:
                 async with connector:
@@ -205,25 +206,42 @@ class NodeBulkOperationService:
                     error=str(exc),
                 )
 
+            # Fetch old status for history
+            old_status: str | None = None
+            if self._node_view_reader is not None:
+                try:
+                    view = await self._node_view_reader.get_node(node_uuid)
+                    old_status = view.status if view else None
+                except Exception:  # noqa: BLE001
+                    old_status = None
+
             # Update status and history (best effort, don't fail bulk on single)
-            try:
-                if self._status_history_writer is not None:
+            # Update status first, then history
+            if self._status_writer is not None:
+                try:
+                    await self._status_writer.update_node_status(node_uuid, new_status)
+                except Exception as exc:  # noqa: BLE001
+                    audit.warning(
+                        "node.bulk.check.status_update_failed",
+                        node_id=node_id_str,
+                        error=str(exc),
+                    )
+            if self._status_history_writer is not None:
+                try:
                     await self._status_history_writer.save(
                         NodeStatusChangeDTO(
                             node_id=node_uuid,
-                            old_status=None,
+                            old_status=old_status,
                             new_status=new_status,
                             source="connectivity_check",
                         )
                     )
-                if self._status_writer is not None:
-                    await self._status_writer.update_node_status(node_uuid, new_status)
-            except Exception as exc:  # noqa: BLE001
-                audit.warning(
-                    "node.bulk.check.status_update_failed",
-                    node_id=node_id_str,
-                    error=str(exc),
-                )
+                except Exception as exc:  # noqa: BLE001
+                    audit.warning(
+                        "node.bulk.check.history_failed",
+                        node_id=node_id_str,
+                        error=str(exc),
+                    )
 
             return (node_id_str, success, error)
 

@@ -25,7 +25,13 @@ async def execute_vert_bulk[TItem, TResult](
 
     Sets 207 when partially succeeded via ``set_bulk_status``.
     """
-    results = await asyncio.gather(*(worker(item) for item in items))
+    sem = asyncio.Semaphore(20)
+
+    async def _bounded(item: TItem) -> TResult:
+        async with sem:
+            return await worker(item)
+
+    results = await asyncio.gather(*(_bounded(item) for item in items))
     succeeded = sum(1 for r in results if getattr(r, "status", None) == "success")
     failed = len(results) - succeeded
     set_bulk_status(response, succeeded, failed)
@@ -42,7 +48,13 @@ async def execute_vert_bulk_simple[TItem, TResult](
     success_status: str = "success",
 ) -> BulkResult[TResult]:
     """Variant for result types without strict status field checks."""
-    results = await asyncio.gather(*(worker(item) for item in items))
+    sem = asyncio.Semaphore(20)
+
+    async def _bounded(item: TItem) -> TResult:
+        async with sem:
+            return await worker(item)
+
+    results = await asyncio.gather(*(_bounded(item) for item in items))
     succeeded = sum(1 for r in results if getattr(r, "status", None) == success_status)
     failed = len(results) - succeeded
     set_bulk_status(response, succeeded, failed)

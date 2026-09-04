@@ -352,6 +352,7 @@ class SSHConnectorFactory:
         password: str | None,
         ssh_key: str | None,
         passphrase: str | None = None,
+        timeout: int = 30,
     ) -> SSHConnector:
         return SSHConnector(
             host=host,
@@ -360,6 +361,7 @@ class SSHConnectorFactory:
             password=password,
             ssh_key=ssh_key,
             passphrase=passphrase,
+            timeout=timeout,
             known_hosts=(
                 self._known_hosts_path if self._strict_host_key_checking else None
             ),

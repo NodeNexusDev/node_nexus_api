@@ -15,12 +15,6 @@ def raise_for_docker_error(stderr: str, exit_code: int) -> None:
     if exit_code == 0:
         return
     normalized = stderr.lower()
-    if (
-        "no such container" in normalized
-        or "no such image or container" in normalized
-        or "no such object" in normalized
-    ):
-        raise ContainerNotFoundError(stderr)
     if "no such image" in normalized:
         raise ImageNotFoundError(stderr)
     if "no such network" in normalized or (
@@ -31,6 +25,12 @@ def raise_for_docker_error(stderr: str, exit_code: int) -> None:
         "volume" in normalized and "not found" in normalized
     ):
         raise VolumeNotFoundError(stderr)
+    if (
+        "no such container" in normalized
+        or "no such image or container" in normalized
+        or "no such object" in normalized
+    ):
+        raise ContainerNotFoundError(stderr)
     if "cannot connect to the docker daemon" in normalized:
         raise DockerDaemonError(stderr)
     if "is not running" in normalized:

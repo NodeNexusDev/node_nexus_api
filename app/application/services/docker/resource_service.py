@@ -240,12 +240,12 @@ class DockerResourceService:
     async def create_volume(self, data: VolumeCreateRequestDTO) -> str:
         """Create a Docker volume and return the volume name."""
         parts = ["volume create"]
-        if data.name:
-            validate_volume_name(data.name)
-            parts.append(shlex.quote(data.name))
         if data.driver and data.driver != "local":
             validate_network_driver(data.driver)
             parts.append(f"--driver {shlex.quote(data.driver)}")
+        if data.name:
+            validate_volume_name(data.name)
+            parts.append(shlex.quote(data.name))
         node = await self._runner.get_target(data.node_id)
         cmd = self._runner.build_command(node, " ".join(parts))
         stdout, stderr, exit_code = await self._runner.execute(node, cmd)

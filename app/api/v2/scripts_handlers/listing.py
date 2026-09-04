@@ -180,13 +180,18 @@ async def list_scripts(
             offset = decode_offset(cursor)
         except ValueError:
             raise HTTPException(status_code=422, detail="Invalid cursor") from None
+    # Handle non-aligned offset correctly (offset % limit != 0)
+    remainder = offset % limit if limit else 0
     page = offset // limit + 1 if limit else 1
+    fetch_size = limit + remainder if remainder else limit
     audit.info(
         "api.v2.scripts.list", cursor=cursor, limit=limit, tag=tag, search=search
     )
     scripts, total = await service.get_all_scripts(
-        page=page, size=limit, tags=tag_list, search=search
+        page=page, size=fetch_size, tags=tag_list, search=search
     )
+    if remainder:
+        scripts = scripts[remainder : remainder + limit]
     items = [_script_response(s) for s in scripts]
     has_more = (offset + len(items)) < total
     next_cursor = encode_offset(offset + limit) if has_more else None

@@ -127,8 +127,10 @@ async def get_command_history(
             offset = decode_offset(cursor)
         except ValueError:
             raise HTTPException(status_code=422, detail="Invalid cursor") from None
+    remainder = offset % limit if limit else 0
     page = offset // limit + 1 if limit else 1
-    page_dto = await service.get_node_history(node_id, page=page, size=limit)
+    fetch_size = limit + remainder if remainder else limit
+    page_dto = await service.get_node_history(node_id, page=page, size=fetch_size)
     items = [
         CommandHistoryResponse(
             id=item.id,
@@ -145,6 +147,8 @@ async def get_command_history(
         )
         for item in page_dto.items
     ]
+    if remainder:
+        items = items[remainder : remainder + limit]
     has_more = (offset + len(items)) < page_dto.total
     next_cursor = encode_offset(offset + limit) if has_more else None
     return CursorPage[CommandHistoryResponse](

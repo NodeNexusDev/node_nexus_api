@@ -10,6 +10,7 @@ import structlog
 if TYPE_CHECKING:
     from app.application.ports.audit_sink import AuditEventSink
     from app.application.ports.credential_cipher import CredentialCipher
+    from app.application.ports.node_management import NodeManagementReader
     from app.application.ports.node_reader import (
         NodeConnectionReader,
         NodeStatusWriter,
@@ -46,6 +47,7 @@ class NodeCommandService:
         audit_service: AuditEventSink | None = None,
         history_writer: CommandHistoryWriter | None = None,
         status_history_writer: NodeStatusHistoryWriter | None = None,
+        node_view_reader: NodeManagementReader | None = None,
     ) -> None:
         self._node_reader = node_reader
         self._status_writer = status_writer
@@ -54,6 +56,7 @@ class NodeCommandService:
         self._connector_factory = connector_factory
         self._history_writer = history_writer
         self._status_history_writer = status_history_writer
+        self._node_view_reader = node_view_reader
 
     async def _log(
         self,
@@ -97,20 +100,36 @@ class NodeCommandService:
 
         await self._log("check", node_id, {"status": new_status})
 
-        # Record status change in history before updating the node
-        if self._status_history_writer is not None:
-            from app.application.dto.node_status_history import NodeStatusChangeDTO
-
-            await self._status_history_writer.save(
-                NodeStatusChangeDTO(
-                    node_id=node_id,
-                    old_status=None,  # current status not fetched separately
-                    new_status=new_status,
-                    source="connectivity_check",
-                )
-            )
+        # Fetch old status for history
+        old_status: str | None = None
+        if self._node_view_reader is not None:
+            try:
+                view = await self._node_view_reader.get_node(node_id)
+                old_status = view.status if view else None
+            except Exception:  # noqa: BLE001
+                old_status = None
 
         updated = await self._status_writer.update_node_status(node_id, new_status)
+
+        # Record status change in history after updating the node
+        if self._status_history_writer is not None:
+            try:
+                from app.application.dto.node_status_history import NodeStatusChangeDTO
+
+                await self._status_history_writer.save(
+                    NodeStatusChangeDTO(
+                        node_id=node_id,
+                        old_status=old_status,
+                        new_status=new_status,
+                        source="connectivity_check",
+                    )
+                )
+            except Exception as exc:  # noqa: BLE001
+                audit.warning(
+                    "node.connectivity.history_failed",
+                    node_id=str(node_id),
+                    error=str(exc),
+                )
         if updated is None:  # defensive: the node existed when the use case started
             raise NodeNotFoundError(f"Node {node_id} not found")
         return updated

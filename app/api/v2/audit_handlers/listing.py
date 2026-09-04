@@ -69,7 +69,9 @@ async def list_audit_logs(
             offset = decode_offset(cursor)
         except ValueError:
             raise HTTPException(status_code=422, detail="Invalid cursor") from None
+    remainder = offset % limit if limit else 0
     page = offset // limit + 1 if limit else 1
+    fetch_size = limit + remainder if remainder else limit
     audit.info(
         "api.v2.audit.list",
         cursor=cursor,
@@ -85,9 +87,11 @@ async def list_audit_logs(
         date_from=date_from,
         date_to=date_to,
         page=page,
-        size=limit,
+        size=fetch_size,
     )
     items = [_to_response(item) for item in result.items]
+    if remainder:
+        items = items[remainder : remainder + limit]
     has_more = (offset + len(items)) < result.total
     next_cursor = encode_offset(offset + limit) if has_more else None
     return CursorPage[AuditLogResponse](

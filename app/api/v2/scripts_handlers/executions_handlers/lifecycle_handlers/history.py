@@ -183,9 +183,15 @@ async def get_executions(
             offset = decode_offset(cursor)
         except ValueError:
             raise HTTPException(status_code=422, detail="Invalid cursor") from None
+    remainder = offset % limit if limit else 0
     page = offset // limit + 1 if limit else 1
-    executions, total = await service.get_executions(script_id, page=page, size=limit)
+    fetch_size = limit + remainder if remainder else limit
+    executions, total = await service.get_executions(
+        script_id, page=page, size=fetch_size
+    )
     items = [_execution_response(e) for e in executions]
+    if remainder:
+        items = items[remainder : remainder + limit]
     has_more = (offset + len(items)) < total
     next_cursor = encode_offset(offset + limit) if has_more else None
     return CursorPage[ScriptExecutionResponse](
@@ -221,11 +227,15 @@ async def get_scheduled_execution_history(
             offset = decode_offset(cursor)
         except ValueError:
             raise HTTPException(status_code=422, detail="Invalid cursor") from None
+    remainder = offset % limit if limit else 0
     page = offset // limit + 1 if limit else 1
+    fetch_size = limit + remainder if remainder else limit
     executions, total = await service.get_executions(
-        script_id, page=page, size=limit, trigger="scheduled"
+        script_id, page=page, size=fetch_size, trigger="scheduled"
     )
     items = [_execution_response(e) for e in executions]
+    if remainder:
+        items = items[remainder : remainder + limit]
     has_more = (offset + len(items)) < total
     next_cursor = encode_offset(offset + limit) if has_more else None
     return CursorPage[ScriptExecutionResponse](

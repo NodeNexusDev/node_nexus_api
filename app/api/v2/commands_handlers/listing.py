@@ -129,13 +129,17 @@ async def list_commands(
             offset = decode_offset(cursor)
         except ValueError:
             raise HTTPException(status_code=422, detail="Invalid cursor") from None
+    remainder = offset % limit if limit else 0
     page = offset // limit + 1 if limit else 1
+    fetch_size = limit + remainder if remainder else limit
     audit.info(
         "api.v2.commands.list", cursor=cursor, limit=limit, tag=tag, search=search
     )  # noqa: E501
     commands, total = await service.get_all_commands(
-        page=page, size=limit, tags=tag_list, search=search
+        page=page, size=fetch_size, tags=tag_list, search=search
     )
+    if remainder:
+        commands = commands[remainder : remainder + limit]
     items = [_command_response(c) for c in commands]
     has_more = (offset + len(items)) < total
     next_cursor = encode_offset(offset + limit) if has_more else None
