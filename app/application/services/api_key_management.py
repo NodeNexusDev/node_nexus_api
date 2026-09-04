@@ -58,6 +58,12 @@ class APIKeyManagementService:
             created_at=created.created_at,
         )
 
+    async def get_api_key(self, key_id: UUID) -> APIKeyViewDTO:
+        view = await self._reader.get_api_key(key_id)
+        if view is None:
+            raise APIKeyNotFoundError(f"API key {key_id} not found")
+        return view
+
     async def list_api_keys(self, page: int, size: int) -> APIKeyPageDTO:
         return await self._reader.list_api_keys((page - 1) * size, size)
 

@@ -4,12 +4,12 @@ import uuid
 
 import structlog
 from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
-from fastapi import APIRouter, Query, Security, status
+from fastapi import APIRouter, HTTPException, Query, Security, status
 
 from app.api.deps import require_superuser
-from app.application.dto.user import UserViewDTO
+from app.application.dto.user import UserUpdateDTO, UserViewDTO
 from app.application.services.user_service import UserService
-from app.schemas.auth import UserCreate, UserListResponse, UserResponse
+from app.schemas.auth import UserCreate, UserListResponse, UserResponse, UserUpdate
 
 audit = structlog.get_logger("audit")
 
@@ -64,6 +64,42 @@ async def create_user(
         caller_is_superuser=True,
     )
     return _user_response(result)
+
+
+@router.get("/{user_id}", response_model=UserResponse)
+@inject
+async def get_user(
+    user_id: uuid.UUID,
+    service: FromDishka[UserService],
+    _key: uuid.UUID = Security(require_superuser),
+) -> UserResponse:
+    """Get one user by id (superuser only)."""
+    audit.info("api.users.get", user_id=str(user_id))
+    user = await service.get_user(user_id, caller_is_superuser=True)
+    return _user_response(user)
+
+
+@router.patch("/{user_id}", response_model=UserResponse)
+@inject
+async def patch_user(
+    user_id: uuid.UUID,
+    data: UserUpdate,
+    service: FromDishka[UserService],
+    _key: uuid.UUID = Security(require_superuser),
+) -> UserResponse:
+    """Patch all mutable user fields (superuser only)."""
+    audit.info("api.users.patch", user_id=str(user_id))
+    dto = UserUpdateDTO(
+        email=data.email,
+        password=data.password,
+        is_active=data.is_active,
+        is_superuser=data.is_superuser,
+    )
+    try:
+        updated = await service.patch_user(user_id, dto, caller_is_superuser=True)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return _user_response(updated)
 
 
 @router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)

@@ -20,7 +20,7 @@ from app.application.dto.template_pack import (
     PackListQueryDTO,
 )
 from app.application.dto.template_pack import PackManifestDTO as ManifestDTO
-from app.application.dto.template_registry import RegistryCreateDTO
+from app.application.dto.template_registry import RegistryCreateDTO, RegistryUpdateDTO
 from app.application.services.template_pack_service import (
     PackConflictError,
     PackNotFoundError,
@@ -47,6 +47,7 @@ from app.schemas.template_registry import (
     RegistryResponse,
     RegistrySyncItem,
     RegistrySyncResult,
+    RegistryUpdate,
 )
 
 audit = structlog.get_logger("audit")
@@ -206,6 +207,38 @@ async def get_registry(
         view = await service.get_registry(registry_id)
     except RegistryNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return _registry_response(view)
+
+
+# ---------------------------------------------------------------------------
+# Registries — PATCH /registries/{id} -> 200
+# ---------------------------------------------------------------------------
+
+
+@router.patch("/registries/{registry_id}", response_model=RegistryResponse)
+@inject
+async def patch_registry(
+    registry_id: uuid.UUID,
+    data: RegistryUpdate,
+    service: FromDishka[TemplateRegistryService],
+    _principal: Principal = Security(require_write_or_jwt_scope),
+) -> RegistryResponse:
+    """Partially update registry (owner, name, token, branch)."""
+    audit.info("api.v2.templates.registries.patch", registry_id=str(registry_id))
+    try:
+        view = await service.patch_registry(
+            registry_id,
+            RegistryUpdateDTO(
+                owner=data.owner,
+                name=data.name,
+                github_token=data.github_token,
+                default_branch=data.default_branch,
+            ),
+        )
+    except RegistryNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except RegistryConflictError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     return _registry_response(view)
 
 

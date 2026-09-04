@@ -41,6 +41,17 @@ class UserResponse(BaseModel):
     created_at: datetime
 
 
+class UserUpdate(BaseModel):
+    """Patch user (all fields)."""
+
+    email: EmailStr | None = None
+    password: str | None = Field(
+        default=None, min_length=12, max_length=1024, repr=False
+    )
+    is_active: bool | None = None
+    is_superuser: bool | None = None
+
+
 class UserListResponse(BaseModel):
     """Schema for user list response."""
 

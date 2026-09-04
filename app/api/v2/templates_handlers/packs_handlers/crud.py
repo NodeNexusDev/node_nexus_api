@@ -15,6 +15,9 @@ from app.api.v2.templates_handlers.packs_handlers.crud_handlers.create import ( 
 from app.api.v2.templates_handlers.packs_handlers.crud_handlers.listing import (  # noqa: E501
     router as listing_router,
 )
+from app.api.v2.templates_handlers.packs_handlers.crud_handlers.management import (  # noqa: E501
+    router as management_router,
+)
 
 __all__ = [
     "_pack_detail_response",
@@ -26,3 +29,4 @@ __all__ = [
 router = APIRouter(route_class=DishkaRoute)
 router.include_router(create_router)
 router.include_router(listing_router)
+router.include_router(management_router)

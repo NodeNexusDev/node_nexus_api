@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.adapters.persistence.dao.refresh_token import RefreshTokenRepository
 from app.adapters.persistence.dao.user import UserRepository
-from app.application.dto.user import UserCreateDTO, UserViewDTO
+from app.application.dto.user import UserCreateDTO, UserUpdateDTO, UserViewDTO
 from app.models.user import UserModel
 
 if TYPE_CHECKING:
@@ -77,6 +77,28 @@ class SqlAlchemyUserGateway:
                 }
             )
             return self._to_view(user)
+
+    async def update_user(
+        self, user_id: UUID, data: UserUpdateDTO
+    ) -> UserViewDTO | None:
+        async with self._sessionmaker.begin() as session:
+            repo = UserRepository(session)
+            user = await repo.get_by_id(user_id)
+            if user is None:
+                return None
+            payload: dict[str, object] = {}
+            if data.email is not None:
+                payload["email"] = data.email
+            if data.password is not None:
+                payload["hashed_password"] = self._password_hasher.hash(data.password)
+            if data.is_active is not None:
+                payload["is_active"] = data.is_active
+            if data.is_superuser is not None:
+                payload["is_superuser"] = data.is_superuser
+            if not payload:
+                return self._to_view(user)
+            updated = await repo.update(user_id, payload)
+            return self._to_view(updated) if updated else None
 
     async def delete_user(self, user_id: UUID) -> bool:
         async with self._sessionmaker.begin() as session:

@@ -26,6 +26,16 @@ class UserCreateDTO:
 
 
 @dataclass(frozen=True, slots=True)
+class UserUpdateDTO:
+    """Partial update for user (all fields optional)."""
+
+    email: str | None = None
+    password: str | None = field(default=None, repr=False)
+    is_active: bool | None = None
+    is_superuser: bool | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class UserPageDTO:
     """Bounded page of users."""
 

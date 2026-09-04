@@ -137,6 +137,25 @@ class ExecutionRetriesRequest(BaseModel):
     execution_ids: list[uuid.UUID] = Field(min_length=1, max_length=100)
 
 
+class CommandBulkUpdateItem(BaseModel):
+    id: uuid.UUID
+    changes: CommandUpdate
+
+
+class CommandBulkUpdateRequest(BaseModel):
+    updates: list[CommandBulkUpdateItem] = Field(min_length=1, max_length=20)
+
+
+class CommandBulkUpdateResult(BaseModel):
+    command_id: uuid.UUID
+    status: Literal["success", "error"]
+    error: str = ""
+
+
+class CommandDeletionsRequest(BaseModel):
+    ids: list[uuid.UUID] = Field(min_length=1, max_length=100)
+
+
 class ExecutionCancelsRequest(BaseModel):
     """Request to cancel multiple executions."""
 

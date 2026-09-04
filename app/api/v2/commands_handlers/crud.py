@@ -36,7 +36,10 @@ from app.schemas.command import (
     BulkExecutionItem,
     CommandBulkCreateRequest,
     CommandBulkCreateResult,
+    CommandBulkUpdateRequest,
+    CommandBulkUpdateResult,
     CommandCreate,
+    CommandDeletionsRequest,
     CommandExecutionsRequest,
     CommandParameter,
     CommandResponse,
@@ -100,6 +103,78 @@ def _command_response(command: CommandViewDTO) -> CommandResponse:
         tags=list(command.tags),
         created_at=command.created_at,
         updated_at=command.updated_at,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Bulk update — PATCH /  (bulk-first, 207 on partial)
+# ---------------------------------------------------------------------------
+
+
+@router.patch("/", response_model=BulkResult[CommandBulkUpdateResult])
+@inject
+async def bulk_update_commands(
+    data: CommandBulkUpdateRequest,
+    service: FromDishka[CommandManagementService],
+    response: Response,
+    _principal: Principal = Security(require_write_or_jwt_scope),
+) -> BulkResult[CommandBulkUpdateResult]:
+    """Bulk update commands via PATCH / (bulk-first, no bulk keyword)."""
+    audit.info("api.v2.commands.bulk_update", count=len(data.updates))
+
+    async def _update_one(item: Any) -> CommandBulkUpdateResult:  # noqa: ANN401
+        try:
+            changes = item.changes.model_dump(exclude_unset=True)
+            if isinstance(changes.get("parameters"), list):
+                changes["parameters"] = tuple(
+                    CommandParameterDTO(**p) for p in changes["parameters"]
+                )
+            if isinstance(changes.get("tags"), list):
+                changes["tags"] = tuple(changes["tags"])
+            await service.update_command(
+                item.id, CommandUpdateDTO(changes=tuple(changes.items()))
+            )
+            return CommandBulkUpdateResult(command_id=item.id, status="success")
+        except Exception as exc:  # noqa: BLE001
+            return CommandBulkUpdateResult(
+                command_id=item.id, status="error", error=str(exc)
+            )
+
+    results = await asyncio.gather(*(_update_one(u) for u in data.updates))
+    succeeded = sum(1 for r in results if r.status == "success")
+    failed = len(results) - succeeded
+    set_bulk_status(response, succeeded, failed)
+    return BulkResult[CommandBulkUpdateResult](
+        total=len(results), succeeded=succeeded, failed=failed, results=list(results)
+    )
+
+
+@router.post("/deletions", response_model=BulkResult[CommandBulkUpdateResult])
+@inject
+async def bulk_delete_commands(
+    data: CommandDeletionsRequest,
+    service: FromDishka[CommandManagementService],
+    response: Response,
+    _principal: Principal = Security(require_write_or_jwt_scope),
+) -> BulkResult[CommandBulkUpdateResult]:
+    """Bulk delete commands via POST /deletions (RESTful body, 207 on partial)."""
+    audit.info("api.v2.commands.bulk_delete", count=len(data.ids))
+
+    async def _delete_one(cid: uuid.UUID) -> CommandBulkUpdateResult:
+        try:
+            await service.delete_command(cid)
+            return CommandBulkUpdateResult(command_id=cid, status="success")
+        except Exception as exc:  # noqa: BLE001
+            return CommandBulkUpdateResult(
+                command_id=cid, status="error", error=str(exc)
+            )
+
+    results = await asyncio.gather(*(_delete_one(cid) for cid in data.ids))
+    succeeded = sum(1 for r in results if r.status == "success")
+    failed = len(results) - succeeded
+    set_bulk_status(response, succeeded, failed)
+    return BulkResult[CommandBulkUpdateResult](
+        total=len(results), succeeded=succeeded, failed=failed, results=list(results)
     )
 
 

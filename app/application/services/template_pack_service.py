@@ -26,6 +26,7 @@ from app.application.dto.template_pack import (
     PackPageDTO,
     PackStatsBucketDTO,
     PackStatsDTO,
+    PackUpdateDTO,
     PackViewDTO,
 )
 from app.core.exceptions import DomainError, PackConflictError, PackNotFoundError
@@ -584,4 +585,58 @@ class TemplatePackService:
             installed=installed,
             not_installed=not_installed,
             buckets=tuple(buckets),
+        )
+
+    async def patch_pack(self, pack_id: uuid.UUID, data: PackUpdateDTO) -> PackViewDTO:
+        """Update pack metadata (partial)."""
+        detail = self._packs.get(pack_id)
+        if detail is None:
+            raise PackNotFoundError(f"Pack {pack_id} not found")
+        view = detail.pack
+        now = datetime.now(UTC)
+        new_view = PackViewDTO(
+            id=view.id,
+            registry_id=view.registry_id,
+            pack_id=view.pack_id,
+            name=data.name if data.name is not None else view.name,
+            description=data.description
+            if data.description is not None
+            else view.description,
+            version=data.version if data.version is not None else view.version,
+            author=data.author if data.author is not None else view.author,
+            tags=tuple(data.tags) if data.tags is not None else view.tags,
+            manifest_sha=data.manifest_sha
+            if data.manifest_sha is not None
+            else view.manifest_sha,
+            readme=data.readme if data.readme is not None else view.readme,
+            installed_version=view.installed_version,
+            installed_at=view.installed_at,
+            created_at=view.created_at,
+            updated_at=now,
+        )
+        self._packs[pack_id] = PackDetailDTO(
+            pack=new_view,
+            assets=detail.assets,
+            commands=detail.commands,
+            scripts=detail.scripts,
+        )
+        audit.info("template_pack.update.ok", pack_id=str(pack_id))
+        return new_view
+
+    async def delete_pack(self, pack_id: uuid.UUID) -> None:
+        """Hard delete pack with assets and installations."""
+        detail = self._packs.pop(pack_id, None)
+        if detail is None:
+            raise PackNotFoundError(f"Pack {pack_id} not found")
+        _ASSET_RAW.pop(pack_id, None)
+        # Remove installations and release names (like uninstall)
+        self._installations.pop(pack_id, None)
+        names = _INSTALLATION_NAMES.pop(pack_id, [])
+        for entity_type, name in names:
+            if entity_type == "command":
+                _COMMAND_NAMES.discard(name)
+            else:
+                _SCRIPT_NAMES.discard(name)
+        audit.info(
+            "template_pack.delete.ok", pack_id=str(pack_id), name=detail.pack.name
         )

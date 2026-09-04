@@ -50,6 +50,15 @@ class UserRepository:
         await self._session.flush()
         return True
 
+    async def update(self, id: UUID, data: Mapping[str, object]) -> UserModel | None:
+        user = await self.get_by_id(id)
+        if user is None:
+            return None
+        for key, value in data.items():
+            setattr(user, key, value)
+        await self._session.flush()
+        return user
+
     async def count(self) -> int:
         from sqlalchemy import func
 

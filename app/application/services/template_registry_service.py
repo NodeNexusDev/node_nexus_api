@@ -11,6 +11,7 @@ from app.application.dto.template_registry import (
     RegistryCreateDTO,
     RegistryPageDTO,
     RegistrySyncResultDTO,
+    RegistryUpdateDTO,
     RegistryViewDTO,
 )
 from app.core.exceptions import DomainError
@@ -81,6 +82,41 @@ class TemplateRegistryService:
             raise RegistryNotFoundError(f"Registry {registry_id} not found")
         del self._store[registry_id]
         audit.info("template_registry.delete.ok", registry_id=str(registry_id))
+
+    async def patch_registry(
+        self, registry_id: uuid.UUID, data: RegistryUpdateDTO
+    ) -> RegistryViewDTO:
+        """Partial update (owner/name/branch/token)."""
+        view = self._store.get(registry_id)
+        if view is None:
+            raise RegistryNotFoundError(f"Registry {registry_id} not found")
+        # Check duplicate owner/name if changed
+        new_owner = data.owner if data.owner is not None else view.owner
+        new_name = data.name if data.name is not None else view.name
+        for oid, existing in self._store.items():
+            if (
+                oid != registry_id
+                and existing.owner == new_owner
+                and existing.name == new_name
+            ):
+                raise RegistryConflictError(
+                    f"Registry {new_owner}/{new_name} already exists"
+                )
+        now = datetime.now(UTC)
+        updated = RegistryViewDTO(
+            id=view.id,
+            owner=new_owner,
+            name=new_name,
+            default_branch=data.default_branch
+            if data.default_branch is not None
+            else view.default_branch,
+            last_synced_at=view.last_synced_at,
+            created_at=view.created_at,
+            updated_at=now,
+        )
+        self._store[registry_id] = updated
+        audit.info("template_registry.patch.ok", registry_id=str(registry_id))
+        return updated
 
     async def sync_registry(self, registry_id: uuid.UUID) -> RegistrySyncResultDTO:
         """Sync stub — returns empty success."""

@@ -10,10 +10,14 @@ from fastapi import APIRouter, HTTPException, Query, Security
 
 from app.api.deps import Principal, get_current_principal, require_write_or_jwt_scope
 from app.api.pagination import decode_offset, encode_offset
-from app.application.dto.favorite import FavoriteCreateDTO, FavoriteDTO
+from app.application.dto.favorite import (
+    FavoriteCreateDTO,
+    FavoriteDTO,
+    FavoriteUpdateDTO,
+)
 from app.application.services.favorite_service import FavoriteService
 from app.schemas.common import CursorPage
-from app.schemas.favorite import FavoriteCreate, FavoriteResponse
+from app.schemas.favorite import FavoriteCreate, FavoriteResponse, FavoriteUpdate
 
 audit = structlog.get_logger("audit")
 
@@ -101,6 +105,49 @@ async def add_favorite(
     )
     result = await service.add_favorite(dto)
     return _favorite_response(result)
+
+
+@router.get("/{target_type}/{target_id}", response_model=FavoriteResponse)
+@inject
+async def get_favorite(
+    target_type: str,
+    target_id: str,
+    service: FromDishka[FavoriteService],
+    _principal: Principal = Security(get_current_principal),
+) -> FavoriteResponse:
+    """Get a single favorite by composite key."""
+    audit.info("api.v2.favorites.get", target_type=target_type, target_id=target_id)
+    try:
+        uuid.UUID(target_id)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=422, detail="Invalid target_id, must be UUID"
+        ) from exc
+    dto = await service.get_favorite(target_type, target_id)
+    return _favorite_response(dto)
+
+
+@router.patch("/{target_type}/{target_id}", response_model=FavoriteResponse)
+@inject
+async def patch_favorite(
+    target_type: str,
+    target_id: str,
+    data: FavoriteUpdate,
+    service: FromDishka[FavoriteService],
+    _principal: Principal = Security(require_write_or_jwt_scope),
+) -> FavoriteResponse:
+    """Patch favorite name/note."""
+    audit.info("api.v2.favorites.patch", target_type=target_type, target_id=target_id)
+    try:
+        uuid.UUID(target_id)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=422, detail="Invalid target_id, must be UUID"
+        ) from exc
+    dto = await service.update_favorite(
+        target_type, target_id, FavoriteUpdateDTO(name=data.name, note=data.note)
+    )
+    return _favorite_response(dto)
 
 
 @router.delete("/{target_type}/{target_id}", status_code=204)

@@ -35,6 +35,7 @@ from app.application.services.schedule_management import ScheduleManagementServi
 from app.application.services.script_execution_service import ScriptExecutionService
 from app.application.services.script_history_service import ScriptHistoryService
 from app.application.services.script_management_service import ScriptManagementService
+from app.api.v2._bulk import set_bulk_status
 from app.schemas.common import BulkResult, CursorPage
 from app.schemas.execution_stats import (
     ExecutionStatsResponse,
@@ -45,7 +46,10 @@ from app.schemas.scheduler import ScheduledJob, ScheduleRequest, ScheduleRespons
 from app.schemas.script import (
     ScriptBulkCreateRequest,
     ScriptBulkCreateResult,
+    ScriptBulkUpdateRequest,
+    ScriptBulkUpdateResult,
     ScriptCreate,
+    ScriptDeletionsRequest,
     ScriptExecutionsRequest,
     ScriptResponse,
     ScriptStep,
@@ -151,6 +155,76 @@ def _scheduled_job(schedule: ScheduleViewDTO) -> ScheduledJob:
         last_success_at=schedule.last_success_at,
         last_failure_at=schedule.last_failure_at,
         next_run_at=schedule.next_run_at,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Bulk update — PATCH /  (207 on partial)
+# ---------------------------------------------------------------------------
+
+
+@router.patch("/", response_model=BulkResult[ScriptBulkUpdateResult])
+@inject
+async def bulk_update_scripts(
+    data: ScriptBulkUpdateRequest,
+    service: FromDishka[ScriptManagementService],
+    response: Response,
+    _principal: Principal = Security(require_write_or_jwt_scope),
+) -> BulkResult[ScriptBulkUpdateResult]:
+    """Bulk update scripts via PATCH /."""
+    audit.info("api.v2.scripts.bulk_update", count=len(data.updates))
+
+    async def _update_one(item: Any) -> ScriptBulkUpdateResult:  # noqa: ANN401
+        try:
+            changes = item.changes.model_dump(exclude_unset=True)
+            if isinstance(changes.get("steps"), list):
+                changes["steps"] = tuple(
+                    _step_dto(s) for s in (item.changes.steps or ())
+                )
+            if isinstance(changes.get("tags"), list):
+                changes["tags"] = tuple(changes["tags"])
+            await service.update_script(
+                item.id, ScriptUpdateDTO(changes=tuple(changes.items()))
+            )
+            return ScriptBulkUpdateResult(script_id=item.id, status="success")
+        except Exception as exc:  # noqa: BLE001
+            return ScriptBulkUpdateResult(
+                script_id=item.id, status="error", error=str(exc)
+            )
+
+    results = await asyncio.gather(*(_update_one(u) for u in data.updates))
+    succeeded = sum(1 for r in results if r.status == "success")
+    failed = len(results) - succeeded
+    set_bulk_status(response, succeeded, failed)
+    return BulkResult[ScriptBulkUpdateResult](
+        total=len(results), succeeded=succeeded, failed=failed, results=list(results)
+    )
+
+
+@router.post("/deletions", response_model=BulkResult[ScriptBulkUpdateResult])
+@inject
+async def bulk_delete_scripts(
+    data: ScriptDeletionsRequest,
+    service: FromDishka[ScriptManagementService],
+    response: Response,
+    _principal: Principal = Security(require_write_or_jwt_scope),
+) -> BulkResult[ScriptBulkUpdateResult]:
+    """Bulk delete scripts via POST /deletions (207 on partial)."""
+    audit.info("api.v2.scripts.bulk_delete", count=len(data.ids))
+
+    async def _delete_one(sid: uuid.UUID) -> ScriptBulkUpdateResult:
+        try:
+            await service.delete_script(sid)
+            return ScriptBulkUpdateResult(script_id=sid, status="success")
+        except Exception as exc:  # noqa: BLE001
+            return ScriptBulkUpdateResult(script_id=sid, status="error", error=str(exc))
+
+    results = await asyncio.gather(*(_delete_one(sid) for sid in data.ids))
+    succeeded = sum(1 for r in results if r.status == "success")
+    failed = len(results) - succeeded
+    set_bulk_status(response, succeeded, failed)
+    return BulkResult[ScriptBulkUpdateResult](
+        total=len(results), succeeded=succeeded, failed=failed, results=list(results)
     )
 
 

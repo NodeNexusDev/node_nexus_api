@@ -50,5 +50,24 @@ class APIKeyResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class BulkAPIKeyDeleteRequest(BaseModel):
+    """Bulk delete API keys by IDs (POST for body)."""
+
+    key_ids: list[uuid.UUID] = Field(min_length=1, max_length=100)
+
+
+class BulkAPIKeyDeleteResult(BaseModel):
+    key_id: uuid.UUID
+    status: Literal["success", "error"]
+    error: str = ""
+
+
+class BulkAPIKeyDeleteResponse(BaseModel):
+    total: int = Field(ge=0)
+    succeeded: int = Field(ge=0)
+    failed: int = Field(ge=0)
+    results: list[BulkAPIKeyDeleteResult]
+
+
 class APIKeyList(PaginatedResponse[APIKeyResponse]):
     """Paginated list of API keys."""
