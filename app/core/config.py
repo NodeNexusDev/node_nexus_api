@@ -14,21 +14,21 @@ class Settings(BaseSettings):
         env_file=".env", env_file_encoding="utf-8", extra="ignore"
     )
 
-    DATABASE_URL: str
-    SECRET_KEY: str
+    DATABASE_URL: str = Field(repr=False)
+    SECRET_KEY: str = Field(repr=False)
     ENVIRONMENT: Literal["development", "test", "production"] = "production"
     DEBUG: bool = False
-    LOG_LEVEL: str = "INFO"
-    PORT: int = 8000
+    LOG_LEVEL: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "INFO"
+    PORT: int = Field(default=8000, ge=1, le=65535)
 
     # CORS
     CORS_ORIGINS: list[str] = Field(default=["http://localhost:3000"])
 
     # API Key Authentication
-    MASTER_API_KEY: str = ""
+    MASTER_API_KEY: str = Field(default="", repr=False)
 
     # Encryption
-    ENCRYPTION_SALT: str = ""  # Required in production — set via .env
+    ENCRYPTION_SALT: str = Field(default="", repr=False)  # Required in production
 
     # SSH host verification
     SSH_STRICT_HOST_KEY_CHECKING: bool = True
@@ -76,7 +76,7 @@ class Settings(BaseSettings):
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
     REFRESH_TOKEN_COOKIE_MAX_AGE: int = 60 * 60 * 24 * 7  # 7 days in seconds
     INITIAL_SUPERUSER_EMAIL: str = ""
-    INITIAL_SUPERUSER_PASSWORD: str = ""
+    INITIAL_SUPERUSER_PASSWORD: str = Field(default="", repr=False)
 
     @model_validator(mode="after")
     def validate_security_configuration(self) -> "Settings":

@@ -120,7 +120,7 @@ class TestBulkCheckAudit:
         assert result.succeeded == 1
         audit.log.assert_awaited_once_with(
             action="bulk_nodes.check",
-            details={"total": 1, "succeeded": 1, "failed": 0},
+            details={"total": 1, "succeeded": 1, "failed": 0, "mode": "db"},
         )
 
     @pytest.mark.asyncio

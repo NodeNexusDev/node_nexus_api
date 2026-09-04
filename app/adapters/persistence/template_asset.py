@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import hashlib
 import io
@@ -100,37 +101,42 @@ class SqlAlchemyTemplateAssetGateway:
                 select(TemplateAssetModel).where(TemplateAssetModel.pack_id == pack_id)
             )
             models = rows.scalars().all()
+            # Snapshot needed data to avoid holding session in thread
+            snapshot = [
+                (m.path, m.content, m.size, m.created_at.timestamp()) for m in models
+            ]
+
+        def _build() -> bytes:
             buf = io.BytesIO()
             with tarfile.open(fileobj=buf, mode="w") as tar:
-                for m in models:
-                    # Content stored as string; recover bytes
+                for path, content, size, mtime in snapshot:
                     raw: bytes
                     try:
-                        raw = m.content.encode("utf-8")
-                        # If content was base64-encoded due to binary, try decode?
-                        # Heuristic: if size != len(raw) and sha mismatch, try base64
-                        if m.size != len(raw):
+                        raw = content.encode("utf-8")
+                        if size != len(raw):
                             try:
-                                decoded = base64.b64decode(m.content, validate=True)
-                                if len(decoded) == m.size:
+                                decoded = base64.b64decode(content, validate=True)
+                                if len(decoded) == size:
                                     raw = decoded
                             except Exception as exc:
                                 logger.debug(
                                     "template_asset.base64_fallback_failed",
-                                    path=m.path,
+                                    path=path,
                                     error=str(exc),
                                 )
                     except Exception as exc:
                         logger.warning(
                             "template_asset.content_encode_failed",
-                            path=m.path,
+                            path=path,
                             error=str(exc),
                         )
                         raw = b""
-                    info = tarfile.TarInfo(name=m.path)
+                    info = tarfile.TarInfo(name=path)
                     info.size = len(raw)
-                    info.mtime = int(m.created_at.timestamp())
+                    info.mtime = int(mtime)
                     info.mode = 0o644
                     tar.addfile(info, io.BytesIO(raw))
             buf.seek(0)
             return buf.getvalue()
+
+        return await asyncio.to_thread(_build)

@@ -42,6 +42,10 @@ nav:
       - Импорт и экспорт: guides/configuration-import-export.md
       - Избранное, заметки, теги: guides/favorites-notes-tags.md
       - Дашборд, поиск, метрики: guides/dashboard-search-metrics.md
+      - Глобальный поиск: guides/search.md
+      - Поток событий: guides/events.md
+      - Пользователи: guides/users.md
+      - Планировщик: guides/scheduler.md
       - Решение проблем: guides/troubleshooting.md
       - Частые вопросы: guides/faq.md
   - Эксплуатация:

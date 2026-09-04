@@ -9,6 +9,23 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - SETGID
+      - SETUID
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 1G
+    networks:
+      - app_net
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request, os; req = urllib.request.Request('http://localhost:8000/health', headers={'X-API-Key': os.environ['MASTER_API_KEY']}); urllib.request.urlopen(req, timeout=5)\""]
       interval: 10s
@@ -20,14 +37,28 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+    tmpfs:
+      - /tmp
 
   db:
-    image: postgres:16@sha256:f1c3376c26f2609ab9f29f71f824103fe2fcd8ee0346485cb6122a4f93df6f94
+    image: postgres:16@sha256:f1c3376c26f2609ab9f71f824103fe2fcd8ee0346485cb6122a4f93df6f94
     env_file: .env
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - SETGID
+      - SETUID
+    networks:
+      - app_net
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
       interval: 5s
@@ -38,6 +69,10 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+
+networks:
+  app_net:
+    driver: bridge
 
 volumes:
   known_hosts:

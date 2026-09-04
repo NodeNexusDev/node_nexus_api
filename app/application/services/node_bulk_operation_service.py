@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+import asyncio
+import uuid
+from typing import TYPE_CHECKING, Literal
 
 import structlog
 
@@ -16,8 +18,14 @@ from app.application.ports.node_bulk_operator import NodeBulkOperator
 
 if TYPE_CHECKING:
     from app.application.ports.audit_sink import AuditEventSink
+    from app.application.ports.credential_cipher import CredentialCipher
+    from app.application.ports.node_reader import NodeConnectionReader, NodeStatusWriter
+    from app.application.ports.node_status_history import NodeStatusHistoryWriter
+    from app.application.ports.remote_command import RemoteConnectorFactory
 
 audit = structlog.get_logger("audit")
+
+_DEFAULT_CHECK_CONCURRENCY = 50
 
 
 class NodeBulkOperationService:
@@ -27,9 +35,20 @@ class NodeBulkOperationService:
         self,
         operator: NodeBulkOperator,
         audit_service: AuditEventSink | None = None,
+        node_reader: NodeConnectionReader | None = None,
+        status_writer: NodeStatusWriter | None = None,
+        credential_cipher: CredentialCipher | None = None,
+        connector_factory: RemoteConnectorFactory | None = None,
+        status_history_writer: NodeStatusHistoryWriter | None = None,
     ) -> None:
         self._operator = operator
         self._audit = audit_service
+        self._node_reader = node_reader
+        self._status_writer = status_writer
+        self._credential_cipher = credential_cipher
+        self._connector_factory = connector_factory
+        self._status_history_writer = status_history_writer
+        self._check_semaphore = asyncio.Semaphore(_DEFAULT_CHECK_CONCURRENCY)
 
     async def bulk_delete(self, data: BulkNodeDeleteDTO) -> BulkNodeOperationResultDTO:
         """Delete multiple nodes."""
@@ -89,22 +108,169 @@ class NodeBulkOperationService:
         )
         return result
 
-    async def bulk_check(self, node_ids: tuple[str, ...]) -> BulkNodeCheckResultDTO:
-        """Check which nodes exist by IDs."""
-        result = await self._operator.bulk_check(node_ids)
+    async def bulk_check(
+        self,
+        node_ids: tuple[str, ...],
+        mode: Literal["db", "ssh"] = "db",
+    ) -> BulkNodeCheckResultDTO:
+        """Check which nodes exist by IDs or via SSH.
+
+        Modes:
+        - db: check existence in DB (legacy)
+        - ssh: SSH connectivity check with status update (echo ok)
+        """
+        if mode == "db":
+            result = await self._operator.bulk_check(node_ids)
+            if self._audit:
+                await self._audit.log(
+                    action="bulk_nodes.check",
+                    details={
+                        "total": result.total,
+                        "succeeded": result.succeeded,
+                        "failed": result.failed,
+                        "mode": mode,
+                    },
+                )
+            audit.info(
+                "node.bulk.check",
+                total=result.total,
+                succeeded=result.succeeded,
+                failed=result.failed,
+                mode=mode,
+            )
+            return result
+
+        # ssh mode
+        if (
+            self._node_reader is None
+            or self._connector_factory is None
+            or self._credential_cipher is None
+        ):
+            # Fallback to db if ssh deps not configured (e.g., in tests with mocks)
+            audit.warning("node.bulk.check.ssh_fallback_to_db", reason="missing_deps")
+            result = await self._operator.bulk_check(node_ids)
+            return result
+
+        assert self._node_reader is not None
+        assert self._credential_cipher is not None
+        assert self._connector_factory is not None
+
+        node_reader = self._node_reader
+        credential_cipher = self._credential_cipher
+        connector_factory = self._connector_factory
+
+        # Lazy import to avoid circular deps
+        from app.application.dto.node_status_history import NodeStatusChangeDTO
+        from app.application.services.ssh_executor import build_ssh_connector
+        from app.core.exceptions import ConnectionFailedError
+
+        async def _check_one(node_id_str: str) -> tuple[str, bool, str | None]:
+            try:
+                node_uuid = uuid.UUID(node_id_str)
+            except ValueError:
+                return (node_id_str, False, "Invalid node id")
+
+            node = await node_reader.get_connection(node_uuid)
+            if node is None:
+                return (node_id_str, False, "Node not found")
+
+            connector = build_ssh_connector(
+                node, credential_cipher, connector_factory
+            )
+
+            try:
+                async with connector:
+                    await connector.execute_command("echo ok")
+                new_status = "active"
+                success = True
+                error = None
+                audit.info("node.bulk.check.ssh_ok", node_id=node_id_str)
+            except ConnectionFailedError as exc:
+                new_status = "unreachable"
+                success = False
+                error = str(exc)
+                audit.warning(
+                    "node.bulk.check.ssh_failed",
+                    node_id=node_id_str,
+                    error=str(exc),
+                )
+            except Exception as exc:  # noqa: BLE001
+                new_status = "unreachable"
+                success = False
+                error = str(exc)
+                audit.error(
+                    "node.bulk.check.ssh_unexpected",
+                    node_id=node_id_str,
+                    error_type=type(exc).__name__,
+                    error=str(exc),
+                )
+
+            # Update status and history (best effort, don't fail bulk on single)
+            try:
+                if self._status_history_writer is not None:
+                    await self._status_history_writer.save(
+                        NodeStatusChangeDTO(
+                            node_id=node_uuid,
+                            old_status=None,
+                            new_status=new_status,
+                            source="connectivity_check",
+                        )
+                    )
+                if self._status_writer is not None:
+                    await self._status_writer.update_node_status(node_uuid, new_status)
+            except Exception as exc:  # noqa: BLE001
+                audit.warning(
+                    "node.bulk.check.status_update_failed",
+                    node_id=node_id_str,
+                    error=str(exc),
+                )
+
+            return (node_id_str, success, error)
+
+        async def _check_one_sem(node_id_str: str) -> tuple[str, bool, str | None]:  # noqa: ANN202
+            async with self._check_semaphore:
+                return await _check_one(node_id_str)
+
+        results = await asyncio.gather(*(_check_one_sem(nid) for nid in node_ids))
+
+        succeeded_ids: list[uuid.UUID] = []
+        succeeded = 0
+        failed = 0
+        for nid_str, ok, _err in results:
+            if ok:
+                succeeded += 1
+                try:
+                    succeeded_ids.append(uuid.UUID(nid_str))
+                except ValueError:
+                    pass
+            else:
+                failed += 1
+
+        total = len(node_ids)
+        # For API handler, succeeded/failed already counted, but also
+        # include node_ids for compatibility
+        result = BulkNodeCheckResultDTO(
+            total=total,
+            succeeded=succeeded,
+            failed=failed,
+            node_ids=tuple(succeeded_ids),
+        )
+
         if self._audit:
             await self._audit.log(
                 action="bulk_nodes.check",
                 details={
-                    "total": result.total,
-                    "succeeded": result.succeeded,
-                    "failed": result.failed,
+                    "total": total,
+                    "succeeded": succeeded,
+                    "failed": failed,
+                    "mode": mode,
                 },
             )
         audit.info(
             "node.bulk.check",
-            total=result.total,
-            succeeded=result.succeeded,
-            failed=result.failed,
+            total=total,
+            succeeded=succeeded,
+            failed=failed,
+            mode=mode,
         )
         return result
