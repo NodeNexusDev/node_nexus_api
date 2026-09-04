@@ -55,13 +55,17 @@ async def list_favorites(
             offset = decode_offset(cursor)
         except ValueError:
             raise HTTPException(status_code=422, detail="Invalid cursor") from None
+    remainder = offset % limit if limit else 0
     page = offset // limit + 1 if limit else 1
+    fetch_size = limit + remainder if remainder else limit
     audit.info(
         "api.v2.favorites.list", cursor=cursor, limit=limit, target_type=target_type
     )
     items, total = await service.list_favorites(
-        target_type=target_type, page=page, size=limit
+        target_type=target_type, page=page, size=fetch_size
     )
+    if remainder:
+        items = items[remainder : remainder + limit]
     has_more = (offset + len(items)) < total
     next_cursor = encode_offset(offset + limit) if has_more else None
     return CursorPage[FavoriteResponse](

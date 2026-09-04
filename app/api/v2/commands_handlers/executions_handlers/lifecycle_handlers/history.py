@@ -130,8 +130,10 @@ async def get_executions_history(
             offset = decode_offset(cursor)
         except ValueError:
             raise HTTPException(status_code=422, detail="Invalid cursor") from None
+    remainder = offset % limit if limit else 0
     page = offset // limit + 1 if limit else 1
-    result = await service.get_batch_history(batch_id, page=page, size=limit)
+    fetch_size = limit + remainder if remainder else limit
+    result = await service.get_batch_history(batch_id, page=page, size=fetch_size)
     items = [
         CommandHistoryResponse(
             id=item.id,
@@ -148,6 +150,8 @@ async def get_executions_history(
         )
         for item in result.items
     ]
+    if remainder:
+        items = items[remainder : remainder + limit]
     has_more = (offset + len(items)) < result.total
     next_cursor = encode_offset(offset + limit) if has_more else None
     return CursorPage[CommandHistoryResponse](

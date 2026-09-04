@@ -177,9 +177,7 @@ class NodeBulkOperationService:
             if node is None:
                 return (node_id_str, False, "Node not found")
 
-            connector = build_ssh_connector(
-                node, credential_cipher, connector_factory
-            )
+            connector = build_ssh_connector(node, credential_cipher, connector_factory)
 
             try:
                 async with connector:
