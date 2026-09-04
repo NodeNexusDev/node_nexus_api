@@ -253,7 +253,9 @@ class TestProvidersCoverage:
         # 760,820,858,867,1023,1058,1067,1105,1121,1126,1131,1141,1244
         assert sp.get_node_status_history_service(MagicMock(), MagicMock()) is not None
         assert sp.get_execution_history_service(MagicMock()) is not None
-        assert sp.get_node_bulk_operation_service(MagicMock(), MagicMock()) is not None
+        assert sp.get_node_bulk_operation_service(
+            MagicMock(), MagicMock(), MagicMock(), MagicMock(), MagicMock(), MagicMock(), MagicMock()
+        ) is not None
         assert sp.get_execution_lifecycle_service(MagicMock(), MagicMock()) is not None
         # docker system service
         runner = MagicMock()

@@ -173,11 +173,21 @@ async def bulk_check_nodes(
     data: NodeChecksRequest,
     service: FromDishka[NodeBulkOperationService],
     response: Response,
+    mode: str = Query("ssh", description="Check mode: db or ssh"),
     _principal: Principal = Security(require_write_or_jwt_scope),
 ) -> BulkResult[BulkNodeUpdateResult]:
-    """Check existence/connectivity for multiple nodes (no bulk keyword)."""
-    audit.info("api.v2.nodes.checks", ids=[str(i) for i in data.ids])
-    result = await service.bulk_check(node_ids=tuple(str(n) for n in data.ids))
+    """Check existence/connectivity for multiple nodes (no bulk keyword).
+
+    Modes:
+    - db: check existence in DB (legacy)
+    - ssh: SSH connectivity check with status update (echo ok)
+    """
+    if mode not in ("db", "ssh"):
+        raise HTTPException(status_code=422, detail="Invalid mode, use db or ssh")
+    audit.info("api.v2.nodes.checks", ids=[str(i) for i in data.ids], mode=mode)
+    result = await service.bulk_check(
+        node_ids=tuple(str(n) for n in data.ids), mode=mode  # type: ignore[arg-type]
+    )
     succeeded_ids = (
         {uuid.UUID(str(x)) for x in result.node_ids} if result.node_ids else set()
     )

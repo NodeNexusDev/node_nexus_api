@@ -344,9 +344,22 @@ class ServiceProvider(Provider):
         self,
         operator: NodeBulkOperator,
         audit_service: AuditEventSink,
+        node_reader: NodeConnectionReader,
+        status_writer: NodeStatusWriter,
+        credential_cipher: CredentialCipher,
+        connector_factory: RemoteConnectorFactory,
+        status_history_writer: NodeStatusHistoryWriter,
     ) -> NodeBulkOperationService:
         """Get the bulk node operation service."""
-        return NodeBulkOperationService(operator=operator, audit_service=audit_service)
+        return NodeBulkOperationService(
+            operator=operator,
+            audit_service=audit_service,
+            node_reader=node_reader,
+            status_writer=status_writer,
+            credential_cipher=credential_cipher,
+            connector_factory=connector_factory,
+            status_history_writer=status_history_writer,
+        )
 
     @provide(scope=Scope.REQUEST)
     def get_execution_lifecycle_service(
