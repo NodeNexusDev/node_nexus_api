@@ -78,6 +78,20 @@ class RequestAuditOutbox:
         self._session = session
 
     async def enqueue(self, event: AuditEventDTO) -> None:
+        # Use savepoint so a single audit flush failure does not invalidate
+        # the outer request transaction (bulk M×N keeps remaining inserts).
+        # See SQLAlchemy AsyncSession.begin_nested() / context7 SAVEPOINT pattern.
+        # Fallback to direct flush for test doubles without begin_nested.
+        begin_nested = getattr(self._session, "begin_nested", None)
+        if callable(begin_nested):
+            try:
+                async with begin_nested():  # type: ignore[operator]
+                    self._session.add(_outbox_model(event))
+                    await self._session.flush()
+                return
+            except (TypeError, AttributeError):
+                # Mock without async context manager protocol — fallback
+                pass
         self._session.add(_outbox_model(event))
         await self._session.flush()
 
