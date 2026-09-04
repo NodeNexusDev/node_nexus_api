@@ -44,19 +44,24 @@ def build_ssh_connector(
     timeout: int | None = None,
 ) -> RemoteCommandSession:
     """Build an SSH connector from a node connection DTO."""
-    from typing import Any
-
-    kwargs: dict[str, Any] = {
-        "host": node.host,
-        "port": node.port,
-        "username": node.username,
-        "password": cipher.decrypt(node.password),
-        "ssh_key": cipher.decrypt(node.ssh_key),
-        "passphrase": cipher.decrypt(node.passphrase),
-    }
     if timeout is not None:
-        kwargs["timeout"] = timeout
-    return factory.create_ssh(**kwargs)  # type: ignore[arg-type]
+        return factory.create_ssh(
+            host=node.host,
+            port=node.port,
+            username=node.username,
+            password=cipher.decrypt(node.password),
+            ssh_key=cipher.decrypt(node.ssh_key),
+            passphrase=cipher.decrypt(node.passphrase),
+            timeout=timeout,
+        )
+    return factory.create_ssh(
+        host=node.host,
+        port=node.port,
+        username=node.username,
+        password=cipher.decrypt(node.password),
+        ssh_key=cipher.decrypt(node.ssh_key),
+        passphrase=cipher.decrypt(node.passphrase),
+    )
 
 
 async def execute_ssh(

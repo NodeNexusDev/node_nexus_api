@@ -85,7 +85,11 @@ class RequestAuditOutbox:
         begin_nested = getattr(self._session, "begin_nested", None)
         if callable(begin_nested):
             try:
-                async with begin_nested():  # type: ignore[operator]
+                from contextlib import AbstractAsyncContextManager
+                from typing import cast
+
+                ctx = cast(AbstractAsyncContextManager[object], begin_nested())
+                async with ctx:
                     self._session.add(_outbox_model(event))
                     await self._session.flush()
                 return
