@@ -262,6 +262,7 @@ class TestProvidersCoverage:
                 MagicMock(),
                 MagicMock(),
                 MagicMock(),
+                MagicMock(),
             )
             is not None
         )

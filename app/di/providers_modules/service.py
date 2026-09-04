@@ -228,6 +228,7 @@ class ServiceProvider(Provider):
         credential_cipher: CredentialCipher,
         history_writer: CommandHistoryWriter,
         status_history_writer: NodeStatusHistoryWriter,
+        node_view_reader: NodeManagementReader,
     ) -> NodeCommandService:
         """Get the single-node SSH command service."""
         return NodeCommandService(
@@ -238,6 +239,7 @@ class ServiceProvider(Provider):
             credential_cipher=credential_cipher,
             history_writer=history_writer,
             status_history_writer=status_history_writer,
+            node_view_reader=node_view_reader,
         )
 
     @provide(scope=Scope.REQUEST)
@@ -348,6 +350,7 @@ class ServiceProvider(Provider):
         credential_cipher: CredentialCipher,
         connector_factory: RemoteConnectorFactory,
         status_history_writer: NodeStatusHistoryWriter,
+        node_view_reader: NodeManagementReader,
     ) -> NodeBulkOperationService:
         """Get the bulk node operation service."""
         return NodeBulkOperationService(
@@ -358,6 +361,7 @@ class ServiceProvider(Provider):
             credential_cipher=credential_cipher,
             connector_factory=connector_factory,
             status_history_writer=status_history_writer,
+            node_view_reader=node_view_reader,
         )
 
     @provide(scope=Scope.REQUEST)

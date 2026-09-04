@@ -3,9 +3,13 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import json
 import re
 import shlex
+import tempfile
+import uuid
+from pathlib import Path
 from typing import TYPE_CHECKING
 from uuid import UUID
 
@@ -29,6 +33,21 @@ if TYPE_CHECKING:
 audit = structlog.get_logger("audit")
 
 _PROJECT_NAME_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9_.-]*$")
+_ALLOWED_COMPOSE_VERBS = frozenset(
+    {  # noqa: E501
+        "start",
+        "stop",
+        "restart",
+        "pause",
+        "unpause",
+        "kill",
+        "create",
+        "rm",
+        "pull",
+        "push",
+        "build",
+    }
+)
 
 
 def _validate_project_name(name: str) -> str:
@@ -39,13 +58,12 @@ def _validate_project_name(name: str) -> str:
 
 
 def _compose_file_path(project_name: str) -> str:
-    """Safe temp compose file path for a project."""
-    import tempfile
-    from pathlib import Path
-
+    """Safe temp compose file path for a project (unique per call to avoid race)."""
     safe = "".join(c if c.isalnum() else "_" for c in project_name)
     tmpdir = Path(tempfile.gettempdir())
-    return str(tmpdir / f"nn-compose-{safe}.yml")
+    # Short uuid suffix avoids concurrent writes to same path
+    suffix = uuid.uuid4().hex[:8]
+    return str(tmpdir / f"nn-compose-{safe}-{suffix}.yml")
 
 
 def _env_prefix(env: dict[str, str] | None) -> str:
@@ -167,8 +185,10 @@ class ComposeService:
         node = await self._runner.get_target(node_id)
         file_path = _compose_file_path(project.project_name)
         env_str = _env_prefix(project.env)
-        quoted = shlex.quote(project.compose)
-        write_cmd = f"printf %s {quoted} > {shlex.quote(file_path)}"
+        b64 = base64.b64encode(project.compose.encode()).decode()
+        write_cmd = (  # noqa: E501
+            f"printf %s {shlex.quote(b64)} | base64 -d > {shlex.quote(file_path)}"
+        )
         docker_args = (
             f"compose -p {shlex.quote(project.project_name)} "
             f"-f {shlex.quote(file_path)} {compose_args}"
@@ -191,6 +211,8 @@ class ComposeService:
         timeout: int = 60,
     ) -> list[ComposeServiceResultDTO]:
         """Run compose verb per service with gather."""
+        if verb not in _ALLOWED_COMPOSE_VERBS:
+            raise ValueError(f"Invalid compose verb: {verb!r}")
         if not services:
             try:
                 out = await self._run_compose(

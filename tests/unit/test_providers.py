@@ -183,6 +183,7 @@ def test_service_provider_resolves() -> None:
         credential_cipher,
         MagicMock(),
         MagicMock(),
+        MagicMock(),
     )
     node_bulk_command_svc = svc_provider.get_node_bulk_command_service(
         audit_svc,

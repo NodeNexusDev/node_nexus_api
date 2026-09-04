@@ -190,27 +190,40 @@ class NodeManagementService:
             )
         )
 
-        # Record status change before updating
-        if self._status_history_writer is not None:
-            for field, value in secured.changes:
-                if field == "status":
-                    from app.application.dto.node_status_history import (
-                        NodeStatusChangeDTO,
-                    )
-
-                    await self._status_history_writer.save(
-                        NodeStatusChangeDTO(
-                            node_id=node_id,
-                            old_status=None,
-                            new_status=str(value),
-                            source="manual_update",
-                        )
-                    )
-                    break
+        # Capture old status for history
+        old_status: str | None = None
+        new_status: str | None = None
+        for field, value in secured.changes:
+            if field == "status":
+                new_status = str(value)
+                try:
+                    current = await self._reader.get_node(node_id)
+                    old_status = current.status if current else None
+                except Exception:  # noqa: BLE001
+                    old_status = None
+                break
 
         node = await self._writer.update_node(node_id, secured)
         if node is None:
             raise NodeNotFoundError(f"Node {node_id} not found")
+        if new_status is not None and self._status_history_writer is not None:
+            try:
+                from app.application.dto.node_status_history import NodeStatusChangeDTO
+
+                await self._status_history_writer.save(
+                    NodeStatusChangeDTO(
+                        node_id=node_id,
+                        old_status=old_status,
+                        new_status=new_status,
+                        source="manual_update",
+                    )
+                )
+            except Exception as exc:  # noqa: BLE001
+                audit.warning(
+                    "node.update.history_failed",
+                    node_id=str(node_id),
+                    error=str(exc),
+                )
         audit.info("node.update.ok", node_id=str(node_id))
         audit_details: JsonObject = {
             key: list(value) if isinstance(value, tuple) else value
