@@ -24,6 +24,7 @@ from app.application.policies.output import bound_output
 from app.application.services._target_resolver import resolve_targets
 from app.application.types import JsonObject, JsonValue, PersistenceObject
 from app.core.exceptions import (
+    AuditWriteError,
     CommandNotFoundError,
     NodeNotFoundError,
     ScriptNotFoundError,
@@ -114,14 +115,24 @@ class ScriptExecutionService:
 
         results = await asyncio.gather(*(run(target) for target in targets))
         for result in results:
-            await self._execution_writer.update_execution(
-                result.execution_id,
-                {
-                    "status": result.status,
-                    "steps": [self._step_result_dict(step) for step in result.steps],
-                    "finished_at": datetime.now(UTC),
-                },
-            )
+            try:
+                await self._execution_writer.update_execution(
+                    result.execution_id,
+                    {
+                        "status": result.status,
+                        "steps": [
+                            self._step_result_dict(step) for step in result.steps
+                        ],
+                        "finished_at": datetime.now(UTC),
+                    },
+                )
+            except Exception:
+                audit.warning(
+                    "script.history.persist_failed",
+                    script_id=str(script_id),
+                    execution_id=str(result.execution_id),
+                    node_id=str(result.node_id),
+                )
             await self._log_result(script_id, result)
 
         return ScriptExecutionBatchResultDTO(
@@ -250,11 +261,19 @@ class ScriptExecutionService:
             status=result.status,
         )
         if self._audit:
-            await self._audit.log(
-                action="execute",
-                node_id=result.node_id,
-                details={"script_id": str(script_id), "status": result.status},
-            )
+            try:
+                await self._audit.log(
+                    action="execute",
+                    node_id=result.node_id,
+                    details={"script_id": str(script_id), "status": result.status},
+                )
+            except AuditWriteError:
+                audit.warning(
+                    "audit.script_result_skipped",
+                    script_id=str(script_id),
+                    node_id=str(result.node_id),
+                    status=result.status,
+                )
 
     @staticmethod
     def _step_result_dict(step: ScriptStepResultDTO) -> PersistenceObject:
