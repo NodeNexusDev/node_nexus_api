@@ -6,6 +6,8 @@ import uuid
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock
 
+import pytest
+
 
 class TestSmall7:
     async def test_bulk_status_not_207(self):
@@ -121,6 +123,22 @@ class TestSmall7:
         )
         assert ok2.label == "s"
 
+    async def test_bulk_extra(self):
+        from unittest.mock import MagicMock
+
+        from fastapi import Response
+
+        from app.api.v2._bulk import execute_vert_bulk
+
+        async def worker(x):
+            m = MagicMock()
+            m.status = "success"
+            return m
+
+        resp = Response()
+        res = await execute_vert_bulk([1, 2, 3], worker, resp)
+        assert res.total == 3
+
     async def test_user_service_patch_no_changes(self):
         from app.adapters.persistence.user import SqlAlchemyUserGateway
 
@@ -165,3 +183,49 @@ class TestSmall7:
                 # Actually we already patched, just call update with empty DTO
                 res = await gw.update_user(model.id, UserUpdateDTO())
                 assert res is not None
+
+    async def test_error_mapping_extra(self):
+        from unittest.mock import MagicMock
+
+        from fastapi import Request
+
+        from app.api.error_mapping import (
+            domain_error_handler,
+            internal_error_handler,
+            status_for_domain_error,
+        )
+        from app.core.exceptions import (
+            ConnectionFailedError,
+            DomainError,
+            NodeNotFoundError,
+        )
+
+        assert status_for_domain_error(NodeNotFoundError("x")) == 404
+        # Cover 5xx branch and MRO fallback (custom not in dict -> DomainError 422)
+        assert status_for_domain_error(ConnectionFailedError("x")) == 503
+
+        class _CustomError(DomainError):
+            pass
+
+        assert status_for_domain_error(_CustomError("x")) == 422
+        req = MagicMock(spec=Request)
+        req.url.path = "/test"
+        req.state.request_id = "abc"
+        resp = await domain_error_handler(req, NodeNotFoundError("not found"))
+        assert resp.status_code == 404
+        # 500 path covers logger.error at 132
+        resp_500 = await domain_error_handler(req, ConnectionFailedError("fail"))
+        assert resp_500.status_code == 503
+        resp2 = await internal_error_handler(req, RuntimeError("boom"))
+        assert resp2.status_code == 500
+        # Cover non-DomainError branch (raise)
+        req2 = MagicMock(spec=Request)
+        req2.url.path = "/test"
+        req2.state = MagicMock()
+        # No request_id attribute
+        del req2.state.request_id
+        with pytest.raises(ValueError):
+            await domain_error_handler(req2, ValueError("not domain"))
+        # Cover internal handler without request_id
+        resp3 = await internal_error_handler(req2, RuntimeError("boom2"))
+        assert resp3.status_code == 500

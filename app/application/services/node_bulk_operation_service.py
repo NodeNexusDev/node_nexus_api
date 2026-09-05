@@ -215,12 +215,26 @@ class NodeBulkOperationService:
                 except Exception:  # noqa: BLE001
                     old_status = None
 
-            # Update status and history (best effort, don't fail bulk on single)
-            # Update status first, then history
+            # Update status and history — honest: DB failure => failed
+            status_ok = True
             if self._status_writer is not None:
                 try:
-                    await self._status_writer.update_node_status(node_uuid, new_status)
+                    updated = await self._status_writer.update_node_status(
+                        node_uuid, new_status
+                    )
+                    if updated is None:
+                        # Node vanished between read and write
+                        status_ok = False
+                        success = False
+                        error = "Node not found on status update"
+                        audit.warning(
+                            "node.bulk.check.status_not_found",
+                            node_id=node_id_str,
+                        )
                 except Exception as exc:  # noqa: BLE001
+                    status_ok = False
+                    success = False
+                    error = f"Status update failed: {exc}"
                     audit.warning(
                         "node.bulk.check.status_update_failed",
                         node_id=node_id_str,
@@ -237,11 +251,18 @@ class NodeBulkOperationService:
                         )
                     )
                 except Exception as exc:  # noqa: BLE001
+                    # History failure should not hide status result, but log
                     audit.warning(
                         "node.bulk.check.history_failed",
                         node_id=node_id_str,
                         error=str(exc),
                     )
+                    # If status was ok but history failed, keep success as per status_ok
+                    # (history is secondary)
+
+            # If status update failed, override success
+            if not status_ok:
+                success = False
 
             return (node_id_str, success, error)
 

@@ -112,7 +112,10 @@ class TestBulkCheck:
         svc._node_view_reader.get_node = AsyncMock(
             return_value=MagicMock(status="active")
         )
-        svc._status_writer.update_node_status = AsyncMock(return_value=None)
+        view = MagicMock()
+        view.id = uid
+        view.status = "active"
+        svc._status_writer.update_node_status = AsyncMock(return_value=view)
         svc._status_history_writer.create_history = AsyncMock(return_value=None)
         mock_connector = AsyncMock()
         mock_connector.__aenter__ = AsyncMock(return_value=mock_connector)

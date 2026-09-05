@@ -120,7 +120,7 @@ def status_for_domain_error(exc: DomainError) -> int:
     for cls in type(exc).__mro__:
         if cls in DOMAIN_ERROR_STATUS:
             return DOMAIN_ERROR_STATUS[cast(type[DomainError], cls)]
-    return 422
+    return 422  # pragma: no cover - DomainError fallback ensures unreachable
 
 
 async def domain_error_handler(request: Request, exc: Exception) -> JSONResponse:
