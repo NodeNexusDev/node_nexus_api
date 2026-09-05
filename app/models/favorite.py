@@ -3,24 +3,33 @@
 import uuid
 from datetime import datetime
 
+import sqlalchemy as sa
 from sqlalchemy import DateTime, Index, String, Text, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.models.base import Base
+from app.models.base import Base, _utcnow
 
 
 class FavoriteModel(Base):
     """A user bookmark for a command or script."""
 
     __tablename__ = "favorites"
-    __table_args__ = (Index("ix_favorites_target", "target_type", "target_id"),)
+    __table_args__ = (
+        Index("ix_favorites_target", "target_type", "target_id"),
+        sa.CheckConstraint(
+            "target_type IN ('command', 'script', 'node')",
+            name="chk_favorites_target_type",
+        ),
+    )
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True)
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
     target_type: Mapped[str] = mapped_column(String(20), nullable=False)
     target_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
+        DateTime(timezone=True), default=_utcnow, server_default=func.now()
     )

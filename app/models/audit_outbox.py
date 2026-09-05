@@ -3,6 +3,7 @@
 import uuid
 from datetime import datetime
 
+import sqlalchemy as sa
 from sqlalchemy import JSON, DateTime, Index, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -15,6 +16,10 @@ class AuditOutboxModel(Base):
 
     __tablename__ = "audit_outbox"
     __table_args__ = (
+        sa.CheckConstraint(
+            "status IN ('pending', 'processing', 'completed', 'failed')",
+            name="chk_audit_outbox_status",
+        ),
         Index(
             "ix_audit_outbox_delivery",
             "status",
@@ -29,10 +34,10 @@ class AuditOutboxModel(Base):
     attempts: Mapped[int] = mapped_column(Integer, default=0)
     last_error_type: Mapped[str | None] = mapped_column(String(255), nullable=True)
     next_attempt_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=_utcnow
+        DateTime(timezone=True), default=_utcnow, server_default=sa.func.now()
     )
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=_utcnow
+        DateTime(timezone=True), default=_utcnow, server_default=sa.func.now()
     )
     delivered_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
