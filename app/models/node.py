@@ -3,6 +3,7 @@
 import uuid
 from datetime import datetime
 
+import sqlalchemy as sa
 from sqlalchemy import ARRAY, JSON, Boolean, DateTime, Index, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -26,6 +27,10 @@ class NodeModel(Base):
         Index("ix_nodes_host", "host"),
         Index("ix_nodes_status", "status"),
         Index("ix_nodes_tags", "tags", postgresql_using="gin"),
+        sa.CheckConstraint(
+            "status IN ('active', 'unreachable', 'error')",
+            name="chk_nodes_status",
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
@@ -47,10 +52,11 @@ class NodeModel(Base):
     )
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=_utcnow
+        DateTime(timezone=True), default=_utcnow, server_default=sa.func.now()
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=_utcnow,
         onupdate=_utcnow,
+        server_default=sa.func.now(),
     )

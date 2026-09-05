@@ -116,7 +116,7 @@ class TestBulkCheckAudit:
         operator.bulk_check.return_value = BulkNodeCheckResultDTO(
             total=1, succeeded=1, failed=0, node_ids=(NODE_ID,)
         )
-        result = await svc.bulk_check(node_ids=(str(NODE_ID),))
+        result = await svc.bulk_check(node_ids=(str(NODE_ID),), mode="db")
         assert result.succeeded == 1
         audit.log.assert_awaited_once_with(
             action="bulk_nodes.check",
@@ -130,5 +130,5 @@ class TestBulkCheckAudit:
         operator.bulk_check.return_value = BulkNodeCheckResultDTO(
             total=1, succeeded=1, failed=0, node_ids=(NODE_ID,)
         )
-        result = await svc.bulk_check(node_ids=(str(NODE_ID),))
+        result = await svc.bulk_check(node_ids=(str(NODE_ID),), mode="db")
         assert result.succeeded == 1

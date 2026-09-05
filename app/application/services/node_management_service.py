@@ -191,11 +191,13 @@ class NodeManagementService:
         )
 
         # Capture old status for history
-        old_status: str | None = None
-        new_status: str | None = None
+        from app.core.types import NodeStatus
+
+        old_status: NodeStatus | None = None
+        new_status: NodeStatus | None = None
         for field, value in secured.changes:
             if field == "status":
-                new_status = str(value)
+                new_status = cast(NodeStatus, str(value))
                 try:
                     current = await self._reader.get_node(node_id)
                     old_status = current.status if current else None
@@ -206,7 +208,11 @@ class NodeManagementService:
         node = await self._writer.update_node(node_id, secured)
         if node is None:
             raise NodeNotFoundError(f"Node {node_id} not found")
-        if new_status is not None and self._status_history_writer is not None:
+        if (
+            new_status is not None
+            and self._status_history_writer is not None
+            and old_status != new_status
+        ):
             try:
                 from app.application.dto.node_status_history import NodeStatusChangeDTO
 
@@ -224,6 +230,16 @@ class NodeManagementService:
                     node_id=str(node_id),
                     error=str(exc),
                 )
+        elif (
+            new_status is not None
+            and old_status == new_status
+            and self._status_history_writer is not None
+        ):
+            audit.info(
+                "node.update.history_skipped_noop",
+                node_id=str(node_id),
+                status=new_status,
+            )
         audit.info("node.update.ok", node_id=str(node_id))
         audit_details: JsonObject = {
             key: list(value) if isinstance(value, tuple) else value

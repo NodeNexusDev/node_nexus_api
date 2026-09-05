@@ -541,7 +541,7 @@ class TestNodeStatusHistoryGateway:
             node_id=uuid.uuid4(),
             old_status="active",
             new_status="unreachable",
-            source="check",
+            source="connectivity_check",
         )
         await gw.save(data)
         session.add.assert_called_once()
@@ -562,7 +562,7 @@ class TestNodeStatusHistoryGateway:
             node_id=uuid.uuid4(),
             old_status="active",
             new_status="unreachable",
-            source="check",
+            source="connectivity_check",
             changed_at=datetime.now(UTC),
         )
         count_result = MagicMock()

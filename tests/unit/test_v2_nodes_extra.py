@@ -987,7 +987,7 @@ class TestStatusHistory:
         return NodeStatusHistoryRecordDTO(
             id=uuid.uuid4(),
             node_id=nid,
-            old_status="inactive",
+            old_status="unreachable",
             new_status="active",
             source="manual_update",
             changed_at=datetime.now(UTC),
@@ -1129,7 +1129,7 @@ class TestStatusHistory:
             node_id=_NODE_ID,
             old_status=None,
             new_status="active",
-            source="auto",
+            source="manual_update",
             changed_at=datetime(2026, 1, 1, tzinfo=UTC),
         )
         svc.get_history.return_value = NodeStatusHistoryPageDTO(items=(rec,), total=1)
@@ -1146,7 +1146,7 @@ class TestStatusHistory:
         assert item["id"] == str(rec.id)
         assert item["old_status"] is None
         assert item["new_status"] == "active"
-        assert item["source"] == "auto"
+        assert item["source"] == "manual_update"
 
     async def test_limit_bounds(self) -> None:
         svc = AsyncMock(spec=NodeStatusHistoryService)
