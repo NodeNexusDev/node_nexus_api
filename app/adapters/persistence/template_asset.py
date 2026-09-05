@@ -30,48 +30,57 @@ class SqlAlchemyTemplateAssetGateway:
         self, pack_id: uuid.UUID, assets: tuple[PackAssetCreateDTO, ...]
     ) -> tuple[PackAssetDTO, ...]:
         """Decode base64, compute size/sha and persist (TemplateAssetWriter)."""
+        async with self._sessionmaker.begin() as session:
+            result = await self.write_assets_in_session(session, pack_id, assets)
+            return tuple(result)
+
+    async def write_assets_in_session(
+        self,
+        session: AsyncSession,
+        pack_id: uuid.UUID,
+        assets: tuple[PackAssetCreateDTO, ...],
+    ) -> tuple[PackAssetDTO, ...]:
+        """Write assets within an existing session/transaction (atomic)."""
         now = datetime.now(UTC)
         result: list[PackAssetDTO] = []
-        async with self._sessionmaker.begin() as session:
-            for asset in assets:
-                try:
-                    raw = base64.b64decode(asset.content_base64, validate=True)
-                except Exception as exc:
-                    from app.core.exceptions import DomainError
+        for asset in assets:
+            try:
+                raw = base64.b64decode(asset.content_base64, validate=True)
+            except Exception as exc:
+                from app.core.exceptions import DomainError
 
-                    raise DomainError(
-                        f"Invalid base64 for asset {asset.path}: {exc}"
-                    ) from exc
-                size = len(raw)
-                sha = hashlib.sha256(raw).hexdigest()
-                # Store raw content as utf-8 with fallback to base64
-                try:
-                    content_str = raw.decode("utf-8")
-                except UnicodeDecodeError:
-                    content_str = base64.b64encode(raw).decode()
-                model = TemplateAssetModel(
-                    id=uuid.uuid4(),
+                raise DomainError(
+                    f"Invalid base64 for asset {asset.path}: {exc}"
+                ) from exc
+            size = len(raw)
+            sha = hashlib.sha256(raw).hexdigest()
+            try:
+                content_str = raw.decode("utf-8")
+            except UnicodeDecodeError:
+                content_str = base64.b64encode(raw).decode()
+            model = TemplateAssetModel(
+                id=uuid.uuid4(),
+                pack_id=pack_id,
+                path=asset.path,
+                content=content_str,
+                size=size,
+                sha=sha,
+                created_at=now,
+                updated_at=now,
+            )
+            session.add(model)
+            result.append(
+                PackAssetDTO(
+                    id=model.id,
                     pack_id=pack_id,
                     path=asset.path,
-                    content=content_str,
                     size=size,
                     sha=sha,
                     created_at=now,
                     updated_at=now,
                 )
-                session.add(model)
-                result.append(
-                    PackAssetDTO(
-                        id=model.id,
-                        pack_id=pack_id,
-                        path=asset.path,
-                        size=size,
-                        sha=sha,
-                        created_at=now,
-                        updated_at=now,
-                    )
-                )
-            await session.flush()
+            )
+        await session.flush()
         return tuple(result)
 
     async def list_assets(self, pack_id: uuid.UUID) -> tuple[PackAssetDTO, ...]:
