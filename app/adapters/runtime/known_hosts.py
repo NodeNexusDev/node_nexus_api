@@ -42,7 +42,7 @@ class FileKnownHostsManager:
                 raise HostKeyFetchError(msg) from exc
         else:
             try:
-                await asyncio.to_thread(self._path.chmod, 0o644)  # type: ignore[arg-type]
+                await asyncio.to_thread(lambda: self._path.chmod(0o644))
             except OSError as exc:
                 logger.debug(
                     "known_hosts.chmod_failed",

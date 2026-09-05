@@ -98,9 +98,9 @@ async def get_audit_stats(
             ]
             return AuditStatsResponse(total=total, buckets=buckets)
         total = int(getattr(raw, "total", 0))
-        buckets_attr = getattr(raw, "buckets", [])
+        buckets_attr = cast(list[Any], getattr(raw, "buckets", []))
         buckets: list[AuditStatsBucket] = []
-        for b in buckets_attr:  # type: ignore[assignment]
+        for b in buckets_attr:
             if isinstance(b, dict):
                 buckets.append(
                     AuditStatsBucket(
@@ -136,9 +136,9 @@ async def get_audit_stats(
             results=buckets,
         )
     total = int(getattr(raw, "total", 0))
-    buckets_attr = getattr(raw, "buckets", getattr(raw, "items", []))
+    buckets_attr = cast(list[Any], getattr(raw, "buckets", getattr(raw, "items", [])))
     buckets = []
-    for b in buckets_attr:  # type: ignore[assignment]
+    for b in buckets_attr:
         if isinstance(b, dict):
             buckets.append(
                 AuditStatsBucket(

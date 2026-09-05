@@ -187,7 +187,7 @@ async def bulk_check_nodes(
     audit.info("api.v2.nodes.checks", ids=[str(i) for i in data.ids], mode=mode)
     result = await service.bulk_check(
         node_ids=tuple(str(n) for n in data.ids),
-        mode=mode,  # type: ignore[arg-type]
+        mode=mode,
     )
     succeeded_ids = (
         {uuid.UUID(str(x)) for x in result.node_ids} if result.node_ids else set()

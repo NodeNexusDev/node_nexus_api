@@ -144,7 +144,7 @@ async def bulk_executions(
             rendered = render_command(
                 cmd.command,
                 list(cmd.parameters),
-                raw_params,  # type: ignore[arg-type]
+                raw_params,
             )
             result = await bulk_service.execute(
                 BulkCommandRequestDTO(

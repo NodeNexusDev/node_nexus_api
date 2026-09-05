@@ -23,9 +23,9 @@ _decode_offset = decode_offset  # noqa: N816
 audit = structlog.get_logger("audit")
 
 # Ensure handlers share the same logger instance
-_listing.audit = audit  # type: ignore[attr-defined]  # noqa: E501
-_management.audit = audit  # type: ignore[attr-defined]  # noqa: E501
-_stats.audit = audit  # type: ignore[attr-defined]  # noqa: E501
+setattr(_listing, "audit", audit)
+setattr(_management, "audit", audit)
+setattr(_stats, "audit", audit)
 
 __all__ = [
     "_decode_offset",

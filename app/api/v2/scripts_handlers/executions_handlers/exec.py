@@ -193,12 +193,12 @@ async def bulk_executions(
                 ScriptExecutionRequestDTO(
                     node_ids=tuple(data.node_ids),
                     tags=tuple(data.node_tags),
-                    params=tuple(raw_params.items()),  # type: ignore[arg-type]
+                    params=tuple(raw_params.items()),
                 ),
             )
             items: list[BulkScriptExecutionItem] = []
             for node_res in result.results:
-                status: Literal["success", "error"] = node_res.status  # type: ignore[assignment]
+                status: Literal["success", "error"] = node_res.status
                 items.append(
                     BulkScriptExecutionItem(
                         script_id=script_id,

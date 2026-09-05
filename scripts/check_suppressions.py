@@ -16,6 +16,12 @@ _ALLOWED_PRODUCTION = {
     ("app/api/v2/commands.py", "type:", "arg-type"),
     ("app/api/v2/scripts.py", "type:", "arg-type"),
     ("app/api/v2/scripts.py", "type:", "assignment"),
+    (
+        "app/api/v2/nodes_handlers/bulk_handlers/operations.py",
+        "ty:",
+        "invalid-argument-type",
+    ),
+    ("app/api/v2/nodes_handlers/bulk_handlers/operations.py", "type:", "arg-type"),
 }
 
 
