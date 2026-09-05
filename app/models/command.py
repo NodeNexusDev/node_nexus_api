@@ -3,6 +3,7 @@
 import uuid
 from datetime import datetime
 
+import sqlalchemy as sa
 from sqlalchemy import ARRAY, JSON, DateTime, Index, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -18,6 +19,7 @@ class CommandModel(Base):
     __table_args__ = (
         Index("ix_commands_name", "name", unique=True),
         Index("ix_commands_tags", "tags", postgresql_using="gin"),
+        Index("ix_commands_template_pack_id", "template_pack_id"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
@@ -32,8 +34,11 @@ class CommandModel(Base):
     )
     template_pack_id: Mapped[uuid.UUID | None] = mapped_column(nullable=True)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=_utcnow
+        DateTime(timezone=True), default=_utcnow, server_default=sa.func.now()
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=_utcnow, onupdate=_utcnow
+        DateTime(timezone=True),
+        default=_utcnow,
+        onupdate=_utcnow,
+        server_default=sa.func.now(),
     )

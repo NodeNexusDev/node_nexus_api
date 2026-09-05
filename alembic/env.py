@@ -15,6 +15,7 @@ from app.models.base import Base
 from app.models.command import CommandModel  # noqa: F401
 from app.models.command_execution import CommandExecutionModel  # noqa: F401
 from app.models.compose_project import ComposeProjectModel  # noqa: F401
+from app.models.favorite import FavoriteModel  # noqa: F401
 from app.models.node import NodeModel  # noqa: F401
 from app.models.node_status_history import NodeStatusHistoryModel  # noqa: F401
 from app.models.refresh_token import RefreshTokenModel  # noqa: F401

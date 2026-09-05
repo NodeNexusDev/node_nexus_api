@@ -419,11 +419,6 @@ class RepositoryProvider(Provider):
         """Bind persistent schedule writes."""
         return gateway
 
-    @provide(scope=Scope.REQUEST)
-    def get_node_repository(self, session: AsyncSession) -> NodeRepository:
-        """Get node repository."""
-        return NodeRepository(session)
-
     @provide(scope=Scope.APP)
     def get_audit_log_gateway(
         self, sessionmaker: async_sessionmaker[AsyncSession]
@@ -459,23 +454,6 @@ class RepositoryProvider(Provider):
     def get_favorite_writer(self, session: AsyncSession) -> FavoriteWriter:
         """Bind favorite writer to the persistence adapter."""
         return SqlAlchemyFavoriteGateway(session)
-
-    @provide(scope=Scope.REQUEST)
-    def get_command_repository(self, session: AsyncSession) -> CommandRepository:
-        """Get command repository."""
-        return CommandRepository(session)
-
-    @provide(scope=Scope.REQUEST)
-    def get_script_repository(self, session: AsyncSession) -> ScriptRepository:
-        """Get script repository."""
-        return ScriptRepository(session)
-
-    @provide(scope=Scope.REQUEST)
-    def get_script_execution_repository(
-        self, session: AsyncSession
-    ) -> ScriptExecutionRepository:
-        """Get script execution repository."""
-        return ScriptExecutionRepository(session)
 
     @provide(scope=Scope.REQUEST)
     def get_health_repository(self, session: AsyncSession) -> HealthRepository:

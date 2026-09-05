@@ -12,7 +12,7 @@ FORBIDDEN_IMPORTS: dict[str, tuple[str, ...]] = {
     "models": ("app.api", "app.services", "app.repositories"),
     "core": ("app.api",),
     "repositories": ("app.api", "app.services"),
-    "api": ("app.repositories", "app.models", "app.di.container"),
+    "api": ("app.repositories", "app.models", "app.di.container", "sqlalchemy"),
     "application": (
         "app.api",
         "app.schemas",

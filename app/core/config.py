@@ -29,6 +29,12 @@ class Settings(BaseSettings):
 
     # Encryption
     ENCRYPTION_SALT: str = Field(default="", repr=False)  # Required in production
+    ENCRYPTION_SALT_PREV: str | None = Field(
+        default=None, repr=False, description="Previous salt for rotation"
+    )
+    SECRET_KEY_PREV: str | None = Field(
+        default=None, repr=False, description="Previous secret for rotation"
+    )
 
     # SSH host verification
     SSH_STRICT_HOST_KEY_CHECKING: bool = True
