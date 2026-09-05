@@ -59,6 +59,7 @@ from app.adapters.persistence.user import (
     SqlAlchemyRefreshTokenGateway,
     SqlAlchemyUserGateway,
 )
+from app.adapters.persistence.scheduler_ownership import SqlAlchemySchedulerOwnership
 from app.adapters.runtime.apscheduler_runtime import ApschedulerRuntime
 from app.adapters.runtime.docker import SshDockerRuntime
 from app.adapters.runtime.known_hosts import FileKnownHostsManager
@@ -94,6 +95,7 @@ from app.application.ports.global_search import GlobalSearchReader
 from app.application.ports.health import DatabaseHealthProbe
 from app.application.ports.jwt_handler import JWTHandler
 from app.application.ports.known_hosts import KnownHostsManager
+from app.application.ports.scheduler_ownership import SchedulerOwnership
 from app.application.ports.node_bulk_operator import NodeBulkOperator
 from app.application.ports.node_management import (
     NodeManagementReader,
@@ -241,17 +243,24 @@ class SchedulerProvider(Provider):
         """Bind runtime schedule operations."""
         return scheduler
 
+    @provide(scope=Scope.APP, provides=SchedulerOwnership)
+    def get_scheduler_ownership(self, engine: AsyncEngine) -> SchedulerOwnership:
+        """Provide the PostgreSQL advisory-lock ownership port."""
+        return SqlAlchemySchedulerOwnership(engine)
+
     @provide(scope=Scope.APP)
     async def get_script_scheduler(
         self, engine: AsyncEngine, settings: Settings
     ) -> AsyncIterable[ApschedulerRuntime]:
         """Start and finalize the application-scoped script scheduler."""
+        ownership = SqlAlchemySchedulerOwnership(engine)
         scheduler = ApschedulerRuntime(
+            ownership=ownership,
             ownership_poll_seconds=settings.SCHEDULER_OWNERSHIP_POLL_SECONDS,
         )
         if settings.SCHEDULER_ENABLED:
-            await scheduler.acquire_ownership(engine)
-            scheduler.start_ownership_monitor(engine)
+            await scheduler.acquire_ownership()
+            scheduler.start_ownership_monitor()
             await scheduler.start()
         try:
             yield scheduler

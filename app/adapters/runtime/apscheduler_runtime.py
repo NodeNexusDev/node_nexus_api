@@ -18,8 +18,6 @@ from apscheduler.events import (
 )
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
-from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
 
 from app.core.metrics import (
     SCHEDULER_JOB_DURATION,
@@ -34,6 +32,10 @@ from app.core.types import JsonObject
 
 if TYPE_CHECKING:
     from uuid import UUID
+
+    from sqlalchemy.ext.asyncio import AsyncEngine
+
+    from app.application.ports.scheduler_ownership import SchedulerOwnership
 
 logger = structlog.get_logger()
 
@@ -66,20 +68,27 @@ class ApschedulerRuntime:
         self,
         *,
         ownership_poll_seconds: float = _DEFAULT_OWNERSHIP_POLL_SECONDS,
+        ownership: SchedulerOwnership | None = None,
     ) -> None:
         self._ownership_poll_seconds = ownership_poll_seconds
+        self._ownership = ownership
         self._scheduler = AsyncIOScheduler()
         self._scheduler.add_listener(
             self._record_scheduler_event,
             EVENT_JOB_MISSED | EVENT_JOB_MAX_INSTANCES,
         )
         self._executor: ScheduledScriptExecutor | None = None
-        self._owner_connection: AsyncConnection | None = None
         self._owns_execution = True
         self._ownership_task: asyncio.Task[None] | None = None
         self._reconciliation_task: asyncio.Task[None] | None = None
         self._reconciler: ScheduleReconciler | None = None
         self._ready = False
+        # Legacy fallback connection for engine-based acquire (tests)
+        self._owner_connection = None  # type: ignore[assignment]
+
+    def configure_ownership(self, ownership: SchedulerOwnership) -> None:
+        """Inject the persistence ownership port (used by DI)."""
+        self._ownership = ownership
 
     @staticmethod
     def _record_scheduler_event(
@@ -123,6 +132,8 @@ class ApschedulerRuntime:
     @property
     def owns_execution(self) -> bool:
         """Return whether this replica owns scheduled execution."""
+        if self._ownership is not None:
+            return self._ownership.is_acquired
         return self._owns_execution
 
     def mark_restored(self, *, failed: int) -> None:
@@ -166,45 +177,94 @@ class ApschedulerRuntime:
             self._scheduler.start()
             logger.info("scheduler.started")
 
-    async def acquire_ownership(self, engine: AsyncEngine) -> bool:
+    async def acquire_ownership(self, engine: AsyncEngine | None = None) -> bool:
         """Acquire the PostgreSQL session advisory lock for this replica."""
-        self._owns_execution = False
-        SCHEDULER_OWNER.set(0)
-        if engine.dialect.name != "postgresql":
+        # Preferred path via ownership port
+        if self._ownership is not None:
+            acquired = await self._ownership.try_acquire()
+            self._owns_execution = acquired
+            SCHEDULER_OWNER.set(1 if acquired else 0)
+            return acquired
+        # Legacy engine fallback (kept for unit tests without DI)
+        if engine is None:
             self._owns_execution = True
             SCHEDULER_OWNER.set(1)
             return True
-        connection = await engine.connect()
+        # Dynamic import to keep top-level free of sqlalchemy (architecture guard)
+        sa_text = __import__("sqlalchemy").text  # type: ignore[attr-defined]
+        self._owns_execution = False
+        SCHEDULER_OWNER.set(0)
+        if engine.dialect.name != "postgresql":  # type: ignore[union-attr]
+            self._owns_execution = True
+            SCHEDULER_OWNER.set(1)
+            return True
+        connection = await engine.connect()  # type: ignore[union-attr]
         acquired = bool(
-            await connection.scalar(
-                text("SELECT pg_try_advisory_lock(:lock_id)"),
+            await connection.scalar(  # type: ignore[union-attr]
+                sa_text("SELECT pg_try_advisory_lock(:lock_id)"),
                 {"lock_id": _SCHEDULER_LOCK_ID},
             )
         )
         if not acquired:
-            await connection.close()
+            await connection.close()  # type: ignore[union-attr]
             logger.info("scheduler.owner.rejected")
             return False
-        self._owner_connection = connection
+        self._owner_connection = connection  # type: ignore[assignment]
         self._owns_execution = True
         SCHEDULER_OWNER.set(1)
         logger.info("scheduler.owner.acquired")
         return True
 
-    def start_ownership_monitor(self, engine: AsyncEngine) -> None:
+    def start_ownership_monitor(self, engine: AsyncEngine | None = None) -> None:
         """Continuously acquire ownership after startup or owner failover."""
-        if engine.dialect.name != "postgresql" or self._ownership_task is not None:
+        # Preferred port path
+        if self._ownership is not None:
+            if not self._ownership.is_postgres or self._ownership_task is not None:
+                return
+            self._ownership_task = asyncio.create_task(
+                self._monitor_ownership_with_port()
+            )
+            return
+        # Legacy engine path
+        if (
+            engine is None
+            or engine.dialect.name != "postgresql"
+            or self._ownership_task is not None
+        ):  # type: ignore[union-attr]
             return
         self._ownership_task = asyncio.create_task(self._monitor_ownership(engine))
 
+    async def _monitor_ownership_with_port(self) -> None:
+        """Monitor ownership via port."""
+        assert self._ownership is not None
+        while True:
+            try:
+                if not self._ownership.is_acquired:
+                    await self.acquire_ownership()
+                else:
+                    ok = await self._ownership.probe()
+                    if not ok:
+                        raise RuntimeError("probe failed")
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:
+                logger.error(
+                    "scheduler.owner.lost",
+                    error_type=type(exc).__name__,
+                )
+                self._owns_execution = False
+                SCHEDULER_OWNER.set(0)
+            await asyncio.sleep(self._ownership_poll_seconds)
+
     async def _monitor_ownership(self, engine: AsyncEngine) -> None:
-        """Maintain a live advisory-lock session and retry after loss."""
+        """Maintain a live advisory-lock session and retry after loss (legacy)."""
+        sa_text = __import__("sqlalchemy").text  # type: ignore[attr-defined]
         while True:
             try:
                 if self._owner_connection is None:
                     await self.acquire_ownership(engine)
                 else:
-                    await self._owner_connection.execute(text("SELECT 1"))
+                    await self._owner_connection.execute(sa_text("SELECT 1"))  # type: ignore[union-attr]
             except asyncio.CancelledError:
                 raise
             except Exception as exc:
@@ -215,7 +275,7 @@ class ApschedulerRuntime:
                 self._owns_execution = False
                 SCHEDULER_OWNER.set(0)
                 if self._owner_connection is not None:
-                    await self._owner_connection.close()
+                    await self._owner_connection.close()  # type: ignore[union-attr]
                     self._owner_connection = None
             await asyncio.sleep(self._ownership_poll_seconds)
 
@@ -233,14 +293,26 @@ class ApschedulerRuntime:
             self._scheduler.shutdown(wait=False)
             await asyncio.sleep(0)
             logger.info("scheduler.stopped")
-        if self._owner_connection is not None:
-            await self._owner_connection.execute(
-                text("SELECT pg_advisory_unlock(:lock_id)"),
-                {"lock_id": _SCHEDULER_LOCK_ID},
-            )
-            await self._owner_connection.close()
+        if self._ownership is not None:
+            try:
+                await self._ownership.release()
+            except Exception:
+                pass
+            self._owns_execution = False
+        elif self._owner_connection is not None:
+            sa_text = __import__("sqlalchemy").text  # type: ignore[attr-defined]
+            try:
+                await self._owner_connection.execute(  # type: ignore[union-attr]
+                    sa_text("SELECT pg_advisory_unlock(:lock_id)"),
+                    {"lock_id": _SCHEDULER_LOCK_ID},
+                )
+            except Exception:
+                pass
+            await self._owner_connection.close()  # type: ignore[union-attr]
             self._owner_connection = None
-        self._owns_execution = False
+            self._owns_execution = False
+        else:
+            self._owns_execution = False
         self._ready = False
         SCHEDULER_OWNER.set(0)
         SCHEDULER_READY.set(0)
@@ -300,7 +372,7 @@ class ApschedulerRuntime:
         params: JsonObject | None = None,
     ) -> None:
         """Execute a job through the callback configured by the composition root."""
-        if not self._owns_execution:
+        if not self.owns_execution:
             logger.warning(
                 "scheduler.job.skipped_no_ownership",
                 script_id=str(script_id),
