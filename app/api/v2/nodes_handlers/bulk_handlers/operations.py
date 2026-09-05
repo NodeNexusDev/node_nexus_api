@@ -13,6 +13,7 @@ from fastapi import APIRouter, HTTPException, Query, Response, Security
 
 from app.api.deps import Principal, get_current_principal, require_write_or_jwt_scope
 from app.api.pagination import decode_offset, encode_offset
+from app.api.v2._bulk import set_bulk_status
 from app.application.dto.bulk_node_operation import BulkNodeDeleteDTO
 from app.application.dto.node_management import NodeCreateDTO, NodeUpdateDTO
 from app.application.dto.node_status_history import NodeStatusHistoryQueryDTO
@@ -113,8 +114,7 @@ async def bulk_update_nodes(
     )
     succeeded = sum(1 for r in results if r.status == "success")
     failed = len(results) - succeeded
-    if failed > 0 and succeeded > 0:
-        response.status_code = 207
+    set_bulk_status(response, succeeded, failed)
     return BulkResult[BulkNodeUpdateResult](
         total=len(results),
         succeeded=succeeded,
@@ -152,8 +152,7 @@ async def bulk_delete_nodes(
             )
     succeeded = len(succeeded_ids)
     failed = len(data.ids) - succeeded
-    if failed > 0 and succeeded > 0:
-        response.status_code = 207
+    set_bulk_status(response, succeeded, failed)
     return BulkResult[BulkNodeUpdateResult](
         total=len(data.ids),
         succeeded=succeeded,
@@ -227,8 +226,7 @@ async def bulk_check_nodes(
                 )
     succeeded = sum(1 for r in results if r.status == "success")
     failed = len(results) - succeeded
-    if failed > 0 and succeeded > 0:
-        response.status_code = 207
+    set_bulk_status(response, succeeded, failed)
     return BulkResult[BulkNodeUpdateResult](
         total=len(results),
         succeeded=succeeded,

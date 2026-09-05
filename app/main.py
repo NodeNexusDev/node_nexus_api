@@ -19,10 +19,10 @@ from starlette.middleware.base import RequestResponseEndpoint
 from starlette.responses import Response
 
 from app.adapters.lifecycle.application_startup import ApplicationStartup
+from app.adapters.lifecycle.commit_middleware import CommitOnResponseMiddleware
 from app.adapters.telemetry import init_telemetry
 from app.api.error_mapping import domain_error_handler
 from app.api.middleware import (
-    CommitOnResponseMiddleware,
     RateLimitMiddleware,
     RequestIdMiddleware,
     RequestLoggingMiddleware,
