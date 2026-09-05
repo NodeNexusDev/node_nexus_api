@@ -12,6 +12,10 @@ from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.types import ASGIApp
 
+from app.adapters.lifecycle.commit_middleware import (  # noqa: F401
+    CommitOnResponseMiddleware,
+)
+
 logger = structlog.get_logger()
 
 
