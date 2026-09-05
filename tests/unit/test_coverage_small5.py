@@ -82,9 +82,7 @@ class TestBulkCheck:
         svc._node_view_reader.get_node = AsyncMock(
             return_value=MagicMock(status="active")
         )
-        with patch(
-            "app.application.services.ssh_executor.build_ssh_connector"
-        ):
+        with patch("app.application.services.ssh_executor.build_ssh_connector"):
             res = await svc.bulk_check(node_ids=("not-a-uuid",), mode="ssh")
             assert res.failed == 1
 

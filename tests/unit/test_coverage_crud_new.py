@@ -132,7 +132,6 @@ class TestFavoritesNewCRUD:
                     AsyncMock(spec=APIKeyAuthenticationService),
                 )
 
-
         c = make_async_container(P())
         setup_dishka(c, app)
         return app

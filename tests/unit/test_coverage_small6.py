@@ -43,7 +43,6 @@ class TestFavoritesRemainder:
         app = FastAPI()
         app.add_exception_handler(Exception, domain_error_handler)
         # Use domain_error_handler for FavoriteNotFound
-        from app.core.exceptions import DomainError
 
         app.add_exception_handler(DomainError, domain_error_handler)
         app.include_router(router)
@@ -69,7 +68,6 @@ class TestFavoritesRemainder:
                     APIKeyAuthenticationService,
                     AsyncMock(spec=APIKeyAuthenticationService),
                 )
-
 
         c = make_async_container(P())
         setup_dishka(c, app)
@@ -184,7 +182,6 @@ class TestTemplatePackExtra:
     async def test_create_pack_duplicate(self):
         from app.application.dto.template_pack import PackCreateDTO, PackManifestDTO
         from app.application.services.template_pack_service import TemplatePackService
-        from app.core.exceptions import DomainError
 
         svc = TemplatePackService()
         pid = f"dup-{uuid4()}"
