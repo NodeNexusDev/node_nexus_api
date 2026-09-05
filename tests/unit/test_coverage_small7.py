@@ -64,6 +64,29 @@ class TestSmall7:
         assert result.succeeded == 1
         assert any("cmd_1" in r.name for r in result.results if r.status == "success")
 
+    async def test_error_mapping(self):
+        from unittest.mock import MagicMock
+
+        from fastapi import Request
+
+        from app.api.error_mapping import (
+            internal_error_handler,
+            status_for_domain_error,
+        )
+        from app.core.exceptions import DomainError
+
+        # Cover fallback 422
+        class UnknownError(DomainError):
+            pass
+
+        assert status_for_domain_error(UnknownError("x")) == 422
+        # Cover internal handler
+        req = MagicMock(spec=Request)
+        req.url.path = "/test"
+        req.state.request_id = "abc"
+        resp = await internal_error_handler(req, RuntimeError("boom"))
+        assert resp.status_code == 500
+
     async def test_schema_script_validation(self):
         from app.schemas.script import ScriptExecuteRequest, ScriptStep
 
