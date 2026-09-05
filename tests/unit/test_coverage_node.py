@@ -159,7 +159,7 @@ class TestNodeManagementService:
         updated = NodeViewDTO(
             id=existing.id,
             name="n",
-            status="active",
+            status="unreachable",
             username="root",
             tags=(),
             created_at=existing.created_at,
@@ -171,7 +171,7 @@ class TestNodeManagementService:
             changes=(
                 ("host", "new"),
                 ("port", 2222),
-                ("status", "active"),
+                ("status", "unreachable"),
                 ("password", "secret"),
             )
         )

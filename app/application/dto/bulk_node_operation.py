@@ -6,6 +6,8 @@ import uuid
 from dataclasses import dataclass
 from typing import Literal
 
+from app.core.types import NodeStatus
+
 
 @dataclass(frozen=True, slots=True)
 class BulkNodeDeleteDTO:
@@ -25,11 +27,20 @@ class BulkNodeOperationResultDTO:
 
 
 @dataclass(frozen=True, slots=True)
+class BulkNodeCheckDetailDTO:
+    node_id: str
+    success: bool
+    error: str | None = None
+    new_status: NodeStatus | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class BulkNodeCheckResultDTO:
     total: int
     succeeded: int
     failed: int
     node_ids: tuple[uuid.UUID, ...]
+    details: tuple[BulkNodeCheckDetailDTO, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)

@@ -114,13 +114,13 @@ class NodeBulkOperationService:
     async def bulk_check(
         self,
         node_ids: tuple[str, ...],
-        mode: Literal["db", "ssh"] = "db",
+        mode: Literal["db", "ssh"] = "ssh",
     ) -> BulkNodeCheckResultDTO:
         """Check which nodes exist by IDs or via SSH.
 
         Modes:
         - db: check existence in DB (legacy)
-        - ssh: SSH connectivity check with status update (echo ok)
+        - ssh: SSH connectivity check with status update (echo ok) — default
         """
         if mode == "db":
             result = await self._operator.bulk_check(node_ids)
@@ -165,27 +165,39 @@ class NodeBulkOperationService:
         # Lazy import to avoid circular deps
         from app.application.dto.node_status_history import NodeStatusChangeDTO
         from app.application.services.ssh_executor import build_ssh_connector
-        from app.core.exceptions import ConnectionFailedError
+        from app.core.exceptions import ConnectionFailedError, CredentialDecryptionError
+        from app.core.types import NodeStatus
 
-        async def _check_one(node_id_str: str) -> tuple[str, bool, str | None]:
+        async def _check_one(
+            node_id_str: str,
+        ) -> tuple[str, bool, str | None, NodeStatus | None]:
             try:
                 node_uuid = uuid.UUID(node_id_str)
             except ValueError:
-                return (node_id_str, False, "Invalid node id")
+                return (node_id_str, False, "Invalid node id", None)
 
             node = await node_reader.get_connection(node_uuid)
             if node is None:
-                return (node_id_str, False, "Node not found")
+                return (node_id_str, False, "Node not found", None)
 
             connector = build_ssh_connector(node, credential_cipher, connector_factory)
 
             try:
                 async with connector:
                     await connector.execute_command("echo ok")
-                new_status = "active"
+                new_status: NodeStatus = "active"
                 success = True
                 error = None
                 audit.info("node.bulk.check.ssh_ok", node_id=node_id_str)
+            except CredentialDecryptionError as exc:
+                new_status = "error"
+                success = False
+                error = str(exc)
+                audit.error(
+                    "node.bulk.check.credential_failed",
+                    node_id=node_id_str,
+                    error=str(exc),
+                )
             except ConnectionFailedError as exc:
                 new_status = "unreachable"
                 success = False
@@ -207,7 +219,7 @@ class NodeBulkOperationService:
                 )
 
             # Fetch old status for history
-            old_status: str | None = None
+            old_status: NodeStatus | None = None
             if self._node_view_reader is not None:
                 try:
                     view = await self._node_view_reader.get_node(node_uuid)
@@ -240,7 +252,14 @@ class NodeBulkOperationService:
                         node_id=node_id_str,
                         error=str(exc),
                     )
-            if self._status_history_writer is not None:
+            # Skip history if no change or status write failed (best-effort)
+            should_write_history = (
+                self._status_history_writer is not None
+                and status_ok
+                and old_status != new_status
+            )
+            if should_write_history:
+                assert self._status_history_writer is not None
                 try:
                     await self._status_history_writer.save(
                         NodeStatusChangeDTO(
@@ -251,22 +270,31 @@ class NodeBulkOperationService:
                         )
                     )
                 except Exception as exc:  # noqa: BLE001
-                    # History failure should not hide status result, but log
                     audit.warning(
                         "node.bulk.check.history_failed",
                         node_id=node_id_str,
                         error=str(exc),
                     )
-                    # If status was ok but history failed, keep success as per status_ok
-                    # (history is secondary)
+            elif (
+                self._status_history_writer is not None
+                and old_status == new_status
+                and status_ok
+            ):
+                audit.info(
+                    "node.bulk.check.history_skipped_noop",
+                    node_id=node_id_str,
+                    status=new_status,
+                )
 
             # If status update failed, override success
             if not status_ok:
                 success = False
 
-            return (node_id_str, success, error)
+            return (node_id_str, success, error, new_status)
 
-        async def _check_one_sem(node_id_str: str) -> tuple[str, bool, str | None]:  # noqa: ANN202
+        async def _check_one_sem(  # noqa: ANN202
+            node_id_str: str,
+        ) -> tuple[str, bool, str | None, NodeStatus | None]:
             async with self._check_semaphore:
                 return await _check_one(node_id_str)
 
@@ -275,7 +303,15 @@ class NodeBulkOperationService:
         succeeded_ids: list[uuid.UUID] = []
         succeeded = 0
         failed = 0
-        for nid_str, ok, _err in results:
+        from app.application.dto.bulk_node_operation import BulkNodeCheckDetailDTO
+
+        details: list[BulkNodeCheckDetailDTO] = []
+        for nid_str, ok, _err, _st in results:
+            details.append(
+                BulkNodeCheckDetailDTO(
+                    node_id=nid_str, success=ok, error=_err, new_status=_st
+                )
+            )
             if ok:
                 succeeded += 1
                 try:
@@ -293,6 +329,7 @@ class NodeBulkOperationService:
             succeeded=succeeded,
             failed=failed,
             node_ids=tuple(succeeded_ids),
+            details=tuple(details),
         )
 
         if self._audit:

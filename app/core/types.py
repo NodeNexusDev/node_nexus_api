@@ -4,6 +4,7 @@ from typing import Literal
 
 type ConnectionType = Literal["ssh"]
 type NodeStatus = Literal["active", "unreachable", "error"]
+type NodeStatusSource = Literal["connectivity_check", "manual_update"]
 
 type Tag = str
 type TagList = tuple[Tag, ...]

@@ -189,20 +189,42 @@ async def bulk_check_nodes(
         node_ids=tuple(str(n) for n in data.ids),
         mode=mode,
     )
-    succeeded_ids = (
-        {uuid.UUID(str(x)) for x in result.node_ids} if result.node_ids else set()
-    )
-    # Service counts succeeded as existing nodes
-    results: list[BulkNodeUpdateResult] = []
-    for nid in data.ids:
-        if nid in succeeded_ids:
-            results.append(BulkNodeUpdateResult(node_id=nid, status="success"))
-        else:
-            results.append(
-                BulkNodeUpdateResult(
-                    node_id=nid, status="error", error="Node not found"
+    # Prefer detailed per-node results if available (ssh mode)
+    if result.details:
+        by_id = {d.node_id: d for d in result.details}
+        results: list[BulkNodeUpdateResult] = []
+        for nid in data.ids:
+            d = by_id.get(str(nid))
+            if d is not None and d.success:
+                results.append(BulkNodeUpdateResult(node_id=nid, status="success"))
+            elif d is not None:
+                # Reveal actual failure reason (unreachable / error / invalid)
+                results.append(
+                    BulkNodeUpdateResult(
+                        node_id=nid, status="error", error=d.error or "Node not found"
+                    )
                 )
-            )
+            else:
+                results.append(
+                    BulkNodeUpdateResult(
+                        node_id=nid, status="error", error="Node not found"
+                    )
+                )
+    else:
+        succeeded_ids = (
+            {uuid.UUID(str(x)) for x in result.node_ids} if result.node_ids else set()
+        )
+        # Service counts succeeded as existing nodes
+        results = []
+        for nid in data.ids:
+            if nid in succeeded_ids:
+                results.append(BulkNodeUpdateResult(node_id=nid, status="success"))
+            else:
+                results.append(
+                    BulkNodeUpdateResult(
+                        node_id=nid, status="error", error="Node not found"
+                    )
+                )
     succeeded = sum(1 for r in results if r.status == "success")
     failed = len(results) - succeeded
     if failed > 0 and succeeded > 0:

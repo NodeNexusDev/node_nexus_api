@@ -27,7 +27,11 @@ from app.application.services.ssh_executor import (
     save_history,
 )
 from app.application.types import JsonObject
-from app.core.exceptions import ConnectionFailedError, NodeNotFoundError
+from app.core.exceptions import (
+    ConnectionFailedError,
+    CredentialDecryptionError,
+    NodeNotFoundError,
+)
 
 if TYPE_CHECKING:
     from app.application.ports.command_history import CommandHistoryWriter
@@ -80,8 +84,15 @@ class NodeCommandService:
         try:
             async with connector:
                 await connector.execute_command("echo ok")
-            new_status = "active"
+            new_status: _NodeStatus = "active"
             audit.info("node.connectivity.ok", node_id=str(node_id))
+        except CredentialDecryptionError as exc:
+            new_status = "error"
+            audit.error(
+                "node.connectivity.credential_failed",
+                node_id=str(node_id),
+                error=str(exc),
+            )
         except ConnectionFailedError as exc:
             new_status = "unreachable"
             audit.warning(
@@ -101,7 +112,9 @@ class NodeCommandService:
         await self._log("check", node_id, {"status": new_status})
 
         # Fetch old status for history
-        old_status: str | None = None
+        from app.core.types import NodeStatus as _NodeStatus
+
+        old_status: _NodeStatus | None = None
         if self._node_view_reader is not None:
             try:
                 view = await self._node_view_reader.get_node(node_id)
@@ -110,9 +123,11 @@ class NodeCommandService:
                 old_status = None
 
         updated = await self._status_writer.update_node_status(node_id, new_status)
+        if updated is None:  # defensive: the node existed when the use case started
+            raise NodeNotFoundError(f"Node {node_id} not found")
 
-        # Record status change in history after updating the node
-        if self._status_history_writer is not None:
+        # Record status change only if changed
+        if self._status_history_writer is not None and old_status != new_status:
             try:
                 from app.application.dto.node_status_history import NodeStatusChangeDTO
 
@@ -130,8 +145,12 @@ class NodeCommandService:
                     node_id=str(node_id),
                     error=str(exc),
                 )
-        if updated is None:  # defensive: the node existed when the use case started
-            raise NodeNotFoundError(f"Node {node_id} not found")
+        elif self._status_history_writer is not None and old_status == new_status:
+            audit.info(
+                "node.connectivity.history_skipped_noop",
+                node_id=str(node_id),
+                status=new_status,
+            )
         return updated
 
     async def execute_command(
