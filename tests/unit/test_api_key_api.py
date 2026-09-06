@@ -23,6 +23,7 @@ from app.application.services.api_key_authentication import (
     APIKeyAuthenticationService,
 )
 from app.application.services.api_key_management import APIKeyManagementService
+from app.core.config import Settings, get_settings
 from app.core.exceptions import APIKeyNotFoundError, DomainError
 from tests.typing import as_typed_mock
 
@@ -74,6 +75,11 @@ def _create_test_app(service: APIKeyManagementService | AsyncMock) -> FastAPI:
         @provide(scope=Scope.APP)
         def get_jwt_handler(self) -> JWTHandler:
             return as_typed_mock(JWTHandler, MagicMock(spec=JWTHandler))
+
+        @provide(scope=Scope.APP)
+        def get_settings(self) -> Settings:
+
+            return get_settings()
 
     container = make_async_container(MockServiceProvider())
     setup_dishka(container, app)
@@ -130,7 +136,7 @@ def mock_service() -> AsyncMock:
 
 
 class TestCreateApiKey:
-    @patch("app.api.deps.get_settings")
+    @patch("app.core.config.get_settings")
     async def test_success(
         self, mock_get_settings: Any, mock_service: AsyncMock
     ) -> None:
@@ -157,7 +163,7 @@ class TestCreateApiKey:
         assert request.name == "my-key"
         assert request.scope == "read-write"
 
-    @patch("app.api.deps.get_settings")
+    @patch("app.core.config.get_settings")
     async def test_validation_error(
         self, mock_get_settings: Any, mock_service: AsyncMock
     ) -> None:
@@ -181,7 +187,7 @@ class TestCreateApiKey:
 
 
 class TestListApiKeys:
-    @patch("app.api.deps.get_settings")
+    @patch("app.core.config.get_settings")
     async def test_empty(self, mock_get_settings: Any, mock_service: AsyncMock) -> None:
         mock_get_settings.return_value = _mock_settings("test-master-key")
         app = _create_test_app(mock_service)
@@ -201,7 +207,7 @@ class TestListApiKeys:
         assert data["items"] == []
         assert data["total"] == 0
 
-    @patch("app.api.deps.get_settings")
+    @patch("app.core.config.get_settings")
     async def test_with_data(
         self, mock_get_settings: Any, mock_service: AsyncMock
     ) -> None:
@@ -226,7 +232,7 @@ class TestListApiKeys:
         assert len(data["items"]) == 2
         assert data["total"] == 2
 
-    @patch("app.api.deps.get_settings")
+    @patch("app.core.config.get_settings")
     async def test_pagination(
         self, mock_get_settings: Any, mock_service: AsyncMock
     ) -> None:
@@ -250,7 +256,7 @@ class TestListApiKeys:
 
 
 class TestRevokeApiKey:
-    @patch("app.api.deps.get_settings")
+    @patch("app.core.config.get_settings")
     async def test_success(
         self, mock_get_settings: Any, mock_service: AsyncMock
     ) -> None:
@@ -271,7 +277,7 @@ class TestRevokeApiKey:
         assert response.status_code == 204
         mock_service.revoke_api_key.assert_called_once_with(key_id)
 
-    @patch("app.api.deps.get_settings")
+    @patch("app.core.config.get_settings")
     async def test_not_found(
         self, mock_get_settings: Any, mock_service: AsyncMock
     ) -> None:

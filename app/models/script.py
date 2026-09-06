@@ -29,7 +29,9 @@ class ScriptModel(Base):
     tags: Mapped[list[str] | None] = mapped_column(
         ARRAY(String(100)).with_variant(JSON(), "sqlite"), nullable=True, default=list
     )
-    template_pack_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("template_packs.id", ondelete="SET NULL"), nullable=True)  # noqa: E501
+    template_pack_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("template_packs.id", ondelete="SET NULL"), nullable=True
+    )  # noqa: E501
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_utcnow, server_default=sa.func.now()
     )

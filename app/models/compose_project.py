@@ -29,12 +29,16 @@ class ComposeProjectModel(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
-    node_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("nodes.id", ondelete="CASCADE"), nullable=False)  # noqa: E501
+    node_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("nodes.id", ondelete="CASCADE"), nullable=False
+    )  # noqa: E501
     project_name: Mapped[str] = mapped_column(String(100), nullable=False)
     compose: Mapped[str] = mapped_column(Text, nullable=False)
     env: Mapped[dict[str, str] | None] = mapped_column(JSON, nullable=True)
     template_pack_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("template_packs.id", ondelete="SET NULL"), nullable=True  # noqa: E501
+        UUID(as_uuid=True),
+        ForeignKey("template_packs.id", ondelete="SET NULL"),
+        nullable=True,  # noqa: E501
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_utcnow, server_default=sa.func.now()

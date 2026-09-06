@@ -44,6 +44,7 @@ from app.application.services.compose_service import (
 from app.application.services.compose_service import (
     _validate_project_name as svc_validate,
 )
+from app.core.config import Settings, get_settings
 from app.core.exceptions import (
     ComposeProjectAlreadyExistsError,
     ComposeProjectNotFoundError,
@@ -60,7 +61,7 @@ LONG_NAME = "a" * 101
 COMPOSE_YML = "version: '3'\nservices:\n  web:\n    image: nginx"
 
 _SETTINGS_PATCH = patch(
-    "app.api.deps.get_settings",
+    "app.core.config.get_settings",
     return_value=_mock_settings("test-master"),
 )
 
@@ -120,6 +121,11 @@ def _create_app(service_mock: AsyncMock | MagicMock | None = None) -> FastAPI:
         @provide(scope=Scope.REQUEST)
         def get_compose_service(self) -> ComposeService:
             return as_typed_mock(ComposeService, svc)
+
+        @provide(scope=Scope.APP)
+        def get_settings(self) -> Settings:
+
+            return get_settings()
 
     container = make_async_container(MockProvider(), MockAuthServiceProvider())
     setup_dishka(container, app)

@@ -18,7 +18,7 @@ from app.application.services.streaming_command_service import (
     StreamingCommandService,
     StreamingCommandSession,
 )
-from app.core.config import Settings, get_settings
+from app.core.config import Settings
 from app.core.exceptions import ConnectionFailedError, NodeNotFoundError
 from app.schemas.websocket import WebSocketCommandMessage, WebSocketSignalMessage
 
@@ -36,19 +36,16 @@ async def _validate_ws_token(
     websocket: WebSocket,
     token: str | None,
     api_key_service: APIKeyAuthenticationService,
-    settings: Settings | None = None,
+    settings: Settings,
 ) -> bool:
     """Validate WebSocket API key token against the API key service.
 
     Returns True if authenticated, False and closes the socket otherwise.
     """
-    effective = settings if settings is not None else get_settings()
     if not token:
         await websocket.close(code=4001, reason="Missing token")
         return False
-    if effective.MASTER_API_KEY and hmac.compare_digest(
-        token, effective.MASTER_API_KEY
-    ):
+    if settings.MASTER_API_KEY and hmac.compare_digest(token, settings.MASTER_API_KEY):
         audit.info("ws.auth.ok", key_type="master")
         return True
     try:
@@ -116,7 +113,7 @@ async def exec_stream(
     node_id: UUID,
     streaming_service: FromDishka[StreamingCommandService],
     api_key_service: FromDishka[APIKeyAuthenticationService],
-    settings: FromDishka[Settings] | None = None,
+    settings: FromDishka[Settings],
 ) -> None:
     """Stream command output via WebSocket.
 
@@ -127,7 +124,6 @@ async def exec_stream(
 
     On disconnect, the SSH process is killed.
     """
-    effective = settings if settings is not None else get_settings()
     token = (
         websocket.headers.get("x-api-key")
         if isinstance(websocket.headers, Mapping)
@@ -137,7 +133,7 @@ async def exec_stream(
     # receive the documented WebSocket close codes instead of an HTTP 403
     # handshake rejection from the ASGI server.
     await websocket.accept()
-    if not await _validate_ws_token(websocket, token, api_key_service, effective):
+    if not await _validate_ws_token(websocket, token, api_key_service, settings):
         return
 
     active_task: asyncio.Task[None] | None = None

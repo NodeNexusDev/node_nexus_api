@@ -5,13 +5,14 @@ import json
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from fastapi import WebSocketDisconnect
 
 from app.api.v2.websocket import _send_command_events, _validate_ws_token, exec_stream
 from app.application.dto.remote_stream import RemoteStreamEventDTO
+from app.core.config import Settings
 from app.core.exceptions import ConnectionFailedError, NodeNotFoundError
 
 _exec = getattr(exec_stream, "__dishka_orig_func__")
@@ -21,6 +22,15 @@ def _make_ws(token: str | None = "test-key") -> AsyncMock:
     ws = AsyncMock()
     ws.headers = {"x-api-key": token} if token else {}
     return ws
+
+
+def _settings(master: str = "") -> Settings:
+    return Settings(  # type: ignore[call-arg]
+        DATABASE_URL="sqlite+aiosqlite:///:memory:",
+        SECRET_KEY="0123456789abcdef0123456789ABCDEF",
+        MASTER_API_KEY=master,
+        ENVIRONMENT="test",
+    )
 
 
 class FakeStreamingSession:
@@ -69,31 +79,45 @@ def _api_key_service() -> AsyncMock:
 class TestExecStreamFullCoverage:
     async def test_master_token_authentication(self) -> None:
         ws = _make_ws()
-        settings = SimpleNamespace(MASTER_API_KEY="master")
-        with patch("app.api.v2.websocket.get_settings", return_value=settings):
-            assert await _validate_ws_token(ws, "master", _api_key_service()) is True
+        settings = _settings("master")
+        assert (
+            await _validate_ws_token(ws, "master", _api_key_service(), settings) is True
+        )  # type: ignore[arg-type]
 
     async def test_read_only_and_invalid_token_are_rejected(self) -> None:
         ws = _make_ws()
+        settings = _settings("")
         service = _api_key_service()
         service.authenticate.return_value = SimpleNamespace(
             scope="read-only", key_prefix="nnk_test"
         )
-        assert await _validate_ws_token(ws, "read-only", service) is False
+        assert await _validate_ws_token(ws, "read-only", service, settings) is False  # type: ignore[arg-type]
         service.authenticate.side_effect = ValueError("invalid")
-        assert await _validate_ws_token(ws, "invalid", service) is False
+        assert await _validate_ws_token(ws, "invalid", service, settings) is False  # type: ignore[arg-type]
         service.authenticate.side_effect = RuntimeError("database")
-        assert await _validate_ws_token(ws, "broken", service) is False
+        assert await _validate_ws_token(ws, "broken", service, settings) is False  # type: ignore[arg-type]
 
     async def test_missing_token(self) -> None:
         ws = _make_ws(None)
-        await _exec(ws, MagicMock(), FakeStreamingService(), _api_key_service())
+        await _exec(
+            ws,
+            MagicMock(),
+            FakeStreamingService(),
+            _api_key_service(),
+            _settings(""),
+        )  # type: ignore[arg-type]
         ws.close.assert_awaited_once_with(code=4001, reason="Missing token")
 
     async def test_node_not_found(self) -> None:
         ws = _make_ws()
         service = FakeStreamingService(NodeNotFoundError("not found"))
-        await _exec(ws, MagicMock(), service, _api_key_service())
+        await _exec(
+            ws,
+            MagicMock(),
+            service,
+            _api_key_service(),
+            _settings(""),
+        )  # type: ignore[arg-type]
         ws.close.assert_awaited_once_with(code=4004, reason="Node not found")
 
     async def test_command_execution_success(self) -> None:
@@ -102,7 +126,13 @@ class TestExecStreamFullCoverage:
             {"command": "ls -la"},
             WebSocketDisconnect(),
         ]
-        await _exec(ws, MagicMock(), FakeStreamingService(), _api_key_service())
+        await _exec(
+            ws,
+            MagicMock(),
+            FakeStreamingService(),
+            _api_key_service(),
+            _settings(""),
+        )  # type: ignore[arg-type]
         payloads = [call.args[0] for call in ws.send_json.await_args_list]
         assert {
             "version": "1",
@@ -117,7 +147,13 @@ class TestExecStreamFullCoverage:
             {"type": "signal", "signal": "SIGINT"},
             WebSocketDisconnect(),
         ]
-        await _exec(ws, MagicMock(), FakeStreamingService(), _api_key_service())
+        await _exec(
+            ws,
+            MagicMock(),
+            FakeStreamingService(),
+            _api_key_service(),
+            _settings(""),
+        )  # type: ignore[arg-type]
         ws.send_json.assert_any_await(
             {"version": "1", "type": "signal_ack", "signal": "SIGINT"}
         )
@@ -129,7 +165,13 @@ class TestExecStreamFullCoverage:
             {"type": "signal", "signal": "SIGTERM"},
             WebSocketDisconnect(),
         ]
-        await _exec(ws, MagicMock(), FakeStreamingService(), _api_key_service())
+        await _exec(
+            ws,
+            MagicMock(),
+            FakeStreamingService(),
+            _api_key_service(),
+            _settings(""),
+        )  # type: ignore[arg-type]
         messages = [call.args[0]["message"] for call in ws.send_json.await_args_list]
         assert "Invalid JSON" in messages
         assert "Signal rejected" in messages
@@ -137,13 +179,25 @@ class TestExecStreamFullCoverage:
     async def test_oversized_message_closes_socket(self) -> None:
         ws = _make_ws()
         ws.receive_json.return_value = {"command": "x" * 20_000}
-        await _exec(ws, MagicMock(), FakeStreamingService(), _api_key_service())
+        await _exec(
+            ws,
+            MagicMock(),
+            FakeStreamingService(),
+            _api_key_service(),
+            _settings(""),
+        )  # type: ignore[arg-type]
         ws.close.assert_awaited_with(code=1009, reason="Message too large")
 
     async def test_missing_command_field(self) -> None:
         ws = _make_ws()
         ws.receive_json.side_effect = [{"type": "data"}, WebSocketDisconnect()]
-        await _exec(ws, MagicMock(), FakeStreamingService(), _api_key_service())
+        await _exec(
+            ws,
+            MagicMock(),
+            FakeStreamingService(),
+            _api_key_service(),
+            _settings(""),
+        )  # type: ignore[arg-type]
         ws.send_json.assert_any_await(
             {
                 "version": "1",
@@ -164,6 +218,7 @@ class TestExecStreamFullCoverage:
             MagicMock(),
             FakeStreamingService(error),
             _api_key_service(),
+            _settings(""),  # type: ignore[arg-type]
         )
         payloads = [call.args[0] for call in ws.send_json.await_args_list]
         expected_message = (
@@ -181,14 +236,26 @@ class TestExecStreamFullCoverage:
         ws = _make_ws()
         ws.receive_json.side_effect = WebSocketDisconnect()
         service = FakeStreamingService()
-        await _exec(ws, MagicMock(), service, _api_key_service())
+        await _exec(
+            ws,
+            MagicMock(),
+            service,
+            _api_key_service(),
+            _settings(""),
+        )  # type: ignore[arg-type]
         assert service.closed is True
 
     async def test_unexpected_receive_error_closes_application_session(self) -> None:
         ws = _make_ws()
         ws.receive_json.side_effect = RuntimeError("disconnect")
         service = FakeStreamingService()
-        await _exec(ws, MagicMock(), service, _api_key_service())
+        await _exec(
+            ws,
+            MagicMock(),
+            service,
+            _api_key_service(),
+            _settings(""),
+        )  # type: ignore[arg-type]
         assert service.closed is True
         ws.close.assert_awaited_once_with(code=1011, reason="Internal error")
 
@@ -196,7 +263,13 @@ class TestExecStreamFullCoverage:
         ws = _make_ws()
         ws.receive_json.side_effect = RuntimeError("disconnect")
         ws.close.side_effect = RuntimeError("already closed")
-        await _exec(ws, MagicMock(), FakeStreamingService(), _api_key_service())
+        await _exec(
+            ws,
+            MagicMock(),
+            FakeStreamingService(),
+            _api_key_service(),
+            _settings(""),
+        )  # type: ignore[arg-type]
 
     async def test_cancelled_command_forwarding_is_propagated(self) -> None:
         session = MagicMock()

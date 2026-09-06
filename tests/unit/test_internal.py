@@ -61,7 +61,7 @@ def _create_internal_app(**services: object) -> FastAPI:
 SCRIPT_ID = "00000000-0000-0000-0000-000000000001"
 
 _settings_patcher = patch(
-    "app.api.deps.get_settings",
+    "app.core.config.get_settings",
     return_value=_mock_settings("test-master"),
 )
 
@@ -116,6 +116,7 @@ class TestTriggerScheduledScript:
         executor.execute = AsyncMock(return_value=None)
         settings = MagicMock()
         settings.E2E_ENABLED = True
+        settings.MASTER_API_KEY = "test-master"
         app = _create_internal_app(
             job_scheduler=scheduler,
             schedule_reader=schedule_reader,
@@ -145,6 +146,7 @@ class TestTriggerNotFound:
         executor = AsyncMock()
         settings = MagicMock()
         settings.E2E_ENABLED = True
+        settings.MASTER_API_KEY = "test-master"
         app = _create_internal_app(
             job_scheduler=scheduler,
             schedule_reader=schedule_reader,
@@ -172,6 +174,7 @@ class TestTriggerDisabled:
         executor = AsyncMock()
         settings = MagicMock()
         settings.E2E_ENABLED = False
+        settings.MASTER_API_KEY = "test-master"
         app = _create_internal_app(
             job_scheduler=scheduler,
             schedule_reader=schedule_reader,

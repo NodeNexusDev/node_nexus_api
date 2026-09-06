@@ -14,8 +14,24 @@ from app.application.services.api_key_authentication import (
     AuthenticatedPrincipal,
 )
 from app.core.types import ConnectionType, NodeStatus
+from app.models.api_key import APIKeyModel  # noqa: F401
+from app.models.audit_log import AuditLogModel  # noqa: F401
+from app.models.audit_outbox import AuditOutboxModel  # noqa: F401
 from app.models.command import CommandModel
+from app.models.command_execution import CommandExecutionModel  # noqa: F401
+from app.models.compose_project import ComposeProjectModel  # noqa: F401
+from app.models.favorite import FavoriteModel  # noqa: F401
 from app.models.node import NodeModel
+from app.models.node_status_history import NodeStatusHistoryModel  # noqa: F401
+from app.models.refresh_token import RefreshTokenModel  # noqa: F401
+from app.models.script import ScriptModel  # noqa: F401
+from app.models.script_execution import ScriptExecutionModel  # noqa: F401
+from app.models.script_schedule import ScriptScheduleModel  # noqa: F401
+from app.models.template_asset import TemplateAssetModel  # noqa: F401
+from app.models.template_installation import TemplateInstallationModel  # noqa: F401
+from app.models.template_pack import TemplatePackModel  # noqa: F401
+from app.models.template_registry import TemplateRegistryModel  # noqa: F401
+from app.models.user import UserModel  # noqa: F401
 from app.schemas.node import NodeResponse
 from tests.typing import as_typed_mock
 

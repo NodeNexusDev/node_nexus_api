@@ -13,6 +13,7 @@ from httpx2 import ASGITransport, AsyncClient
 from app.api.v2.config import router as config_router
 from app.application.dto.config import ConfigImportResultDTO, ConfigTransferDTO
 from app.application.services.config_service import ConfigService
+from app.core.config import Settings, get_settings
 from tests.unit.conftest import MockAuthServiceProvider, _mock_settings
 
 
@@ -24,6 +25,11 @@ def _create_test_app(service: ConfigService) -> FastAPI:
         @provide(scope=Scope.REQUEST)
         def get_service(self) -> ConfigService:
             return service
+
+        @provide(scope=Scope.APP)
+        def get_settings(self) -> Settings:
+
+            return get_settings()
 
     container = make_async_container(MockServiceProvider(), MockAuthServiceProvider())
     setup_dishka(container, app)
@@ -38,7 +44,9 @@ def mock_service() -> AsyncMock:
 @pytest.fixture
 async def client(mock_service: AsyncMock) -> AsyncGenerator[AsyncClient]:
     app = _create_test_app(mock_service)
-    with patch("app.api.deps.get_settings", return_value=_mock_settings("test-master")):
+    with patch(
+        "app.core.config.get_settings", return_value=_mock_settings("test-master")
+    ):
         async with AsyncClient(
             transport=ASGITransport(app=app),
             base_url="http://test",
