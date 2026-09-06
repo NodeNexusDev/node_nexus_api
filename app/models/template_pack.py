@@ -29,7 +29,9 @@ class TemplatePackModel(Base):
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
     registry_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("template_registries.id", ondelete="SET NULL"), nullable=True  # noqa: E501
+        UUID(as_uuid=True),
+        ForeignKey("template_registries.id", ondelete="SET NULL"),
+        nullable=True,  # noqa: E501
     )
     pack_id: Mapped[str] = mapped_column(String(100), nullable=False)
     name: Mapped[str] = mapped_column(String(255), nullable=False)

@@ -14,6 +14,7 @@ from httpx2 import ASGITransport, AsyncClient
 from app.application.dto.user import UserPageDTO, UserViewDTO
 from app.application.ports.jwt_handler import JWTHandler
 from app.application.services.user_service import UserService
+from app.core.config import Settings, get_settings
 from app.core.exceptions import (
     DomainError,
     InsufficientPermissionsError,
@@ -98,6 +99,11 @@ def _create_app(
         def get_api_key_service(self) -> APIKeyAuthenticationService:
             mock = AsyncMock(spec=APIKeyAuthenticationService)
             return as_typed_mock(APIKeyAuthenticationService, mock)
+
+        @provide(scope=Scope.APP)
+        def get_settings(self) -> Settings:
+
+            return get_settings()
 
     container = make_async_container(MockProvider())
     setup_dishka(container, app)

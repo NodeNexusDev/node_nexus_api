@@ -13,6 +13,7 @@ from app.application.dto.favorite import FavoriteDTO
 from app.application.ports.jwt_handler import JWTHandler
 from app.application.services.api_key_authentication import APIKeyAuthenticationService
 from app.application.services.favorite_service import FavoriteService
+from app.core.config import Settings, get_settings
 from app.core.exceptions import DomainError
 
 
@@ -69,11 +70,16 @@ class TestFavoritesRemainder:
                     AsyncMock(spec=APIKeyAuthenticationService),
                 )
 
+            @provide(scope=Scope.APP)
+            def get_settings(self) -> Settings:
+
+                return get_settings()
+
         c = make_async_container(P())
         setup_dishka(c, app)
         return app
 
-    @patch("app.api.deps.get_settings")
+    @patch("app.core.config.get_settings")
     async def test_list_favorites_non_aligned(self, mock_settings):
         mock_settings.return_value = MagicMock(
             MASTER_API_KEY="test", SECRET_KEY="test", ENVIRONMENT="test"
@@ -116,7 +122,7 @@ class TestFavoritesRemainder:
         assert call_kwargs["size"] == 25
         assert call_kwargs["page"] == 1  # offset 5 //20 +1 =1
 
-    @patch("app.api.deps.get_settings")
+    @patch("app.core.config.get_settings")
     async def test_list_favorites_invalid_cursor(self, mock_settings):
         mock_settings.return_value = MagicMock(
             MASTER_API_KEY="test", SECRET_KEY="test", ENVIRONMENT="test"

@@ -22,6 +22,7 @@ from app.api.v2.websocket import (
     exec_stream,
 )
 from app.application.dto.remote_stream import RemoteStreamEventDTO
+from app.core.config import Settings
 from app.core.exceptions import ConnectionFailedError, NodeNotFoundError
 from tests.typing import as_unvalidated
 
@@ -48,6 +49,15 @@ def _api_key_service() -> AsyncMock:
         key_prefix="nnk_test",
     )
     return service
+
+
+def _settings(master: str = "") -> Settings:
+    return Settings(  # type: ignore[call-arg]
+        DATABASE_URL="sqlite+aiosqlite:///:memory:",
+        SECRET_KEY="0123456789abcdef0123456789ABCDEF",
+        MASTER_API_KEY=master,
+        ENVIRONMENT="test",
+    )
 
 
 class _TrackableAsyncIterator:
@@ -172,7 +182,7 @@ class TestValidateWsToken:
         service = _api_key_service()
         service.authenticate.side_effect = ConnectionError("refused")
 
-        result = await _validate_ws_token(ws, "nnk_badkey", service)
+        result = await _validate_ws_token(ws, "nnk_badkey", service, _settings(""))  # type: ignore[arg-type]
 
         assert result is False
         ws.close.assert_awaited_once_with(code=4003, reason="Invalid API key")
@@ -184,7 +194,7 @@ class TestValidateWsToken:
         service = _api_key_service()
         service.authenticate.side_effect = RuntimeError("db timeout")
 
-        result = await _validate_ws_token(ws, "nnk_abcdef", service)
+        result = await _validate_ws_token(ws, "nnk_abcdef", service, _settings(""))  # type: ignore[arg-type]
 
         assert result is False
         ws.close.assert_awaited_once_with(code=4003, reason="Invalid API key")
@@ -379,7 +389,13 @@ class TestExecStreamHeaderParsing:
         ws = _make_ws("dummy")
         setattr(ws, "headers", "not-a-mapping")
 
-        await _exec(ws, uuid4(), MagicMock(), _api_key_service())
+        await _exec(
+            ws,
+            uuid4(),
+            MagicMock(),
+            _api_key_service(),
+            _settings(""),
+        )  # type: ignore[arg-type]
 
         ws.close.assert_awaited_once_with(code=4001, reason="Missing token")
 
@@ -399,7 +415,13 @@ class TestExecStreamDisconnectCleanup:
             WebSocketDisconnect(),
         ]
 
-        await _exec(ws, _NODE_ID, service, _api_key_service())
+        await _exec(
+            ws,
+            _NODE_ID,
+            service,
+            _api_key_service(),
+            _settings(""),
+        )  # type: ignore[arg-type]
 
         assert session.aborted is True
 
@@ -412,7 +434,13 @@ class TestExecStreamDisconnectCleanup:
 
         ws.receive_json.side_effect = WebSocketDisconnect()
 
-        await _exec(ws, _NODE_ID, service, _api_key_service())
+        await _exec(
+            ws,
+            _NODE_ID,
+            service,
+            _api_key_service(),
+            _settings(""),
+        )  # type: ignore[arg-type]
 
         assert session.aborted is False
 
@@ -430,7 +458,13 @@ class TestExecStreamCommandExecution:
         ]
         service = _FakeStreamingService()
 
-        await _exec(ws, _NODE_ID, service, _api_key_service())
+        await _exec(
+            ws,
+            _NODE_ID,
+            service,
+            _api_key_service(),
+            _settings(""),
+        )  # type: ignore[arg-type]
 
         payloads = [call.args[0] for call in ws.send_json.await_args_list]
         assert {"version": "1", "type": "stdout", "data": "ok\n"} in payloads
@@ -450,7 +484,13 @@ class TestExecStreamCommandExecution:
             WebSocketDisconnect(),
         ]
 
-        await _exec(ws, _NODE_ID, service, _api_key_service())
+        await _exec(
+            ws,
+            _NODE_ID,
+            service,
+            _api_key_service(),
+            _settings(""),
+        )  # type: ignore[arg-type]
 
         messages = [call.args[0] for call in ws.send_json.await_args_list]
         assert any(m.get("message") == "A command is already running" for m in messages)
@@ -466,7 +506,13 @@ class TestExecStreamCommandExecution:
             WebSocketDisconnect(),
         ]
 
-        await _exec(ws, _NODE_ID, service, _api_key_service())
+        await _exec(
+            ws,
+            _NODE_ID,
+            service,
+            _api_key_service(),
+            _settings(""),
+        )  # type: ignore[arg-type]
 
         messages = [call.args[0] for call in ws.send_json.await_args_list]
         assert not any(
@@ -488,7 +534,13 @@ class TestExecStreamErrorHandling:
         ]
         service = _FakeStreamingService()
 
-        await _exec(ws, _NODE_ID, service, _api_key_service())
+        await _exec(
+            ws,
+            _NODE_ID,
+            service,
+            _api_key_service(),
+            _settings(""),
+        )  # type: ignore[arg-type]
 
         messages = [call.args[0] for call in ws.send_json.await_args_list]
         assert any(m.get("message") == "Invalid JSON" for m in messages)
@@ -499,7 +551,13 @@ class TestExecStreamErrorHandling:
         ws = _make_ws()
         ws.receive_json.return_value = {"command": "x" * 20_000}
 
-        await _exec(ws, _NODE_ID, _FakeStreamingService(), _api_key_service())
+        await _exec(
+            ws,
+            _NODE_ID,
+            _FakeStreamingService(),
+            _api_key_service(),
+            _settings(""),
+        )  # type: ignore[arg-type]
 
         ws.close.assert_awaited_with(code=1009, reason="Message too large")
 
@@ -512,7 +570,13 @@ class TestExecStreamErrorHandling:
             WebSocketDisconnect(),
         ]
 
-        await _exec(ws, _NODE_ID, _FakeStreamingService(), _api_key_service())
+        await _exec(
+            ws,
+            _NODE_ID,
+            _FakeStreamingService(),
+            _api_key_service(),
+            _settings(""),
+        )  # type: ignore[arg-type]
 
         payloads = [call.args[0] for call in ws.send_json.await_args_list]
         assert {"version": "1", "type": "signal_ack", "signal": "SIGINT"} in payloads
@@ -526,7 +590,13 @@ class TestExecStreamErrorHandling:
             WebSocketDisconnect(),
         ]
 
-        await _exec(ws, _NODE_ID, _FakeStreamingService(), _api_key_service())
+        await _exec(
+            ws,
+            _NODE_ID,
+            _FakeStreamingService(),
+            _api_key_service(),
+            _settings(""),
+        )  # type: ignore[arg-type]
 
         messages = [call.args[0] for call in ws.send_json.await_args_list]
         assert any(m.get("message") == "Signal rejected" for m in messages)
@@ -540,7 +610,13 @@ class TestExecStreamErrorHandling:
             WebSocketDisconnect(),
         ]
 
-        await _exec(ws, _NODE_ID, _FakeStreamingService(), _api_key_service())
+        await _exec(
+            ws,
+            _NODE_ID,
+            _FakeStreamingService(),
+            _api_key_service(),
+            _settings(""),
+        )  # type: ignore[arg-type]
 
         messages = [call.args[0] for call in ws.send_json.await_args_list]
         assert any(m.get("message") == "Invalid command message" for m in messages)
@@ -555,7 +631,13 @@ class TestExecStreamServiceErrors:
         ws = _make_ws()
         service = _FailingStreamingService(NodeNotFoundError("missing"))
 
-        await _exec(ws, _NODE_ID, service, _api_key_service())
+        await _exec(
+            ws,
+            _NODE_ID,
+            service,
+            _api_key_service(),
+            _settings(""),
+        )  # type: ignore[arg-type]
 
         ws.close.assert_awaited_once_with(code=4004, reason="Node not found")
         payloads = [call.args[0] for call in ws.send_json.await_args_list]
@@ -567,7 +649,13 @@ class TestExecStreamServiceErrors:
         ws = _make_ws()
         service = _FailingStreamingService(ConnectionFailedError("timeout"))
 
-        await _exec(ws, _NODE_ID, service, _api_key_service())
+        await _exec(
+            ws,
+            _NODE_ID,
+            service,
+            _api_key_service(),
+            _settings(""),
+        )  # type: ignore[arg-type]
 
         payloads = [call.args[0] for call in ws.send_json.await_args_list]
         assert any(m.get("message") == "Remote connection failed" for m in payloads)
@@ -582,7 +670,13 @@ class TestExecStreamUnexpectedErrors:
         ws = _make_ws()
         ws.receive_json.side_effect = RuntimeError("kaboom")
 
-        await _exec(ws, _NODE_ID, _FakeStreamingService(), _api_key_service())
+        await _exec(
+            ws,
+            _NODE_ID,
+            _FakeStreamingService(),
+            _api_key_service(),
+            _settings(""),
+        )  # type: ignore[arg-type]
 
         ws.close.assert_awaited_once_with(code=1011, reason="Internal error")
 
@@ -593,7 +687,13 @@ class TestExecStreamUnexpectedErrors:
         ws.receive_json.side_effect = RuntimeError("disconnect")
         ws.close.side_effect = RuntimeError("already closed")
 
-        await _exec(ws, _NODE_ID, _FakeStreamingService(), _api_key_service())
+        await _exec(
+            ws,
+            _NODE_ID,
+            _FakeStreamingService(),
+            _api_key_service(),
+            _settings(""),
+        )  # type: ignore[arg-type]
 
         ws.close.assert_awaited_once()
 
@@ -603,7 +703,13 @@ class TestExecStreamUnexpectedErrors:
         ws = _make_ws()
         ws.receive_json.side_effect = WebSocketDisconnect()
 
-        await _exec(ws, _NODE_ID, _FakeStreamingService(), _api_key_service())
+        await _exec(
+            ws,
+            _NODE_ID,
+            _FakeStreamingService(),
+            _api_key_service(),
+            _settings(""),
+        )  # type: ignore[arg-type]
 
         ws.close.assert_not_awaited()
         ws.send_json.assert_not_awaited()
@@ -624,7 +730,13 @@ class TestExecStreamDisconnectCleanupFinally:
             WebSocketDisconnect(),
         ]
 
-        await _exec(ws, _NODE_ID, service, _api_key_service())
+        await _exec(
+            ws,
+            _NODE_ID,
+            service,
+            _api_key_service(),
+            _settings(""),
+        )  # type: ignore[arg-type]
 
         assert session.aborted is True
 
@@ -641,4 +753,10 @@ class TestExecStreamDisconnectCleanupFinally:
             WebSocketDisconnect(),
         ]
 
-        await _exec(ws, _NODE_ID, service, _api_key_service())
+        await _exec(
+            ws,
+            _NODE_ID,
+            service,
+            _api_key_service(),
+            _settings(""),
+        )  # type: ignore[arg-type]

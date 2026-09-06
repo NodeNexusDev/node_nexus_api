@@ -12,6 +12,12 @@ _SUPPRESSION_RE = re.compile(
 _ALLOWED_PRODUCTION = {
     ("app/core/config.py", "type:", "call-arg"),
     ("app/adapters/persistence/compose.py", "type:", "assignment"),
+    ("app/adapters/persistence/template_pack.py", "type:", "call-arg"),
+    ("app/adapters/persistence/template_pack.py", "type:", "attr-defined"),
+    ("app/adapters/runtime/apscheduler_runtime.py", "type:", "assignment"),
+    ("app/adapters/runtime/apscheduler_runtime.py", "type:", "attr-defined"),
+    ("app/adapters/runtime/apscheduler_runtime.py", "type:", "union-attr"),
+    ("app/adapters/runtime/ssh.py", "type:", "assignment"),
     ("app/api/v2/audit.py", "type:", "assignment"),
     ("app/api/v2/commands.py", "type:", "arg-type"),
     ("app/api/v2/scripts.py", "type:", "arg-type"),

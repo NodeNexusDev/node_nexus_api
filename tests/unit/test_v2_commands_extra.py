@@ -36,6 +36,7 @@ from app.application.services.execution_lifecycle_service import (
 )
 from app.application.services.execution_stats_service import ExecutionStatsService
 from app.application.services.node_bulk_command_service import NodeBulkCommandService
+from app.core.config import Settings, get_settings
 from app.core.exceptions import CommandNotFoundError, DomainError
 from tests.typing import as_typed_mock
 from tests.unit.conftest import MockAuthServiceProvider, _mock_settings
@@ -183,6 +184,11 @@ def _create_app(
         def get_exec_lifecycle(self) -> ExecutionLifecycleService:
             return as_typed_mock(ExecutionLifecycleService, el)
 
+        @provide(scope=Scope.APP)
+        def get_settings(self) -> Settings:
+
+            return get_settings()
+
     container = make_async_container(MockProvider(), MockAuthServiceProvider())
     setup_dishka(container, app)
     return app
@@ -197,7 +203,7 @@ EXEC_ID = uuid.uuid4()
 EXEC_ID2 = uuid.uuid4()
 
 _settings_patcher = patch(
-    "app.api.deps.get_settings", return_value=_mock_settings("test-master")
+    "app.core.config.get_settings", return_value=_mock_settings("test-master")
 )
 
 

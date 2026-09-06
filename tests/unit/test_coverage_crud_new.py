@@ -25,6 +25,7 @@ from app.application.services.script_management_service import ScriptManagementS
 from app.application.services.template_pack_service import TemplatePackService
 from app.application.services.template_registry_service import TemplateRegistryService
 from app.application.services.user_service import UserService
+from app.core.config import Settings, get_settings
 from app.core.exceptions import DomainError, FavoriteNotFoundError
 
 
@@ -132,11 +133,16 @@ class TestFavoritesNewCRUD:
                     AsyncMock(spec=APIKeyAuthenticationService),
                 )
 
+            @provide(scope=Scope.APP)
+            def get_settings(self) -> Settings:
+
+                return get_settings()
+
         c = make_async_container(P())
         setup_dishka(c, app)
         return app
 
-    @patch("app.api.deps.get_settings")
+    @patch("app.core.config.get_settings")
     async def test_get_favorite_success(self, mock_settings):
 
         mock_settings.return_value = MagicMock(
@@ -157,7 +163,7 @@ class TestFavoritesNewCRUD:
         assert resp.status_code == 200
         assert resp.json()["target_type"] == "node"
 
-    @patch("app.api.deps.get_settings")
+    @patch("app.core.config.get_settings")
     async def test_get_favorite_invalid_uuid(self, mock_settings):
         mock_settings.return_value = MagicMock(
             MASTER_API_KEY="test", SECRET_KEY="test", ENVIRONMENT="test"
@@ -173,7 +179,7 @@ class TestFavoritesNewCRUD:
             )
         assert resp.status_code == 422
 
-    @patch("app.api.deps.get_settings")
+    @patch("app.core.config.get_settings")
     async def test_patch_favorite_success(self, mock_settings):
         mock_settings.return_value = MagicMock(
             MASTER_API_KEY="test", SECRET_KEY="test", ENVIRONMENT="test"
@@ -195,7 +201,7 @@ class TestFavoritesNewCRUD:
         assert resp.status_code == 200
         svc.update_favorite.assert_awaited_once()
 
-    @patch("app.api.deps.get_settings")
+    @patch("app.core.config.get_settings")
     async def test_patch_favorite_invalid_uuid(self, mock_settings):
         mock_settings.return_value = MagicMock(
             MASTER_API_KEY="test", SECRET_KEY="test", ENVIRONMENT="test"
@@ -213,7 +219,7 @@ class TestFavoritesNewCRUD:
             )
         assert resp.status_code == 422
 
-    @patch("app.api.deps.get_settings")
+    @patch("app.core.config.get_settings")
     async def test_get_favorite_not_found(self, mock_settings):
         mock_settings.return_value = MagicMock(
             MASTER_API_KEY="test", SECRET_KEY="test", ENVIRONMENT="test"
@@ -231,7 +237,7 @@ class TestFavoritesNewCRUD:
             )
         assert resp.status_code == 404
 
-    @patch("app.api.deps.get_settings")
+    @patch("app.core.config.get_settings")
     async def test_list_favorites_remainder(self, mock_settings):
         mock_settings.return_value = MagicMock(
             MASTER_API_KEY="test", SECRET_KEY="test", ENVIRONMENT="test"
@@ -292,11 +298,16 @@ class TestPacksManagement:
                     AsyncMock(spec=APIKeyAuthenticationService),
                 )
 
+            @provide(scope=Scope.APP)
+            def get_settings(self) -> Settings:
+
+                return get_settings()
+
         c = make_async_container(P())
         setup_dishka(c, app)
         return app
 
-    @patch("app.api.deps.get_settings")
+    @patch("app.core.config.get_settings")
     async def test_patch_pack_success(self, mock_settings):
         mock_settings.return_value = MagicMock(
             MASTER_API_KEY="test", SECRET_KEY="test", ENVIRONMENT="test"
@@ -318,7 +329,7 @@ class TestPacksManagement:
         assert resp.status_code == 200
         assert resp.json()["name"] == "new"
 
-    @patch("app.api.deps.get_settings")
+    @patch("app.core.config.get_settings")
     async def test_patch_pack_404(self, mock_settings):
         from app.core.exceptions import PackNotFoundError
 
@@ -339,7 +350,7 @@ class TestPacksManagement:
             )
         assert resp.status_code == 404
 
-    @patch("app.api.deps.get_settings")
+    @patch("app.core.config.get_settings")
     async def test_delete_pack_success(self, mock_settings):
         mock_settings.return_value = MagicMock(
             MASTER_API_KEY="test", SECRET_KEY="test", ENVIRONMENT="test"
@@ -356,7 +367,7 @@ class TestPacksManagement:
             )
         assert resp.status_code == 204
 
-    @patch("app.api.deps.get_settings")
+    @patch("app.core.config.get_settings")
     async def test_delete_pack_404(self, mock_settings):
         from app.core.exceptions import PackNotFoundError
 
@@ -375,7 +386,7 @@ class TestPacksManagement:
             )
         assert resp.status_code == 404
 
-    @patch("app.api.deps.get_settings")
+    @patch("app.core.config.get_settings")
     async def test_bulk_delete_packs_207(self, mock_settings):
         from app.core.exceptions import PackNotFoundError
 
@@ -400,7 +411,7 @@ class TestPacksManagement:
         assert resp.json()["succeeded"] == 1
         assert resp.json()["failed"] == 1
 
-    @patch("app.api.deps.get_settings")
+    @patch("app.core.config.get_settings")
     async def test_bulk_delete_all_success(self, mock_settings):
         mock_settings.return_value = MagicMock(
             MASTER_API_KEY="test", SECRET_KEY="test", ENVIRONMENT="test"
@@ -454,11 +465,16 @@ class TestRegistriesPatch:
                     AsyncMock(spec=APIKeyAuthenticationService),
                 )
 
+            @provide(scope=Scope.APP)
+            def get_settings(self) -> Settings:
+
+                return get_settings()
+
         c = make_async_container(P())
         setup_dishka(c, app)
         return app
 
-    @patch("app.api.deps.get_settings")
+    @patch("app.core.config.get_settings")
     async def test_patch_success(self, mock_settings):
         mock_settings.return_value = MagicMock(
             MASTER_API_KEY="test", SECRET_KEY="test", ENVIRONMENT="test"
@@ -479,7 +495,7 @@ class TestRegistriesPatch:
             )
         assert resp.status_code == 200
 
-    @patch("app.api.deps.get_settings")
+    @patch("app.core.config.get_settings")
     async def test_patch_404(self, mock_settings):
         from app.application.services.template_registry_service import (
             RegistryNotFoundError,
@@ -502,7 +518,7 @@ class TestRegistriesPatch:
             )
         assert resp.status_code == 404
 
-    @patch("app.api.deps.get_settings")
+    @patch("app.core.config.get_settings")
     async def test_patch_conflict(self, mock_settings):
         from app.application.services.template_registry_service import (
             RegistryConflictError,
@@ -558,11 +574,16 @@ class TestUsersNew:
                     AsyncMock(spec=APIKeyAuthenticationService),
                 )
 
+            @provide(scope=Scope.APP)
+            def get_settings(self) -> Settings:
+
+                return get_settings()
+
         c = make_async_container(P())
         setup_dishka(c, app)
         return app
 
-    @patch("app.api.deps.get_settings")
+    @patch("app.core.config.get_settings")
     async def test_get_user_success(self, mock_settings):
         mock_settings.return_value = MagicMock(
             MASTER_API_KEY="test", SECRET_KEY="test", ENVIRONMENT="test"
@@ -581,7 +602,7 @@ class TestUsersNew:
         assert resp.status_code == 200
         assert resp.json()["email"] == "test@example.com"
 
-    @patch("app.api.deps.get_settings")
+    @patch("app.core.config.get_settings")
     async def test_get_user_not_found(self, mock_settings):
         from app.core.exceptions import UserNotFoundError
 
@@ -600,7 +621,7 @@ class TestUsersNew:
             )
         assert resp.status_code == 404
 
-    @patch("app.api.deps.get_settings")
+    @patch("app.core.config.get_settings")
     async def test_patch_user_all_fields(self, mock_settings):
         mock_settings.return_value = MagicMock(
             MASTER_API_KEY="test", SECRET_KEY="test", ENVIRONMENT="test"
@@ -626,7 +647,7 @@ class TestUsersNew:
             )
         assert resp.status_code == 200
 
-    @patch("app.api.deps.get_settings")
+    @patch("app.core.config.get_settings")
     async def test_patch_user_duplicate_email(self, mock_settings):
         from app.core.exceptions import UserAlreadyExistsError
 
@@ -647,7 +668,7 @@ class TestUsersNew:
             )
         assert resp.status_code == 409
 
-    @patch("app.api.deps.get_settings")
+    @patch("app.core.config.get_settings")
     async def test_patch_user_forbidden(self, mock_settings):
         mock_settings.return_value = MagicMock(
             MASTER_API_KEY="test", SECRET_KEY="test", ENVIRONMENT="test"
@@ -698,11 +719,16 @@ class TestAPIKeysNew:
 
                 return as_typed_mock(JWTHandler, _mock_jwt())
 
+            @provide(scope=Scope.APP)
+            def get_settings(self) -> Settings:
+
+                return get_settings()
+
         c = make_async_container(P())
         setup_dishka(c, app)
         return app
 
-    @patch("app.api.deps.get_settings")
+    @patch("app.core.config.get_settings")
     async def test_get_api_key_success(self, mock_settings):
         mock_settings.return_value = MagicMock(
             MASTER_API_KEY="test", SECRET_KEY="test", ENVIRONMENT="test"
@@ -731,7 +757,7 @@ class TestAPIKeysNew:
             )
         assert resp.status_code == 200
 
-    @patch("app.api.deps.get_settings")
+    @patch("app.core.config.get_settings")
     async def test_get_api_key_404(self, mock_settings):
         from app.core.exceptions import APIKeyNotFoundError
 
@@ -750,7 +776,7 @@ class TestAPIKeysNew:
             )
         assert resp.status_code == 404
 
-    @patch("app.api.deps.get_settings")
+    @patch("app.core.config.get_settings")
     async def test_bulk_delete_success(self, mock_settings):
         mock_settings.return_value = MagicMock(
             MASTER_API_KEY="test", SECRET_KEY="test", ENVIRONMENT="test"
@@ -770,7 +796,7 @@ class TestAPIKeysNew:
         assert resp.status_code == 200
         assert resp.json()["succeeded"] == 1
 
-    @patch("app.api.deps.get_settings")
+    @patch("app.core.config.get_settings")
     async def test_bulk_delete_207(self, mock_settings):
         from app.core.exceptions import APIKeyNotFoundError
 
@@ -827,11 +853,16 @@ class TestCommandsBulk:
                     AsyncMock(spec=APIKeyAuthenticationService),
                 )
 
+            @provide(scope=Scope.APP)
+            def get_settings(self) -> Settings:
+
+                return get_settings()
+
         c = make_async_container(P())
         setup_dishka(c, app)
         return app
 
-    @patch("app.api.deps.get_settings")
+    @patch("app.core.config.get_settings")
     async def test_bulk_update_commands_207(self, mock_settings):
         mock_settings.return_value = MagicMock(
             MASTER_API_KEY="test", SECRET_KEY="test", ENVIRONMENT="test"
@@ -871,7 +902,7 @@ class TestCommandsBulk:
         assert resp.status_code == 207
         assert resp.json()["succeeded"] == 1
 
-    @patch("app.api.deps.get_settings")
+    @patch("app.core.config.get_settings")
     async def test_bulk_delete_commands_207(self, mock_settings):
         mock_settings.return_value = MagicMock(
             MASTER_API_KEY="test", SECRET_KEY="test", ENVIRONMENT="test"
@@ -892,7 +923,7 @@ class TestCommandsBulk:
             )
         assert resp.status_code == 207
 
-    @patch("app.api.deps.get_settings")
+    @patch("app.core.config.get_settings")
     async def test_bulk_update_param_conversion(self, mock_settings):
         mock_settings.return_value = MagicMock(
             MASTER_API_KEY="test", SECRET_KEY="test", ENVIRONMENT="test"
@@ -970,11 +1001,16 @@ class TestCommandsBulk:
                     AsyncMock(spec=APIKeyAuthenticationService),
                 )
 
+            @provide(scope=Scope.APP)
+            def get_settings(self) -> Settings:
+
+                return get_settings()
+
         c = make_async_container(P())
         setup_dishka(c, app)
         return app
 
-    @patch("app.api.deps.get_settings")
+    @patch("app.core.config.get_settings")
     async def test_bulk_update_scripts_207(self, mock_settings):
         mock_settings.return_value = MagicMock(
             MASTER_API_KEY="test", SECRET_KEY="test", ENVIRONMENT="test"
@@ -1011,7 +1047,7 @@ class TestCommandsBulk:
             )
         assert resp.status_code == 207
 
-    @patch("app.api.deps.get_settings")
+    @patch("app.core.config.get_settings")
     async def test_bulk_delete_scripts_success(self, mock_settings):
         mock_settings.return_value = MagicMock(
             MASTER_API_KEY="test", SECRET_KEY="test", ENVIRONMENT="test"
@@ -1031,7 +1067,7 @@ class TestCommandsBulk:
         assert resp.status_code == 200
         assert resp.json()["succeeded"] == 1
 
-    @patch("app.api.deps.get_settings")
+    @patch("app.core.config.get_settings")
     async def test_bulk_update_scripts_with_steps(self, mock_settings):
         mock_settings.return_value = MagicMock(
             MASTER_API_KEY="test", SECRET_KEY="test", ENVIRONMENT="test"

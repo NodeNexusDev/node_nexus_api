@@ -74,6 +74,7 @@ def _create_app_principal(
     from fastapi.responses import JSONResponse
 
     from app.api.deps import get_current_principal
+    from app.core.config import Settings, get_settings
 
     app = FastAPI()
 
@@ -103,6 +104,11 @@ def _create_app_principal(
         def get_jwt_handler(self) -> JWTHandler:
             return as_typed_mock(JWTHandler, mock_jwt)
 
+        @provide(scope=Scope.APP)
+        def get_settings(self) -> Settings:
+
+            return get_settings()
+
     container = make_async_container(MockProvider())
     setup_dishka(container, app)
     return app
@@ -111,7 +117,7 @@ def _create_app_principal(
 class TestGetCurrentPrincipalJWT:
     """JWT path in get_current_principal."""
 
-    @patch("app.api.deps.get_settings")
+    @patch("app.core.config.get_settings")
     async def test_jwt_valid_user(self, mock_get_settings: Any) -> None:
         user_id = str(uuid4())
         mock_get_settings.return_value = _mock_settings("")
@@ -126,7 +132,7 @@ class TestGetCurrentPrincipalJWT:
         assert data["source"] == "jwt"
         assert data["identifier"] == user_id
 
-    @patch("app.api.deps.get_settings")
+    @patch("app.core.config.get_settings")
     async def test_jwt_master_key_claim(self, mock_get_settings: Any) -> None:
         mock_get_settings.return_value = _mock_settings("mk-123")
         mock_jwt = _mock_jwt_handler(
@@ -141,7 +147,7 @@ class TestGetCurrentPrincipalJWT:
         data = resp.json()
         assert data["identifier"] == "master"
 
-    @patch("app.api.deps.get_settings")
+    @patch("app.core.config.get_settings")
     async def test_invalid_jwt_fails_closed_when_api_key_is_also_present(
         self, mock_get_settings: Any
     ) -> None:
@@ -170,7 +176,7 @@ class TestGetCurrentPrincipalJWT:
 class TestGetCurrentPrincipalAPIKey:
     """API key path in get_current_principal."""
 
-    @patch("app.api.deps.get_settings")
+    @patch("app.core.config.get_settings")
     async def test_api_key_valid(self, mock_get_settings: Any) -> None:
         mock_get_settings.return_value = _mock_settings("")
 
@@ -181,7 +187,7 @@ class TestGetCurrentPrincipalAPIKey:
         assert data["source"] == "api_key"
         assert data["identifier"] == "nnk_vali"
 
-    @patch("app.api.deps.get_settings")
+    @patch("app.core.config.get_settings")
     async def test_api_key_master(self, mock_get_settings: Any) -> None:
         mock_get_settings.return_value = _mock_settings("test-master")
 
@@ -196,7 +202,7 @@ class TestGetCurrentPrincipalAPIKey:
         assert resp.status_code == 401
         assert "Not authenticated" in resp.json()["detail"]
 
-    @patch("app.api.deps.get_settings")
+    @patch("app.core.config.get_settings")
     async def test_invalid_api_key_returns_401(self, mock_get_settings: Any) -> None:
         mock_get_settings.return_value = _mock_settings("")
         mock_service = AsyncMock()
@@ -218,6 +224,7 @@ def _create_app_write_scope(
     from fastapi.responses import JSONResponse
 
     from app.api.deps import require_write_or_jwt_scope
+    from app.core.config import Settings, get_settings
 
     app = FastAPI()
 
@@ -247,6 +254,11 @@ def _create_app_write_scope(
         def get_jwt_handler(self) -> JWTHandler:
             return as_typed_mock(JWTHandler, mock_jwt)
 
+        @provide(scope=Scope.APP)
+        def get_settings(self) -> Settings:
+
+            return get_settings()
+
     container = make_async_container(MockProvider())
     setup_dishka(container, app)
     return app
@@ -255,7 +267,7 @@ def _create_app_write_scope(
 class TestRequireWriteOrJwtScopeJWT:
     """JWT path in require_write_or_jwt_scope."""
 
-    @patch("app.api.deps.get_settings")
+    @patch("app.core.config.get_settings")
     async def test_jwt_superuser_allowed(self, mock_get_settings: Any) -> None:
         user_id = str(uuid4())
         mock_get_settings.return_value = _mock_settings("")
@@ -273,7 +285,7 @@ class TestRequireWriteOrJwtScopeJWT:
         assert data["source"] == "jwt"
         assert data["identifier"] == user_id
 
-    @patch("app.api.deps.get_settings")
+    @patch("app.core.config.get_settings")
     async def test_jwt_non_superuser_denied(self, mock_get_settings: Any) -> None:
         user_id = str(uuid4())
         mock_get_settings.return_value = _mock_settings("")
@@ -289,7 +301,7 @@ class TestRequireWriteOrJwtScopeJWT:
         assert resp.status_code == 403
         assert "Superuser" in resp.json()["detail"]
 
-    @patch("app.api.deps.get_settings")
+    @patch("app.core.config.get_settings")
     async def test_invalid_jwt_fails_closed_when_write_key_is_also_present(
         self, mock_get_settings: Any
     ) -> None:
@@ -318,14 +330,14 @@ class TestRequireWriteOrJwtScopeJWT:
 class TestRequireWriteOrJwtScopeAPIKey:
     """API key path in require_write_or_jwt_scope."""
 
-    @patch("app.api.deps.get_settings")
+    @patch("app.core.config.get_settings")
     async def test_write_key_allowed(self, mock_get_settings: Any) -> None:
         mock_get_settings.return_value = _mock_settings("")
         app = _create_app_write_scope()
         resp = await _get(app, "/test-write", {"X-API-Key": "nnk_validkey123"})
         assert resp.status_code == 200
 
-    @patch("app.api.deps.get_settings")
+    @patch("app.core.config.get_settings")
     async def test_read_only_key_denied(self, mock_get_settings: Any) -> None:
         mock_get_settings.return_value = _mock_settings("")
         mock_service = AsyncMock()
@@ -336,7 +348,7 @@ class TestRequireWriteOrJwtScopeAPIKey:
         assert resp.status_code == 403
         assert "read-only" in resp.json()["detail"].lower()
 
-    @patch("app.api.deps.get_settings")
+    @patch("app.core.config.get_settings")
     async def test_master_key_allowed(self, mock_get_settings: Any) -> None:
         mock_get_settings.return_value = _mock_settings("test-master")
         app = _create_app_write_scope()

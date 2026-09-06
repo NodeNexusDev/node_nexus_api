@@ -50,6 +50,7 @@ from app.application.services.node_status_history_service import (
     NodeStatusHistoryService,
 )
 from app.application.services.node_validation_service import NodeValidationService
+from app.core.config import Settings, get_settings
 from app.core.exceptions import DomainError
 from app.schemas.common import decode_cursor, encode_cursor
 from tests.typing import as_typed_mock
@@ -101,13 +102,18 @@ def _create_v2_nodes_app(
         def get_node_status_history(self) -> NodeStatusHistoryService:
             return as_typed_mock(NodeStatusHistoryService, history)
 
+        @provide(scope=Scope.APP)
+        def get_settings(self) -> Settings:
+
+            return get_settings()
+
     container = make_async_container(MockProvider(), MockAuthServiceProvider())
     setup_dishka(container, app)
     return app
 
 
 _SETTINGS_PATCH = patch(
-    "app.api.deps.get_settings",
+    "app.core.config.get_settings",
     return_value=_mock_settings("test-master"),
 )
 

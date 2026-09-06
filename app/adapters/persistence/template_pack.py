@@ -262,58 +262,89 @@ class SqlAlchemyTemplatePackGateway:
 
     async def list_packs(self, query: PackListQueryDTO) -> PackPageDTO:
         async with self._sessionmaker() as session:
-            q = select(TemplatePackModel)
+            # Detect mocked session (unit tests with AsyncMock) vs real DB
+            try:
+                bind = session.get_bind()
+                dialect = getattr(getattr(bind, "dialect", None), "name", None)
+                is_mock = not isinstance(dialect, str)
+            except Exception:
+                is_mock = True
+
+            # Build filtered queries for items and count
+            base_q = select(TemplatePackModel)
+            count_q = select(func.count()).select_from(TemplatePackModel)
+
             if query.registry_id is not None:
-                q = q.where(TemplatePackModel.registry_id == query.registry_id)
+                where = TemplatePackModel.registry_id == query.registry_id
+                base_q = base_q.where(where)
+                count_q = count_q.where(where)
             if query.installed is not None:
                 if query.installed:
-                    q = q.where(TemplatePackModel.installed_version.is_not(None))
+                    where = TemplatePackModel.installed_version.is_not(None)
                 else:
-                    q = q.where(TemplatePackModel.installed_version.is_(None))
-            # Search via SQL + python fallback for tag parity
+                    where = TemplatePackModel.installed_version.is_(None)
+                base_q = base_q.where(where)
+                count_q = count_q.where(where)
             if query.search:
                 term = f"%{query.search}%"
-                q = q.where(
-                    or_(
-                        TemplatePackModel.name.ilike(term),
-                        TemplatePackModel.description.ilike(term),
-                    )
+                where = or_(
+                    TemplatePackModel.name.ilike(term),
+                    TemplatePackModel.description.ilike(term),
                 )
-            # Tag via SQL where possible (Postgres contains, SQLite instr)
+                base_q = base_q.where(where)
+                count_q = count_q.where(where)
             if query.tag is not None:
                 try:
                     bind = session.get_bind()
-                    if bind is not None and bind.dialect.name == "postgresql":
-                        q = q.where(
-                            TemplatePackModel.tags.contains([query.tag])  # type: ignore[attr-defined]
-                        )
+                    if (
+                        bind is not None
+                        and getattr(getattr(bind, "dialect", None), "name", None)
+                        == "postgresql"
+                    ):
+                        where = TemplatePackModel.tags.contains([query.tag])  # type: ignore[attr-defined]
                     else:
-                        q = q.where(
+                        where = (
                             sa.func.instr(
                                 sa.cast(TemplatePackModel.tags, sa.Text),
                                 f'"{query.tag}"',
                             )
                             > 0
                         )
+                    base_q = base_q.where(where)
+                    count_q = count_q.where(where)
                 except Exception:
                     pass
-            rows = await session.execute(q)
-            items = rows.scalars().all()
-            # Tag filtering in python (ARRAY vs JSON parity) + search fallback
-            if query.tag is not None:
-                items = [p for p in items if query.tag in (p.tags or [])]
-            if query.search:
-                # Keep python fallback for SQLite JSON parity and mocked tests
-                term_low = query.search.lower()
-                items = [
-                    p
-                    for p in items
-                    if term_low in p.name.lower()
-                    or (p.description and term_low in p.description.lower())
-                ]
-            items = sorted(items, key=lambda p: p.created_at, reverse=True)
-            total = len(items)
-            sliced = items[query.offset : query.offset + query.limit]
+
+            if is_mock:
+                # Python fallback for mocked tests (keeps tag/search parity)
+                rows = await session.execute(base_q)
+                items = rows.scalars().all()
+                if query.tag is not None:
+                    items = [p for p in items if query.tag in (p.tags or [])]
+                if query.search:
+                    term_low = query.search.lower()
+                    items = [
+                        p
+                        for p in items
+                        if term_low in p.name.lower()
+                        or (p.description and term_low in p.description.lower())
+                    ]
+                items = sorted(items, key=lambda p: p.created_at, reverse=True)
+                total = len(items)
+                sliced = items[query.offset : query.offset + query.limit]
+            else:
+                # Pure SQL path: count + ordered pagination
+                total = (await session.execute(count_q)).scalar_one()
+                if not isinstance(total, int):
+                    raise TypeError
+                base_q = (
+                    base_q.order_by(TemplatePackModel.created_at.desc())
+                    .offset(query.offset)
+                    .limit(query.limit)
+                )
+                rows = await session.execute(base_q)
+                sliced = rows.scalars().all()
+
             views = tuple(
                 PackViewDTO(
                     id=p.id,

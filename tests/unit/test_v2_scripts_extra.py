@@ -47,6 +47,7 @@ from app.application.services.schedule_management import ScheduleManagementServi
 from app.application.services.script_execution_service import ScriptExecutionService
 from app.application.services.script_history_service import ScriptHistoryService
 from app.application.services.script_management_service import ScriptManagementService
+from app.core.config import Settings, get_settings
 from app.core.exceptions import DomainError, ScheduleNotFoundError, ScriptNotFoundError
 from app.schemas.script import ScriptStep
 from tests.typing import as_typed_mock
@@ -238,13 +239,18 @@ def _create_v2_scripts_app(**services: object) -> FastAPI:
                 services.get("schedule_management", AsyncMock()),
             )
 
+        @provide(scope=Scope.APP)
+        def get_settings(self) -> Settings:
+
+            return get_settings()
+
     container = make_async_container(MockProvider(), MockAuthServiceProvider())
     setup_dishka(container, app)
     return app
 
 
 _settings_patch = patch(
-    "app.api.deps.get_settings", return_value=_mock_settings("test-master")
+    "app.core.config.get_settings", return_value=_mock_settings("test-master")
 )
 
 

@@ -11,7 +11,7 @@ from app.api.deps import get_current_user_id
 from app.application.dto.user import UserViewDTO
 from app.application.ports.jwt_handler import JWTHandler
 from app.application.services.auth_service import AuthService
-from app.core.config import get_settings
+from app.core.config import Settings
 from app.schemas.auth import LoginRequest, TokenResponse, UserResponse
 from app.schemas.common import AUTHENTICATED_ERROR_RESPONSES
 
@@ -31,9 +31,10 @@ def _user_response(user: UserViewDTO) -> UserResponse:
     )
 
 
-def _set_refresh_cookie(response: Response, refresh_token: str) -> None:
+def _set_refresh_cookie(
+    response: Response, refresh_token: str, settings: Settings
+) -> None:
     """Set refresh token as HttpOnly secure cookie."""
-    settings = get_settings()
     response.set_cookie(
         key="refresh_token",
         value=refresh_token,
@@ -59,13 +60,14 @@ def _clear_refresh_cookie(response: Response) -> None:
 async def login(
     data: LoginRequest,
     service: FromDishka[AuthService],
+    settings: FromDishka[Settings],
     response: Response,
 ) -> TokenResponse:
     """Authenticate user. Refresh token set as HttpOnly cookie."""
     audit.info("api.auth.login", email=data.email)
     result = await service.login(data.email, data.password)
 
-    _set_refresh_cookie(response, result["refresh_token"])
+    _set_refresh_cookie(response, result["refresh_token"], settings)
 
     return TokenResponse(
         access_token=result["access_token"],
@@ -93,6 +95,7 @@ async def logout(
 async def refresh_token(
     jwt_handler: FromDishka[JWTHandler],
     service: FromDishka[AuthService],
+    settings: FromDishka[Settings],
     response: Response,
     refresh_token: str | None = Cookie(default=None, alias="refresh_token"),
 ) -> TokenResponse:
@@ -106,7 +109,7 @@ async def refresh_token(
     audit.info("api.auth.refresh")
     result = await service.refresh_access_token(jwt_handler.hash_token(refresh_token))
 
-    _set_refresh_cookie(response, result["refresh_token"])
+    _set_refresh_cookie(response, result["refresh_token"], settings)
 
     return TokenResponse(
         access_token=result["access_token"],

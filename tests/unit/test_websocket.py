@@ -7,6 +7,16 @@ import pytest
 
 from app.api.v2.websocket import _validate_ws_token
 from app.application.services.api_key_authentication import AuthenticatedPrincipal
+from app.core.config import Settings
+
+
+def _settings(master: str = "") -> Settings:
+    return Settings(  # type: ignore[call-arg]
+        DATABASE_URL="sqlite+aiosqlite:///:memory:",
+        SECRET_KEY="0123456789abcdef0123456789ABCDEF",
+        MASTER_API_KEY=master,
+        ENVIRONMENT="test",
+    )
 
 
 class TestWebSocketAuth:
@@ -16,7 +26,12 @@ class TestWebSocketAuth:
     async def test_missing_token_returns_false(self):
         """_validate_ws_token returns False when token is missing."""
         ws = AsyncMock()
-        result = await _validate_ws_token(ws, token=None, api_key_service=MagicMock())
+        result = await _validate_ws_token(
+            ws,
+            token=None,
+            api_key_service=MagicMock(),
+            settings=_settings(""),
+        )  # type: ignore[arg-type]
         assert result is False
         ws.close.assert_called_once_with(code=4001, reason="Missing token")
 
@@ -24,7 +39,12 @@ class TestWebSocketAuth:
     async def test_empty_token_returns_false(self):
         """_validate_ws_token returns False when token is empty string."""
         ws = AsyncMock()
-        result = await _validate_ws_token(ws, token="", api_key_service=MagicMock())
+        result = await _validate_ws_token(
+            ws,
+            token="",
+            api_key_service=MagicMock(),
+            settings=_settings(""),
+        )  # type: ignore[arg-type]
         assert result is False
         ws.close.assert_called_once_with(code=4001, reason="Missing token")
 
@@ -38,7 +58,10 @@ class TestWebSocketAuth:
         )
 
         result = await _validate_ws_token(
-            ws, token="nnk_validkey1234", api_key_service=mock_api_key_svc
+            ws,
+            token="nnk_validkey1234",
+            api_key_service=mock_api_key_svc,
+            settings=_settings(""),  # type: ignore[arg-type]
         )
         assert result is True
         mock_api_key_svc.authenticate.assert_called_once_with("nnk_validkey1234")
@@ -51,7 +74,10 @@ class TestWebSocketAuth:
         mock_api_key_svc.authenticate.side_effect = Exception("Invalid key")
 
         result = await _validate_ws_token(
-            ws, token="nnk_badkey12345", api_key_service=mock_api_key_svc
+            ws,
+            token="nnk_badkey12345",
+            api_key_service=mock_api_key_svc,
+            settings=_settings(""),  # type: ignore[arg-type]
         )
         assert result is False
         ws.close.assert_called_once_with(code=4003, reason="Invalid API key")
