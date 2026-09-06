@@ -152,8 +152,8 @@ class NodeManagementService:
             ),
         )
         secured = replace(data, credentials=secured_credentials)
-        await self._log_required("create", details={"name": data.name})
         node = await self._writer.create_node(secured)
+        await self._log_required("create", node_id=node.id, details={"name": data.name})
         audit.info("node.create.ok", node_id=str(node.id), name=data.name)
         return node
 
