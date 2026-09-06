@@ -38,22 +38,35 @@ def upgrade() -> None:
         )
     )
 
-    # Check constraints via batch (SQLite compat)
-    with op.batch_alter_table("api_keys") as batch_op:
-        batch_op.create_check_constraint(
-            "chk_api_keys_scope",
-            condition="scope IN ('read-only', 'read-write')",
-        )
-    with op.batch_alter_table("audit_outbox") as batch_op:
-        batch_op.create_check_constraint(
+    # Check constraints via batch (SQLite compat) — idempotent
+    for table, name, cond in [
+        ("api_keys", "chk_api_keys_scope", "scope IN ('read-only', 'read-write')"),
+        (
+            "audit_outbox",
             "chk_audit_outbox_status",
-            condition="status IN ('pending', 'processing', 'completed', 'failed')",
-        )
-    with op.batch_alter_table("favorites") as batch_op:
-        batch_op.create_check_constraint(
+            "status IN ('pending', 'processing', 'completed', 'failed')",
+        ),
+        (
+            "favorites",
             "chk_favorites_target_type",
-            condition="target_type IN ('command', 'script', 'node')",
-        )
+            "target_type IN ('command', 'script', 'node')",
+        ),
+    ]:
+        try:
+            # Check if constraint already exists (model already defines it on fresh DB)
+            bind = op.get_bind()
+            insp = sa.inspect(bind)
+            try:
+                existing = [c["name"] for c in insp.get_check_constraints(table)]
+            except Exception:
+                existing = []
+            if name in existing:
+                continue
+            with bind.begin_nested():
+                with op.batch_alter_table(table) as batch_op:
+                    batch_op.create_check_constraint(name, condition=cond)
+        except Exception:
+            pass
 
     # Server defaults for timestamps
     def _has_column(table: str, column: str) -> bool:
@@ -87,40 +100,43 @@ def upgrade() -> None:
             if not _has_column(table, col):
                 continue
             try:
-                with op.batch_alter_table(table) as batch_op:
-                    batch_op.alter_column(
-                        col,
-                        existing_type=sa.DateTime(timezone=True),
-                        server_default=sa.func.now(),
-                        existing_nullable=False,
-                    )
+                bind = op.get_bind()
+                with bind.begin_nested():
+                    with op.batch_alter_table(table) as batch_op:
+                        batch_op.alter_column(
+                            col,
+                            existing_type=sa.DateTime(timezone=True),
+                            server_default=sa.func.now(),
+                            existing_nullable=False,
+                        )
             except Exception:
                 # Best-effort: column may already have default or be missing — skip.
                 pass
 
-    # Indexes (if_not_exists for idempotency, fallback without)
-    try:
-        op.create_index("ix_audit_logs_node_id", "audit_logs", ["node_id"])
-    except Exception:
-        pass
-    try:
-        op.create_index("ix_audit_logs_action", "audit_logs", ["action"])
-    except Exception:
-        pass
-    try:
-        op.create_index("ix_audit_logs_created_at", "audit_logs", ["created_at"])
-    except Exception:
-        pass
-    try:
-        op.create_index("ix_scripts_template_pack_id", "scripts", ["template_pack_id"])
-    except Exception:
-        pass
-    try:
-        op.create_index(
-            "ix_commands_template_pack_id", "commands", ["template_pack_id"]
-        )
-    except Exception:
-        pass
+    # Indexes (if_not_exists for idempotency, fallback without) — idempotent via inspect
+    def _has_index(table: str, index_name: str) -> bool:
+        bind = op.get_bind()
+        try:
+            insp = sa.inspect(bind)
+            return any(idx["name"] == index_name for idx in insp.get_indexes(table))
+        except Exception:
+            return False
+
+    for idx_name, tbl, cols in [
+        ("ix_audit_logs_node_id", "audit_logs", ["node_id"]),
+        ("ix_audit_logs_action", "audit_logs", ["action"]),
+        ("ix_audit_logs_created_at", "audit_logs", ["created_at"]),
+        ("ix_scripts_template_pack_id", "scripts", ["template_pack_id"]),
+        ("ix_commands_template_pack_id", "commands", ["template_pack_id"]),
+    ]:
+        if _has_index(tbl, idx_name):
+            continue
+        try:
+            bind = op.get_bind()
+            with bind.begin_nested():
+                op.create_index(idx_name, tbl, cols)
+        except Exception:
+            pass
 
 
 def downgrade() -> None:
