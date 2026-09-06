@@ -56,6 +56,15 @@ def upgrade() -> None:
         )
 
     # Server defaults for timestamps
+    def _has_column(table: str, column: str) -> bool:
+        bind = op.get_bind()
+        try:
+            insp = sa.inspect(bind)
+            cols = [c["name"] for c in insp.get_columns(table)]
+            return column in cols
+        except Exception:
+            return False
+
     for table, cols in [
         ("commands", ["created_at", "updated_at"]),
         ("scripts", ["created_at", "updated_at"]),
@@ -75,6 +84,8 @@ def upgrade() -> None:
         ("command_executions", ["started_at", "created_at"]),
     ]:
         for col in cols:
+            if not _has_column(table, col):
+                continue
             try:
                 with op.batch_alter_table(table) as batch_op:
                     batch_op.alter_column(
@@ -84,7 +95,7 @@ def upgrade() -> None:
                         existing_nullable=False,
                     )
             except Exception:
-                # Column may not exist on fresh DB (e.g., script_executions.created_at) — skip.
+                # Best-effort: column may already have default or be missing — skip.
                 pass
 
     # Indexes (if_not_exists for idempotency, fallback without)
