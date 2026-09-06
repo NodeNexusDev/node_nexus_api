@@ -254,7 +254,7 @@ class TestTemplatePackGatewayCreate:
                     ),
                 )
 
-        gw._asset_gateway = NoInSession()  # type: ignore[attr-defined]
+        gw._asset_gateway = NoInSession()  # type: ignore[attr-defined]  # ty: ignore[invalid-assignment]
         b64 = base64.b64encode(b"hello").decode()
         data = PackCreateDTO(
             manifest=PackManifestDTO(
@@ -286,7 +286,7 @@ class TestTemplatePackGatewayCreate:
         gw._asset_gateway = MagicMock()
 
         # Create a falsy list that still contains an item -> triggers else branch with iteration
-        class FalsyList(list):
+        class FalsyList(list):  # ty: ignore[missing-type-argument]
             def __bool__(self):
                 return False
 
@@ -307,7 +307,7 @@ class TestTemplatePackGatewayCreate:
         ]:
             data = PackCreateDTO(
                 manifest=PackManifestDTO(pack_id=pack_id, name="n", version="1.0.0"),
-                assets=flist,  # type: ignore[arg-type]
+                assets=flist,  # type: ignore[arg-type]  # ty: ignore[invalid-argument-type]
             )
             res = await gw.create_pack(data)
             # In dead code path, assets should be created via direct loop
@@ -1289,7 +1289,7 @@ class TestApschedulerRuntimeBoost:
             pass
 
         # Should return at isinstance JobSubmissionEvent check
-        ApschedulerRuntime._record_scheduler_event(Dummy())  # type: ignore[arg-type]
+        ApschedulerRuntime._record_scheduler_event(Dummy())  # type: ignore[arg-type]  # ty: ignore[invalid-argument-type]
 
     def test_owns_execution_and_mark_restored(self):
         from app.adapters.runtime.apscheduler_runtime import ApschedulerRuntime
@@ -1672,7 +1672,7 @@ class TestApschedulerRuntimeBoost:
         rt2.configure_executor(AsyncMock())
         rt2._owns_execution = False
         await rt2._execute_scheduled_script(uuid.uuid4(), [uuid.uuid4()])
-        rt2._executor.assert_not_awaited()  # type: ignore[attr-defined]
+        rt2._executor.assert_not_awaited()  # type: ignore[attr-defined]  # ty: ignore[unresolved-attribute]
 
         # execute with no executor -> RuntimeError
         rt3 = ApschedulerRuntime()
