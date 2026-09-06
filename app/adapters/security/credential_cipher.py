@@ -4,6 +4,7 @@ import base64
 import os
 from functools import lru_cache
 
+import structlog
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
@@ -11,20 +12,46 @@ from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 from app.core.config import get_settings
 from app.core.exceptions import CredentialDecryptionError
 
+logger = structlog.get_logger()
+
 ENCRYPTION_PREFIX = "enc:v1:"
+
+
+def _hkdf_derive(secret: str, salt: str) -> bytes:
+    hkdf = HKDF(
+        algorithm=hashes.SHA256(),
+        length=32,
+        salt=salt.encode(),
+        info=b"aes-256-gcm",
+    )
+    return hkdf.derive(secret.encode())
 
 
 @lru_cache
 def _derive_key() -> bytes:
-    """Derive a 32-byte AES key from SECRET_KEY via HKDF."""
+    """Derive current 32-byte AES key from SECRET_KEY via HKDF."""
     settings = get_settings()
-    hkdf = HKDF(
-        algorithm=hashes.SHA256(),
-        length=32,
-        salt=settings.ENCRYPTION_SALT.encode(),
-        info=b"aes-256-gcm",
-    )
-    return hkdf.derive(settings.SECRET_KEY.encode())
+    return _hkdf_derive(settings.SECRET_KEY, settings.ENCRYPTION_SALT)
+
+
+@lru_cache
+def _derive_prev_key() -> bytes | None:
+    """Derive previous key for rotation, if configured."""
+    settings = get_settings()
+    if settings.SECRET_KEY_PREV and settings.ENCRYPTION_SALT_PREV:
+        return _hkdf_derive(settings.SECRET_KEY_PREV, settings.ENCRYPTION_SALT_PREV)
+    if settings.SECRET_KEY_PREV:
+        # Salt not rotated, use current salt with prev secret
+        return _hkdf_derive(settings.SECRET_KEY_PREV, settings.ENCRYPTION_SALT)
+    if settings.ENCRYPTION_SALT_PREV:
+        return _hkdf_derive(settings.SECRET_KEY, settings.ENCRYPTION_SALT_PREV)
+    return None
+
+
+def clear_key_cache() -> None:
+    """Clear cached derived keys (call after settings reload)."""
+    _derive_key.cache_clear()
+    _derive_prev_key.cache_clear()
 
 
 def encrypt(plaintext: str) -> str:
@@ -36,7 +63,7 @@ def encrypt(plaintext: str) -> str:
 
 
 def decrypt(token: str) -> str:
-    """Decrypt AES-256-GCM ciphertext (enc:v1:)."""
+    """Decrypt AES-256-GCM ciphertext (enc:v1:) with rotation fallback."""
     if not token.startswith(ENCRYPTION_PREFIX):
         raise ValueError("Missing encryption prefix")
     payload = token.removeprefix(ENCRYPTION_PREFIX)
@@ -44,7 +71,16 @@ def decrypt(token: str) -> str:
     if len(raw) < 28:
         raise ValueError("Encrypted payload is too short")
     nonce, ciphertext = raw[:12], raw[12:]
-    return AESGCM(_derive_key()).decrypt(nonce, ciphertext, None).decode()
+    try:
+        return AESGCM(_derive_key()).decrypt(nonce, ciphertext, None).decode()
+    except Exception as primary_exc:
+        prev = _derive_prev_key()
+        if prev is not None:
+            try:
+                return AESGCM(prev).decrypt(nonce, ciphertext, None).decode()
+            except Exception as exc:  # noqa: BLE001
+                logger.debug("credential.prev_decrypt_failed", error=str(exc))
+        raise primary_exc
 
 
 def decrypt_value(value: str | None) -> str | None:

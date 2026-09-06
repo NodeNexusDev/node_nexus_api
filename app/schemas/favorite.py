@@ -14,6 +14,13 @@ class FavoriteCreate(BaseModel):
     note: str | None = None
 
 
+class FavoriteUpdate(BaseModel):
+    """Patch favorite note/name."""
+
+    name: str | None = None
+    note: str | None = None
+
+
 class FavoriteResponse(BaseModel):
     """Favorite response schema."""
 

@@ -144,6 +144,8 @@ COVERED_ENDPOINTS: set[str] = {
     # Commands — bulk-first (POST / is bulk create, executions, raw-executions)
     "GET /api/v2/commands/",
     "POST /api/v2/commands/",
+    "PATCH /api/v2/commands/",
+    "POST /api/v2/commands/deletions",
     "GET /api/v2/commands/{command_id}",
     "PATCH /api/v2/commands/{command_id}",
     "DELETE /api/v2/commands/{command_id}",
@@ -159,6 +161,8 @@ COVERED_ENDPOINTS: set[str] = {
     # Scripts — bulk-first
     "GET /api/v2/scripts/",
     "POST /api/v2/scripts/",
+    "PATCH /api/v2/scripts/",
+    "POST /api/v2/scripts/deletions",
     "GET /api/v2/scripts/{script_id}",
     "PATCH /api/v2/scripts/{script_id}",
     "DELETE /api/v2/scripts/{script_id}",
@@ -176,8 +180,10 @@ COVERED_ENDPOINTS: set[str] = {
     # API Keys
     "GET /api/v2/api-keys/",
     "POST /api/v2/api-keys/",
+    "GET /api/v2/api-keys/{key_id}",
     "PATCH /api/v2/api-keys/{key_id}",
     "DELETE /api/v2/api-keys/{key_id}",
+    "POST /api/v2/api-keys/deletions",
     # Audit
     "GET /api/v2/audit/",
     "DELETE /api/v2/audit/",
@@ -190,18 +196,24 @@ COVERED_ENDPOINTS: set[str] = {
     # Favorites / Search
     "GET /api/v2/favorites/",
     "POST /api/v2/favorites/",
+    "GET /api/v2/favorites/{target_type}/{target_id}",
+    "PATCH /api/v2/favorites/{target_type}/{target_id}",
     "DELETE /api/v2/favorites/{target_type}/{target_id}",
     "GET /api/v2/search",
     # Templates — registries + packs
     "POST /api/v2/templates/registries",
     "GET /api/v2/templates/registries",
     "GET /api/v2/templates/registries/{registry_id}",
+    "PATCH /api/v2/templates/registries/{registry_id}",
     "DELETE /api/v2/templates/registries/{registry_id}",
     "POST /api/v2/templates/registries/{registry_id}/syncs",
     "POST /api/v2/templates/packs",
     "GET /api/v2/templates/packs",
     "GET /api/v2/templates/packs/stats",
     "GET /api/v2/templates/packs/{pack_id}",
+    "PATCH /api/v2/templates/packs/{pack_id}",
+    "DELETE /api/v2/templates/packs/{pack_id}",
+    "POST /api/v2/templates/packs/deletions",
     "GET /api/v2/templates/packs/{pack_id}/archive",
     "GET /api/v2/templates/packs/{pack_id}/installations",
     "POST /api/v2/templates/packs/{pack_id}/installations",
@@ -214,6 +226,8 @@ COVERED_ENDPOINTS: set[str] = {
     "GET /api/v2/auth/me",
     "GET /api/v2/users/",
     "POST /api/v2/users/",
+    "GET /api/v2/users/{user_id}",
+    "PATCH /api/v2/users/{user_id}",
     "DELETE /api/v2/users/{user_id}",
 }
 

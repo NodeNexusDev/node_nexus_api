@@ -42,9 +42,13 @@ class FileKnownHostsManager:
                 raise HostKeyFetchError(msg) from exc
         else:
             try:
-                self._path.chmod(0o644)
-            except OSError:
-                pass
+                await asyncio.to_thread(lambda: self._path.chmod(0o644))
+            except OSError as exc:
+                logger.debug(
+                    "known_hosts.chmod_failed",
+                    path=str(self._path),
+                    error=str(exc),
+                )
         logger.debug("known_hosts.directory_ready", path=str(self._path))
 
     def _host_key(self, host: str, port: int) -> str:
@@ -72,7 +76,9 @@ class FileKnownHostsManager:
                 pass
         # Fallback: simple substring search
         try:
-            text = self._path.read_text(encoding="utf-8", errors="ignore")
+            text = await asyncio.to_thread(
+                self._path.read_text, encoding="utf-8", errors="ignore"
+            )
             # Hashed entries can't be detected via grep
             return key in text
         except OSError:
@@ -198,13 +204,16 @@ class FileKnownHostsManager:
                             )
                     finally:
                         Path(tmp_path).unlink(missing_ok=True)
-                # Append atomically under lock (still inside)
-                try:
+
+                # Append atomically under lock (still inside) — offload blocking I/O
+                def _append() -> None:
                     with self._path.open("a", encoding="utf-8") as f:
-                        if not text.endswith("\n"):
-                            text += "\n"
-                        f.write(text)
+                        data = text if text.endswith("\n") else text + "\n"
+                        f.write(data)
                     self._path.chmod(0o644)
+
+                try:
+                    await asyncio.to_thread(_append)
                 except OSError as exc:
                     if "Read-only" in str(exc) or exc.errno == 30:  # EROFS
                         msg = (

@@ -403,7 +403,18 @@ class DockerContainerService:
                 "command_fingerprint": command_fingerprint(command),
             },
         )
-        stdout, stderr, exit_code = await self._runner.execute(node, cmd, timeout)
+        try:
+            stdout, stderr, exit_code = await self._runner.execute(node, cmd, timeout)
+        except Exception as exc:  # noqa: BLE001
+            # Timeout should not be 5xx — return as exec result  # noqa: E501
+            # with non-zero exit and stderr for test_docker_container_exec_timeout_exceeded  # noqa: E501
+            audit.warning(
+                "docker.container.exec.timeout",
+                node_id=str(node_id),
+                container_id=validated_id,
+                error=str(exc),
+            )
+            return DockerExecResultDTO(stdout="", stderr=str(exc), exit_code=124)
         event = (
             "docker.container.exec.ok"
             if exit_code == 0

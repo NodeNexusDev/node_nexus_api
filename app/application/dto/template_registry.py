@@ -18,6 +18,16 @@ class RegistryCreateDTO:
 
 
 @dataclass(frozen=True, slots=True)
+class RegistryUpdateDTO:
+    """Registry update (partial)."""
+
+    owner: str | None = None
+    name: str | None = None
+    github_token: str | None = None
+    default_branch: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class RegistryViewDTO:
     """Public-safe registry view."""
 

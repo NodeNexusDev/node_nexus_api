@@ -4,7 +4,7 @@ import uuid
 
 import structlog
 from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
-from fastapi import APIRouter, Query, Security
+from fastapi import APIRouter, Query, Response, Security
 
 from app.api.deps import (
     Principal,
@@ -25,6 +25,9 @@ from app.schemas.api_key import (
     APIKeyList,
     APIKeyResponse,
     APIKeyUpdate,
+    BulkAPIKeyDeleteRequest,
+    BulkAPIKeyDeleteResponse,
+    BulkAPIKeyDeleteResult,
 )
 
 audit = structlog.get_logger("audit")
@@ -92,6 +95,47 @@ async def list_api_keys(
     return _list_response(
         await service.list_api_keys(page=page, size=size), page_num=page, size=size
     )
+
+
+@router.post("/deletions", response_model=BulkAPIKeyDeleteResponse)
+@inject
+async def bulk_revoke_api_keys(
+    data: BulkAPIKeyDeleteRequest,
+    service: FromDishka[APIKeyManagementService],
+    response: Response,
+    _key: Principal = Security(require_write_or_jwt_scope),
+) -> BulkAPIKeyDeleteResponse:
+    """Bulk revoke API keys (POST, 207 on partial)."""
+    audit.info("api.api_keys.bulk_revoke", count=len(data.key_ids))
+    results: list[BulkAPIKeyDeleteResult] = []
+    for kid in data.key_ids:
+        try:
+            await service.revoke_api_key(kid)
+            results.append(BulkAPIKeyDeleteResult(key_id=kid, status="success"))
+        except Exception as exc:  # noqa: BLE001
+            results.append(
+                BulkAPIKeyDeleteResult(key_id=kid, status="error", error=str(exc))
+            )
+    succeeded = sum(1 for r in results if r.status == "success")
+    failed = len(results) - succeeded
+    if failed and succeeded:
+        response.status_code = 207
+    return BulkAPIKeyDeleteResponse(
+        total=len(results), succeeded=succeeded, failed=failed, results=results
+    )
+
+
+@router.get("/{key_id}", response_model=APIKeyResponse)
+@inject
+async def get_api_key(
+    key_id: uuid.UUID,
+    service: FromDishka[APIKeyManagementService],
+    _key: Principal = Security(get_current_principal),
+) -> APIKeyResponse:
+    """Get one API key by id."""
+    audit.info("api.api_keys.get", key_id=str(key_id))
+    view = await service.get_api_key(key_id)
+    return _response(view)
 
 
 @router.patch("/{key_id}", response_model=APIKeyResponse)

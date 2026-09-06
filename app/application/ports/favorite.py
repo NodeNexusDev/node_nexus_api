@@ -5,7 +5,11 @@ from __future__ import annotations
 import uuid
 from typing import Protocol
 
-from app.application.dto.favorite import FavoriteCreateDTO, FavoriteDTO
+from app.application.dto.favorite import (
+    FavoriteCreateDTO,
+    FavoriteDTO,
+    FavoriteUpdateDTO,
+)
 
 
 class FavoriteReader(Protocol):
@@ -25,6 +29,12 @@ class FavoriteReader(Protocol):
 
 class FavoriteWriter(Protocol):
     async def add_favorite(self, data: FavoriteCreateDTO) -> FavoriteDTO: ...
+    async def update_favorite(
+        self,
+        target_type: str,
+        target_id: uuid.UUID,
+        data: FavoriteUpdateDTO,
+    ) -> FavoriteDTO | None: ...
     async def remove_favorite(
         self,
         target_type: str,

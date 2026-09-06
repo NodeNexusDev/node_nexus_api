@@ -17,6 +17,7 @@ from app.application.services.api_key_authentication import (
     APIKeyAuthenticationService,
 )
 from app.application.services.auth_service import AuthService
+from app.core.config import Settings, get_settings
 from app.core.exceptions import (
     DomainError,
     InvalidCredentialsError,
@@ -104,6 +105,11 @@ def _create_app(
                 APIKeyAuthenticationService,
                 AsyncMock(spec=APIKeyAuthenticationService),
             )
+
+        @provide(scope=Scope.APP)
+        def get_settings(self) -> Settings:
+
+            return get_settings()
 
     container = make_async_container(MockProvider())
     setup_dishka(container, app)

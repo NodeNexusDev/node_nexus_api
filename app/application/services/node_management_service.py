@@ -65,6 +65,17 @@ class NodeManagementService:
         if self._audit:
             await self._audit.log(action=action, node_id=node_id, details=details)
 
+    async def _log_required(
+        self,
+        action: str,
+        node_id: UUID | None = None,
+        details: JsonObject | None = None,
+    ) -> None:
+        if self._audit:
+            await self._audit.log_required(
+                action=action, node_id=node_id, details=details
+            )
+
     async def get_node(self, node_id: UUID) -> NodeViewDTO:
         """Get a node by ID."""
         node = await self._reader.get_node(node_id)
@@ -142,8 +153,8 @@ class NodeManagementService:
         )
         secured = replace(data, credentials=secured_credentials)
         node = await self._writer.create_node(secured)
+        await self._log_required("create", node_id=node.id, details={"name": data.name})
         audit.info("node.create.ok", node_id=str(node.id), name=data.name)
-        await self._log("create", node_id=node.id, details={"name": data.name})
         return node
 
     async def update_node(self, node_id: UUID, data: NodeUpdateDTO) -> NodeViewDTO:
@@ -190,33 +201,62 @@ class NodeManagementService:
             )
         )
 
-        # Record status change before updating
-        if self._status_history_writer is not None:
-            for field, value in secured.changes:
-                if field == "status":
-                    from app.application.dto.node_status_history import (
-                        NodeStatusChangeDTO,
-                    )
+        # Capture old status for history
+        from app.core.types import NodeStatus
 
-                    await self._status_history_writer.save(
-                        NodeStatusChangeDTO(
-                            node_id=node_id,
-                            old_status=None,
-                            new_status=str(value),
-                            source="manual_update",
-                        )
-                    )
-                    break
+        old_status: NodeStatus | None = None
+        new_status: NodeStatus | None = None
+        for field, value in secured.changes:
+            if field == "status":
+                new_status = cast(NodeStatus, str(value))
+                try:
+                    current = await self._reader.get_node(node_id)
+                    old_status = current.status if current else None
+                except Exception:  # noqa: BLE001
+                    old_status = None
+                break
 
-        node = await self._writer.update_node(node_id, secured)
-        if node is None:
-            raise NodeNotFoundError(f"Node {node_id} not found")
-        audit.info("node.update.ok", node_id=str(node_id))
         audit_details: JsonObject = {
             key: list(value) if isinstance(value, tuple) else value
             for key, value in secured.changes
         }
-        await self._log("update", node_id=node_id, details=audit_details)
+        await self._log_required("update", node_id=node_id, details=audit_details)
+        node = await self._writer.update_node(node_id, secured)
+        if node is None:
+            raise NodeNotFoundError(f"Node {node_id} not found")
+        if (
+            new_status is not None
+            and self._status_history_writer is not None
+            and old_status != new_status
+        ):
+            try:
+                from app.application.dto.node_status_history import NodeStatusChangeDTO
+
+                await self._status_history_writer.save(
+                    NodeStatusChangeDTO(
+                        node_id=node_id,
+                        old_status=old_status,
+                        new_status=new_status,
+                        source="manual_update",
+                    )
+                )
+            except Exception as exc:  # noqa: BLE001
+                audit.warning(
+                    "node.update.history_failed",
+                    node_id=str(node_id),
+                    error=str(exc),
+                )
+        elif (
+            new_status is not None
+            and old_status == new_status
+            and self._status_history_writer is not None
+        ):
+            audit.info(
+                "node.update.history_skipped_noop",
+                node_id=str(node_id),
+                status=new_status,
+            )
+        audit.info("node.update.ok", node_id=str(node_id))
         return node
 
     async def delete_node(self, node_id: UUID) -> bool:
@@ -224,7 +264,7 @@ class NodeManagementService:
         node = await self._reader.get_node(node_id)
         if node is None:
             raise NodeNotFoundError(f"Node {node_id} not found")
-        await self._log("delete", node_id=node_id)
+        await self._log_required("delete", node_id=node_id)
         await self._writer.delete_node(node_id)
         audit.info("node.delete.ok", node_id=str(node_id))
         return True
@@ -254,13 +294,15 @@ class NodeManagementService:
 
         tags = list(node.tags) if node.tags else []
         if data.tag not in tags:
+            await self._log_required(
+                "add_tag", node_id=node_id, details={"tag": data.tag}
+            )
             tags.append(data.tag)
             updated = await self._writer.update_node(
                 node_id,
                 NodeUpdateDTO(changes=(("tags", tuple(tags)),)),
             )
             audit.info("node.tag.add", node_id=str(node_id), tag=data.tag)
-            await self._log("add_tag", node_id=node_id, details={"tag": data.tag})
             if updated is None:
                 raise NodeNotFoundError(f"Node {node_id} not found")
             return updated
@@ -275,13 +317,15 @@ class NodeManagementService:
 
         tags = list(node.tags) if node.tags else []
         if data.tag in tags:
+            await self._log_required(
+                "remove_tag", node_id=node_id, details={"tag": data.tag}
+            )
             tags.remove(data.tag)
             updated = await self._writer.update_node(
                 node_id,
                 NodeUpdateDTO(changes=(("tags", tuple(tags)),)),
             )
             audit.info("node.tag.remove", node_id=str(node_id), tag=data.tag)
-            await self._log("remove_tag", node_id=node_id, details={"tag": data.tag})
             if updated is None:
                 raise NodeNotFoundError(f"Node {node_id} not found")
             return updated

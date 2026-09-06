@@ -14,7 +14,7 @@ from app.application.ports.jwt_handler import JWTHandler
 from app.application.services.api_key_authentication import (
     APIKeyAuthenticationService,
 )
-from app.core.config import get_settings
+from app.core.config import Settings
 
 audit = structlog.get_logger("audit")
 
@@ -44,6 +44,7 @@ class Principal:
 async def get_current_principal(
     api_key_service: FromDishka[APIKeyAuthenticationService],
     jwt_handler: FromDishka[JWTHandler],
+    settings: FromDishka[Settings],
     bearer: HTTPAuthorizationCredentials | None = Security(BEARER_SCHEME),
     api_key: str | None = Security(API_KEY_HEADER),
 ) -> Principal:
@@ -61,7 +62,6 @@ async def get_current_principal(
     """
     if bearer:
         user_id, claims = _decode_access_token(jwt_handler, bearer.credentials)
-        settings = get_settings()
         x_api_key_claim = claims.get("x-api-key")
         if (
             settings.MASTER_API_KEY
@@ -75,7 +75,6 @@ async def get_current_principal(
 
     # Fallback: X-API-Key
     if api_key:
-        settings = get_settings()
         if settings.MASTER_API_KEY and hmac.compare_digest(
             api_key, settings.MASTER_API_KEY
         ):
@@ -96,6 +95,7 @@ async def get_current_principal(
 async def require_write_or_jwt_scope(
     api_key_service: FromDishka[APIKeyAuthenticationService],
     jwt_handler: FromDishka[JWTHandler],
+    settings: FromDishka[Settings],
     bearer: HTTPAuthorizationCredentials | None = Security(BEARER_SCHEME),
     api_key: str | None = Security(API_KEY_HEADER),
 ) -> Principal:
@@ -121,7 +121,6 @@ async def require_write_or_jwt_scope(
 
     # Fallback: X-API-Key
     if api_key:
-        settings = get_settings()
         if settings.MASTER_API_KEY and hmac.compare_digest(
             api_key, settings.MASTER_API_KEY
         ):
@@ -157,20 +156,20 @@ def _decode_access_token(
         return uuid.UUID(sub), payload
     except HTTPException:
         raise
-    except Exception:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
+    except Exception as exc:
+        raise HTTPException(status_code=401, detail="Invalid or expired token") from exc
 
 
 @inject
 async def get_current_api_key(
     api_key_service: FromDishka[APIKeyAuthenticationService],
+    settings: FromDishka[Settings],
     api_key: str | None = Security(API_KEY_HEADER),
 ) -> str:
     """Validate API key from X-API-Key header (legacy)."""
     if not api_key:
         raise HTTPException(status_code=401, detail="Missing X-API-Key header")
 
-    settings = get_settings()
     if settings.MASTER_API_KEY and hmac.compare_digest(
         api_key, settings.MASTER_API_KEY
     ):
@@ -184,13 +183,13 @@ async def get_current_api_key(
 @inject
 async def require_write_scope(
     api_key_service: FromDishka[APIKeyAuthenticationService],
+    settings: FromDishka[Settings],
     api_key: str | None = Security(API_KEY_HEADER),
 ) -> str:
     """Require write scope for the API key (legacy)."""
     if not api_key:
         raise HTTPException(status_code=401, detail="Missing X-API-Key header")
 
-    settings = get_settings()
     if settings.MASTER_API_KEY and hmac.compare_digest(
         api_key, settings.MASTER_API_KEY
     ):

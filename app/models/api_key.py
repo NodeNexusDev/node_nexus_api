@@ -3,6 +3,7 @@
 import uuid
 from datetime import datetime
 
+import sqlalchemy as sa
 from sqlalchemy import Boolean, DateTime, Index, String
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -14,6 +15,9 @@ class APIKeyModel(Base):
 
     __tablename__ = "api_keys"
     __table_args__ = (
+        sa.CheckConstraint(
+            "scope IN ('read-only', 'read-write')", name="chk_api_keys_scope"
+        ),
         Index("ix_api_keys_key_hash", "key_hash"),
         Index("ix_api_keys_key_prefix", "key_prefix"),
     )
@@ -25,7 +29,7 @@ class APIKeyModel(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     scope: Mapped[str] = mapped_column(String(20), default="read-write")
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=_utcnow
+        DateTime(timezone=True), default=_utcnow, server_default=sa.func.now()
     )
     last_used_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True

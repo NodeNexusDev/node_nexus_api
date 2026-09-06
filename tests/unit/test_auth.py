@@ -13,6 +13,7 @@ from app.application.services.api_key_authentication import (
     APIKeyAuthenticationService,
     AuthenticatedPrincipal,
 )
+from app.core.config import Settings
 from app.core.exceptions import (
     APIKeyRevokedError,
     AuthenticationError,
@@ -82,6 +83,12 @@ def _create_app_with_auth(
         def get_service(self) -> APIKeyAuthenticationService:
             return as_typed_mock(APIKeyAuthenticationService, mock_service)
 
+        @provide(scope=Scope.APP)
+        def get_settings(self) -> Settings:
+            from app.core.config import get_settings
+
+            return get_settings()
+
     container = make_async_container(MockServiceProvider())
     setup_dishka(container, app)
 
@@ -97,7 +104,7 @@ class TestAuthMissingHeader:
 
 
 class TestAuthMasterKey:
-    @patch("app.api.deps.get_settings")
+    @patch("app.core.config.get_settings")
     async def test_master_key_returns_master(self, mock_get_settings: Any) -> None:
         mock_get_settings.return_value = _mock_settings("test-master-123")
 
@@ -106,7 +113,7 @@ class TestAuthMasterKey:
         assert response.status_code == 200
         assert response.json()["key"] == "master"
 
-    @patch("app.api.deps.get_settings")
+    @patch("app.core.config.get_settings")
     async def test_empty_master_key_skips_check(self, mock_get_settings: Any) -> None:
         mock_get_settings.return_value = _mock_settings("")
 
@@ -119,7 +126,7 @@ class TestAuthMasterKey:
 
 
 class TestAuthInvalidKey:
-    @patch("app.api.deps.get_settings")
+    @patch("app.core.config.get_settings")
     async def test_invalid_key_returns_401(self, mock_get_settings: Any) -> None:
         mock_get_settings.return_value = _mock_settings("")
 
@@ -133,7 +140,7 @@ class TestAuthInvalidKey:
 
 
 class TestAuthRevokedKey:
-    @patch("app.api.deps.get_settings")
+    @patch("app.core.config.get_settings")
     async def test_revoked_key_returns_401(self, mock_get_settings: Any) -> None:
         mock_get_settings.return_value = _mock_settings("")
 
@@ -149,7 +156,7 @@ class TestAuthRevokedKey:
 
 
 class TestAuthValidKey:
-    @patch("app.api.deps.get_settings")
+    @patch("app.core.config.get_settings")
     async def test_valid_key_returns_prefix(self, mock_get_settings: Any) -> None:
         mock_get_settings.return_value = _mock_settings("")
 
@@ -200,6 +207,12 @@ def _create_app_with_write_scope(
         def get_service(self) -> APIKeyAuthenticationService:
             return as_typed_mock(APIKeyAuthenticationService, mock_service)
 
+        @provide(scope=Scope.APP)
+        def get_settings(self) -> Settings:
+            from app.core.config import get_settings
+
+            return get_settings()
+
     container = make_async_container(MockServiceProvider())
     setup_dishka(container, app)
 
@@ -207,7 +220,7 @@ def _create_app_with_write_scope(
 
 
 class TestScopeEnforcement:
-    @patch("app.api.deps.get_settings")
+    @patch("app.core.config.get_settings")
     async def test_master_key_has_write_scope(self, mock_get_settings: Any) -> None:
         mock_get_settings.return_value = _mock_settings("test-master-123")
 
@@ -220,7 +233,7 @@ class TestScopeEnforcement:
         assert response.status_code == 200
         assert response.json()["key"] == "master"
 
-    @patch("app.api.deps.get_settings")
+    @patch("app.core.config.get_settings")
     async def test_read_write_key_has_write_scope(self, mock_get_settings: Any) -> None:
         mock_get_settings.return_value = _mock_settings("")
 
@@ -235,7 +248,7 @@ class TestScopeEnforcement:
         )
         assert response.status_code == 200
 
-    @patch("app.api.deps.get_settings")
+    @patch("app.core.config.get_settings")
     async def test_read_only_key_denied(self, mock_get_settings: Any) -> None:
         mock_get_settings.return_value = _mock_settings("")
 
@@ -251,7 +264,7 @@ class TestScopeEnforcement:
         assert response.status_code == 403
         assert "read-only" in response.json()["detail"].lower()
 
-    @patch("app.api.deps.get_settings")
+    @patch("app.core.config.get_settings")
     async def test_missing_key_returns_401(self, mock_get_settings: Any) -> None:
         mock_get_settings.return_value = _mock_settings("")
 

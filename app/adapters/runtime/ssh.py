@@ -76,6 +76,7 @@ class SSHConnector:
         self._connection: asyncssh.SSHClientConnection | None = None
         self._active_process: asyncssh.SSHClientProcess[str] | None = None
         self._active_process_group_file: str | None = None
+        self._temp_key_path: str | None = None
 
     async def connect(self) -> None:
         """Establish SSH connection.
@@ -102,9 +103,30 @@ class SSHConnector:
         }
 
         if self._ssh_key:
-            kwargs["client_keys"] = [self._ssh_key.encode()]
-            if self._passphrase:
-                kwargs["passphrase"] = self._passphrase
+            # Prefer in-memory key object via asyncssh.import_private_key
+            try:
+                key_obj = asyncssh.import_private_key(
+                    self._ssh_key,
+                    passphrase=self._passphrase or None,
+                )
+                kwargs["client_keys"] = [key_obj]  # type: ignore[assignment]
+                # Do not pass passphrase separately when key already decrypted
+            except Exception:  # noqa: BLE001
+                # Fallback: temp file for asyncssh (chmod 600)
+                import os
+
+                with tempfile.NamedTemporaryFile(
+                    mode="w", delete=False, prefix="nn_ssh_", suffix=".pem"
+                ) as tf:
+                    tf.write(self._ssh_key)
+                    self._temp_key_path = tf.name
+                try:
+                    os.chmod(self._temp_key_path, 0o600)
+                except OSError:
+                    pass
+                kwargs["client_keys"] = [self._temp_key_path]
+                if self._passphrase:
+                    kwargs["passphrase"] = self._passphrase
         elif self._password:
             kwargs["password"] = self._password
 
@@ -127,6 +149,13 @@ class SSHConnector:
             await self._connection.wait_closed()
             self._connection = None
             logger.debug("ssh.disconnect", host=self._host)
+        # Cleanup temp key file if created
+        if self._temp_key_path:
+            try:
+                Path(self._temp_key_path).unlink(missing_ok=True)
+            except OSError:
+                pass
+            self._temp_key_path = None
 
     async def __aenter__(self) -> Self:
         """Connect and enter the remote session."""
@@ -214,19 +243,28 @@ class SSHConnector:
             command_fingerprint=fingerprint,
         )
         try:
-            async with self._connection.create_process(command) as process:
-                async for line in process.stdout:
-                    yield str(line)
-                # Wait for process to finish
-                await process.wait()
-                exit_code = _exit_status(process)
-                audit.info(
-                    "ssh.stream.ok",
-                    host=self._host,
-                    command_length=len(command),
-                    command_fingerprint=fingerprint,
-                    exit_code=exit_code,
-                )
+            async with asyncio.timeout(self._timeout):
+                async with self._connection.create_process(command) as process:
+                    async for line in process.stdout:
+                        yield str(line)
+                    # Wait for process to finish
+                    await process.wait()
+                    exit_code = _exit_status(process)
+                    audit.info(
+                        "ssh.stream.ok",
+                        host=self._host,
+                        command_length=len(command),
+                        command_fingerprint=fingerprint,
+                        exit_code=exit_code,
+                    )
+        except TimeoutError as exc:
+            audit.error(
+                "ssh.stream.timeout",
+                host=self._host,
+                command_length=len(command),
+                command_fingerprint=fingerprint,
+            )
+            raise ConnectionFailedError("SSH streaming timed out") from exc
         except asyncssh.Error as exc:
             audit.error(
                 "ssh.stream.failed",
@@ -245,13 +283,15 @@ class SSHConnector:
             raise RuntimeError("Not connected")
         queue: asyncio.Queue[RemoteStreamEventDTO] = asyncio.Queue(_STREAM_QUEUE_SIZE)
         group_file = f"{tempfile.gettempdir()}/node-nexus-stream-{uuid4().hex}.pid"
-        grouped_command = f"printf '%s' \"$$\" > {group_file}; {command}"
+        quoted_group_file = shlex.quote(group_file)
+        grouped_command = f"printf '%s' \"$$\" > {quoted_group_file}; {command}"
         remote_command = (
             f'setsid sh -c {shlex.quote(grouped_command)}; status=$?; exit "$status"'
         )
-        process: asyncssh.SSHClientProcess[str] = await self._connection.create_process(
-            remote_command
-        )
+        async with asyncio.timeout(self._timeout):
+            process: asyncssh.SSHClientProcess[
+                str
+            ] = await self._connection.create_process(remote_command)
         self._active_process = process
         self._active_process_group_file = group_file
 
@@ -303,7 +343,7 @@ class SSHConnector:
                     await asyncio.gather(exit_task, return_exceptions=True)
                 self._active_process = None
                 await self._connection.run(
-                    f"rm -f {group_file}",
+                    f"rm -f {shlex.quote(group_file)}",
                     check=False,
                 )
                 self._active_process_group_file = None
@@ -326,8 +366,9 @@ class SSHConnector:
         """Signal the full remote process group, including command children."""
         if not self._connection or not self._active_process_group_file:
             raise RuntimeError("No active process")
+        quoted = shlex.quote(self._active_process_group_file)
         await self._connection.run(
-            f"kill -{signal} -$(cat {self._active_process_group_file})",
+            f"kill -{signal} -$(cat {quoted})",
             check=False,
         )
 
@@ -352,6 +393,7 @@ class SSHConnectorFactory:
         password: str | None,
         ssh_key: str | None,
         passphrase: str | None = None,
+        timeout: int = 30,
     ) -> SSHConnector:
         return SSHConnector(
             host=host,
@@ -360,6 +402,7 @@ class SSHConnectorFactory:
             password=password,
             ssh_key=ssh_key,
             passphrase=passphrase,
+            timeout=timeout,
             known_hosts=(
                 self._known_hosts_path if self._strict_host_key_checking else None
             ),

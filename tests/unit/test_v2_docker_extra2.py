@@ -49,6 +49,7 @@ from app.application.services.docker.container_service import DockerContainerSer
 from app.application.services.docker.image_service import DockerImageService
 from app.application.services.docker.resource_service import DockerResourceService
 from app.application.services.docker.system_service import DockerSystemService
+from app.core.config import Settings, get_settings
 from app.core.exceptions import DomainError
 from tests.typing import as_typed_mock
 from tests.unit.conftest import MockAuthServiceProvider, _mock_settings
@@ -64,7 +65,7 @@ VOL = "myvol1"
 NET = "net123"
 
 _SETTINGS_PATCH = patch(
-    "app.api.deps.get_settings",
+    "app.core.config.get_settings",
     return_value=_mock_settings("test-master"),
 )
 
@@ -101,6 +102,11 @@ def _create_v2_docker_app(
         @provide(scope=Scope.REQUEST)
         def get_system_service(self) -> DockerSystemService:
             return as_typed_mock(DockerSystemService, s_svc)
+
+        @provide(scope=Scope.APP)
+        def get_settings(self) -> Settings:
+
+            return get_settings()
 
     container = make_async_container(MockProvider(), MockAuthServiceProvider())
     setup_dishka(container, app)

@@ -15,21 +15,32 @@ from app.application.services.api_key_management import APIKeyManagementService
 from app.application.services.audit_log_service import AuditLogService
 from app.application.services.command_execution_service import CommandExecutionService
 from app.application.services.command_management_service import CommandManagementService
+from app.application.services.compose_service import ComposeService
 from app.application.services.config_service import ConfigService
 from app.application.services.docker.bulk_service import DockerBulkService
 from app.application.services.docker.container_service import DockerContainerService
 from app.application.services.docker.image_service import DockerImageService
 from app.application.services.docker.resource_service import DockerResourceService
+from app.application.services.execution_lifecycle_service import (
+    ExecutionLifecycleService,
+)
+from app.application.services.execution_stats_service import ExecutionStatsService
+from app.application.services.favorite_service import FavoriteService
+from app.application.services.global_search_service import GlobalSearchService
 from app.application.services.health_service import HealthService
 from app.application.services.node_bulk_command_service import NodeBulkCommandService
 from app.application.services.node_command_service import NodeCommandService
 from app.application.services.node_management_service import NodeManagementService
 from app.application.services.node_metrics_service import NodeMetricsService
+from app.application.services.node_validation_service import NodeValidationService
 from app.application.services.schedule_management import ScheduleManagementService
 from app.application.services.script_execution_service import ScriptExecutionService
 from app.application.services.script_history_service import ScriptHistoryService
 from app.application.services.script_management_service import ScriptManagementService
 from app.application.services.streaming_command_service import StreamingCommandService
+from app.application.services.template_pack_service import TemplatePackService
+from app.application.services.template_registry_service import TemplateRegistryService
+from app.application.services.user_service import UserService
 from app.core.config import Settings
 from app.di.providers import AppProvider
 
@@ -39,21 +50,30 @@ HTTP_DEPENDENCIES = (
     AuditLogService,
     CommandExecutionService,
     CommandManagementService,
+    ComposeService,
     ConfigService,
     DockerBulkService,
     DockerContainerService,
     DockerImageService,
     DockerResourceService,
+    ExecutionLifecycleService,
+    ExecutionStatsService,
+    FavoriteService,
+    GlobalSearchService,
     HealthService,
     NodeBulkCommandService,
     NodeCommandService,
     NodeManagementService,
     NodeMetricsService,
+    NodeValidationService,
     ScheduleManagementService,
     ScriptExecutionService,
     ScriptHistoryService,
     ScriptManagementService,
     StreamingCommandService,
+    TemplatePackService,
+    TemplateRegistryService,
+    UserService,
 )
 
 

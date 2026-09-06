@@ -169,6 +169,25 @@ class ScriptBulkCreateResult(BaseModel):
     error: str = ""
 
 
+class ScriptBulkUpdateItem(BaseModel):
+    id: uuid.UUID
+    changes: ScriptUpdate
+
+
+class ScriptBulkUpdateRequest(BaseModel):
+    updates: list[ScriptBulkUpdateItem] = Field(min_length=1, max_length=20)
+
+
+class ScriptBulkUpdateResult(BaseModel):
+    script_id: uuid.UUID
+    status: Literal["success", "error"]
+    error: str = ""
+
+
+class ScriptDeletionsRequest(BaseModel):
+    ids: list[uuid.UUID] = Field(min_length=1, max_length=100)
+
+
 class ScriptExecutionsRequest(BaseModel):
     """M×N script executions (script_ids × nodes)."""
 

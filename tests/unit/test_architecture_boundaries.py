@@ -88,6 +88,10 @@ def test_api_does_not_access_persistence_or_concrete_connectors() -> None:
                 "app.repositories",
             )
         )
+        and not (
+            path.name == "middleware.py"
+            and module == "app.adapters.lifecycle.commit_middleware"
+        )
     ]
     assert not violations, "Forbidden architecture dependencies:\n" + "\n".join(
         violations

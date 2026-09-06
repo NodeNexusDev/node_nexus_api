@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import hashlib
 import io
@@ -25,6 +26,7 @@ from app.application.dto.template_pack import (
     PackPageDTO,
     PackStatsBucketDTO,
     PackStatsDTO,
+    PackUpdateDTO,
     PackViewDTO,
 )
 from app.core.exceptions import DomainError, PackConflictError, PackNotFoundError
@@ -215,19 +217,25 @@ class TemplatePackService:
         their stored paths. Empty tar if no assets.
         """
         detail = await self.get_pack_detail(pack_id)
-        raw_map = _ASSET_RAW.get(pack_id, {})
-        buf = io.BytesIO()
-        with tarfile.open(fileobj=buf, mode="w") as tar:
-            for asset in detail.assets:
-                content = raw_map.get(asset.path, b"")
-                # Fallback: if no raw stored (e.g. legacy pack), use empty
-                info = tarfile.TarInfo(name=asset.path)
-                info.size = len(content)
-                info.mtime = int(asset.created_at.timestamp())
-                info.mode = 0o644
-                tar.addfile(info, io.BytesIO(content))
-        buf.seek(0)
-        return buf.getvalue()
+        raw_map = dict(_ASSET_RAW.get(pack_id, {}))
+        snapshot = [
+            (a.path, raw_map.get(a.path, b""), a.created_at.timestamp())
+            for a in detail.assets
+        ]
+
+        def _build() -> bytes:
+            buf = io.BytesIO()
+            with tarfile.open(fileobj=buf, mode="w") as tar:
+                for path, content, mtime in snapshot:
+                    info = tarfile.TarInfo(name=path)
+                    info.size = len(content)
+                    info.mtime = int(mtime)
+                    info.mode = 0o644
+                    tar.addfile(info, io.BytesIO(content))
+            buf.seek(0)
+            return buf.getvalue()
+
+        return await asyncio.to_thread(_build)
 
     async def stream_assets_tar(self, pack_id: uuid.UUID) -> bytes:
         """Alias for get_assets_tar (streaming compat)."""
@@ -577,4 +585,58 @@ class TemplatePackService:
             installed=installed,
             not_installed=not_installed,
             buckets=tuple(buckets),
+        )
+
+    async def patch_pack(self, pack_id: uuid.UUID, data: PackUpdateDTO) -> PackViewDTO:
+        """Update pack metadata (partial)."""
+        detail = self._packs.get(pack_id)
+        if detail is None:
+            raise PackNotFoundError(f"Pack {pack_id} not found")
+        view = detail.pack
+        now = datetime.now(UTC)
+        new_view = PackViewDTO(
+            id=view.id,
+            registry_id=view.registry_id,
+            pack_id=view.pack_id,
+            name=data.name if data.name is not None else view.name,
+            description=data.description
+            if data.description is not None
+            else view.description,
+            version=data.version if data.version is not None else view.version,
+            author=data.author if data.author is not None else view.author,
+            tags=tuple(data.tags) if data.tags is not None else view.tags,
+            manifest_sha=data.manifest_sha
+            if data.manifest_sha is not None
+            else view.manifest_sha,
+            readme=data.readme if data.readme is not None else view.readme,
+            installed_version=view.installed_version,
+            installed_at=view.installed_at,
+            created_at=view.created_at,
+            updated_at=now,
+        )
+        self._packs[pack_id] = PackDetailDTO(
+            pack=new_view,
+            assets=detail.assets,
+            commands=detail.commands,
+            scripts=detail.scripts,
+        )
+        audit.info("template_pack.update.ok", pack_id=str(pack_id))
+        return new_view
+
+    async def delete_pack(self, pack_id: uuid.UUID) -> None:
+        """Hard delete pack with assets and installations."""
+        detail = self._packs.pop(pack_id, None)
+        if detail is None:
+            raise PackNotFoundError(f"Pack {pack_id} not found")
+        _ASSET_RAW.pop(pack_id, None)
+        # Remove installations and release names (like uninstall)
+        self._installations.pop(pack_id, None)
+        names = _INSTALLATION_NAMES.pop(pack_id, [])
+        for entity_type, name in names:
+            if entity_type == "command":
+                _COMMAND_NAMES.discard(name)
+            else:
+                _SCRIPT_NAMES.discard(name)
+        audit.info(
+            "template_pack.delete.ok", pack_id=str(pack_id), name=detail.pack.name
         )

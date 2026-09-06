@@ -38,6 +38,7 @@ class SshDockerRuntime:
             password=self._credential_cipher.decrypt(target.password),
             ssh_key=self._credential_cipher.decrypt(target.ssh_key),
             passphrase=self._credential_cipher.decrypt(target.passphrase),
+            timeout=timeout,
         )
         try:
             async with connector:

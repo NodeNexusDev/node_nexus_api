@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+import structlog
+
 from app.application.dto.execution_lifecycle import (
     CancelExecutionDTO,
     RetryCommandDTO,
@@ -17,7 +19,7 @@ if TYPE_CHECKING:
     from app.application.ports.command_history import CommandHistoryReader
     from app.application.ports.execution_lifecycle import ExecutionLifecycleManager
 
-audit_logger = __import__("structlog").get_logger("audit")
+audit_logger = structlog.get_logger("audit")
 
 
 class ExecutionLifecycleService:

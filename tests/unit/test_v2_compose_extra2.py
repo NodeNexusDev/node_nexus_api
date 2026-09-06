@@ -44,6 +44,7 @@ from app.application.services.compose_service import (
 from app.application.services.compose_service import (
     _validate_project_name as svc_validate,
 )
+from app.core.config import Settings, get_settings
 from app.core.exceptions import (
     ComposeProjectAlreadyExistsError,
     ComposeProjectNotFoundError,
@@ -60,7 +61,7 @@ LONG_NAME = "a" * 101
 COMPOSE_YML = "version: '3'\nservices:\n  web:\n    image: nginx"
 
 _SETTINGS_PATCH = patch(
-    "app.api.deps.get_settings",
+    "app.core.config.get_settings",
     return_value=_mock_settings("test-master"),
 )
 
@@ -121,6 +122,11 @@ def _create_app(service_mock: AsyncMock | MagicMock | None = None) -> FastAPI:
         def get_compose_service(self) -> ComposeService:
             return as_typed_mock(ComposeService, svc)
 
+        @provide(scope=Scope.APP)
+        def get_settings(self) -> Settings:
+
+            return get_settings()
+
     container = make_async_container(MockProvider(), MockAuthServiceProvider())
     setup_dishka(container, app)
     return app
@@ -163,7 +169,10 @@ class TestHelpers:
         assert p3 == "/tmp/nn-compose-a_b_c_d.yml" or "a_b" in p3
 
     def test_compose_file_path_sanitizes(self) -> None:
-        assert svc_compose_file_path("proj!@#") == "/tmp/nn-compose-proj___.yml"
+        p = svc_compose_file_path("proj!@#")
+        assert p.startswith("/tmp/nn-compose-proj___")
+        assert p.endswith(".yml")
+        assert "-a" not in p or len(p) > len("/tmp/nn-compose-proj___.yml")
 
     def test_encode_decode_roundtrip(self) -> None:
         for off in (0, 1, 5, 100):

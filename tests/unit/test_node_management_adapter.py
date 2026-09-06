@@ -137,7 +137,12 @@ async def test_update_node_normalizes_immutable_tags() -> None:
         )
 
     assert result is not None
-    repository.update.assert_awaited_once_with(node_id, {"tags": ["prod"]})
+    # update should include tags normalized to list plus explicit updated_at
+    call_args = repository.update.call_args
+    assert call_args is not None
+    assert call_args.args[0] == node_id
+    assert call_args.args[1]["tags"] == ["prod"]
+    assert "updated_at" in call_args.args[1]
 
 
 async def test_delete_node_uses_adapter_owned_transaction() -> None:
@@ -172,7 +177,9 @@ async def test_update_node_status_uses_short_transaction() -> None:
     assert result is not None
     assert result.status == "unreachable"
     factory.begin.assert_called_once_with()
-    repository.update.assert_awaited_once_with(
-        node.id,
-        {"status": "unreachable"},
-    )
+    # update should include status and updated_at (honest bulk)
+    call_args = repository.update.call_args
+    assert call_args is not None
+    assert call_args.args[0] == node.id
+    assert call_args.args[1]["status"] == "unreachable"
+    assert "updated_at" in call_args.args[1]

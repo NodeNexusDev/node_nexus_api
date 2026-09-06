@@ -152,10 +152,26 @@ class SqlAlchemyComposeGateway:
             return True
 
     async def upsert_project(self, data: ComposeCreateDTO) -> ComposeViewDTO:
-        """Create or update a compose project."""
+        """Create or update a compose project (race-safe)."""
         existing = await self.get_project(data.node_id, data.project_name)
         if existing is None:
-            return await self.create_project(data)
+            try:
+                return await self.create_project(data)
+            except ComposeProjectAlreadyExistsError:
+                # Raced with concurrent create, fallback to update
+                dto = ComposeUpdateDTO(
+                    compose=data.compose,
+                    env=data.env,
+                    has_env=True,
+                    template_pack_id=data.template_pack_id,
+                    has_template_pack_id=True,
+                )
+                updated = await self.update_project(
+                    data.node_id, data.project_name, dto
+                )
+                if updated is None:
+                    raise
+                return updated
         dto = ComposeUpdateDTO(
             compose=data.compose,
             env=data.env,
@@ -166,5 +182,12 @@ class SqlAlchemyComposeGateway:
         updated = await self.update_project(data.node_id, data.project_name, dto)
         # update_project returns None only if raced delete, fallback to create
         if updated is None:
-            return await self.create_project(data)
+            try:
+                return await self.create_project(data)
+            except ComposeProjectAlreadyExistsError:
+                # Raced again, retry update
+                retry = await self.update_project(data.node_id, data.project_name, dto)
+                if retry is None:
+                    raise
+                return retry
         return updated

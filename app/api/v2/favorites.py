@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import base64
-import json
 import uuid
 
 import structlog
@@ -11,30 +9,23 @@ from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
 from fastapi import APIRouter, HTTPException, Query, Security
 
 from app.api.deps import Principal, get_current_principal, require_write_or_jwt_scope
-from app.application.dto.favorite import FavoriteCreateDTO, FavoriteDTO
+from app.api.pagination import decode_offset, encode_offset
+from app.application.dto.favorite import (
+    FavoriteCreateDTO,
+    FavoriteDTO,
+    FavoriteUpdateDTO,
+)
 from app.application.services.favorite_service import FavoriteService
 from app.schemas.common import CursorPage
-from app.schemas.favorite import FavoriteCreate, FavoriteResponse
+from app.schemas.favorite import FavoriteCreate, FavoriteResponse, FavoriteUpdate
 
 audit = structlog.get_logger("audit")
 
+# Compatibility aliases for tests importing private helpers
+_encode_offset = encode_offset  # noqa: N816
+_decode_offset = decode_offset  # noqa: N816
+
 router = APIRouter(prefix="/favorites", tags=["favorites"], route_class=DishkaRoute)
-
-
-def _encode_offset(offset: int) -> str:
-    """Encode an offset cursor for pagination."""
-    payload = json.dumps({"offset": offset})
-    return base64.urlsafe_b64encode(payload.encode()).decode()
-
-
-def _decode_offset(cursor: str) -> int:
-    """Decode an offset cursor, raising ValueError on invalid input."""
-    try:
-        raw = base64.urlsafe_b64decode(cursor.encode())
-        data = json.loads(raw)
-        return int(data["offset"])
-    except Exception as exc:
-        raise ValueError(f"Invalid cursor: {cursor}") from exc
 
 
 def _favorite_response(dto: FavoriteDTO) -> FavoriteResponse:
@@ -65,18 +56,22 @@ async def list_favorites(
     offset = 0
     if cursor is not None:
         try:
-            offset = _decode_offset(cursor)
+            offset = decode_offset(cursor)
         except ValueError:
             raise HTTPException(status_code=422, detail="Invalid cursor") from None
+    remainder = offset % limit if limit else 0
     page = offset // limit + 1 if limit else 1
+    fetch_size = limit + remainder if remainder else limit
     audit.info(
         "api.v2.favorites.list", cursor=cursor, limit=limit, target_type=target_type
     )
     items, total = await service.list_favorites(
-        target_type=target_type, page=page, size=limit
+        target_type=target_type, page=page, size=fetch_size
     )
+    if remainder:
+        items = items[remainder : remainder + limit]
     has_more = (offset + len(items)) < total
-    next_cursor = _encode_offset(offset + limit) if has_more else None
+    next_cursor = encode_offset(offset + limit) if has_more else None
     return CursorPage[FavoriteResponse](
         items=[_favorite_response(item) for item in items],
         next_cursor=next_cursor,
@@ -110,6 +105,49 @@ async def add_favorite(
     )
     result = await service.add_favorite(dto)
     return _favorite_response(result)
+
+
+@router.get("/{target_type}/{target_id}", response_model=FavoriteResponse)
+@inject
+async def get_favorite(
+    target_type: str,
+    target_id: str,
+    service: FromDishka[FavoriteService],
+    _principal: Principal = Security(get_current_principal),
+) -> FavoriteResponse:
+    """Get a single favorite by composite key."""
+    audit.info("api.v2.favorites.get", target_type=target_type, target_id=target_id)
+    try:
+        uuid.UUID(target_id)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=422, detail="Invalid target_id, must be UUID"
+        ) from exc
+    dto = await service.get_favorite(target_type, target_id)
+    return _favorite_response(dto)
+
+
+@router.patch("/{target_type}/{target_id}", response_model=FavoriteResponse)
+@inject
+async def patch_favorite(
+    target_type: str,
+    target_id: str,
+    data: FavoriteUpdate,
+    service: FromDishka[FavoriteService],
+    _principal: Principal = Security(require_write_or_jwt_scope),
+) -> FavoriteResponse:
+    """Patch favorite name/note."""
+    audit.info("api.v2.favorites.patch", target_type=target_type, target_id=target_id)
+    try:
+        uuid.UUID(target_id)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=422, detail="Invalid target_id, must be UUID"
+        ) from exc
+    dto = await service.update_favorite(
+        target_type, target_id, FavoriteUpdateDTO(name=data.name, note=data.note)
+    )
+    return _favorite_response(dto)
 
 
 @router.delete("/{target_type}/{target_id}", status_code=204)

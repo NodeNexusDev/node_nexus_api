@@ -7,7 +7,11 @@ import uuid
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.application.dto.favorite import FavoriteCreateDTO, FavoriteDTO
+from app.application.dto.favorite import (
+    FavoriteCreateDTO,
+    FavoriteDTO,
+    FavoriteUpdateDTO,
+)
 from app.models.favorite import FavoriteModel
 
 
@@ -69,6 +73,26 @@ class SqlAlchemyFavoriteGateway:
         self._session.add(model)
         await self._session.flush()
         return _dto(model)
+
+    async def update_favorite(
+        self,
+        target_type: str,
+        target_id: uuid.UUID,
+        data: FavoriteUpdateDTO,
+    ) -> FavoriteDTO | None:
+        q = select(FavoriteModel).where(
+            FavoriteModel.target_type == target_type,
+            FavoriteModel.target_id == target_id,
+        )
+        row = (await self._session.execute(q)).scalar_one_or_none()
+        if row is None:
+            return None
+        if data.name is not None:
+            row.name = data.name
+        if data.note is not None:
+            row.note = data.note
+        await self._session.flush()
+        return _dto(row)
 
     async def remove_favorite(
         self,

@@ -50,6 +50,7 @@ from app.application.services.docker.resource_service import DockerResourceServi
 from app.application.services.docker.system_service import DockerSystemService
 from app.application.services.template_pack_service import TemplatePackService
 from app.application.services.template_registry_service import TemplateRegistryService
+from app.core.config import Settings, get_settings
 from app.core.exceptions import (
     ComposeProjectAlreadyExistsError,
     ComposeProjectNotFoundError,
@@ -1299,6 +1300,11 @@ def _create_compose_app(mock_service: AsyncMock) -> FastAPI:
         def get_compose_service(self) -> ComposeService:
             return as_typed_mock(ComposeService, mock_service)
 
+        @provide(scope=Scope.APP)
+        def get_settings(self) -> Settings:
+
+            return get_settings()
+
     app.include_router(compose_router, prefix="/api/v2")
     container = make_async_container(MockProvider(), MockAuthServiceProvider())
     setup_dishka(container, app)
@@ -1318,7 +1324,8 @@ class TestComposeApiV2:
             headers={"X-API-Key": "test-master"},
         ) as client:
             with patch(
-                "app.api.deps.get_settings", return_value=_mock_settings("test-master")
+                "app.core.config.get_settings",
+                return_value=_mock_settings("test-master"),
             ):
                 resp = await client.post(
                     f"/api/v2/nodes/{nid}/docker/compose/projects",
@@ -1340,7 +1347,8 @@ class TestComposeApiV2:
             headers={"X-API-Key": "test-master"},
         ) as client:
             with patch(
-                "app.api.deps.get_settings", return_value=_mock_settings("test-master")
+                "app.core.config.get_settings",
+                return_value=_mock_settings("test-master"),
             ):
                 resp = await client.post(
                     f"/api/v2/nodes/{nid}/docker/compose/projects",
@@ -1358,7 +1366,8 @@ class TestComposeApiV2:
             headers={"X-API-Key": "test-master"},
         ) as client:
             with patch(
-                "app.api.deps.get_settings", return_value=_mock_settings("test-master")
+                "app.core.config.get_settings",
+                return_value=_mock_settings("test-master"),
             ):
                 resp = await client.post(
                     f"/api/v2/nodes/{nid}/docker/compose/projects",
@@ -1379,7 +1388,8 @@ class TestComposeApiV2:
             headers={"X-API-Key": "test-master"},
         ) as client:
             with patch(
-                "app.api.deps.get_settings", return_value=_mock_settings("test-master")
+                "app.core.config.get_settings",
+                return_value=_mock_settings("test-master"),
             ):
                 resp = await client.get(
                     f"/api/v2/nodes/{nid}/docker/compose/projects?limit=1"
@@ -1401,7 +1411,8 @@ class TestComposeApiV2:
             headers={"X-API-Key": "test-master"},
         ) as client:
             with patch(
-                "app.api.deps.get_settings", return_value=_mock_settings("test-master")
+                "app.core.config.get_settings",
+                return_value=_mock_settings("test-master"),
             ):
                 resp = await client.get(
                     f"/api/v2/nodes/{nid}/docker/compose/projects?cursor=invalid"
@@ -1420,7 +1431,8 @@ class TestComposeApiV2:
             headers={"X-API-Key": "test-master"},
         ) as client:
             with patch(
-                "app.api.deps.get_settings", return_value=_mock_settings("test-master")
+                "app.core.config.get_settings",
+                return_value=_mock_settings("test-master"),
             ):
                 resp = await client.get(
                     f"/api/v2/nodes/{nid}/docker/compose/projects/proj"
@@ -1438,7 +1450,8 @@ class TestComposeApiV2:
             headers={"X-API-Key": "test-master"},
         ) as client:
             with patch(
-                "app.api.deps.get_settings", return_value=_mock_settings("test-master")
+                "app.core.config.get_settings",
+                return_value=_mock_settings("test-master"),
             ):
                 resp = await client.get(
                     f"/api/v2/nodes/{nid}/docker/compose/projects/missing"
@@ -1457,7 +1470,8 @@ class TestComposeApiV2:
             headers={"X-API-Key": "test-master"},
         ) as client:
             with patch(
-                "app.api.deps.get_settings", return_value=_mock_settings("test-master")
+                "app.core.config.get_settings",
+                return_value=_mock_settings("test-master"),
             ):
                 resp = await client.patch(
                     f"/api/v2/nodes/{nid}/docker/compose/projects/proj",
@@ -1476,7 +1490,8 @@ class TestComposeApiV2:
             headers={"X-API-Key": "test-master"},
         ) as client:
             with patch(
-                "app.api.deps.get_settings", return_value=_mock_settings("test-master")
+                "app.core.config.get_settings",
+                return_value=_mock_settings("test-master"),
             ):
                 resp = await client.delete(
                     f"/api/v2/nodes/{nid}/docker/compose/projects/proj"
@@ -1508,7 +1523,8 @@ class TestComposeApiV2:
             headers={"X-API-Key": "test-master"},
         ) as client:
             with patch(
-                "app.api.deps.get_settings", return_value=_mock_settings("test-master")
+                "app.core.config.get_settings",
+                return_value=_mock_settings("test-master"),
             ):
                 resp = await client.post(
                     f"/api/v2/nodes/{nid}/docker/compose/projects/proj/ups",
@@ -1530,7 +1546,8 @@ class TestComposeApiV2:
             headers={"X-API-Key": "test-master"},
         ) as client:
             with patch(
-                "app.api.deps.get_settings", return_value=_mock_settings("test-master")
+                "app.core.config.get_settings",
+                return_value=_mock_settings("test-master"),
             ):
                 resp = await client.post(
                     f"/api/v2/nodes/{nid}/docker/compose/projects/proj/downs",
@@ -1554,7 +1571,8 @@ class TestComposeApiV2:
             headers={"X-API-Key": "test-master"},
         ) as client:
             with patch(
-                "app.api.deps.get_settings", return_value=_mock_settings("test-master")
+                "app.core.config.get_settings",
+                return_value=_mock_settings("test-master"),
             ):
                 resp = await client.get(
                     f"/api/v2/nodes/{nid}/docker/compose/projects/proj/ps"
@@ -1633,6 +1651,11 @@ def _create_templates_app(
         def get_pack_service(self) -> TemplatePackService:
             return as_typed_mock(TemplatePackService, pack_service)
 
+        @provide(scope=Scope.APP)
+        def get_settings(self) -> Settings:
+
+            return get_settings()
+
     app.include_router(templates_router, prefix="/api/v2")
     container = make_async_container(MockProvider(), MockAuthServiceProvider())
     setup_dishka(container, app)
@@ -1663,7 +1686,8 @@ class TestTemplatesApiV2:
             headers={"X-API-Key": "test-master"},
         ) as client:
             with patch(
-                "app.api.deps.get_settings", return_value=_mock_settings("test-master")
+                "app.core.config.get_settings",
+                return_value=_mock_settings("test-master"),
             ):
                 resp = await client.post(
                     "/api/v2/templates/registries",
@@ -1686,7 +1710,8 @@ class TestTemplatesApiV2:
             headers={"X-API-Key": "test-master"},
         ) as client:
             with patch(
-                "app.api.deps.get_settings", return_value=_mock_settings("test-master")
+                "app.core.config.get_settings",
+                return_value=_mock_settings("test-master"),
             ):
                 resp = await client.post(
                     "/api/v2/templates/registries", json={"owner": "o", "name": "n"}
@@ -1719,7 +1744,8 @@ class TestTemplatesApiV2:
             headers={"X-API-Key": "test-master"},
         ) as client:
             with patch(
-                "app.api.deps.get_settings", return_value=_mock_settings("test-master")
+                "app.core.config.get_settings",
+                return_value=_mock_settings("test-master"),
             ):
                 resp = await client.get("/api/v2/templates/registries?limit=1")
         assert resp.status_code == 200
@@ -1735,7 +1761,8 @@ class TestTemplatesApiV2:
             headers={"X-API-Key": "test-master"},
         ) as client:
             with patch(
-                "app.api.deps.get_settings", return_value=_mock_settings("test-master")
+                "app.core.config.get_settings",
+                return_value=_mock_settings("test-master"),
             ):
                 resp = await client.get("/api/v2/templates/registries?cursor=bad")
         assert resp.status_code == 422
@@ -1763,7 +1790,8 @@ class TestTemplatesApiV2:
             headers={"X-API-Key": "test-master"},
         ) as client:
             with patch(
-                "app.api.deps.get_settings", return_value=_mock_settings("test-master")
+                "app.core.config.get_settings",
+                return_value=_mock_settings("test-master"),
             ):
                 resp = await client.get(f"/api/v2/templates/registries/{view.id}")
         assert resp.status_code == 200
@@ -1795,7 +1823,8 @@ class TestTemplatesApiV2:
             headers={"X-API-Key": "test-master"},
         ) as client:
             with patch(
-                "app.api.deps.get_settings", return_value=_mock_settings("test-master")
+                "app.core.config.get_settings",
+                return_value=_mock_settings("test-master"),
             ):
                 resp = await client.post(f"/api/v2/templates/registries/{rid}/syncs")
         assert resp.status_code == 207
@@ -1845,7 +1874,8 @@ class TestTemplatesApiV2:
             headers={"X-API-Key": "test-master"},
         ) as client:
             with patch(
-                "app.api.deps.get_settings", return_value=_mock_settings("test-master")
+                "app.core.config.get_settings",
+                return_value=_mock_settings("test-master"),
             ):
                 resp = await client.post(
                     "/api/v2/templates/packs",
@@ -1870,7 +1900,8 @@ class TestTemplatesApiV2:
             headers={"X-API-Key": "test-master"},
         ) as client:
             with patch(
-                "app.api.deps.get_settings", return_value=_mock_settings("test-master")
+                "app.core.config.get_settings",
+                return_value=_mock_settings("test-master"),
             ):
                 resp = await client.post(
                     "/api/v2/templates/packs",
@@ -1912,7 +1943,8 @@ class TestTemplatesApiV2:
             headers={"X-API-Key": "test-master"},
         ) as client:
             with patch(
-                "app.api.deps.get_settings", return_value=_mock_settings("test-master")
+                "app.core.config.get_settings",
+                return_value=_mock_settings("test-master"),
             ):
                 resp = await client.post(
                     f"/api/v2/templates/packs/{pid}/installations?on_conflict=rename"
@@ -1934,7 +1966,8 @@ class TestTemplatesApiV2:
             headers={"X-API-Key": "test-master"},
         ) as client:
             with patch(
-                "app.api.deps.get_settings", return_value=_mock_settings("test-master")
+                "app.core.config.get_settings",
+                return_value=_mock_settings("test-master"),
             ):
                 resp = await client.post(
                     f"/api/v2/templates/packs/{pid}/installations?on_conflict=fail"
@@ -1980,7 +2013,8 @@ class TestTemplatesApiV2:
             headers={"X-API-Key": "test-master"},
         ) as client:
             with patch(
-                "app.api.deps.get_settings", return_value=_mock_settings("test-master")
+                "app.core.config.get_settings",
+                return_value=_mock_settings("test-master"),
             ):
                 resp = await client.post(f"/api/v2/templates/packs/{pid}/installations")
         assert resp.status_code == 207
@@ -2536,6 +2570,11 @@ def _create_docker_app(mock_service: AsyncMock) -> FastAPI:
         def get_system_service(self) -> DockerSystemService:
             return as_typed_mock(DockerSystemService, mock_service)
 
+        @provide(scope=Scope.APP)
+        def get_settings(self) -> Settings:
+
+            return get_settings()
+
     app.include_router(docker_router, prefix="/api/v2")
     container = make_async_container(MockProvider(), MockAuthServiceProvider())
     setup_dishka(container, app)
@@ -2554,7 +2593,8 @@ class TestDockerBulkApiV2:
             headers={"X-API-Key": "test-master"},
         ) as client:
             with patch(
-                "app.api.deps.get_settings", return_value=_mock_settings("test-master")
+                "app.core.config.get_settings",
+                return_value=_mock_settings("test-master"),
             ):
                 resp = await client.post(
                     f"/api/v2/nodes/{nid}/docker/containers/starts",
@@ -2582,7 +2622,8 @@ class TestDockerBulkApiV2:
             headers={"X-API-Key": "test-master"},
         ) as client:
             with patch(
-                "app.api.deps.get_settings", return_value=_mock_settings("test-master")
+                "app.core.config.get_settings",
+                return_value=_mock_settings("test-master"),
             ):
                 resp = await client.post(
                     f"/api/v2/nodes/{nid}/docker/containers/starts",
@@ -2602,7 +2643,8 @@ class TestDockerBulkApiV2:
             headers={"X-API-Key": "test-master"},
         ) as client:
             with patch(
-                "app.api.deps.get_settings", return_value=_mock_settings("test-master")
+                "app.core.config.get_settings",
+                return_value=_mock_settings("test-master"),
             ):
                 resp = await client.post(
                     f"/api/v2/nodes/{nid}/docker/containers/stops?timeout=10",
@@ -2621,7 +2663,8 @@ class TestDockerBulkApiV2:
             headers={"X-API-Key": "test-master"},
         ) as client:
             with patch(
-                "app.api.deps.get_settings", return_value=_mock_settings("test-master")
+                "app.core.config.get_settings",
+                return_value=_mock_settings("test-master"),
             ):
                 resp = await client.post(
                     f"/api/v2/nodes/{nid}/docker/containers/restarts",
@@ -2640,7 +2683,8 @@ class TestDockerBulkApiV2:
             headers={"X-API-Key": "test-master"},
         ) as client:
             with patch(
-                "app.api.deps.get_settings", return_value=_mock_settings("test-master")
+                "app.core.config.get_settings",
+                return_value=_mock_settings("test-master"),
             ):
                 resp = await client.post(
                     f"/api/v2/nodes/{nid}/docker/containers/removals",
@@ -2659,7 +2703,8 @@ class TestDockerBulkApiV2:
             headers={"X-API-Key": "test-master"},
         ) as client:
             with patch(
-                "app.api.deps.get_settings", return_value=_mock_settings("test-master")
+                "app.core.config.get_settings",
+                return_value=_mock_settings("test-master"),
             ):
                 resp = await client.post(
                     f"/api/v2/nodes/{nid}/docker/containers/pauses",
@@ -2678,7 +2723,8 @@ class TestDockerBulkApiV2:
             headers={"X-API-Key": "test-master"},
         ) as client:
             with patch(
-                "app.api.deps.get_settings", return_value=_mock_settings("test-master")
+                "app.core.config.get_settings",
+                return_value=_mock_settings("test-master"),
             ):
                 resp = await client.post(
                     f"/api/v2/nodes/{nid}/docker/containers/unpauses",
@@ -2697,7 +2743,8 @@ class TestDockerBulkApiV2:
             headers={"X-API-Key": "test-master"},
         ) as client:
             with patch(
-                "app.api.deps.get_settings", return_value=_mock_settings("test-master")
+                "app.core.config.get_settings",
+                return_value=_mock_settings("test-master"),
             ):
                 resp = await client.post(
                     f"/api/v2/nodes/{nid}/docker/containers/kills",
@@ -2716,7 +2763,8 @@ class TestDockerBulkApiV2:
             headers={"X-API-Key": "test-master"},
         ) as client:
             with patch(
-                "app.api.deps.get_settings", return_value=_mock_settings("test-master")
+                "app.core.config.get_settings",
+                return_value=_mock_settings("test-master"),
             ):
                 resp = await client.post(
                     f"/api/v2/nodes/{nid}/docker/containers/updates",
@@ -2739,7 +2787,8 @@ class TestDockerBulkApiV2:
             headers={"X-API-Key": "test-master"},
         ) as client:
             with patch(
-                "app.api.deps.get_settings", return_value=_mock_settings("test-master")
+                "app.core.config.get_settings",
+                return_value=_mock_settings("test-master"),
             ):
                 resp = await client.post(
                     f"/api/v2/nodes/{nid}/docker/containers/executions",
@@ -2775,7 +2824,8 @@ class TestDockerBulkApiV2:
             headers={"X-API-Key": "test-master"},
         ) as client:
             with patch(
-                "app.api.deps.get_settings", return_value=_mock_settings("test-master")
+                "app.core.config.get_settings",
+                return_value=_mock_settings("test-master"),
             ):
                 resp = await client.post(
                     f"/api/v2/nodes/{nid}/docker/containers/inspections",
@@ -2794,7 +2844,8 @@ class TestDockerBulkApiV2:
             headers={"X-API-Key": "test-master"},
         ) as client:
             with patch(
-                "app.api.deps.get_settings", return_value=_mock_settings("test-master")
+                "app.core.config.get_settings",
+                return_value=_mock_settings("test-master"),
             ):
                 resp = await client.post(
                     f"/api/v2/nodes/{nid}/docker/containers/logs",
@@ -2825,7 +2876,8 @@ class TestDockerBulkApiV2:
             headers={"X-API-Key": "test-master"},
         ) as client:
             with patch(
-                "app.api.deps.get_settings", return_value=_mock_settings("test-master")
+                "app.core.config.get_settings",
+                return_value=_mock_settings("test-master"),
             ):
                 resp = await client.post(
                     f"/api/v2/nodes/{nid}/docker/containers/stats",
@@ -2850,7 +2902,8 @@ class TestDockerBulkApiV2:
             headers={"X-API-Key": "test-master"},
         ) as client:
             with patch(
-                "app.api.deps.get_settings", return_value=_mock_settings("test-master")
+                "app.core.config.get_settings",
+                return_value=_mock_settings("test-master"),
             ):
                 resp = await client.post(
                     f"/api/v2/nodes/{nid}/docker/containers/{cid}/kill",
@@ -2908,7 +2961,8 @@ class TestDockerBulkApiV2:
             headers={"X-API-Key": "test-master"},
         ) as client:
             with patch(
-                "app.api.deps.get_settings", return_value=_mock_settings("test-master")
+                "app.core.config.get_settings",
+                return_value=_mock_settings("test-master"),
             ):
                 resp = await client.post(
                     f"/api/v2/nodes/{nid}/docker/images/pulls",
@@ -2927,7 +2981,8 @@ class TestDockerBulkApiV2:
             headers={"X-API-Key": "test-master"},
         ) as client:
             with patch(
-                "app.api.deps.get_settings", return_value=_mock_settings("test-master")
+                "app.core.config.get_settings",
+                return_value=_mock_settings("test-master"),
             ):
                 resp = await client.post(
                     f"/api/v2/nodes/{nid}/docker/images/removals",
@@ -3293,7 +3348,7 @@ class TestComposeApiVerbBulk:
         app = _create_compose_app(mock_service)
         headers = {"X-API-Key": "test-master"}
         with patch(
-            "app.api.deps.get_settings", return_value=_mock_settings("test-master")
+            "app.core.config.get_settings", return_value=_mock_settings("test-master")
         ):
             async with AsyncClient(
                 transport=ASGITransport(app=app),
@@ -3475,7 +3530,7 @@ class TestComposeApiVerbBulk:
         app = _create_templates_app(mock_reg, mock_pack)
         headers = {"X-API-Key": "test-master"}
         with patch(
-            "app.api.deps.get_settings", return_value=_mock_settings("test-master")
+            "app.core.config.get_settings", return_value=_mock_settings("test-master")
         ):
             async with AsyncClient(
                 transport=ASGITransport(app=app),

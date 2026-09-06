@@ -36,6 +36,7 @@ class RemoteConnectorFactory(Protocol):
         password: str | None,
         ssh_key: str | None,
         passphrase: str | None = None,
+        timeout: int = 30,
     ) -> RemoteCommandSession:
         """Create one SSH-backed remote command session."""
         ...

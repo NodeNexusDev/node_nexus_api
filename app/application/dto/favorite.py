@@ -16,6 +16,12 @@ class FavoriteCreateDTO:
 
 
 @dataclass(frozen=True, slots=True)
+class FavoriteUpdateDTO:
+    name: str | None = None
+    note: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class FavoriteDTO:
     id: uuid.UUID
     target_type: str

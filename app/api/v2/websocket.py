@@ -18,7 +18,7 @@ from app.application.services.streaming_command_service import (
     StreamingCommandService,
     StreamingCommandSession,
 )
-from app.core.config import get_settings
+from app.core.config import Settings
 from app.core.exceptions import ConnectionFailedError, NodeNotFoundError
 from app.schemas.websocket import WebSocketCommandMessage, WebSocketSignalMessage
 
@@ -36,6 +36,7 @@ async def _validate_ws_token(
     websocket: WebSocket,
     token: str | None,
     api_key_service: APIKeyAuthenticationService,
+    settings: Settings,
 ) -> bool:
     """Validate WebSocket API key token against the API key service.
 
@@ -44,7 +45,6 @@ async def _validate_ws_token(
     if not token:
         await websocket.close(code=4001, reason="Missing token")
         return False
-    settings = get_settings()
     if settings.MASTER_API_KEY and hmac.compare_digest(token, settings.MASTER_API_KEY):
         audit.info("ws.auth.ok", key_type="master")
         return True
@@ -81,7 +81,7 @@ async def _send_command_events(
     events = session.execute_events(command)
     try:
         async for event in events:
-            payload = {"version": "1", "type": event.type}
+            payload: dict[str, object] = {"version": "1", "type": event.type}
             if event.data is not None:
                 payload["data"] = event.data
             if event.exit_code is not None:
@@ -113,6 +113,7 @@ async def exec_stream(
     node_id: UUID,
     streaming_service: FromDishka[StreamingCommandService],
     api_key_service: FromDishka[APIKeyAuthenticationService],
+    settings: FromDishka[Settings],
 ) -> None:
     """Stream command output via WebSocket.
 
@@ -132,7 +133,7 @@ async def exec_stream(
     # receive the documented WebSocket close codes instead of an HTTP 403
     # handshake rejection from the ASGI server.
     await websocket.accept()
-    if not await _validate_ws_token(websocket, token, api_key_service):
+    if not await _validate_ws_token(websocket, token, api_key_service, settings):
         return
 
     active_task: asyncio.Task[None] | None = None

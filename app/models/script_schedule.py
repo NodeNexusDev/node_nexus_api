@@ -3,6 +3,7 @@
 import uuid
 from datetime import datetime
 
+import sqlalchemy as sa
 from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Index, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -17,6 +18,10 @@ class ScriptScheduleModel(Base):
     __table_args__ = (
         Index("ix_script_schedules_script_id", "script_id", unique=True),
         Index("ix_script_schedules_enabled", "enabled"),
+        sa.CheckConstraint(
+            "operational_state IN ('registered', 'pending_registration')",
+            name="chk_script_schedules_operational_state",
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
@@ -32,10 +37,13 @@ class ScriptScheduleModel(Base):
     operational_state: Mapped[str] = mapped_column(String(50), default="registered")
     last_error_type: Mapped[str | None] = mapped_column(String(255), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=_utcnow
+        DateTime(timezone=True), default=_utcnow, server_default=sa.func.now()
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=_utcnow, onupdate=_utcnow
+        DateTime(timezone=True),
+        default=_utcnow,
+        onupdate=_utcnow,
+        server_default=sa.func.now(),
     )
     last_run_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True

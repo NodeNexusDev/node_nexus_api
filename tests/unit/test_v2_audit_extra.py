@@ -21,6 +21,7 @@ from app.application.dto.audit import AuditLogDTO, AuditLogPageDTO
 from app.application.dto.export import AuditExportRowDTO
 from app.application.ports.export import AuditExporter
 from app.application.services.audit_log_service import AuditLogService
+from app.core.config import Settings
 from app.schemas.common import BulkResult
 from tests.typing import as_typed_mock
 from tests.unit.conftest import MockAuthServiceProvider, _mock_settings
@@ -70,6 +71,12 @@ def _create_audit_app(
         @provide(scope=Scope.REQUEST)
         def get_exporter(self) -> AuditExporter:
             return as_typed_mock(AuditExporter, exp)
+
+        @provide(scope=Scope.APP)
+        def get_settings(self) -> Settings:
+            from app.core.config import get_settings
+
+            return get_settings()
 
     container = make_async_container(AuditTestProvider(), MockAuthServiceProvider())
     setup_dishka(container, app)
@@ -124,7 +131,7 @@ class TestListAuditLogs:
         svc.get_logs.return_value = AuditLogPageDTO(items=(), total=0)
         app = _create_audit_app(service_mock=svc)
         with patch(
-            "app.api.deps.get_settings",
+            "app.core.config.get_settings",
             return_value=_mock_settings("test-master"),
         ):
             async with AsyncClient(
@@ -151,7 +158,7 @@ class TestListAuditLogs:
         svc.get_logs.return_value = AuditLogPageDTO(items=tuple(logs), total=5)
         app = _create_audit_app(service_mock=svc)
         with patch(
-            "app.api.deps.get_settings",
+            "app.core.config.get_settings",
             return_value=_mock_settings("test-master"),
         ):
             async with AsyncClient(
@@ -177,7 +184,7 @@ class TestListAuditLogs:
         cursor = _encode_offset(2)
         app = _create_audit_app(service_mock=svc)
         with patch(
-            "app.api.deps.get_settings",
+            "app.core.config.get_settings",
             return_value=_mock_settings("test-master"),
         ):
             async with AsyncClient(
@@ -202,7 +209,7 @@ class TestListAuditLogs:
         svc.get_logs.return_value = AuditLogPageDTO(items=tuple(logs), total=2)
         app = _create_audit_app(service_mock=svc)
         with patch(
-            "app.api.deps.get_settings",
+            "app.core.config.get_settings",
             return_value=_mock_settings("test-master"),
         ):
             async with AsyncClient(
@@ -219,7 +226,7 @@ class TestListAuditLogs:
         svc = AsyncMock()
         app = _create_audit_app(service_mock=svc)
         with patch(
-            "app.api.deps.get_settings",
+            "app.core.config.get_settings",
             return_value=_mock_settings("test-master"),
         ):
             async with AsyncClient(
@@ -240,7 +247,7 @@ class TestListAuditLogs:
         dt_to = datetime(2026, 1, 31, tzinfo=UTC).isoformat()
         app = _create_audit_app(service_mock=svc)
         with patch(
-            "app.api.deps.get_settings",
+            "app.core.config.get_settings",
             return_value=_mock_settings("test-master"),
         ):
             async with AsyncClient(
@@ -287,7 +294,7 @@ class TestListAuditLogs:
             elif qs == "user":
                 url = "/api/v2/audit/?user=bob"
             with patch(
-                "app.api.deps.get_settings",
+                "app.core.config.get_settings",
                 return_value=_mock_settings("test-master"),
             ):
                 async with AsyncClient(
@@ -306,7 +313,7 @@ class TestListAuditLogs:
         cursor = _encode_offset(10)
         app = _create_audit_app(service_mock=svc)
         with patch(
-            "app.api.deps.get_settings",
+            "app.core.config.get_settings",
             return_value=_mock_settings("test-master"),
         ):
             async with AsyncClient(
@@ -333,7 +340,7 @@ class TestDeleteAuditLogs:
         svc.delete_all_logs.return_value = 5
         app = _create_audit_app(service_mock=svc)
         with patch(
-            "app.api.deps.get_settings",
+            "app.core.config.get_settings",
             return_value=_mock_settings("test-master"),
         ):
             async with AsyncClient(
@@ -350,7 +357,7 @@ class TestDeleteAuditLogs:
         app = _create_audit_app(service_mock=svc)
         # request with non-master key, but settings master is test-master
         with patch(
-            "app.api.deps.get_settings",
+            "app.core.config.get_settings",
             return_value=_mock_settings("test-master"),
         ):
             async with AsyncClient(
@@ -367,7 +374,7 @@ class TestDeleteAuditLogs:
         svc = AsyncMock()
         app = _create_audit_app(service_mock=svc)
         with patch(
-            "app.api.deps.get_settings",
+            "app.core.config.get_settings",
             return_value=_mock_settings("test-master"),
         ):
             async with AsyncClient(
@@ -384,7 +391,7 @@ class TestDeleteAuditLogs:
         svc = AsyncMock()
         app = _create_audit_app(service_mock=svc)
         with patch(
-            "app.api.deps.get_settings",
+            "app.core.config.get_settings",
             return_value=_mock_settings("test-master"),
         ):
             async with AsyncClient(
@@ -400,7 +407,7 @@ class TestDeleteAuditLogs:
         svc = AsyncMock()
         app = _create_audit_app(service_mock=svc)
         with patch(
-            "app.api.deps.get_settings",
+            "app.core.config.get_settings",
             return_value=_mock_settings("test-master"),
         ):
             async with AsyncClient(
@@ -415,7 +422,7 @@ class TestDeleteAuditLogs:
         svc = AsyncMock()
         app = _create_audit_app(service_mock=svc)
         with patch(
-            "app.api.deps.get_settings",
+            "app.core.config.get_settings",
             return_value=_mock_settings("test-master"),
         ):
             async with AsyncClient(
@@ -439,7 +446,7 @@ class TestExportAudit:
         exp.export_audit.return_value = rows
         app = _create_audit_app(exporter_mock=exp)
         with patch(
-            "app.api.deps.get_settings",
+            "app.core.config.get_settings",
             return_value=_mock_settings("test-master"),
         ):
             async with AsyncClient(
@@ -463,7 +470,7 @@ class TestExportAudit:
         exp.export_audit.return_value = rows
         app = _create_audit_app(exporter_mock=exp)
         with patch(
-            "app.api.deps.get_settings",
+            "app.core.config.get_settings",
             return_value=_mock_settings("test-master"),
         ):
             async with AsyncClient(
@@ -481,7 +488,7 @@ class TestExportAudit:
         exp.export_audit.return_value = rows
         app = _create_audit_app(exporter_mock=exp)
         with patch(
-            "app.api.deps.get_settings",
+            "app.core.config.get_settings",
             return_value=_mock_settings("test-master"),
         ):
             async with AsyncClient(
@@ -502,7 +509,7 @@ class TestExportAudit:
         exp.export_audit.return_value = []
         app = _create_audit_app(exporter_mock=exp)
         with patch(
-            "app.api.deps.get_settings",
+            "app.core.config.get_settings",
             return_value=_mock_settings("test-master"),
         ):
             async with AsyncClient(
@@ -519,7 +526,7 @@ class TestExportAudit:
         exp.export_audit.return_value = []
         app = _create_audit_app(exporter_mock=exp)
         with patch(
-            "app.api.deps.get_settings",
+            "app.core.config.get_settings",
             return_value=_mock_settings("test-master"),
         ):
             async with AsyncClient(
@@ -539,7 +546,7 @@ class TestExportAudit:
         cursor = _encode_offset(1)
         app = _create_audit_app(exporter_mock=exp)
         with patch(
-            "app.api.deps.get_settings",
+            "app.core.config.get_settings",
             return_value=_mock_settings("test-master"),
         ):
             async with AsyncClient(
@@ -562,7 +569,7 @@ class TestExportAudit:
         cursor = _encode_offset(2)
         app = _create_audit_app(exporter_mock=exp)
         with patch(
-            "app.api.deps.get_settings",
+            "app.core.config.get_settings",
             return_value=_mock_settings("test-master"),
         ):
             async with AsyncClient(
@@ -583,7 +590,7 @@ class TestExportAudit:
         exp.export_audit.return_value = [_make_row()]
         app = _create_audit_app(exporter_mock=exp)
         with patch(
-            "app.api.deps.get_settings",
+            "app.core.config.get_settings",
             return_value=_mock_settings("test-master"),
         ):
             async with AsyncClient(
@@ -603,7 +610,7 @@ class TestExportAudit:
         dt_to = datetime(2026, 1, 31, tzinfo=UTC).isoformat()
         app = _create_audit_app(exporter_mock=exp)
         with patch(
-            "app.api.deps.get_settings",
+            "app.core.config.get_settings",
             return_value=_mock_settings("test-master"),
         ):
             async with AsyncClient(
@@ -637,7 +644,7 @@ class TestExportAudit:
         cursor = _encode_offset(0)
         app = _create_audit_app(exporter_mock=exp)
         with patch(
-            "app.api.deps.get_settings",
+            "app.core.config.get_settings",
             return_value=_mock_settings("test-master"),
         ):
             async with AsyncClient(
@@ -663,7 +670,7 @@ class TestAuditStats:
         svc.get_stats = AsyncMock(return_value={"total": 5, "buckets": []})
         app = _create_audit_app(service_mock=svc)
         with patch(
-            "app.api.deps.get_settings",
+            "app.core.config.get_settings",
             return_value=_mock_settings("test-master"),
         ):
             async with AsyncClient(
@@ -691,7 +698,7 @@ class TestAuditStats:
         )
         app = _create_audit_app(service_mock=svc)
         with patch(
-            "app.api.deps.get_settings",
+            "app.core.config.get_settings",
             return_value=_mock_settings("test-master"),
         ):
             async with AsyncClient(
@@ -719,7 +726,7 @@ class TestAuditStats:
         svc.get_stats = AsyncMock(return_value=Raw())
         app = _create_audit_app(service_mock=svc)
         with patch(
-            "app.api.deps.get_settings",
+            "app.core.config.get_settings",
             return_value=_mock_settings("test-master"),
         ):
             async with AsyncClient(
@@ -748,7 +755,7 @@ class TestAuditStats:
         svc.get_stats = AsyncMock(return_value=Raw())
         app = _create_audit_app(service_mock=svc)
         with patch(
-            "app.api.deps.get_settings",
+            "app.core.config.get_settings",
             return_value=_mock_settings("test-master"),
         ):
             async with AsyncClient(
@@ -774,7 +781,7 @@ class TestAuditStats:
         svc.get_stats = AsyncMock(return_value=Raw())
         app = _create_audit_app(service_mock=svc)
         with patch(
-            "app.api.deps.get_settings",
+            "app.core.config.get_settings",
             return_value=_mock_settings("test-master"),
         ):
             async with AsyncClient(
@@ -801,7 +808,7 @@ class TestAuditStats:
         )
         app = _create_audit_app(service_mock=svc)
         with patch(
-            "app.api.deps.get_settings",
+            "app.core.config.get_settings",
             return_value=_mock_settings("test-master"),
         ):
             async with AsyncClient(
@@ -828,7 +835,7 @@ class TestAuditStats:
         )
         app = _create_audit_app(service_mock=svc)
         with patch(
-            "app.api.deps.get_settings",
+            "app.core.config.get_settings",
             return_value=_mock_settings("test-master"),
         ):
             async with AsyncClient(
@@ -850,7 +857,7 @@ class TestAuditStats:
         svc.get_stats = AsyncMock(return_value=Raw())
         app = _create_audit_app(service_mock=svc)
         with patch(
-            "app.api.deps.get_settings",
+            "app.core.config.get_settings",
             return_value=_mock_settings("test-master"),
         ):
             async with AsyncClient(
@@ -876,7 +883,7 @@ class TestAuditStats:
         svc.get_stats = AsyncMock(return_value=Raw())
         app = _create_audit_app(service_mock=svc)
         with patch(
-            "app.api.deps.get_settings",
+            "app.core.config.get_settings",
             return_value=_mock_settings("test-master"),
         ):
             async with AsyncClient(
@@ -902,7 +909,7 @@ class TestAuditStats:
         svc.get_stats = AsyncMock(return_value=Raw())
         app = _create_audit_app(service_mock=svc)
         with patch(
-            "app.api.deps.get_settings",
+            "app.core.config.get_settings",
             return_value=_mock_settings("test-master"),
         ):
             async with AsyncClient(
@@ -928,7 +935,7 @@ class TestAuditStats:
         )
         app = _create_audit_app(service_mock=svc)
         with patch(
-            "app.api.deps.get_settings",
+            "app.core.config.get_settings",
             return_value=_mock_settings("test-master"),
         ):
             async with AsyncClient(
@@ -948,7 +955,7 @@ class TestAuditStats:
         dt_to = datetime(2026, 1, 31, tzinfo=UTC).isoformat()
         app = _create_audit_app(service_mock=svc)
         with patch(
-            "app.api.deps.get_settings",
+            "app.core.config.get_settings",
             return_value=_mock_settings("test-master"),
         ):
             async with AsyncClient(
@@ -971,7 +978,7 @@ class TestAuditStats:
         svc.get_stats = AsyncMock(side_effect=AttributeError("no get_stats"))
         app = _create_audit_app(service_mock=svc)
         with patch(
-            "app.api.deps.get_settings",
+            "app.core.config.get_settings",
             return_value=_mock_settings("test-master"),
         ):
             async with AsyncClient(
@@ -988,7 +995,7 @@ class TestAuditStats:
         svc.get_stats = AsyncMock(side_effect=RuntimeError("boom"))
         app = _create_audit_app(service_mock=svc)
         with patch(
-            "app.api.deps.get_settings",
+            "app.core.config.get_settings",
             return_value=_mock_settings("test-master"),
         ):
             async with AsyncClient(
@@ -1011,7 +1018,7 @@ class TestAuditStats:
         svc.get_stats = AsyncMock(return_value=Raw())
         app = _create_audit_app(service_mock=svc)
         with patch(
-            "app.api.deps.get_settings",
+            "app.core.config.get_settings",
             return_value=_mock_settings("test-master"),
         ):
             async with AsyncClient(
@@ -1034,7 +1041,7 @@ class TestAuditStats:
         svc.get_stats = AsyncMock(return_value=Raw())
         app = _create_audit_app(service_mock=svc)
         with patch(
-            "app.api.deps.get_settings",
+            "app.core.config.get_settings",
             return_value=_mock_settings("test-master"),
         ):
             async with AsyncClient(
@@ -1053,7 +1060,7 @@ class TestAuditStats:
         )
         app = _create_audit_app(service_mock=svc)
         with patch(
-            "app.api.deps.get_settings",
+            "app.core.config.get_settings",
             return_value=_mock_settings("test-master"),
         ):
             async with AsyncClient(
@@ -1077,7 +1084,7 @@ class TestAuditStats:
         )
         app = _create_audit_app(service_mock=svc)
         with patch(
-            "app.api.deps.get_settings",
+            "app.core.config.get_settings",
             return_value=_mock_settings("test-master"),
         ):
             async with AsyncClient(
@@ -1104,7 +1111,7 @@ class TestGetAuditLog:
         svc.get_log = AsyncMock(return_value=dto)
         app = _create_audit_app(service_mock=svc)
         with patch(
-            "app.api.deps.get_settings",
+            "app.core.config.get_settings",
             return_value=_mock_settings("test-master"),
         ):
             async with AsyncClient(
@@ -1124,7 +1131,7 @@ class TestGetAuditLog:
         svc.get_log = AsyncMock(return_value=None)
         app = _create_audit_app(service_mock=svc)
         with patch(
-            "app.api.deps.get_settings",
+            "app.core.config.get_settings",
             return_value=_mock_settings("test-master"),
         ):
             async with AsyncClient(
@@ -1145,7 +1152,7 @@ class TestGetAuditLog:
         svc.get_log = AsyncMock(side_effect=AttributeError("missing"))  # type: ignore[method-assign]
         app = _create_audit_app(service_mock=svc)  # type: ignore[arg-type]
         with patch(
-            "app.api.deps.get_settings",
+            "app.core.config.get_settings",
             return_value=_mock_settings("test-master"),
         ):
             async with AsyncClient(
@@ -1161,7 +1168,7 @@ class TestGetAuditLog:
         svc.get_log = AsyncMock(side_effect=Exception("Audit log not found"))
         app = _create_audit_app(service_mock=svc)
         with patch(
-            "app.api.deps.get_settings",
+            "app.core.config.get_settings",
             return_value=_mock_settings("test-master"),
         ):
             async with AsyncClient(
@@ -1177,7 +1184,7 @@ class TestGetAuditLog:
         svc.get_log = AsyncMock(side_effect=RuntimeError("db down"))
         app = _create_audit_app(service_mock=svc)
         with patch(
-            "app.api.deps.get_settings",
+            "app.core.config.get_settings",
             return_value=_mock_settings("test-master"),
         ):
             async with AsyncClient(
@@ -1205,7 +1212,7 @@ class TestGetAuditLog:
         svc.get_log = AsyncMock(return_value=raw)
         app = _create_audit_app(service_mock=svc)
         with patch(
-            "app.api.deps.get_settings",
+            "app.core.config.get_settings",
             return_value=_mock_settings("test-master"),
         ):
             async with AsyncClient(
@@ -1223,7 +1230,7 @@ class TestGetAuditLog:
         svc.get_log = AsyncMock(return_value=MagicMock(spec=[]))
         app = _create_audit_app(service_mock=svc)
         with patch(
-            "app.api.deps.get_settings",
+            "app.core.config.get_settings",
             return_value=_mock_settings("test-master"),
         ):
             async with AsyncClient(
@@ -1240,7 +1247,7 @@ class TestGetAuditLog:
         svc.get_log = AsyncMock(return_value=None)
         app = _create_audit_app(service_mock=svc)
         with patch(
-            "app.api.deps.get_settings",
+            "app.core.config.get_settings",
             return_value=_mock_settings("test-master"),
         ):
             async with AsyncClient(
@@ -1257,7 +1264,7 @@ class TestGetAuditLog:
         svc.get_log = AsyncMock(return_value=dto)
         app = _create_audit_app(service_mock=svc)
         with patch(
-            "app.api.deps.get_settings",
+            "app.core.config.get_settings",
             return_value=_mock_settings("test-master"),
         ):
             with patch.object(audit_module.audit, "info") as mock_info:
@@ -1282,7 +1289,7 @@ class TestDirectCoverage:
         svc.get_logs.return_value = AuditLogPageDTO(items=(), total=0)
         app = _create_audit_app(service_mock=svc)
         with patch(
-            "app.api.deps.get_settings",
+            "app.core.config.get_settings",
             return_value=_mock_settings("test-master"),
         ):
             with patch.object(audit_module.audit, "info") as mi:
@@ -1299,7 +1306,7 @@ class TestDirectCoverage:
         exp.export_audit.return_value = []
         app = _create_audit_app(exporter_mock=exp)
         with patch(
-            "app.api.deps.get_settings",
+            "app.core.config.get_settings",
             return_value=_mock_settings("test-master"),
         ):
             with patch.object(audit_module.audit, "info") as mi:
@@ -1316,7 +1323,7 @@ class TestDirectCoverage:
         svc.get_stats = AsyncMock(return_value={"total": 0, "buckets": []})
         app = _create_audit_app(service_mock=svc)
         with patch(
-            "app.api.deps.get_settings",
+            "app.core.config.get_settings",
             return_value=_mock_settings("test-master"),
         ):
             with patch.object(audit_module.audit, "info") as mi:
@@ -1333,7 +1340,7 @@ class TestDirectCoverage:
         svc.delete_all_logs.return_value = 0
         app = _create_audit_app(service_mock=svc)
         with patch(
-            "app.api.deps.get_settings",
+            "app.core.config.get_settings",
             return_value=_mock_settings("test-master"),
         ):
             with patch.object(audit_module.audit, "info") as mi:
@@ -1351,7 +1358,7 @@ class TestDirectCoverage:
         app = _create_audit_app(service_mock=svc)
         dt = datetime(2026, 2, 1, tzinfo=UTC).isoformat()
         with patch(
-            "app.api.deps.get_settings",
+            "app.core.config.get_settings",
             return_value=_mock_settings("test-master"),
         ):
             async with AsyncClient(

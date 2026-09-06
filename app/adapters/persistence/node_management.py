@@ -1,5 +1,6 @@
 """Short-scope SQLAlchemy adapter for node management ports."""
 
+from datetime import UTC, datetime
 from typing import cast
 from uuid import UUID
 
@@ -119,6 +120,8 @@ class SqlAlchemyNodeManagementGateway:
         tags = changes.get("tags")
         if isinstance(tags, tuple):
             changes["tags"] = list(tags)
+        # Explicit updated_at to avoid reliance on model onupdate (SQLite/no trigger)
+        changes["updated_at"] = datetime.now(UTC)
         async with self._sessionmaker.begin() as session:
             node = await NodeRepository(session).update(node_id, changes)
             return self._to_view(node) if node is not None else None
@@ -141,7 +144,7 @@ class SqlAlchemyNodeManagementGateway:
         async with self._sessionmaker.begin() as session:
             node = await NodeRepository(session).update(
                 node_id,
-                {"status": status},
+                {"status": status, "updated_at": datetime.now(UTC)},
             )
             return self._to_view(node) if node is not None else None
 

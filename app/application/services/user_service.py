@@ -7,7 +7,12 @@ from uuid import UUID
 
 import structlog
 
-from app.application.dto.user import UserCreateDTO, UserPageDTO, UserViewDTO
+from app.application.dto.user import (
+    UserCreateDTO,
+    UserPageDTO,
+    UserUpdateDTO,
+    UserViewDTO,
+)
 from app.core.exceptions import (
     InsufficientPermissionsError,
     UserAlreadyExistsError,
@@ -75,6 +80,40 @@ class UserService:
         users = await self._reader.list_users(offset, limit)
         total = await self._reader.count_users()
         return UserPageDTO(items=tuple(users), total=total)
+
+    async def get_user(
+        self, user_id: UUID, *, caller_is_superuser: bool = False
+    ) -> UserViewDTO:
+        """Get one user by id."""
+        if not caller_is_superuser:
+            raise InsufficientPermissionsError("Only superusers can get users")
+        user = await self._reader.get_user(user_id)
+        if user is None:
+            raise UserNotFoundError(f"User {user_id} not found")
+        return user
+
+    async def patch_user(
+        self,
+        user_id: UUID,
+        data: UserUpdateDTO,
+        *,
+        caller_is_superuser: bool = False,
+    ) -> UserViewDTO:
+        """Patch all mutable fields (email, password, is_active, is_superuser)."""
+        if not caller_is_superuser:
+            raise InsufficientPermissionsError("Only superusers can update users")
+        # email uniqueness
+        if data.email is not None:
+            existing = await self._reader.get_by_email(data.email)
+            if existing is not None and existing.id != user_id:
+                raise UserAlreadyExistsError(
+                    f"User with email '{data.email}' already exists"
+                )
+        updated = await self._writer.update_user(user_id, data)
+        if updated is None:
+            raise UserNotFoundError(f"User {user_id} not found")
+        audit.info("user.patch.ok", user_id=str(user_id))
+        return updated
 
     async def delete_user(
         self, user_id: UUID, *, caller_is_superuser: bool = False

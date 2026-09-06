@@ -3,7 +3,7 @@
 from typing import Protocol
 from uuid import UUID
 
-from app.application.dto.user import UserCreateDTO, UserViewDTO
+from app.application.dto.user import UserCreateDTO, UserUpdateDTO, UserViewDTO
 
 
 class UserReader(Protocol):
@@ -47,6 +47,12 @@ class UserWriter(Protocol):
 
     async def create_user(self, data: UserCreateDTO) -> UserViewDTO:
         """Create and return a user."""
+        ...
+
+    async def update_user(
+        self, user_id: UUID, data: UserUpdateDTO
+    ) -> UserViewDTO | None:
+        """Patch user fields, return updated view or None if not found."""
         ...
 
     async def delete_user(self, user_id: UUID) -> bool:

@@ -1,5 +1,7 @@
 """Short-scope SQLAlchemy adapter for node status history ports."""
 
+from typing import cast
+
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.adapters.persistence.dao.node_status_history import (
@@ -11,6 +13,7 @@ from app.application.dto.node_status_history import (
     NodeStatusHistoryQueryDTO,
     NodeStatusHistoryRecordDTO,
 )
+from app.core.types import NodeStatus, NodeStatusSource
 from app.models.node_status_history import NodeStatusHistoryModel
 
 
@@ -55,8 +58,8 @@ class SqlAlchemyNodeStatusHistoryGateway:
         return NodeStatusHistoryRecordDTO(
             id=record.id,
             node_id=record.node_id,
-            old_status=record.old_status,
-            new_status=record.new_status,
-            source=record.source,
+            old_status=cast(NodeStatus | None, record.old_status),
+            new_status=cast(NodeStatus, record.new_status),
+            source=cast(NodeStatusSource, record.source),
             changed_at=record.changed_at,
         )

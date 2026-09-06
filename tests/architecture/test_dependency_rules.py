@@ -12,7 +12,7 @@ FORBIDDEN_IMPORTS: dict[str, tuple[str, ...]] = {
     "models": ("app.api", "app.services", "app.repositories"),
     "core": ("app.api",),
     "repositories": ("app.api", "app.services"),
-    "api": ("app.repositories", "app.models", "app.di.container"),
+    "api": ("app.repositories", "app.models", "app.di.container", "sqlalchemy"),
     "application": (
         "app.api",
         "app.schemas",
@@ -192,15 +192,23 @@ def test_runtime_orchestration_does_not_import_global_container(
 
 
 def test_app_resources_define_lifecycle_finalizers() -> None:
-    source = (APP_ROOT / "di" / "providers.py").read_text(encoding="utf-8")
+    source = ""
+    for p in (APP_ROOT / "di").rglob("*.py"):
+        source += p.read_text(encoding="utf-8")
     assert "await engine.dispose()" in source
     assert "await scheduler.stop()" in source
 
 
 def test_application_ports_have_explicit_dishka_bindings() -> None:
     """Composition root must identify port registrations explicitly."""
-    path = APP_ROOT / "di" / "providers.py"
-    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    # Aggregate all provider files (split modules)
+    sources = []
+    for p in sorted((APP_ROOT / "di").rglob("*.py")):
+        if p.name.startswith("test_"):
+            continue
+        sources.append(p.read_text(encoding="utf-8"))
+    combined = "\n".join(sources)
+    tree = ast.parse(combined, filename="app/di/providers.py")
     port_factories = {
         "get_api_key_reader",
         "get_api_key_writer",

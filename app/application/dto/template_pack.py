@@ -171,6 +171,19 @@ class PackStatsBucketDTO:
 
 
 @dataclass(frozen=True, slots=True)
+class PackUpdateDTO:
+    """Pack metadata update (partial)."""
+
+    name: str | None = None
+    description: str | None = None
+    version: str | None = None
+    author: str | None = None
+    tags: tuple[str, ...] | None = None
+    manifest_sha: str | None = None
+    readme: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class PackStatsDTO:
     """Stats result."""
 

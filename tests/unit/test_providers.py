@@ -4,11 +4,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from app.adapters.persistence.dao.command import CommandRepository
 from app.adapters.persistence.dao.health import HealthRepository
-from app.adapters.persistence.dao.node import NodeRepository
-from app.adapters.persistence.dao.script import ScriptRepository
-from app.adapters.persistence.dao.script_execution import ScriptExecutionRepository
 from app.application.services.api_key_authentication import (
     APIKeyAuthenticationService,
 )
@@ -41,7 +37,7 @@ async def test_db_provider_disposes_engine() -> None:
     engine.dispose = AsyncMock()
     provider = DbProvider()
 
-    with patch("app.di.providers.create_async_engine", return_value=engine):
+    with patch("app.di.providers_modules.db.create_async_engine", return_value=engine):
         resource = provider.get_engine(settings)
         provided_engine = await anext(resource)
         assert provided_engine is engine
@@ -86,15 +82,9 @@ async def test_scheduler_provider_manages_lifecycle() -> None:
 def test_repository_provider_resolves() -> None:
     session = MagicMock()
     provider = RepositoryProvider()
-    assert isinstance(provider.get_node_repository(session), NodeRepository)
     audit_gateway = provider.get_audit_log_gateway(MagicMock())
     assert provider.get_audit_log_reader(audit_gateway) is audit_gateway
     assert provider.get_audit_log_writer(audit_gateway) is audit_gateway
-    assert isinstance(provider.get_command_repository(session), CommandRepository)
-    assert isinstance(provider.get_script_repository(session), ScriptRepository)
-    assert isinstance(
-        provider.get_script_execution_repository(session), ScriptExecutionRepository
-    )
     api_key_gateway = provider.get_api_key_gateway(MagicMock())
     assert provider.get_api_key_reader(api_key_gateway) is api_key_gateway
     assert provider.get_api_key_writer(api_key_gateway) is api_key_gateway
@@ -181,6 +171,7 @@ def test_service_provider_resolves() -> None:
         node_reader,
         MagicMock(),
         credential_cipher,
+        MagicMock(),
         MagicMock(),
         MagicMock(),
     )
@@ -326,7 +317,10 @@ async def test_audit_worker_provider_lifecycle() -> None:
     provider = SchedulerProvider()
     worker = MagicMock()
     worker.stop = AsyncMock()
-    with patch("app.di.providers.AuditOutboxWorker", return_value=worker):
+    with patch(
+        "app.di.providers_modules.scheduler.AuditOutboxWorker",  # noqa: E501
+        return_value=worker,
+    ):
         resource = provider.get_audit_outbox_worker(MagicMock())
         assert await anext(resource) is worker
         await resource.aclose()
@@ -336,7 +330,7 @@ async def test_audit_worker_provider_lifecycle() -> None:
 
 def test_config_provider_returns_cached_settings() -> None:
     expected = MagicMock()
-    with patch("app.di.providers.get_settings", return_value=expected):
+    with patch("app.di.providers_modules.config.get_settings", return_value=expected):
         assert ConfigProvider().get_settings() is expected
 
 

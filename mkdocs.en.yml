@@ -37,6 +37,10 @@ nav:
       - Import and export: guides/configuration-import-export.md
       - Favorites, notes, tags: guides/favorites-notes-tags.md
       - Dashboard, search, metrics: guides/dashboard-search-metrics.md
+      - Global search: guides/search.md
+      - Event stream: guides/events.md
+      - User management: guides/users.md
+      - Scheduler: guides/scheduler.md
       - Troubleshooting: guides/troubleshooting.md
       - FAQ: guides/faq.md
   - Operations:

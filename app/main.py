@@ -19,10 +19,10 @@ from starlette.middleware.base import RequestResponseEndpoint
 from starlette.responses import Response
 
 from app.adapters.lifecycle.application_startup import ApplicationStartup
+from app.adapters.lifecycle.commit_middleware import CommitOnResponseMiddleware
 from app.adapters.telemetry import init_telemetry
 from app.api.error_mapping import domain_error_handler
 from app.api.middleware import (
-    CommitOnResponseMiddleware,
     RateLimitMiddleware,
     RequestIdMiddleware,
     RequestLoggingMiddleware,
@@ -45,7 +45,7 @@ from app.api.v2.search import router as search_router
 from app.api.v2.templates import router as templates_router
 from app.api.v2.users import router as users_router
 from app.api.v2.websocket import router as ws_router
-from app.core.config import get_settings
+from app.core.config import Settings, get_settings
 from app.core.exceptions import DomainError
 from app.di.container import container
 from app.schemas.common import AUTHENTICATED_ERROR_RESPONSES
@@ -77,9 +77,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         await container.close()
 
 
-def create_app() -> FastAPI:
+def create_app(settings: Settings | None = None) -> FastAPI:
     """Create and configure the FastAPI application."""
-    settings = get_settings()
+    if settings is None:
+        settings = get_settings()
     try:
         app_version = pkg_version("node-nexus-api")
     except PackageNotFoundError:
