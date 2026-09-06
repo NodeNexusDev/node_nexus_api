@@ -78,11 +78,11 @@ class SqlAlchemySchedulerOwnership:
                     text("SELECT pg_advisory_unlock(:lock_id)"),
                     {"lock_id": _SCHEDULER_LOCK_ID},
                 )
-            except Exception:
-                pass
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("scheduler.owner.unlock_failed", error=str(exc))
             try:
                 await self._connection.close()
-            except Exception:
-                pass
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("scheduler.owner.close_failed", error=str(exc))
             self._connection = None
         self._acquired = False

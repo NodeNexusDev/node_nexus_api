@@ -236,7 +236,8 @@ class ApschedulerRuntime:
 
     async def _monitor_ownership_with_port(self) -> None:
         """Monitor ownership via port."""
-        assert self._ownership is not None
+        if self._ownership is None:
+            raise RuntimeError("Scheduler ownership is not configured")
         while True:
             try:
                 if not self._ownership.is_acquired:
@@ -296,8 +297,8 @@ class ApschedulerRuntime:
         if self._ownership is not None:
             try:
                 await self._ownership.release()
-            except Exception:
-                pass
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("scheduler.owner.release_failed", error=str(exc))
             self._owns_execution = False
         elif self._owner_connection is not None:
             sa_text = __import__("sqlalchemy").text  # type: ignore[attr-defined]
@@ -306,9 +307,12 @@ class ApschedulerRuntime:
                     sa_text("SELECT pg_advisory_unlock(:lock_id)"),
                     {"lock_id": _SCHEDULER_LOCK_ID},
                 )
-            except Exception:
-                pass
-            await self._owner_connection.close()  # type: ignore[union-attr]
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("scheduler.owner.unlock_failed", error=str(exc))
+            try:
+                await self._owner_connection.close()  # type: ignore[union-attr]
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("scheduler.owner.close_failed", error=str(exc))
             self._owner_connection = None
             self._owns_execution = False
         else:

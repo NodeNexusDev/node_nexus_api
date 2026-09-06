@@ -10,6 +10,7 @@ from datetime import UTC, datetime
 from typing import Literal
 
 import sqlalchemy as sa
+import structlog
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -34,6 +35,8 @@ from app.models.script import ScriptModel
 from app.models.template_asset import TemplateAssetModel
 from app.models.template_installation import TemplateInstallationModel
 from app.models.template_pack import TemplatePackModel
+
+logger = structlog.get_logger()
 
 
 def _unique_name(base: str, existing: set[str]) -> str:
@@ -312,8 +315,12 @@ class SqlAlchemyTemplatePackGateway:
                         )
                     base_q = base_q.where(where)
                     count_q = count_q.where(where)
-                except Exception:
-                    pass
+                except Exception as exc:  # noqa: BLE001
+                    logger.warning(
+                        "template_pack.tag_filter_failed",
+                        error=str(exc),
+                        tag=query.tag,
+                    )
 
             if is_mock:
                 # Python fallback for mocked tests (keeps tag/search parity)

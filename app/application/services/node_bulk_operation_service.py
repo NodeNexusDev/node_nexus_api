@@ -154,10 +154,12 @@ class NodeBulkOperationService:
             result = await self._operator.bulk_check(node_ids)
             return result
 
-        assert self._node_reader is not None
-        assert self._credential_cipher is not None
-        assert self._connector_factory is not None
-
+        if (
+            self._node_reader is None
+            or self._credential_cipher is None
+            or self._connector_factory is None
+        ):
+            raise RuntimeError("SSH dependencies are not configured")
         node_reader = self._node_reader
         credential_cipher = self._credential_cipher
         connector_factory = self._connector_factory
@@ -259,7 +261,9 @@ class NodeBulkOperationService:
                 and old_status != new_status
             )
             if should_write_history:
-                assert self._status_history_writer is not None
+                # should_write_history guarantees writer is not None
+                if self._status_history_writer is None:
+                    raise RuntimeError("Status history writer is not configured")
                 try:
                     await self._status_history_writer.save(
                         NodeStatusChangeDTO(

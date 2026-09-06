@@ -13,7 +13,7 @@ from app.application.services.api_key_authentication import (
     APIKeyAuthenticationService,
     AuthenticatedPrincipal,
 )
-from app.core.config import Settings, get_settings
+from app.core.config import Settings
 from app.core.exceptions import (
     APIKeyRevokedError,
     AuthenticationError,
@@ -85,6 +85,7 @@ def _create_app_with_auth(
 
         @provide(scope=Scope.APP)
         def get_settings(self) -> Settings:
+            from app.core.config import get_settings
 
             return get_settings()
 
@@ -208,6 +209,7 @@ def _create_app_with_write_scope(
 
         @provide(scope=Scope.APP)
         def get_settings(self) -> Settings:
+            from app.core.config import get_settings
 
             return get_settings()
 

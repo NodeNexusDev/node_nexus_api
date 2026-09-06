@@ -4,12 +4,15 @@ import base64
 import os
 from functools import lru_cache
 
+import structlog
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 
 from app.core.config import get_settings
 from app.core.exceptions import CredentialDecryptionError
+
+logger = structlog.get_logger()
 
 ENCRYPTION_PREFIX = "enc:v1:"
 
@@ -75,8 +78,8 @@ def decrypt(token: str) -> str:
         if prev is not None:
             try:
                 return AESGCM(prev).decrypt(nonce, ciphertext, None).decode()
-            except Exception:
-                pass
+            except Exception as exc:  # noqa: BLE001
+                logger.debug("credential.prev_decrypt_failed", error=str(exc))
         raise primary_exc
 
 

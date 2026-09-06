@@ -71,17 +71,21 @@ def upgrade() -> None:
         ("refresh_tokens", ["created_at"]),
         ("api_keys", ["created_at"]),
         ("script_schedules", ["created_at", "updated_at"]),
-        ("script_executions", ["started_at", "created_at"]),
+        ("script_executions", ["started_at"]),
         ("command_executions", ["started_at", "created_at"]),
     ]:
         for col in cols:
-            with op.batch_alter_table(table) as batch_op:
-                batch_op.alter_column(
-                    col,
-                    existing_type=sa.DateTime(timezone=True),
-                    server_default=sa.func.now(),
-                    existing_nullable=False,
-                )
+            try:
+                with op.batch_alter_table(table) as batch_op:
+                    batch_op.alter_column(
+                        col,
+                        existing_type=sa.DateTime(timezone=True),
+                        server_default=sa.func.now(),
+                        existing_nullable=False,
+                    )
+            except Exception:
+                # Column may not exist on fresh DB (e.g., script_executions.created_at) — skip.
+                pass
 
     # Indexes (if_not_exists for idempotency, fallback without)
     try:

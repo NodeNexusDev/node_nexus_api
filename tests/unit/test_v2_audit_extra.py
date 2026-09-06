@@ -21,7 +21,7 @@ from app.application.dto.audit import AuditLogDTO, AuditLogPageDTO
 from app.application.dto.export import AuditExportRowDTO
 from app.application.ports.export import AuditExporter
 from app.application.services.audit_log_service import AuditLogService
-from app.core.config import Settings, get_settings
+from app.core.config import Settings
 from app.schemas.common import BulkResult
 from tests.typing import as_typed_mock
 from tests.unit.conftest import MockAuthServiceProvider, _mock_settings
@@ -74,6 +74,7 @@ def _create_audit_app(
 
         @provide(scope=Scope.APP)
         def get_settings(self) -> Settings:
+            from app.core.config import get_settings
 
             return get_settings()
 
