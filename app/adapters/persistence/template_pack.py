@@ -9,6 +9,7 @@ from collections import defaultdict
 from datetime import UTC, datetime
 from typing import Literal
 
+import sqlalchemy as sa
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -278,6 +279,24 @@ class SqlAlchemyTemplatePackGateway:
                         TemplatePackModel.description.ilike(term),
                     )
                 )
+            # Tag via SQL where possible (Postgres contains, SQLite instr)
+            if query.tag is not None:
+                try:
+                    bind = session.get_bind()
+                    if bind is not None and bind.dialect.name == "postgresql":
+                        q = q.where(
+                            TemplatePackModel.tags.contains([query.tag])  # type: ignore[attr-defined]
+                        )
+                    else:
+                        q = q.where(
+                            sa.func.instr(
+                                sa.cast(TemplatePackModel.tags, sa.Text),
+                                f'"{query.tag}"',
+                            )
+                            > 0
+                        )
+                except Exception:
+                    pass
             rows = await session.execute(q)
             items = rows.scalars().all()
             # Tag filtering in python (ARRAY vs JSON parity) + search fallback

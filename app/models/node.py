@@ -31,6 +31,10 @@ class NodeModel(Base):
             "status IN ('active', 'unreachable', 'error')",
             name="chk_nodes_status",
         ),
+        sa.CheckConstraint(
+            "connection_type = 'ssh'",
+            name="chk_nodes_connection_type",
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)

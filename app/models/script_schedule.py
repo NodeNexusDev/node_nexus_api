@@ -18,6 +18,10 @@ class ScriptScheduleModel(Base):
     __table_args__ = (
         Index("ix_script_schedules_script_id", "script_id", unique=True),
         Index("ix_script_schedules_enabled", "enabled"),
+        sa.CheckConstraint(
+            "operational_state IN ('registered', 'pending_registration')",
+            name="chk_script_schedules_operational_state",
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
