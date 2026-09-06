@@ -254,7 +254,7 @@ class TestTemplatePackGatewayCreate:
                     ),
                 )
 
-        gw._asset_gateway = NoInSession()  # type: ignore
+        gw._asset_gateway = NoInSession()  # type: ignore[attr-defined]
         b64 = base64.b64encode(b"hello").decode()
         data = PackCreateDTO(
             manifest=PackManifestDTO(
@@ -307,7 +307,7 @@ class TestTemplatePackGatewayCreate:
         ]:
             data = PackCreateDTO(
                 manifest=PackManifestDTO(pack_id=pack_id, name="n", version="1.0.0"),
-                assets=flist,  # type: ignore
+                assets=flist,  # type: ignore[arg-type]
             )
             res = await gw.create_pack(data)
             # In dead code path, assets should be created via direct loop
@@ -1289,7 +1289,7 @@ class TestApschedulerRuntimeBoost:
             pass
 
         # Should return at isinstance JobSubmissionEvent check
-        ApschedulerRuntime._record_scheduler_event(Dummy())  # type: ignore
+        ApschedulerRuntime._record_scheduler_event(Dummy())  # type: ignore[arg-type]
 
     def test_owns_execution_and_mark_restored(self):
         from app.adapters.runtime.apscheduler_runtime import ApschedulerRuntime
@@ -1495,7 +1495,7 @@ class TestApschedulerRuntimeBoost:
         mock_owner.try_acquire = AsyncMock(return_value=True)
         mock_owner.probe = AsyncMock(return_value=True)
         rt2 = ApschedulerRuntime(ownership=mock_owner)
-        rt2.acquire_ownership = AsyncMock(return_value=True)  # type: ignore
+        rt2.acquire_ownership = AsyncMock(return_value=True)  # type: ignore[attr-defined]
         with patch(
             "app.adapters.runtime.apscheduler_runtime.asyncio.sleep",
             AsyncMock(side_effect=asyncio.CancelledError),
@@ -1546,7 +1546,7 @@ class TestApschedulerRuntimeBoost:
         rt._owner_connection = None
         eng = MagicMock()
         eng.dialect.name = "postgresql"
-        rt.acquire_ownership = AsyncMock(return_value=True)  # type: ignore
+        rt.acquire_ownership = AsyncMock(return_value=True)  # type: ignore[attr-defined]
         with patch(
             "app.adapters.runtime.apscheduler_runtime.asyncio.sleep",
             AsyncMock(side_effect=asyncio.CancelledError),
@@ -1672,7 +1672,7 @@ class TestApschedulerRuntimeBoost:
         rt2.configure_executor(AsyncMock())
         rt2._owns_execution = False
         await rt2._execute_scheduled_script(uuid.uuid4(), [uuid.uuid4()])
-        rt2._executor.assert_not_awaited()  # type: ignore
+        rt2._executor.assert_not_awaited()  # type: ignore[attr-defined]
 
         # execute with no executor -> RuntimeError
         rt3 = ApschedulerRuntime()
@@ -1729,7 +1729,7 @@ class TestApschedulerRuntimeBoost:
         sid = uuid.uuid4()
         rt.schedule_script(sid, "0 9 * * *", [])
         job = rt._scheduler.get_job(str(sid))
-        job.next_run_time = "not datetime"  # type: ignore
+        job.next_run_time = "not datetime"  # type: ignore[assignment]
         assert rt.get_next_run_time(sid) is None
         # also when job is None
         assert rt.get_next_run_time(uuid.uuid4()) is None
