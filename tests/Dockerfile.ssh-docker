@@ -1,4 +1,4 @@
-FROM lscr.io/linuxserver/openssh-server:latest@sha256:96b9a4d3b5106746d08d43a6911650d4d21f7d5c7f2ac9660e792bdb5e63157c
+FROM lscr.io/linuxserver/openssh-server:latest@sha256:39ba37d50fdd6be1bf70644c871e5dcb9234ee79ac56424ea03ca08cadf1e7b0
 
 USER root
 
