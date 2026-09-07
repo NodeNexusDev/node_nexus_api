@@ -110,6 +110,7 @@ jobs:
         run: uv run ty check .
 
   test:
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     needs: lint
     env:
@@ -155,6 +156,7 @@ jobs:
           path: coverage.xml
 
   docker:
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     needs: test
     steps:
@@ -183,6 +185,7 @@ jobs:
             node-nexus-api:test python -c "from app.main import app; print('App loaded successfully')"
 
   e2e-smoke:
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     needs: docker
     timeout-minutes: 15
@@ -218,6 +221,7 @@ jobs:
           path: build/test-results/
 
   e2e-full:
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     needs: e2e-smoke
     timeout-minutes: 30
