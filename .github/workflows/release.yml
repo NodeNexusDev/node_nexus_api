@@ -93,8 +93,8 @@ jobs:
           images: ghcr.io/${{ github.repository }}
           tags: |
             type=sha,prefix=
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{version}},value=${{ steps.find_tag.outputs.tag }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ steps.find_tag.outputs.tag }}
             type=raw,value=latest,enable=${{ steps.find_tag.outputs.skip == 'false' }}
 
       - name: Build and push Docker image
