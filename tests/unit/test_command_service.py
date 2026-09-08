@@ -36,6 +36,7 @@ def make_command_view(**overrides: object) -> CommandViewDTO:
         "command": "df -h",
         "parameters": (),
         "tags": (),
+        "timeout": 30,
         "created_at": now,
         "updated_at": now,
     }
@@ -47,6 +48,7 @@ def make_command_view(**overrides: object) -> CommandViewDTO:
         command=values["command"],
         parameters=values["parameters"],
         tags=values["tags"],
+        timeout=values["timeout"],
         created_at=values["created_at"],
         updated_at=values["updated_at"],
     )

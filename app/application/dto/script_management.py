@@ -31,6 +31,7 @@ class ScriptCreateDTO:
     steps: tuple[ScriptStepDTO, ...]
     description: str | None = None
     tags: tuple[str, ...] = ()
+    timeout: int = 30
 
 
 @dataclass(frozen=True, slots=True)
@@ -49,6 +50,7 @@ class ScriptViewDTO:
     description: str | None
     steps: tuple[ScriptStepDTO, ...]
     tags: tuple[str, ...]
+    timeout: int
     created_at: datetime
     updated_at: datetime
 

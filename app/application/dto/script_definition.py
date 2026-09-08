@@ -12,3 +12,4 @@ class ScriptDefinitionDTO:
 
     id: UUID
     steps: tuple[JsonObject, ...]
+    timeout: int = 30

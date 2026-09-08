@@ -105,6 +105,7 @@ class ScriptManagementService:
             description=original.description,
             steps=original.steps,
             tags=original.tags,
+            timeout=original.timeout,
         )
         cloned = await self._writer.create_script(clone_data)
         audit.info("script.clone.ok", script_id=str(cloned.id), source=str(script_id))

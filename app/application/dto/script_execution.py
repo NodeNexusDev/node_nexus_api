@@ -37,6 +37,7 @@ class ScriptExecutionRequestDTO:
     params: tuple[tuple[str, JsonValue], ...] = ()
     trigger: str = "manual"
     schedule_id: UUID | None = None
+    timeout: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -47,6 +48,7 @@ class ScriptExecutionTargetDTO:
     script_id: UUID
     node: NodeConnectionDTO
     steps: tuple[ResolvedScriptStepDTO, ...]
+    timeout: int = 30
 
 
 @dataclass(frozen=True, slots=True)
@@ -95,6 +97,7 @@ class ScriptExecutionDTO:
     steps: tuple[ScriptStepResultDTO, ...]
     started_at: datetime
     finished_at: datetime | None
+    timeout: int | None = None
 
 
 @dataclass(frozen=True, slots=True)

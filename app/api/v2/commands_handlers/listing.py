@@ -98,6 +98,7 @@ def _command_response(command: CommandViewDTO) -> CommandResponse:
             for parameter in command.parameters
         ],
         tags=list(command.tags),
+        timeout=command.timeout,
         created_at=command.created_at,
         updated_at=command.updated_at,
     )
@@ -175,6 +176,7 @@ async def bulk_create_commands(
                 command=item.command,
                 parameters=tuple(_parameter_dto(p) for p in item.parameters),
                 tags=tuple(item.tags),
+                timeout=item.timeout if item.timeout is not None else 30,
             )
             created = await service.create_command(dto)
             return CommandBulkCreateResult(

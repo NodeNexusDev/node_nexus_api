@@ -98,6 +98,7 @@ def _command_response(command: CommandViewDTO) -> CommandResponse:
             for parameter in command.parameters
         ],
         tags=list(command.tags),
+        timeout=command.timeout,
         created_at=command.created_at,
         updated_at=command.updated_at,
     )
@@ -146,12 +147,16 @@ async def bulk_executions(
                 list(cmd.parameters),
                 raw_params,
             )
+            effective_timeout = (
+                data.timeout if data.timeout is not None else cmd.timeout
+            )
             result = await bulk_service.execute(
                 BulkCommandRequestDTO(
                     command=rendered,
                     node_ids=tuple(data.node_ids),
                     tags=tuple(data.node_tags),
                     command_id=command_id,
+                    timeout=effective_timeout,
                 )
             )
             items: list[BulkExecutionItem] = []
@@ -224,11 +229,13 @@ async def bulk_raw_executions(
 
     async def _execute_raw(command: str) -> list[BulkExecutionItem]:
         try:
+            effective_timeout = data.timeout if data.timeout is not None else 30
             result = await bulk_service.execute(
                 BulkCommandRequestDTO(
                     command=command,
                     node_ids=tuple(data.node_ids),
                     tags=tuple(data.node_tags),
+                    timeout=effective_timeout,
                 )
             )
             items: list[BulkExecutionItem] = []

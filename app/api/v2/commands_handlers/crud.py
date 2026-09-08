@@ -101,6 +101,7 @@ def _command_response(command: CommandViewDTO) -> CommandResponse:
             for parameter in command.parameters
         ],
         tags=list(command.tags),
+        timeout=command.timeout,
         created_at=command.created_at,
         updated_at=command.updated_at,
     )

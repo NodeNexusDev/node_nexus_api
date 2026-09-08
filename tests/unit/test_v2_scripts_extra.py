@@ -66,6 +66,7 @@ def _make_script_view(**overrides: object) -> ScriptViewDTO:
         "description": "desc",
         "steps": (),
         "tags": ("ops",),
+        "timeout": 30,
         "created_at": now,
         "updated_at": now,
     }

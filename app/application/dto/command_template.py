@@ -13,3 +13,4 @@ class CommandTemplateDTO:
     id: UUID
     command: str
     parameters: tuple[CommandParameterDTO, ...]
+    timeout: int = 30

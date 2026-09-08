@@ -30,6 +30,7 @@ def _script_view() -> ScriptViewDTO:
         description=None,
         steps=(ScriptStepDTO(label="check", type="inline", command="true"),),
         tags=("ops",),
+        timeout=30,
         created_at=now,
         updated_at=now,
     )

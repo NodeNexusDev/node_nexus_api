@@ -74,3 +74,25 @@ class CommandExecutionRepository:
             )
         )
         return result.scalar_one()
+
+    async def list_by_command(
+        self, command_id: UUID, skip: int = 0, limit: int = 100
+    ) -> list[CommandExecutionModel]:
+        """Get paginated records for one command template ordered by created_at DESC."""
+        result = await self._session.execute(
+            select(CommandExecutionModel)
+            .where(CommandExecutionModel.command_id == command_id)
+            .order_by(CommandExecutionModel.created_at.desc())
+            .offset(skip)
+            .limit(limit)
+        )
+        return list(result.scalars().all())
+
+    async def count_by_command(self, command_id: UUID) -> int:
+        """Count execution records for one command template."""
+        result = await self._session.execute(
+            select(func.count(CommandExecutionModel.id)).where(
+                CommandExecutionModel.command_id == command_id
+            )
+        )
+        return result.scalar_one()

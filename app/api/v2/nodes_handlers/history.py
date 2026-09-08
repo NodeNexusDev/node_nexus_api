@@ -143,6 +143,24 @@ async def get_node_status_history(
     )
 
 
+@router.get(
+    "/{node_id}/history",
+    response_model=CursorPage[NodeStatusHistoryItem],
+    include_in_schema=False,
+)
+@inject
+async def get_node_history_alias(
+    node_id: uuid.UUID,
+    service: FromDishka[NodeStatusHistoryService],
+    cursor: str | None = Query(None, description="Opaque cursor for pagination"),
+    limit: int = Query(20, ge=1, le=100),
+    _principal: Principal = Security(get_current_principal),
+) -> CursorPage[NodeStatusHistoryItem]:
+    """RESTful alias for GET /{id}/history (bulk-first consistency)."""
+
+    return await get_node_status_history(node_id, service, cursor, limit, _principal)
+
+
 # ---------------------------------------------------------------------------
 # Single node — GET /{node_id}, PATCH /{node_id}, DELETE /{node_id}
 # ---------------------------------------------------------------------------

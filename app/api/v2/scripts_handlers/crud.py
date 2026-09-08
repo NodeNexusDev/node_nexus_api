@@ -108,6 +108,7 @@ def _script_response(script: ScriptViewDTO) -> ScriptResponse:
             for step in script.steps
         ],
         tags=list(script.tags),
+        timeout=script.timeout,
         created_at=script.created_at,
         updated_at=script.updated_at,
     )

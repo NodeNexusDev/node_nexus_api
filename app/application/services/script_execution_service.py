@@ -22,6 +22,7 @@ from app.application.dto.script_execution import (
 )
 from app.application.policies.output import bound_output
 from app.application.services._target_resolver import resolve_targets
+from app.application.services.execution_registry import register_execution
 from app.application.types import JsonObject, JsonValue, PersistenceObject
 from app.core.exceptions import (
     AuditWriteError,
@@ -84,6 +85,11 @@ class ScriptExecutionService:
         if not nodes and request.node_ids:
             raise NodeNotFoundError("Node not found")
 
+        # Unified timeout: request override → script model → 30
+        effective_timeout = (
+            request.timeout if request.timeout is not None else definition.timeout
+        )
+
         targets: list[ScriptExecutionTargetDTO] = []
         for node in nodes:
             execution_id = await self._execution_writer.create_execution(
@@ -96,6 +102,7 @@ class ScriptExecutionService:
                     "schedule_id": request.schedule_id,
                     "steps": [],
                     "started_at": datetime.now(UTC),
+                    "timeout": effective_timeout,
                 }
             )
             targets.append(
@@ -104,6 +111,7 @@ class ScriptExecutionService:
                     script_id=script_id,
                     node=node,
                     steps=resolved_steps,
+                    timeout=effective_timeout,
                 )
             )
 
@@ -111,9 +119,34 @@ class ScriptExecutionService:
 
         async def run(target: ScriptExecutionTargetDTO) -> ScriptNodeResultDTO:
             async with semaphore:
+                # Register for cancel
+                task = asyncio.current_task()
+                if task is not None:
+                    register_execution(target.execution_id, task)  # type: ignore[arg-type]
                 return await self._run_remote(target)
 
-        results = await asyncio.gather(*(run(target) for target in targets))
+        # Whole-script timeout (covers all steps, not per-step)
+        try:
+            results = await asyncio.wait_for(
+                asyncio.gather(*(run(target) for target in targets)),
+                timeout=effective_timeout,
+            )
+        except TimeoutError:
+            # Mark all as error on script-level timeout
+            for target in targets:
+                try:
+                    await self._execution_writer.update_execution(
+                        target.execution_id,
+                        {
+                            "status": "error",
+                            "steps": [],
+                            "finished_at": datetime.now(UTC),
+                            "timeout": effective_timeout,
+                        },
+                    )
+                except Exception:
+                    pass
+            raise TimeoutError(f"Script execution timed out after {effective_timeout}s")
         for result in results:
             try:
                 await self._execution_writer.update_execution(
@@ -213,9 +246,19 @@ class ScriptExecutionService:
             async with connector:
                 for index, step in enumerate(target.steps):
                     if step.resolution_error is None:
-                        stdout, stderr, exit_code = await connector.execute_command(
-                            step.command
-                        )
+                        try:
+                            async with asyncio.timeout(target.timeout):
+                                (
+                                    stdout,
+                                    stderr,
+                                    exit_code,
+                                ) = await connector.execute_command(step.command)
+                        except TimeoutError:
+                            stdout, stderr, exit_code = (
+                                "",
+                                f"Timeout after {target.timeout}s",
+                                124,
+                            )
                     else:
                         stdout, stderr, exit_code = "", step.resolution_error, 1
                     safe_stdout = bound_output(stdout)
