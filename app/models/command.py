@@ -35,6 +35,9 @@ class CommandModel(Base):
     template_pack_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("template_packs.id", ondelete="SET NULL"), nullable=True
     )  # noqa: E501
+    timeout: Mapped[int] = mapped_column(
+        sa.Integer, default=30, nullable=False, server_default="30"
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_utcnow, server_default=sa.func.now()
     )

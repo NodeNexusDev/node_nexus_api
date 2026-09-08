@@ -27,6 +27,7 @@ class CommandCreate(BaseModel):
     command: str = Field(..., min_length=1, max_length=4096)
     parameters: list[CommandParameter] = Field(default_factory=list)
     tags: list[str] = Field(default_factory=list)
+    timeout: int | None = Field(default=30, ge=1, le=3600)
 
 
 class CommandUpdate(BaseModel):
@@ -37,6 +38,7 @@ class CommandUpdate(BaseModel):
     command: str | None = Field(default=None, min_length=1, max_length=4096)
     parameters: list[CommandParameter] | None = None
     tags: list[str] | None = None
+    timeout: int | None = Field(default=None, ge=1, le=3600)
 
 
 class CommandResponse(BaseModel):
@@ -50,6 +52,7 @@ class CommandResponse(BaseModel):
     command: str
     parameters: list[CommandParameter] | None
     tags: list[str]
+    timeout: int
     created_at: datetime
     updated_at: datetime
 
@@ -91,6 +94,12 @@ class CommandExecutionsRequest(BaseModel):
     node_ids: list[uuid.UUID] = Field(default_factory=list)
     node_tags: list[str] = Field(default_factory=list)
     params: dict[str, JsonObject] = Field(default_factory=dict)
+    timeout: int | None = Field(
+        default=None,
+        ge=1,
+        le=3600,
+        description="Override timeout for all commands in this batch",  # noqa: E501
+    )
 
     @property
     def _estimated_n(self) -> int:
@@ -105,6 +114,7 @@ class RawExecutionsRequest(BaseModel):
     commands: list[str] = Field(min_length=1, max_length=20)
     node_ids: list[uuid.UUID] = Field(default_factory=list)
     node_tags: list[str] = Field(default_factory=list)
+    timeout: int | None = Field(default=None, ge=1, le=3600)
 
 
 class BulkExecutionItem(BaseModel):

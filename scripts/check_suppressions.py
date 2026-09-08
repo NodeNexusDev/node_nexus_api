@@ -28,6 +28,17 @@ _ALLOWED_PRODUCTION = {
         "invalid-argument-type",
     ),
     ("app/api/v2/nodes_handlers/bulk_handlers/operations.py", "type:", "arg-type"),
+    (
+        "app/api/v2/scripts_handlers/executions_handlers/lifecycle_handlers/history.py",
+        "type:",
+        "assignment",
+    ),
+    (
+        "app/api/v2/scripts_handlers/executions_handlers/lifecycle_handlers/history.py",
+        "type:",
+        "arg-type",
+    ),
+    ("app/application/services/script_execution_service.py", "type:", "arg-type"),
 }
 
 

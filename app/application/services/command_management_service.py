@@ -116,6 +116,7 @@ class CommandManagementService:
                 for p in original.parameters
             ),
             tags=original.tags,
+            timeout=original.timeout,
         )
         cloned = await self._writer.create_command(clone_data)
         audit.info(

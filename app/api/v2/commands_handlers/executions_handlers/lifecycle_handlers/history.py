@@ -98,6 +98,7 @@ def _command_response(command: CommandViewDTO) -> CommandResponse:
             for parameter in command.parameters
         ],
         tags=list(command.tags),
+        timeout=command.timeout,
         created_at=command.created_at,
         updated_at=command.updated_at,
     )
@@ -118,6 +119,35 @@ async def get_executions_history(
     _principal: Principal = Security(get_current_principal),
 ) -> CursorPage[CommandHistoryResponse]:
     """Return paginated execution history for one bulk batch with cursor."""
+
+    return await _get_batch_history(service, batch_id, cursor, limit)
+
+
+@router.get(
+    "/executions",
+    response_model=CursorPage[CommandHistoryResponse],
+    include_in_schema=False,
+)
+@inject
+async def get_executions_by_batch_alias(
+    batch_id: Annotated[uuid.UUID, Query(description="Batch ID to retrieve")],
+    service: FromDishka[ExecutionHistoryService],
+    cursor: str | None = Query(None, description="Opaque cursor for pagination"),
+    limit: int = Query(20, ge=1, le=100),
+    _principal: Principal = Security(get_current_principal),
+) -> CursorPage[CommandHistoryResponse]:
+    """RESTful alias for GET /executions/history (bulk-first consistency)."""
+
+    return await _get_batch_history(service, batch_id, cursor, limit)
+
+
+async def _get_batch_history(
+    service: ExecutionHistoryService,
+    batch_id: uuid.UUID,
+    cursor: str | None,
+    limit: int,
+) -> CursorPage[CommandHistoryResponse]:
+    """Internal helper for batch history pagination."""
     audit.info(
         "api.v2.commands.executions.history",
         batch_id=str(batch_id),

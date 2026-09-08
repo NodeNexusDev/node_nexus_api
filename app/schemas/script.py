@@ -36,6 +36,7 @@ class ScriptCreate(BaseModel):
     description: str | None = Field(default=None, max_length=1000)
     steps: list[ScriptStep] = Field(..., min_length=1)
     tags: list[str] = Field(default_factory=list)
+    timeout: int | None = Field(default=30, ge=1, le=3600)
 
 
 class ScriptUpdate(BaseModel):
@@ -45,6 +46,7 @@ class ScriptUpdate(BaseModel):
     description: str | None = Field(default=None, max_length=1000)
     steps: list[ScriptStep] | None = Field(default=None, min_length=1)
     tags: list[str] | None = None
+    timeout: int | None = Field(default=None, ge=1, le=3600)
 
 
 class ScriptResponse(BaseModel):
@@ -57,6 +59,7 @@ class ScriptResponse(BaseModel):
     description: str | None
     steps: list[ScriptStep]
     tags: list[str]
+    timeout: int
     created_at: datetime
     updated_at: datetime
 
@@ -195,3 +198,9 @@ class ScriptExecutionsRequest(BaseModel):
     node_ids: list[uuid.UUID] = Field(default_factory=list)
     node_tags: list[str] = Field(default_factory=list)
     params: dict[str, JsonObject] = Field(default_factory=dict)
+    timeout: int | None = Field(
+        default=None,
+        ge=1,
+        le=3600,
+        description="Override timeout for all scripts in this batch",  # noqa: E501
+    )

@@ -30,6 +30,7 @@ class CommandCreateDTO:
     description: str | None = None
     parameters: tuple[CommandParameterDTO, ...] = ()
     tags: tuple[str, ...] = ()
+    timeout: int = 30
 
 
 CommandUpdateValue = str | tuple[CommandParameterDTO, ...] | tuple[str, ...] | None
@@ -52,6 +53,7 @@ class CommandViewDTO:
     command: str
     parameters: tuple[CommandParameterDTO, ...]
     tags: tuple[str, ...]
+    timeout: int
     created_at: datetime
     updated_at: datetime
 
@@ -62,6 +64,7 @@ class CommandExecuteRequestDTO:
 
     node_id: UUID
     params: tuple[tuple[str, JsonValue], ...] = ()
+    timeout: int | None = None
 
 
 @dataclass(frozen=True, slots=True)

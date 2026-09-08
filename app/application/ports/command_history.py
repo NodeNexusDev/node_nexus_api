@@ -35,6 +35,12 @@ class CommandHistoryReader(Protocol):
         """Return a paginated history page for one bulk batch."""
         ...
 
+    async def list_by_command(
+        self, command_id: UUID, offset: int, limit: int
+    ) -> CommandHistoryPageDTO:
+        """Return a paginated history page for one command template."""
+        ...
+
     async def get_by_id(self, execution_id: UUID) -> CommandHistoryDTO | None:
         """Return one execution record by ID."""
         ...
