@@ -2,7 +2,7 @@
 title: "ADR-004: WebSocket orchestration"
 status: accepted
 translation_key: architecture.decisions.004
-source_revision: "2026-07-29"
+source_revision: "2026-09-09"
 ---
 
 # ADR-004: WebSocket orchestration

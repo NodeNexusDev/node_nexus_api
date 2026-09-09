@@ -2,7 +2,7 @@
 title: Register the first node
 status: stable
 translation_key: getting-started.first-node
-source_revision: "2026-07-29"
+source_revision: "2026-09-09"
 ---
 
 # Register the first node

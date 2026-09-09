@@ -2,12 +2,12 @@
 title: HTTP API
 status: stable
 translation_key: reference.api
-source_revision: "2026-09-02"
+source_revision: "2026-09-09"
 ---
 
 # HTTP API
 
-The base path is `/api/v2` (version `2.0.0`). Requests and responses use JSON unless an endpoint
+The base path is `/api/v2` (version `2.3.0`). Requests and responses use JSON unless an endpoint
 documents otherwise. Protected operations require `X-API-Key` or a JWT
 `Authorization: Bearer` token. See [Authentication](../guides/authentication.md)
 for details on both methods.

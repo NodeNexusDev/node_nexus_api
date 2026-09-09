@@ -2,7 +2,7 @@
 title: Architecture overview
 status: stable
 translation_key: architecture.overview
-source_revision: "2026-09-02"
+source_revision: "2026-09-09"
 ---
 
 # Architecture overview
@@ -81,6 +81,7 @@ erDiagram
         text command
         list parameters
         list tags
+        int timeout
         uuid template_pack_id FK
         datetime created_at
         datetime updated_at
@@ -92,6 +93,7 @@ erDiagram
         text description
         json steps
         list tags
+        int timeout
         uuid template_pack_id FK
         datetime created_at
         datetime updated_at
@@ -193,6 +195,7 @@ erDiagram
         json params
         string status
         json steps
+        int timeout
         datetime started_at
         datetime finished_at
     }
@@ -291,3 +294,6 @@ Bulk and pagination conventions (v2):
 - `BulkCommandRequestDTO.timeout` (optional `int`) is wired from the API request
   through `NodeBulkCommandService.execute(..., timeout=data.timeout)` to the SSH
   executor per node.
+- `CommandCreate`/`ScriptCreate` persist a `timeout` column (`NOT NULL`, default
+  `30`, range `1..3600`); bulk `*/executions` requests can override it for the
+  whole batch.

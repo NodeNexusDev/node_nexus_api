@@ -2,7 +2,7 @@
 title: Установка
 status: stable
 translation_key: getting-started.installation
-source_revision: "2026-07-30"
+source_revision: "2026-09-09"
 ---
 
 # Установка

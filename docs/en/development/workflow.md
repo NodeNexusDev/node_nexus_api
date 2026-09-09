@@ -2,7 +2,7 @@
 title: Development workflow
 status: stable
 translation_key: development.workflow
-source_revision: "2026-08-18"
+source_revision: "2026-09-09"
 ---
 
 # Development workflow

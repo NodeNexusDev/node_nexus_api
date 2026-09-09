@@ -2,7 +2,7 @@
 title: Шпаргалка
 status: stable
 translation_key: reference.cheat-sheet
-source_revision: "2026-09-02"
+source_revision: "2026-09-09"
 ---
 
 # Шпаргалка
@@ -199,7 +199,7 @@ Bulk ответы — `BulkResult` `{total,succeeded,failed,results}` с код�
 | Задача | Команда |
 |--------|---------|
 | Создать ключ | `curl -X POST -H "X-API-Key: ${NODE_NEXUS_API_KEY}" -H 'Content-Type: application/json' -d '{"name":"reader","scope":"read-only"}' "${NODE_NEXUS_URL}/api/v2/api-keys/"` |
-| Список ключей | `curl -H "X-API-Key: ${NODE_NEXUS_API_KEY}" "${NODE_NEXUS_URL}/api/v2/api-keys/?cursor=&limit=20"` |
+| Список ключей | `curl -H "X-API-Key: ${NODE_NEXUS_API_KEY}" "${NODE_NEXUS_URL}/api/v2/api-keys/?page=1&size=20"` |
 | Обновить ключ | `curl -X PATCH -H "X-API-Key: ${NODE_NEXUS_API_KEY}" -H 'Content-Type: application/json' -d '{"is_active":false}' "${NODE_NEXUS_URL}/api/v2/api-keys/${KEY_ID}"` |
 | Удалить ключ | `curl -X DELETE -H "X-API-Key: ${NODE_NEXUS_API_KEY}" "${NODE_NEXUS_URL}/api/v2/api-keys/${KEY_ID}"` |
 

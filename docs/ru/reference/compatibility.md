@@ -2,7 +2,7 @@
 title: Совместимость и поддержка
 status: stable
 translation_key: reference.compatibility
-source_revision: "2026-09-02"
+source_revision: "2026-09-09"
 ---
 
 # Совместимость и поддержка
@@ -24,6 +24,7 @@ OpenAPI artifact конкретного release.
 
 | Версия | Дата | Тип | Основные изменения |
 |--------|------|-----|--------------------|
+| 2.3.0 | 2026-09-08 | Minor | Timeout у команд/скриптов: поле `timeout` в `CommandCreate`/`ScriptCreate`/`CommandUpdate`/`ScriptUpdate` (`1..3600`, default `30`), per-batch override `timeout` в bulk-выполнениях, `timeout` в ответах; выполнение всего скрипта завершается с `504 Gateway Timeout` по истечении timeout; RESTful alias`ы для истории выполнений (`GET /commands/{id}/executions`, `GET /nodes/{id}/history`, `GET /scripts/{id}/executions/history`) |
 | 2.0.0 | 2026-09-02 | Major | Breaking bulk-first: BulkResult 207 `{total,succeeded,failed,results}` (200 все ок, 207 частично, 422 все неуспешно), `{items}` bulk-создание (1..20), cursor pagination (`cursor`/`limit` + `next_cursor`/`has_more`), docker vert-bulk + 9 операций (kill, update, archive, port, wait, system/version, system/prune, networks/prune, images/history, images/push), compose (persistent `compose_projects`), templates (registries, packs, installations), notes→description, unified stats (`/stats` snapshot и buckets), ErrorResponse `request_id` всегда присутствует, удалён `X-API-Version` |
 | 1.0.0 | 2026-08-25 | Major | Первый стабильный релиз: полный Docker CRUD (контейнеры, образы, сети, volumes, система, bulk), полная документация (bilingual), production CI/CD, 95% покрытие тестами |
 | 0.17.1 | 2026-08-25 | Patch | Исправление CPU метрик (всегда возвращал 100% из-за неверного столбца vmstat), удаление Any из application layer |

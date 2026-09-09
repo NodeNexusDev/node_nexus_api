@@ -2,7 +2,7 @@
 title: Аутентификация
 status: stable
 translation_key: guides.authentication
-source_revision: "2026-08-26"
+source_revision: "2026-09-09"
 ---
 
 # Аутентификация

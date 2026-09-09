@@ -2,7 +2,7 @@
 title: Управление API-ключами
 status: stable
 translation_key: guides.api-keys
-source_revision: "2026-07-29"
+source_revision: "2026-09-09"
 ---
 
 # Управление API-ключами

@@ -2,7 +2,7 @@
 title: WebSocket streaming команд
 status: stable
 translation_key: guides.websocket
-source_revision: "2026-07-29"
+source_revision: "2026-09-09"
 ---
 
 # WebSocket streaming команд
