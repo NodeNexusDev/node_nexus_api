@@ -90,6 +90,23 @@ uv run python -m app.main
 See the [development guide](https://nodenexusdev.github.io/node_nexus_api/en/development/)
 and [architecture decisions](https://nodenexusdev.github.io/node_nexus_api/en/architecture/decisions/).
 
+## Documentation
+
+📖 **[Full documentation](https://nodenexusdev.github.io/node_nexus_api/)** — built with [MkDocs Material](https://squidfunk.github.io/mkdocs-material/) and deployed to GitHub Pages (bilingual `en`/`ru`).
+
+```bash
+# Validate documentation (parity, front matter, links)
+uv run python scripts/docs/check_docs.py
+
+# Local preview
+uv run mkdocs serve -f mkdocs.en.yml
+uv run mkdocs serve -f mkdocs.ru.yml
+
+# Strict builds (CI)
+uv run mkdocs build --strict -f mkdocs.en.yml
+uv run mkdocs build --strict -f mkdocs.ru.yml
+```
+
 ## License
 
 [MIT](LICENSE)

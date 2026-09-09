@@ -111,7 +111,8 @@ def check_navigation(locale: str, errors: list[str]) -> None:
 def check_page(path: Path, errors: list[str]) -> None:
     """Validate front matter and local Markdown links."""
     text = path.read_text(encoding="utf-8")
-    if text.count("\n# ") != 1:
+    stripped = re.sub(r"```.*?```", "", text, flags=re.DOTALL)
+    if stripped.count("\n# ") != 1:
         errors.append(f"{path.relative_to(ROOT)}: expected exactly one H1")
     if any(line.endswith((" ", "\t")) for line in text.splitlines()):
         errors.append(f"{path.relative_to(ROOT)}: trailing whitespace")
