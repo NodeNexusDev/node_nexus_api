@@ -81,15 +81,6 @@ def _parameter_dto(parameter: CommandParameter) -> CommandParameterDTO:
     )
 
 
-            for parameter in command.parameters
-        ],
-        tags=list(command.tags),
-        timeout=command.timeout,
-        created_at=command.created_at,
-        updated_at=command.updated_at,
-    )
-
-
 # ---------------------------------------------------------------------------
 # List — cursor pagination (translate cursor -> page)
 # ---------------------------------------------------------------------------
@@ -215,9 +206,7 @@ async def bulk_raw_executions(
 
     async def _execute_raw(command: str) -> list[BulkExecutionItem]:
         try:
-            effective_timeout = (
-                data.timeout if data.timeout is not None else DEFAULT_TIMEOUT
-            )
+            effective_timeout = data.timeout if data.timeout is not None else DEFAULT_TIMEOUT  # noqa: E501
             result = await bulk_service.execute(
                 BulkCommandRequestDTO(
                     command=command,

@@ -80,15 +80,6 @@ def _parameter_dto(parameter: CommandParameter) -> CommandParameterDTO:
     )
 
 
-            for parameter in command.parameters
-        ],
-        tags=list(command.tags),
-        timeout=command.timeout,
-        created_at=command.created_at,
-        updated_at=command.updated_at,
-    )
-
-
 # ---------------------------------------------------------------------------
 # List — cursor pagination (translate cursor -> page)
 # ---------------------------------------------------------------------------

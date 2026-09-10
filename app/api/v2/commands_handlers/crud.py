@@ -64,6 +64,8 @@ from app.schemas.node import (
 audit = structlog.get_logger("audit")
 
 # Compatibility aliases for tests importing private helpers
+_command_response = command_response  # noqa: N816
+_script_response = script_response  # noqa: N816
 
 router = APIRouter(route_class=DishkaRoute)
 
@@ -80,15 +82,6 @@ def _parameter_dto(parameter: CommandParameter) -> CommandParameterDTO:
         required=parameter.required,
         default=parameter.default,
         description=parameter.description,
-    )
-
-
-            for parameter in command.parameters
-        ],
-        tags=list(command.tags),
-        timeout=command.timeout,
-        created_at=command.created_at,
-        updated_at=command.updated_at,
     )
 
 

@@ -23,12 +23,14 @@ def upgrade() -> None:
     with op.batch_alter_table("commands", schema=None) as batch_op:
         batch_op.create_check_constraint(
             "ck_commands_timeout",
-            {"condition": "timeout >= 1 AND timeout <= 3600", "postgresql_not_valid": True},
+            "timeout >= 1 AND timeout <= 3600",
+            postgresql_not_valid=True,
         )
     with op.batch_alter_table("scripts", schema=None) as batch_op:
         batch_op.create_check_constraint(
             "ck_scripts_timeout",
-            {"condition": "timeout >= 1 AND timeout <= 3600", "postgresql_not_valid": True},
+            "timeout >= 1 AND timeout <= 3600",
+            postgresql_not_valid=True,
         )
     # Validate constraints after creation (PostgreSQL only, no-op on SQLite)
     try:

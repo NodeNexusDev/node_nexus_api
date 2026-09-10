@@ -70,6 +70,7 @@ from app.schemas.script_execution import (
 audit = structlog.get_logger("audit")
 
 # Compatibility aliases for tests importing private helpers
+_script_response = script_response  # noqa: N816
 
 router = APIRouter(route_class=DishkaRoute)
 
