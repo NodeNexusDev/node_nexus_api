@@ -58,6 +58,7 @@ def _encode_offset(offset: int) -> str:
     payload = json.dumps({"offset": offset})
     return base64.urlsafe_b64encode(payload.encode()).decode()
 
+
 def _make_maker(session: MagicMock | AsyncMock) -> MagicMock:
     mock_ctx = MagicMock()
     mock_ctx.__aenter__ = AsyncMock(return_value=session)
@@ -69,6 +70,7 @@ def _make_maker(session: MagicMock | AsyncMock) -> MagicMock:
     maker.return_value = mock_ctx
     maker.begin.return_value = mock_begin
     return maker
+
 
 def _make_history_dto(**overrides) -> CommandHistoryDTO:
     now = datetime.now(UTC)
@@ -91,11 +93,15 @@ def _make_history_dto(**overrides) -> CommandHistoryDTO:
     defaults.update(overrides)
     return CommandHistoryDTO(**defaults)  # type: ignore[arg-type]
 
-_settings_patcher = patch("app.core.config.get_settings", return_value=_mock_settings("test-master"))
+
+_settings_patcher = patch(
+    "app.core.config.get_settings", return_value=_mock_settings("test-master")
+)
 
 # ---------------------------------------------------------------------------
 # 1. DTO timeout fields
 # ---------------------------------------------------------------------------
+
 
 class TestDTOTimeout:
     def test_command_view_dto_timeout(self):
@@ -133,14 +139,18 @@ class TestDTOTimeout:
 
     def test_script_create_dto_timeout(self):
         dto = ScriptCreateDTO(
-            name="s", steps=(ScriptStepDTO(label="a", type="inline", command="hi"),), timeout=42
+            name="s",
+            steps=(ScriptStepDTO(label="a", type="inline", command="hi"),),
+            timeout=42,
         )
         assert dto.timeout == 42
 
     def test_command_template_timeout(self):
         from app.application.dto.command_template import CommandTemplateDTO
 
-        dto = CommandTemplateDTO(id=uuid.uuid4(), command="echo hi", parameters=(), timeout=77)
+        dto = CommandTemplateDTO(
+            id=uuid.uuid4(), command="echo hi", parameters=(), timeout=77
+        )
         assert dto.timeout == 77
 
     def test_script_definition_timeout(self):
@@ -174,7 +184,15 @@ class TestDTOTimeout:
         # ScriptCreate/Response
         sc = ScriptCreate(
             name="s",
-            steps=[{"label": "a", "type": "inline", "command": "echo hi", "params": {}, "on_failure": "stop"}],  # type: ignore[arg-type]
+            steps=[
+                {
+                    "label": "a",
+                    "type": "inline",
+                    "command": "echo hi",
+                    "params": {},
+                    "on_failure": "stop",
+                }
+            ],  # type: ignore[arg-type]
             timeout=55,
         )
         assert sc.timeout == 55
@@ -182,7 +200,15 @@ class TestDTOTimeout:
             id=uuid.uuid4(),
             name="s",
             description=None,
-            steps=[{"label": "a", "type": "inline", "command": "echo hi", "params": {}, "on_failure": "stop"}],  # type: ignore[arg-type]
+            steps=[
+                {
+                    "label": "a",
+                    "type": "inline",
+                    "command": "echo hi",
+                    "params": {},
+                    "on_failure": "stop",
+                }
+            ],  # type: ignore[arg-type]
             tags=[],
             timeout=55,
             created_at=now,
@@ -190,9 +216,11 @@ class TestDTOTimeout:
         )
         assert sr.timeout == 55
 
+
 # ---------------------------------------------------------------------------
 # 2. _command_response includes timeout
 # ---------------------------------------------------------------------------
+
 
 class TestCommandResponseTimeout:
     def test_command_response_includes_timeout(self):
@@ -231,9 +259,11 @@ class TestCommandResponseTimeout:
         resp = _script_response(view)
         assert resp.timeout == 321
 
+
 # ---------------------------------------------------------------------------
 # 3. Persistence gateways timeout
 # ---------------------------------------------------------------------------
+
 
 class TestCommandGatewayTimeout:
     @pytest.mark.asyncio
@@ -260,7 +290,9 @@ class TestCommandGatewayTimeout:
         cmd = make_orm_command(timeout=60)
         cmd.timeout = 60  # type: ignore[attr-defined]
         data = CommandCreateDTO(name="n", command="echo hi", timeout=60)
-        with patch("app.adapters.persistence.command_management.CommandRepository") as repo_cls:
+        with patch(
+            "app.adapters.persistence.command_management.CommandRepository"
+        ) as repo_cls:
             repo_cls.return_value.create = AsyncMock(return_value=cmd)
             view = await SqlAlchemyCommandGateway(factory).create_command(data)
         assert view.timeout == 60
@@ -278,7 +310,9 @@ class TestCommandGatewayTimeout:
         factory = _make_maker(session)
         cmd = make_orm_command(command="echo hi")
         cmd.timeout = 42  # type: ignore[attr-defined]
-        with patch("app.adapters.persistence.command_management.CommandRepository") as repo_cls:
+        with patch(
+            "app.adapters.persistence.command_management.CommandRepository"
+        ) as repo_cls:
             repo_cls.return_value.get_by_id = AsyncMock(return_value=cmd)
             tpl = await SqlAlchemyCommandGateway(factory).get_template(cmd.id)
         assert tpl is not None
@@ -295,7 +329,9 @@ class TestCommandGatewayTimeout:
         cmd.timeout = 90  # type: ignore[attr-defined]
         cmd_id = uuid.uuid4()
         data = CommandUpdateDTO(changes=(("timeout", 90),))  # type: ignore[arg-type]
-        with patch("app.adapters.persistence.command_management.CommandRepository") as repo_cls:
+        with patch(
+            "app.adapters.persistence.command_management.CommandRepository"
+        ) as repo_cls:
             repo_cls.return_value.update = AsyncMock(return_value=cmd)
             view = await SqlAlchemyCommandGateway(factory).update_command(cmd_id, data)
         assert view is not None
@@ -303,6 +339,7 @@ class TestCommandGatewayTimeout:
         await_args = repo_cls.return_value.update.await_args
         assert await_args is not None
         assert await_args.args[1]["timeout"] == 90
+
 
 class TestScriptGatewayTimeout:
     def _script_model(self, **overrides):
@@ -313,7 +350,15 @@ class TestScriptGatewayTimeout:
             "id": uuid.uuid4(),
             "name": "s",
             "description": None,
-            "steps": [{"label": "a", "type": "inline", "command": "echo hi", "params": {}, "on_failure": "stop"}],
+            "steps": [
+                {
+                    "label": "a",
+                    "type": "inline",
+                    "command": "echo hi",
+                    "params": {},
+                    "on_failure": "stop",
+                }
+            ],
             "tags": [],
             "timeout": 55,
             "created_at": now,
@@ -342,7 +387,9 @@ class TestScriptGatewayTimeout:
             steps=(ScriptStepDTO(label="a", type="inline", command="echo hi"),),
             timeout=60,
         )
-        with patch("app.adapters.persistence.script_gateway.ScriptRepository") as repo_cls:
+        with patch(
+            "app.adapters.persistence.script_gateway.ScriptRepository"
+        ) as repo_cls:
             repo_cls.return_value.create = AsyncMock(return_value=model)
             view = await SqlAlchemyScriptGateway(factory).create_script(data)
         assert view.timeout == 60
@@ -358,7 +405,9 @@ class TestScriptGatewayTimeout:
         session = AsyncMock()
         factory = _make_maker(session)
         model = self._script_model(timeout=99)
-        with patch("app.adapters.persistence.script_gateway.ScriptRepository") as repo_cls:
+        with patch(
+            "app.adapters.persistence.script_gateway.ScriptRepository"
+        ) as repo_cls:
             repo_cls.return_value.get_by_id = AsyncMock(return_value=model)
             reader = ScopedScriptDefinitionReader(factory)
             dto = await reader.get_definition(model.id)
@@ -372,7 +421,9 @@ class TestScriptGatewayTimeout:
         session = AsyncMock()
         factory = _make_maker(session)
         model = self._script_model(timeout=88)
-        with patch("app.adapters.persistence.script_gateway.ScriptRepository") as repo_cls:
+        with patch(
+            "app.adapters.persistence.script_gateway.ScriptRepository"
+        ) as repo_cls:
             repo_cls.return_value.get_by_id = AsyncMock(return_value=model)
             dto = await SqlAlchemyScriptGateway(factory).get_definition(model.id)
         assert dto is not None
@@ -384,14 +435,18 @@ class TestScriptGatewayTimeout:
 
         session = AsyncMock()
         factory = _make_maker(session)
-        with patch("app.adapters.persistence.script_gateway.ScriptRepository") as repo_cls:
+        with patch(
+            "app.adapters.persistence.script_gateway.ScriptRepository"
+        ) as repo_cls:
             repo_cls.return_value.get_by_id = AsyncMock(return_value=None)
             dto = await SqlAlchemyScriptGateway(factory).get_definition(uuid.uuid4())
         assert dto is None
 
+
 # ---------------------------------------------------------------------------
 # 4. Execution registry
 # ---------------------------------------------------------------------------
+
 
 class TestExecutionRegistry:
     @pytest.mark.asyncio
@@ -465,9 +520,11 @@ class TestExecutionRegistry:
         assert exec_id not in execution_registry._tasks
         execution_registry._tasks.clear()
 
+
 # ---------------------------------------------------------------------------
 # 5. CommandExecutionService effective_timeout
 # ---------------------------------------------------------------------------
+
 
 class TestCommandExecutionTimeout:
     @pytest.mark.asyncio
@@ -480,7 +537,9 @@ class TestCommandExecutionTimeout:
 
         cmd_id = uuid.uuid4()
         node_id = uuid.uuid4()
-        template = CommandTemplateDTO(id=cmd_id, command="echo hi", parameters=(), timeout=30)
+        template = CommandTemplateDTO(
+            id=cmd_id, command="echo hi", parameters=(), timeout=30
+        )
         cmd_reader = AsyncMock()
         cmd_reader.get_template.return_value = template
         node_reader = AsyncMock()
@@ -504,16 +563,33 @@ class TestCommandExecutionTimeout:
         connector.execute_command.return_value = ("out", "err", 0)
         factory.create_ssh.return_value = connector
 
-        with patch("app.application.services.command_execution_service.build_ssh_connector") as mock_build, patch(
-            "app.application.services.command_execution_service.execute_ssh"
-        ) as mock_exec:
+        with (
+            patch(
+                "app.application.services.command_execution_service.build_ssh_connector"
+            ) as mock_build,
+            patch(
+                "app.application.services.command_execution_service.execute_ssh"
+            ) as mock_exec,
+        ):
             mock_build.return_value = connector
-            mock_exec.return_value = MagicMock(stdout="out", stderr="err", exit_code=0, started_at=datetime.now(UTC), finished_at=datetime.now(UTC))
+            mock_exec.return_value = MagicMock(
+                stdout="out",
+                stderr="err",
+                exit_code=0,
+                started_at=datetime.now(UTC),
+                finished_at=datetime.now(UTC),
+            )
             svc = CommandExecutionService(cmd_reader, node_reader, cipher, factory)
-            await svc.execute_command(cmd_id, CommandExecuteRequestDTO(node_id=node_id, timeout=60))
+            await svc.execute_command(
+                cmd_id, CommandExecuteRequestDTO(node_id=node_id, timeout=60)
+            )
             mock_build.assert_called_once()
             _, kwargs = mock_build.call_args
-            assert kwargs.get("timeout") == 60 or mock_build.call_args.args[3] == 60 if len(mock_build.call_args.args) > 3 else True
+            assert (
+                kwargs.get("timeout") == 60 or mock_build.call_args.args[3] == 60
+                if len(mock_build.call_args.args) > 3
+                else True
+            )
             # check that build was called with timeout 60
             called_timeout = kwargs.get("timeout")
             if called_timeout is None:
@@ -531,7 +607,9 @@ class TestCommandExecutionTimeout:
 
         cmd_id = uuid.uuid4()
         node_id = uuid.uuid4()
-        template = CommandTemplateDTO(id=cmd_id, command="echo hi", parameters=(), timeout=42)
+        template = CommandTemplateDTO(
+            id=cmd_id, command="echo hi", parameters=(), timeout=42
+        )
         cmd_reader = AsyncMock()
         cmd_reader.get_template.return_value = template
         node_reader = AsyncMock()
@@ -550,20 +628,35 @@ class TestCommandExecutionTimeout:
         factory = MagicMock()
         connector = AsyncMock()
         factory.create_ssh.return_value = connector
-        with patch("app.application.services.command_execution_service.build_ssh_connector") as mock_build, patch(
-            "app.application.services.command_execution_service.execute_ssh"
-        ) as mock_exec:
+        with (
+            patch(
+                "app.application.services.command_execution_service.build_ssh_connector"
+            ) as mock_build,
+            patch(
+                "app.application.services.command_execution_service.execute_ssh"
+            ) as mock_exec,
+        ):
             mock_build.return_value = connector
-            mock_exec.return_value = MagicMock(stdout="out", stderr="", exit_code=0, started_at=datetime.now(UTC), finished_at=datetime.now(UTC))
+            mock_exec.return_value = MagicMock(
+                stdout="out",
+                stderr="",
+                exit_code=0,
+                started_at=datetime.now(UTC),
+                finished_at=datetime.now(UTC),
+            )
             svc = CommandExecutionService(cmd_reader, node_reader, cipher, factory)
-            await svc.execute_command(cmd_id, CommandExecuteRequestDTO(node_id=node_id, timeout=None))
+            await svc.execute_command(
+                cmd_id, CommandExecuteRequestDTO(node_id=node_id, timeout=None)
+            )
             # fallback to 42
             _, kwargs = mock_build.call_args
             assert kwargs.get("timeout") == 42
 
+
 # ---------------------------------------------------------------------------
 # 6. ScriptExecutionService timeout
 # ---------------------------------------------------------------------------
+
 
 class TestScriptExecutionTimeout:
     def _make_node(self, node_id: uuid.UUID):
@@ -588,7 +681,9 @@ class TestScriptExecutionTimeout:
         node = self._make_node(node_id)
         script_reader = AsyncMock()
         script_reader.get_definition.return_value = ScriptDefinitionDTO(
-            id=script_id, steps=({"label": "a", "type": "inline", "command": "echo hi"},), timeout=30
+            id=script_id,
+            steps=({"label": "a", "type": "inline", "command": "echo hi"},),
+            timeout=30,
         )
         command_reader = AsyncMock()
         node_reader = AsyncMock()
@@ -604,18 +699,31 @@ class TestScriptExecutionTimeout:
         factory = MagicMock()
         factory.create_ssh.return_value = connector
 
-        svc = ScriptExecutionService(script_reader, command_reader, node_reader, writer, MagicMock(decrypt=MagicMock(return_value=None)), factory)
+        svc = ScriptExecutionService(
+            script_reader,
+            command_reader,
+            node_reader,
+            writer,
+            MagicMock(decrypt=MagicMock(return_value=None)),
+            factory,
+        )
         # request timeout 99 overrides 30
-        result = await svc.execute_script(script_id, ScriptExecutionRequestDTO(node_ids=(node_id,), timeout=99))
+        result = await svc.execute_script(
+            script_id, ScriptExecutionRequestDTO(node_ids=(node_id,), timeout=99)
+        )
         # check create_execution called with timeout 99
         assert writer.create_execution.await_args.args[0]["timeout"] == 99
         assert result.results[0].status == "success"
         writer.create_execution.reset_mock()
         # request timeout None -> fallback to definition 30
         script_reader.get_definition.return_value = ScriptDefinitionDTO(
-            id=script_id, steps=({"label": "a", "type": "inline", "command": "echo hi"},), timeout=55
+            id=script_id,
+            steps=({"label": "a", "type": "inline", "command": "echo hi"},),
+            timeout=55,
         )
-        await svc.execute_script(script_id, ScriptExecutionRequestDTO(node_ids=(node_id,), timeout=None))
+        await svc.execute_script(
+            script_id, ScriptExecutionRequestDTO(node_ids=(node_id,), timeout=None)
+        )
         assert writer.create_execution.await_args.args[0]["timeout"] == 55
 
     @pytest.mark.asyncio
@@ -639,12 +747,21 @@ class TestScriptExecutionTimeout:
         # per-step timeout via raising TimeoutError
         connector.execute_command.side_effect = TimeoutError("step timeout")
         factory.create_ssh.return_value = connector
-        svc = ScriptExecutionService(script_reader, command_reader, node_reader, writer, MagicMock(decrypt=MagicMock(return_value=None)), factory)
+        svc = ScriptExecutionService(
+            script_reader,
+            command_reader,
+            node_reader,
+            writer,
+            MagicMock(decrypt=MagicMock(return_value=None)),
+            factory,
+        )
         target = ScriptExecutionTargetDTO(
             execution_id=uuid.uuid4(),
             script_id=uuid.uuid4(),
             node=self._make_node(uuid.uuid4()),
-            steps=(ResolvedScriptStepDTO(label="a", command="sleep 10", on_failure="stop"),),
+            steps=(
+                ResolvedScriptStepDTO(label="a", command="sleep 10", on_failure="stop"),
+            ),
             timeout=1,
         )
         result = await svc._run_remote(target)
@@ -662,7 +779,9 @@ class TestScriptExecutionTimeout:
         node = self._make_node(node_id)
         script_reader = AsyncMock()
         script_reader.get_definition.return_value = ScriptDefinitionDTO(
-            id=script_id, steps=({"label": "a", "type": "inline", "command": "sleep 10"},), timeout=1
+            id=script_id,
+            steps=({"label": "a", "type": "inline", "command": "sleep 10"},),
+            timeout=1,
         )
         command_reader = AsyncMock()
         node_reader = AsyncMock()
@@ -670,16 +789,32 @@ class TestScriptExecutionTimeout:
         writer = AsyncMock()
         writer.create_execution.return_value = uuid.uuid4()
         # mock _run_remote to sleep longer than timeout
-        svc = ScriptExecutionService(script_reader, command_reader, node_reader, writer, MagicMock(decrypt=MagicMock(return_value=None)), MagicMock())
+        svc = ScriptExecutionService(
+            script_reader,
+            command_reader,
+            node_reader,
+            writer,
+            MagicMock(decrypt=MagicMock(return_value=None)),
+            MagicMock(),
+        )
+
         async def _slow(target):
             await asyncio.sleep(5)
             from app.application.dto.script_execution import ScriptNodeResultDTO
 
-            return ScriptNodeResultDTO(execution_id=target.execution_id, node_id=node_id, node_name="n", status="success", steps=())
+            return ScriptNodeResultDTO(
+                execution_id=target.execution_id,
+                node_id=node_id,
+                node_name="n",
+                status="success",
+                steps=(),
+            )
 
         svc._run_remote = _slow  # type: ignore[method-assign]
         with pytest.raises(TimeoutError, match="timed out after 1s"):
-            await svc.execute_script(script_id, ScriptExecutionRequestDTO(node_ids=(node_id,), timeout=1))
+            await svc.execute_script(
+                script_id, ScriptExecutionRequestDTO(node_ids=(node_id,), timeout=1)
+            )
         # should have called update_execution for each target with error
         assert writer.update_execution.await_count >= 1
         args = writer.update_execution.await_args.args[1]
@@ -696,7 +831,9 @@ class TestScriptExecutionTimeout:
         node = self._make_node(node_id)
         script_reader = AsyncMock()
         script_reader.get_definition.return_value = ScriptDefinitionDTO(
-            id=script_id, steps=({"label": "a", "type": "inline", "command": "echo hi"},), timeout=30
+            id=script_id,
+            steps=({"label": "a", "type": "inline", "command": "echo hi"},),
+            timeout=30,
         )
         command_reader = AsyncMock()
         node_reader = AsyncMock()
@@ -709,10 +846,21 @@ class TestScriptExecutionTimeout:
         connector.execute_command.return_value = ("ok", "", 0)
         factory = MagicMock()
         factory.create_ssh.return_value = connector
-        svc = ScriptExecutionService(script_reader, command_reader, node_reader, writer, MagicMock(decrypt=MagicMock(return_value=None)), factory)
+        svc = ScriptExecutionService(
+            script_reader,
+            command_reader,
+            node_reader,
+            writer,
+            MagicMock(decrypt=MagicMock(return_value=None)),
+            factory,
+        )
         # Patch register_execution to capture call
-        with patch("app.application.services.script_execution_service.register_execution") as mock_reg:
-            result = await svc.execute_script(script_id, ScriptExecutionRequestDTO(node_ids=(node_id,)))
+        with patch(
+            "app.application.services.script_execution_service.register_execution"
+        ) as mock_reg:
+            result = await svc.execute_script(
+                script_id, ScriptExecutionRequestDTO(node_ids=(node_id,))
+            )
             assert mock_reg.called
             assert result.results[0].status == "success"
 
@@ -727,7 +875,9 @@ class TestScriptExecutionTimeout:
         node = self._make_node(node_id)
         script_reader = AsyncMock()
         script_reader.get_definition.return_value = ScriptDefinitionDTO(
-            id=script_id, steps=({"label": "a", "type": "inline", "command": "echo hi"},), timeout=30
+            id=script_id,
+            steps=({"label": "a", "type": "inline", "command": "echo hi"},),
+            timeout=30,
         )
         command_reader = AsyncMock()
         node_reader = AsyncMock()
@@ -740,11 +890,26 @@ class TestScriptExecutionTimeout:
         connector.execute_command.return_value = ("ok", "", 0)
         factory = MagicMock()
         factory.create_ssh.return_value = connector
-        svc = ScriptExecutionService(script_reader, command_reader, node_reader, writer, MagicMock(decrypt=MagicMock(return_value=None)), factory)
-        with patch("app.application.services.script_execution_service.asyncio.current_task", return_value=None), patch(
-            "app.application.services.script_execution_service.register_execution"
-        ) as mock_reg:
-            result = await svc.execute_script(script_id, ScriptExecutionRequestDTO(node_ids=(node_id,)))
+        svc = ScriptExecutionService(
+            script_reader,
+            command_reader,
+            node_reader,
+            writer,
+            MagicMock(decrypt=MagicMock(return_value=None)),
+            factory,
+        )
+        with (
+            patch(
+                "app.application.services.script_execution_service.asyncio.current_task",
+                return_value=None,
+            ),
+            patch(
+                "app.application.services.script_execution_service.register_execution"
+            ) as mock_reg,
+        ):
+            result = await svc.execute_script(
+                script_id, ScriptExecutionRequestDTO(node_ids=(node_id,))
+            )
             mock_reg.assert_not_called()
             assert result.results[0].status == "success"
 
@@ -759,7 +924,9 @@ class TestScriptExecutionTimeout:
         node = self._make_node(node_id)
         script_reader = AsyncMock()
         script_reader.get_definition.return_value = ScriptDefinitionDTO(
-            id=script_id, steps=({"label": "a", "type": "inline", "command": "echo hi"},), timeout=30
+            id=script_id,
+            steps=({"label": "a", "type": "inline", "command": "echo hi"},),
+            timeout=30,
         )
         command_reader = AsyncMock()
         node_reader = AsyncMock()
@@ -773,8 +940,17 @@ class TestScriptExecutionTimeout:
         connector.execute_command.return_value = ("ok", "", 0)
         factory = MagicMock()
         factory.create_ssh.return_value = connector
-        svc = ScriptExecutionService(script_reader, command_reader, node_reader, writer, MagicMock(decrypt=MagicMock(return_value=None)), factory)
-        result = await svc.execute_script(script_id, ScriptExecutionRequestDTO(node_ids=(node_id,)))
+        svc = ScriptExecutionService(
+            script_reader,
+            command_reader,
+            node_reader,
+            writer,
+            MagicMock(decrypt=MagicMock(return_value=None)),
+            factory,
+        )
+        result = await svc.execute_script(
+            script_id, ScriptExecutionRequestDTO(node_ids=(node_id,))
+        )
         assert result.results[0].status == "success"
 
     @pytest.mark.asyncio
@@ -789,7 +965,9 @@ class TestScriptExecutionTimeout:
         node = self._make_node(node_id)
         script_reader = AsyncMock()
         script_reader.get_definition.return_value = ScriptDefinitionDTO(
-            id=script_id, steps=({"label": "a", "type": "inline", "command": "echo hi"},), timeout=30
+            id=script_id,
+            steps=({"label": "a", "type": "inline", "command": "echo hi"},),
+            timeout=30,
         )
         command_reader = AsyncMock()
         node_reader = AsyncMock()
@@ -804,14 +982,26 @@ class TestScriptExecutionTimeout:
         factory.create_ssh.return_value = connector
         audit_mock = AsyncMock()
         audit_mock.log.side_effect = AuditWriteError("fail")
-        svc = ScriptExecutionService(script_reader, command_reader, node_reader, writer, MagicMock(decrypt=MagicMock(return_value=None)), factory, audit_service=audit_mock)
-        result = await svc.execute_script(script_id, ScriptExecutionRequestDTO(node_ids=(node_id,)))
+        svc = ScriptExecutionService(
+            script_reader,
+            command_reader,
+            node_reader,
+            writer,
+            MagicMock(decrypt=MagicMock(return_value=None)),
+            factory,
+            audit_service=audit_mock,
+        )
+        result = await svc.execute_script(
+            script_id, ScriptExecutionRequestDTO(node_ids=(node_id,))
+        )
         assert result.results[0].status == "success"
         assert audit_mock.log.await_count == 1
+
 
 # ---------------------------------------------------------------------------
 # 7. Node bulk with timeout
 # ---------------------------------------------------------------------------
+
 
 class TestNodeBulkTimeout:
     @pytest.mark.asyncio
@@ -837,9 +1027,14 @@ class TestNodeBulkTimeout:
         connector.execute_command.return_value = ("out", "err", 0)
         factory.create_ssh.return_value = connector
         svc = NodeBulkCommandService(AsyncMock(), cipher, factory)
-        with patch("app.application.services.node_bulk_command_service.build_ssh_connector") as mock_build, patch(
-            "app.application.services.node_bulk_command_service.execute_ssh"
-        ) as mock_exec:
+        with (
+            patch(
+                "app.application.services.node_bulk_command_service.build_ssh_connector"
+            ) as mock_build,
+            patch(
+                "app.application.services.node_bulk_command_service.execute_ssh"
+            ) as mock_exec,
+        ):
             mock_build.return_value = connector
             mock_exec.return_value = MagicMock(stdout="out", stderr="err", exit_code=0)
             result = await svc._execute_on_single_node(node, "echo hi", timeout=77)
@@ -866,9 +1061,14 @@ class TestNodeBulkTimeout:
         cipher.decrypt.return_value = None
         factory = MagicMock()
         svc = NodeBulkCommandService(AsyncMock(), cipher, factory)
-        with patch("app.application.services.node_bulk_command_service.build_ssh_connector") as mock_build, patch(
-            "app.application.services.node_bulk_command_service.execute_ssh"
-        ) as mock_exec:
+        with (
+            patch(
+                "app.application.services.node_bulk_command_service.build_ssh_connector"
+            ) as mock_build,
+            patch(
+                "app.application.services.node_bulk_command_service.execute_ssh"
+            ) as mock_exec,
+        ):
             connector = AsyncMock()
             mock_build.return_value = connector
             mock_exec.return_value = MagicMock(stdout="ok", stderr="", exit_code=0)
@@ -876,9 +1076,11 @@ class TestNodeBulkTimeout:
             assert mock_build.call_args.kwargs.get("timeout") is None
             assert result.stdout == "ok"
 
+
 # ---------------------------------------------------------------------------
 # 8. API history handlers
 # ---------------------------------------------------------------------------
+
 
 def _make_cmd_history_app(exec_history: AsyncMock):
     from app.api.v2.commands_handlers.history import router as hist_router
@@ -899,6 +1101,7 @@ def _make_cmd_history_app(exec_history: AsyncMock):
     container = make_async_container(Prov(), MockAuthServiceProvider())
     setup_dishka(container, app)
     return app
+
 
 def _make_batch_history_app(exec_history: AsyncMock):
     from app.api.v2.commands_handlers.executions_handlers.lifecycle_handlers.history import (
@@ -922,6 +1125,7 @@ def _make_batch_history_app(exec_history: AsyncMock):
     setup_dishka(container, app)
     return app
 
+
 def _make_node_history_app(service_mock: AsyncMock):
     from app.api.v2.nodes_handlers.history import router as hist_router
 
@@ -941,6 +1145,7 @@ def _make_node_history_app(service_mock: AsyncMock):
     container = make_async_container(Prov(), MockAuthServiceProvider())
     setup_dishka(container, app)
     return app
+
 
 def _make_script_history_app(service_mock: AsyncMock):
     from app.api.v2.scripts_handlers.executions_handlers.lifecycle_handlers.history import (
@@ -964,16 +1169,23 @@ def _make_script_history_app(service_mock: AsyncMock):
     setup_dishka(container, app)
     return app
 
+
 class TestCommandHistoryAPI:
     @pytest.mark.asyncio
     async def test_get_command_executions_by_command_no_cursor(self):
         svc = AsyncMock()
         dto = _make_history_dto()
-        svc.get_command_history.return_value = CommandHistoryPageDTO(items=(dto,), total=1)
+        svc.get_command_history.return_value = CommandHistoryPageDTO(
+            items=(dto,), total=1
+        )
         app = _make_cmd_history_app(svc)
         cmd_id = uuid.uuid4()
         with _settings_patcher:
-            async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test", headers={"X-API-Key": "test-master"}) as ac:
+            async with AsyncClient(
+                transport=ASGITransport(app=app),
+                base_url="http://test",
+                headers={"X-API-Key": "test-master"},
+            ) as ac:
                 resp = await ac.get(f"/api/v2/commands/{cmd_id}/executions")
         assert resp.status_code == 200
         data = resp.json()
@@ -984,18 +1196,30 @@ class TestCommandHistoryAPI:
     async def test_get_command_executions_by_command_with_cursor_and_limit(self):
         svc = AsyncMock()
         dto = _make_history_dto()
-        svc.get_command_history.return_value = CommandHistoryPageDTO(items=(dto, dto), total=5)
+        svc.get_command_history.return_value = CommandHistoryPageDTO(
+            items=(dto, dto), total=5
+        )
         app = _make_cmd_history_app(svc)
         cmd_id = uuid.uuid4()
         cursor = _encode_offset(0)
         with _settings_patcher:
-            async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test", headers={"X-API-Key": "test-master"}) as ac:
-                resp = await ac.get(f"/api/v2/commands/{cmd_id}/executions?cursor={cursor}&limit=2")
+            async with AsyncClient(
+                transport=ASGITransport(app=app),
+                base_url="http://test",
+                headers={"X-API-Key": "test-master"},
+            ) as ac:
+                resp = await ac.get(
+                    f"/api/v2/commands/{cmd_id}/executions?cursor={cursor}&limit=2"
+                )
         assert resp.status_code == 200
         assert resp.json()["has_more"] is True
         # also test invalid cursor
         with _settings_patcher:
-            async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test", headers={"X-API-Key": "test-master"}) as ac:
+            async with AsyncClient(
+                transport=ASGITransport(app=app),
+                base_url="http://test",
+                headers={"X-API-Key": "test-master"},
+            ) as ac:
                 resp2 = await ac.get(f"/api/v2/commands/{cmd_id}/executions?cursor=bad")
         assert resp2.status_code == 422
 
@@ -1004,13 +1228,21 @@ class TestCommandHistoryAPI:
         svc = AsyncMock()
         # create 3 items, total 5, offset 1 limit 2 -> remainder 1, fetch_size 3, items sliced remainder:remainder+limit -> 1:3 => 2 items, has_more true
         dtos = tuple(_make_history_dto() for _ in range(3))
-        svc.get_command_history.return_value = CommandHistoryPageDTO(items=dtos, total=5)
+        svc.get_command_history.return_value = CommandHistoryPageDTO(
+            items=dtos, total=5
+        )
         app = _make_cmd_history_app(svc)
         cmd_id = uuid.uuid4()
         cursor = _encode_offset(1)
         with _settings_patcher:
-            async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test", headers={"X-API-Key": "test-master"}) as ac:
-                resp = await ac.get(f"/api/v2/commands/{cmd_id}/executions?cursor={cursor}&limit=2")
+            async with AsyncClient(
+                transport=ASGITransport(app=app),
+                base_url="http://test",
+                headers={"X-API-Key": "test-master"},
+            ) as ac:
+                resp = await ac.get(
+                    f"/api/v2/commands/{cmd_id}/executions?cursor={cursor}&limit=2"
+                )
         assert resp.status_code == 200
         data = resp.json()
         assert len(data["items"]) == 2
@@ -1037,16 +1269,23 @@ class TestCommandHistoryAPI:
         result2 = await _get_history(svc, node_id, cursor, 2)
         assert len(result2.items) == 2
 
+
 class TestBatchHistoryAPI:
     @pytest.mark.asyncio
     async def test_get_executions_by_batch_alias_no_cursor(self):
         svc = AsyncMock()
         dto = _make_history_dto()
-        svc.get_batch_history.return_value = CommandHistoryPageDTO(items=(dto,), total=1)
+        svc.get_batch_history.return_value = CommandHistoryPageDTO(
+            items=(dto,), total=1
+        )
         app = _make_batch_history_app(svc)
         batch_id = uuid.uuid4()
         with _settings_patcher:
-            async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test", headers={"X-API-Key": "test-master"}) as ac:
+            async with AsyncClient(
+                transport=ASGITransport(app=app),
+                base_url="http://test",
+                headers={"X-API-Key": "test-master"},
+            ) as ac:
                 resp = await ac.get(f"/api/v2/commands/executions?batch_id={batch_id}")
         assert resp.status_code == 200
         svc.get_batch_history.assert_awaited_once_with(batch_id, page=1, size=20)
@@ -1055,19 +1294,33 @@ class TestBatchHistoryAPI:
     async def test_get_batch_history_with_cursor(self):
         svc = AsyncMock()
         dto = _make_history_dto()
-        svc.get_batch_history.return_value = CommandHistoryPageDTO(items=(dto,), total=5)
+        svc.get_batch_history.return_value = CommandHistoryPageDTO(
+            items=(dto,), total=5
+        )
         app = _make_batch_history_app(svc)
         batch_id = uuid.uuid4()
         cursor = _encode_offset(0)
         with _settings_patcher:
-            async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test", headers={"X-API-Key": "test-master"}) as ac:
-                resp = await ac.get(f"/api/v2/commands/executions?batch_id={batch_id}&cursor={cursor}&limit=2")
+            async with AsyncClient(
+                transport=ASGITransport(app=app),
+                base_url="http://test",
+                headers={"X-API-Key": "test-master"},
+            ) as ac:
+                resp = await ac.get(
+                    f"/api/v2/commands/executions?batch_id={batch_id}&cursor={cursor}&limit=2"
+                )
         assert resp.status_code == 200
         assert resp.json()["has_more"] is True
         # and history endpoint alias
         with _settings_patcher:
-            async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test", headers={"X-API-Key": "test-master"}) as ac:
-                resp2 = await ac.get(f"/api/v2/commands/executions/history?batch_id={batch_id}&cursor={cursor}&limit=2")
+            async with AsyncClient(
+                transport=ASGITransport(app=app),
+                base_url="http://test",
+                headers={"X-API-Key": "test-master"},
+            ) as ac:
+                resp2 = await ac.get(
+                    f"/api/v2/commands/executions/history?batch_id={batch_id}&cursor={cursor}&limit=2"
+                )
         assert resp2.status_code == 200
 
     @pytest.mark.asyncio
@@ -1076,8 +1329,14 @@ class TestBatchHistoryAPI:
         app = _make_batch_history_app(svc)
         batch_id = uuid.uuid4()
         with _settings_patcher:
-            async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test", headers={"X-API-Key": "test-master"}) as ac:
-                resp = await ac.get(f"/api/v2/commands/executions?batch_id={batch_id}&cursor=bad")
+            async with AsyncClient(
+                transport=ASGITransport(app=app),
+                base_url="http://test",
+                headers={"X-API-Key": "test-master"},
+            ) as ac:
+                resp = await ac.get(
+                    f"/api/v2/commands/executions?batch_id={batch_id}&cursor=bad"
+                )
         assert resp.status_code == 422
 
     @pytest.mark.asyncio
@@ -1095,6 +1354,7 @@ class TestBatchHistoryAPI:
         assert len(result.items) == 2
         assert result.has_more is True
 
+
 class TestNodeHistoryAlias:
     @pytest.mark.asyncio
     async def test_get_node_history_alias(self):
@@ -1105,14 +1365,23 @@ class TestNodeHistoryAlias:
         )
 
         now = datetime.now(UTC)
-        dto = NodeStatusHistoryRecordDTO(id=uuid.uuid4(), node_id=uuid.uuid4(), old_status="active", new_status="active", source="manual_update", changed_at=now)  # type: ignore[arg-type]
+        dto = NodeStatusHistoryRecordDTO(
+            id=uuid.uuid4(),
+            node_id=uuid.uuid4(),
+            old_status="active",
+            new_status="active",
+            source="manual_update",
+            changed_at=now,
+        )  # type: ignore[arg-type]
         svc = AsyncMock()
         svc.get_history.return_value = NodeStatusHistoryPageDTO(items=(dto,), total=1)
         node_id = uuid.uuid4()
         # Call alias via its original function to avoid dishka wrapper
         alias_orig = get_node_history_alias.__dishka_orig_func__  # type: ignore[attr-defined]
         mock_inner = AsyncMock(return_value=MagicMock(items=[dto]))
-        with patch("app.api.v2.nodes_handlers.history.get_node_status_history", mock_inner):
+        with patch(
+            "app.api.v2.nodes_handlers.history.get_node_status_history", mock_inner
+        ):
             result = await alias_orig(node_id, svc, None, 20, MagicMock())  # type: ignore[arg-type]
             mock_inner.assert_awaited_once()
             assert result is not None
@@ -1121,7 +1390,11 @@ class TestNodeHistoryAlias:
         svc2.get_history.return_value = NodeStatusHistoryPageDTO(items=(dto,), total=1)
         app = _make_node_history_app(svc2)
         with _settings_patcher:
-            async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test", headers={"X-API-Key": "test-master"}) as ac:
+            async with AsyncClient(
+                transport=ASGITransport(app=app),
+                base_url="http://test",
+                headers={"X-API-Key": "test-master"},
+            ) as ac:
                 resp2 = await ac.get(f"/api/v2/nodes/{node_id}/status-history")
         assert resp2.status_code == 200
         assert len(resp2.json()["items"]) == 1
@@ -1139,8 +1412,14 @@ class TestNodeHistoryAlias:
         # Also test via HTTP for status-history
         app = _make_node_history_app(svc)
         with _settings_patcher:
-            async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test", headers={"X-API-Key": "test-master"}) as ac:
-                resp = await ac.get(f"/api/v2/nodes/{node_id}/status-history?cursor=bad!!")
+            async with AsyncClient(
+                transport=ASGITransport(app=app),
+                base_url="http://test",
+                headers={"X-API-Key": "test-master"},
+            ) as ac:
+                resp = await ac.get(
+                    f"/api/v2/nodes/{node_id}/status-history?cursor=bad!!"
+                )
         assert resp.status_code == 422
 
     @pytest.mark.asyncio
@@ -1152,17 +1431,34 @@ class TestNodeHistoryAlias:
         )
 
         now = datetime.now(UTC)
-        dtos = tuple(NodeStatusHistoryRecordDTO(id=uuid.uuid4(), node_id=uuid.uuid4(), old_status="active", new_status="active", source="manual_update", changed_at=now) for _ in range(3))
+        dtos = tuple(
+            NodeStatusHistoryRecordDTO(
+                id=uuid.uuid4(),
+                node_id=uuid.uuid4(),
+                old_status="active",
+                new_status="active",
+                source="manual_update",
+                changed_at=now,
+            )
+            for _ in range(3)
+        )
         svc.get_history.return_value = NodeStatusHistoryPageDTO(items=dtos, total=10)
         app = _make_node_history_app(svc)
         node_id = uuid.uuid4()
         cursor = _encode_offset(1)
         with _settings_patcher:
-            async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test", headers={"X-API-Key": "test-master"}) as ac:
-                resp = await ac.get(f"/api/v2/nodes/{node_id}/status-history?cursor={cursor}&limit=2")
+            async with AsyncClient(
+                transport=ASGITransport(app=app),
+                base_url="http://test",
+                headers={"X-API-Key": "test-master"},
+            ) as ac:
+                resp = await ac.get(
+                    f"/api/v2/nodes/{node_id}/status-history?cursor={cursor}&limit=2"
+                )
         assert resp.status_code == 200
         # node history does NOT do remainder slicing, it just passes offset/limit to service, so returns all 3
         assert len(resp.json()["items"]) == 3
+
 
 class TestScriptHistoryAlias:
     def _make_exec_dto(self, script_id: uuid.UUID):
@@ -1189,14 +1485,24 @@ class TestScriptHistoryAlias:
         svc.get_executions.return_value = ([dto], 1)
         app = _make_script_history_app(svc)
         with _settings_patcher:
-            async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test", headers={"X-API-Key": "test-master"}) as ac:
+            async with AsyncClient(
+                transport=ASGITransport(app=app),
+                base_url="http://test",
+                headers={"X-API-Key": "test-master"},
+            ) as ac:
                 resp = await ac.get(f"/api/v2/scripts/{script_id}/executions")
         assert resp.status_code == 200
         assert len(resp.json()["items"]) == 1
         # alias via /executions/history?script_id=
         with _settings_patcher:
-            async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test", headers={"X-API-Key": "test-master"}) as ac:
-                resp2 = await ac.get(f"/api/v2/scripts/executions/history?script_id={script_id}")
+            async with AsyncClient(
+                transport=ASGITransport(app=app),
+                base_url="http://test",
+                headers={"X-API-Key": "test-master"},
+            ) as ac:
+                resp2 = await ac.get(
+                    f"/api/v2/scripts/executions/history?script_id={script_id}"
+                )
         assert resp2.status_code == 200
 
     @pytest.mark.asyncio
@@ -1208,8 +1514,14 @@ class TestScriptHistoryAlias:
         app = _make_script_history_app(svc)
         cursor = _encode_offset(1)
         with _settings_patcher:
-            async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test", headers={"X-API-Key": "test-master"}) as ac:
-                resp = await ac.get(f"/api/v2/scripts/{script_id}/executions?cursor={cursor}&limit=2")
+            async with AsyncClient(
+                transport=ASGITransport(app=app),
+                base_url="http://test",
+                headers={"X-API-Key": "test-master"},
+            ) as ac:
+                resp = await ac.get(
+                    f"/api/v2/scripts/{script_id}/executions?cursor={cursor}&limit=2"
+                )
         assert resp.status_code == 200
         assert len(resp.json()["items"]) == 2
         assert resp.json()["has_more"] is True
@@ -1221,8 +1533,14 @@ class TestScriptHistoryAlias:
         svc.get_executions.return_value = ([], 0)
         app = _make_script_history_app(svc)
         with _settings_patcher:
-            async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test", headers={"X-API-Key": "test-master"}) as ac:
-                resp = await ac.get(f"/api/v2/scripts/{script_id}/executions?cursor=bad")
+            async with AsyncClient(
+                transport=ASGITransport(app=app),
+                base_url="http://test",
+                headers={"X-API-Key": "test-master"},
+            ) as ac:
+                resp = await ac.get(
+                    f"/api/v2/scripts/{script_id}/executions?cursor=bad"
+                )
         assert resp.status_code == 422
 
     @pytest.mark.asyncio
@@ -1249,9 +1567,11 @@ class TestScriptHistoryAlias:
         with pytest.raises(Exception):
             await _get_executions(svc, script_id, "bad", 2)
 
+
 # ---------------------------------------------------------------------------
 # 9. Bulk create with timeout
 # ---------------------------------------------------------------------------
+
 
 class TestBulkCreateTimeout:
     @pytest.mark.asyncio
@@ -1259,7 +1579,17 @@ class TestBulkCreateTimeout:
 
         svc = AsyncMock()
         now = datetime.now(UTC)
-        view = CommandViewDTO(id=uuid.uuid4(), name="n", description=None, command="echo hi", parameters=(), tags=(), timeout=60, created_at=now, updated_at=now)
+        view = CommandViewDTO(
+            id=uuid.uuid4(),
+            name="n",
+            description=None,
+            command="echo hi",
+            parameters=(),
+            tags=(),
+            timeout=60,
+            created_at=now,
+            updated_at=now,
+        )
         svc.create_command.return_value = view
         # Build app via commands façade
         from app.api.v2.commands import router as cmd_router
@@ -1296,8 +1626,17 @@ class TestBulkCreateTimeout:
         container = make_async_container(Prov(), MockAuthServiceProvider())
         setup_dishka(container, app)
         with _settings_patcher:
-            async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test", headers={"X-API-Key": "test-master"}) as ac:
-                resp = await ac.post("/api/v2/commands/", json={"items": [{"name": "n", "command": "echo hi", "timeout": 60}]})
+            async with AsyncClient(
+                transport=ASGITransport(app=app),
+                base_url="http://test",
+                headers={"X-API-Key": "test-master"},
+            ) as ac:
+                resp = await ac.post(
+                    "/api/v2/commands/",
+                    json={
+                        "items": [{"name": "n", "command": "echo hi", "timeout": 60}]
+                    },
+                )
         assert resp.status_code in (200, 201, 207)
         # verify timeout passed to service
         assert svc.create_command.await_args.args[0].timeout == 60
@@ -1308,7 +1647,16 @@ class TestBulkCreateTimeout:
 
         svc = AsyncMock()
         now = datetime.now(UTC)
-        view = ScriptViewDTO(id=uuid.uuid4(), name="s", description=None, steps=(ScriptStepDTO(label="a", type="inline", command="echo hi"),), tags=(), timeout=77, created_at=now, updated_at=now)
+        view = ScriptViewDTO(
+            id=uuid.uuid4(),
+            name="s",
+            description=None,
+            steps=(ScriptStepDTO(label="a", type="inline", command="echo hi"),),
+            tags=(),
+            timeout=77,
+            created_at=now,
+            updated_at=now,
+        )
         svc.create_script.return_value = view
 
         app = FastAPI()
@@ -1347,8 +1695,31 @@ class TestBulkCreateTimeout:
         container = make_async_container(Prov(), MockAuthServiceProvider())
         setup_dishka(container, app)
         with _settings_patcher:
-            async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test", headers={"X-API-Key": "test-master"}) as ac:
-                resp = await ac.post("/api/v2/scripts/", json={"items": [{"name": "s", "steps": [{"label": "a", "type": "inline", "command": "echo hi", "params": {}, "on_failure": "stop"}], "timeout": 77}]})
+            async with AsyncClient(
+                transport=ASGITransport(app=app),
+                base_url="http://test",
+                headers={"X-API-Key": "test-master"},
+            ) as ac:
+                resp = await ac.post(
+                    "/api/v2/scripts/",
+                    json={
+                        "items": [
+                            {
+                                "name": "s",
+                                "steps": [
+                                    {
+                                        "label": "a",
+                                        "type": "inline",
+                                        "command": "echo hi",
+                                        "params": {},
+                                        "on_failure": "stop",
+                                    }
+                                ],
+                                "timeout": 77,
+                            }
+                        ]
+                    },
+                )
         assert resp.status_code in (200, 201, 207)
         assert svc.create_script.await_args.args[0].timeout == 77
 
@@ -1356,6 +1727,7 @@ class TestBulkCreateTimeout:
 # ---------------------------------------------------------------------------
 # 10. Additional coverage for remaining branches
 # ---------------------------------------------------------------------------
+
 
 class TestAdditionalCoverage:
     def test_node_response_mapping(self):
@@ -1389,12 +1761,21 @@ class TestAdditionalCoverage:
 
         svc = AsyncMock()
         now = datetime.now(UTC)
-        dto = NodeStatusHistoryRecordDTO(id=uuid.uuid4(), node_id=uuid.uuid4(), old_status="active", new_status="active", source="manual_update", changed_at=now)  # type: ignore[arg-type]
+        dto = NodeStatusHistoryRecordDTO(
+            id=uuid.uuid4(),
+            node_id=uuid.uuid4(),
+            old_status="active",
+            new_status="active",
+            source="manual_update",
+            changed_at=now,
+        )  # type: ignore[arg-type]
         svc.get_history.return_value = NodeStatusHistoryPageDTO(items=(dto,), total=1)
         # cursor that is valid for decode_cursor but not decode_offset
         cursor = encode_cursor(now, uuid.uuid4())
         orig = get_node_status_history.__dishka_orig_func__  # type: ignore[attr-defined]
-        result = await orig(uuid.uuid4(), svc, cursor=cursor, limit=20, _principal=MagicMock())  # type: ignore[arg-type]
+        result = await orig(
+            uuid.uuid4(), svc, cursor=cursor, limit=20, _principal=MagicMock()
+        )  # type: ignore[arg-type]
         assert len(result.items) == 1
         # svc should be called with offset 0
         assert svc.get_history.await_args.args[0].offset == 0
@@ -1418,24 +1799,41 @@ class TestAdditionalCoverage:
         )
         script_reader = AsyncMock()
         script_reader.get_definition.return_value = ScriptDefinitionDTO(
-            id=script_id, steps=({"label": "a", "type": "inline", "command": "sleep 10"},), timeout=1
+            id=script_id,
+            steps=({"label": "a", "type": "inline", "command": "sleep 10"},),
+            timeout=1,
         )
         node_reader = AsyncMock()
         node_reader.get_connections_by_ids.return_value = [node]
         writer = AsyncMock()
         writer.create_execution.return_value = uuid.uuid4()
         writer.update_execution.side_effect = RuntimeError("db fail")
-        svc = ScriptExecutionService(script_reader, AsyncMock(), node_reader, writer, MagicMock(decrypt=MagicMock(return_value=None)), MagicMock())
+        svc = ScriptExecutionService(
+            script_reader,
+            AsyncMock(),
+            node_reader,
+            writer,
+            MagicMock(decrypt=MagicMock(return_value=None)),
+            MagicMock(),
+        )
 
         async def _slow(target):
             await asyncio.sleep(5)
             from app.application.dto.script_execution import ScriptNodeResultDTO
 
-            return ScriptNodeResultDTO(execution_id=target.execution_id, node_id=node_id, node_name="n", status="success", steps=())
+            return ScriptNodeResultDTO(
+                execution_id=target.execution_id,
+                node_id=node_id,
+                node_name="n",
+                status="success",
+                steps=(),
+            )
 
         svc._run_remote = _slow  # type: ignore[method-assign]
         with pytest.raises(TimeoutError):
-            await svc.execute_script(script_id, ScriptExecutionRequestDTO(node_ids=(node_id,), timeout=1))
+            await svc.execute_script(
+                script_id, ScriptExecutionRequestDTO(node_ids=(node_id,), timeout=1)
+            )
         # writer.update_execution was attempted and exception swallowed via pass
         assert writer.update_execution.await_count >= 1
 
@@ -1444,14 +1842,20 @@ class TestAdditionalCoverage:
         from app.schemas.script import ScriptExecutionsRequest
 
         # valid timeout
-        r = CommandExecutionsRequest(command_ids=[uuid.uuid4()], node_ids=[uuid.uuid4()], timeout=60)
+        r = CommandExecutionsRequest(
+            command_ids=[uuid.uuid4()], node_ids=[uuid.uuid4()], timeout=60
+        )
         assert r.timeout == 60
         # invalid timeout should raise
         with pytest.raises(Exception):
             CommandExecutionsRequest(command_ids=[uuid.uuid4()], timeout=9999)
-        r2 = ScriptExecutionsRequest(script_ids=[uuid.uuid4()], node_ids=[uuid.uuid4()], timeout=30)
+        r2 = ScriptExecutionsRequest(
+            script_ids=[uuid.uuid4()], node_ids=[uuid.uuid4()], timeout=30
+        )
         assert r2.timeout == 30
-        r3 = RawExecutionsRequest(commands=["echo hi"], node_ids=[uuid.uuid4()], timeout=100)
+        r3 = RawExecutionsRequest(
+            commands=["echo hi"], node_ids=[uuid.uuid4()], timeout=100
+        )
         assert r3.timeout == 100
 
     def test_timeout_boundary_1_and_3600(self):
@@ -1465,12 +1869,44 @@ class TestAdditionalCoverage:
         # lower bound 1 and upper 3600 should pass
         assert CommandCreate(name="n", command="echo hi", timeout=1).timeout == 1
         assert CommandCreate(name="n", command="echo hi", timeout=3600).timeout == 3600
-        assert ScriptCreate(name="s", steps=[{"label": "a", "type": "inline", "command": "echo hi", "params": {}, "on_failure": "stop"}], timeout=1).timeout == 1  # type: ignore[arg-type]
-        assert ScriptCreate(name="s", steps=[{"label": "a", "type": "inline", "command": "echo hi", "params": {}, "on_failure": "stop"}], timeout=3600).timeout == 3600  # type: ignore[arg-type]
+        assert (
+            ScriptCreate(
+                name="s",
+                steps=[
+                    {
+                        "label": "a",
+                        "type": "inline",
+                        "command": "echo hi",
+                        "params": {},
+                        "on_failure": "stop",
+                    }
+                ],
+                timeout=1,
+            ).timeout
+            == 1
+        )  # type: ignore[arg-type]
+        assert (
+            ScriptCreate(
+                name="s",
+                steps=[
+                    {
+                        "label": "a",
+                        "type": "inline",
+                        "command": "echo hi",
+                        "params": {},
+                        "on_failure": "stop",
+                    }
+                ],
+                timeout=3600,
+            ).timeout
+            == 3600
+        )  # type: ignore[arg-type]
         assert CommandExecuteRequest(node_id=uuid.uuid4(), timeout=1).timeout == 1
         assert CommandExecuteRequest(node_id=uuid.uuid4(), timeout=3600).timeout == 3600
         assert ScriptExecuteRequest(node_ids=[uuid.uuid4()], timeout=1).timeout == 1
-        assert ScriptExecuteRequest(node_ids=[uuid.uuid4()], timeout=3600).timeout == 3600
+        assert (
+            ScriptExecuteRequest(node_ids=[uuid.uuid4()], timeout=3600).timeout == 3600
+        )
         assert RawExecutionsRequest(commands=["echo hi"], timeout=1).timeout == 1
         assert RawExecutionsRequest(commands=["echo hi"], timeout=3600).timeout == 3600
         # 0 and 3601 should fail
@@ -1482,4 +1918,3 @@ class TestAdditionalCoverage:
             CommandExecuteRequest(node_id=uuid.uuid4(), timeout=0)
         with pytest.raises(Exception):
             ScriptExecuteRequest(node_ids=[uuid.uuid4()], timeout=3601)
-

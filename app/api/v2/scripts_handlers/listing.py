@@ -87,8 +87,6 @@ def _step_dto(step: ScriptStep) -> ScriptStepDTO:
     )
 
 
-
-
 def _execution_response(execution: ScriptExecutionDTO) -> ScriptExecutionResponse:
     return ScriptExecutionResponse(
         id=execution.id,
