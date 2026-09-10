@@ -59,7 +59,7 @@ async def get_audit_stats(
         None, description="Group by period"
     ),
     _principal: Principal = Security(get_current_principal),
-) -> Any:  # noqa: ANN401
+) -> AuditStatsResponse | BulkResult[AuditStatsBucket]:
     """Get audit stats aggregated or bucketed.
 
     Without group_by returns aggregate. With group_by returns buckets.

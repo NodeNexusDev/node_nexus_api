@@ -127,7 +127,8 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         self._requests = requests
         self._window = window
         self._max_clients = max_clients
-        # TODO: consider Redis-backed rate limiting for multi-replica deployments
+        # Single-replica in-memory rate limiting. For multi-replica, use Redis-backed
+        # backend (see execution_registry TTL doc). Kept as in-memory fallback for dev.
         self._ip_counts: OrderedDict[str, deque[float]] = OrderedDict()
 
     def clear(self) -> None:
