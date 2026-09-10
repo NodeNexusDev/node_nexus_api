@@ -1455,7 +1455,11 @@ class TestAdditionalCoverage:
         assert r3.timeout == 100
 
     def test_timeout_boundary_1_and_3600(self):
-        from app.schemas.command import CommandCreate, CommandExecuteRequest, RawExecutionsRequest
+        from app.schemas.command import (
+            CommandCreate,
+            CommandExecuteRequest,
+            RawExecutionsRequest,
+        )
         from app.schemas.script import ScriptCreate, ScriptExecuteRequest
 
         # lower bound 1 and upper 3600 should pass

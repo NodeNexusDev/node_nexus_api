@@ -17,8 +17,6 @@ if TYPE_CHECKING:
     from app.application.ports.node_reader import NodeConnectionReader
     from app.application.ports.remote_command import RemoteConnectorFactory
 
-from app.application.dto.node_connection import NodeConnectionDTO
-
 from app.application.command_policy import command_fingerprint
 from app.application.dto.bulk_node_operation import BulkValidateCredentialsResultDTO
 from app.application.dto.command_execution import (
@@ -27,6 +25,7 @@ from app.application.dto.command_execution import (
     CommandExecutionDTO,
 )
 from app.application.dto.command_history import CommandHistoryCreateDTO
+from app.application.dto.node_connection import NodeConnectionDTO
 from app.application.policies.output import bound_output
 from app.application.services._target_resolver import resolve_targets
 from app.application.services.ssh_executor import (

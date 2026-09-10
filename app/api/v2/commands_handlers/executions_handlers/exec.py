@@ -215,7 +215,9 @@ async def bulk_raw_executions(
 
     async def _execute_raw(command: str) -> list[BulkExecutionItem]:
         try:
-            effective_timeout = data.timeout if data.timeout is not None else DEFAULT_TIMEOUT
+            effective_timeout = (
+                data.timeout if data.timeout is not None else DEFAULT_TIMEOUT
+            )
             result = await bulk_service.execute(
                 BulkCommandRequestDTO(
                     command=command,
