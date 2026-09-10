@@ -1,6 +1,7 @@
 """Immutable command template used by remote execution."""
 
 from dataclasses import dataclass
+from app.core.constants import DEFAULT_TIMEOUT
 from uuid import UUID
 
 from app.application.dto.command_management import CommandParameterDTO
@@ -13,4 +14,4 @@ class CommandTemplateDTO:
     id: UUID
     command: str
     parameters: tuple[CommandParameterDTO, ...]
-    timeout: int = 30
+    timeout: int = DEFAULT_TIMEOUT

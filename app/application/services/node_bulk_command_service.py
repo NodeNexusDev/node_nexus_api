@@ -11,7 +11,8 @@ from typing import TYPE_CHECKING
 import structlog
 
 if TYPE_CHECKING:
-    from app.application.dto.node_connection import NodeConnectionDTO
+    from app.core.constants import DEFAULT_TIMEOUT
+from app.application.dto.node_connection import NodeConnectionDTO
     from app.application.ports.audit_sink import AuditEventSink
     from app.application.ports.command_history import CommandHistoryWriter
     from app.application.ports.credential_cipher import CredentialCipher

@@ -6,6 +6,7 @@ from typing import Literal
 from uuid import UUID
 
 from app.application.types import JsonValue
+from app.core.constants import DEFAULT_TIMEOUT
 
 ParameterType = Literal["string", "integer", "boolean"]
 
@@ -30,7 +31,7 @@ class CommandCreateDTO:
     description: str | None = None
     parameters: tuple[CommandParameterDTO, ...] = ()
     tags: tuple[str, ...] = ()
-    timeout: int = 30
+    timeout: int = DEFAULT_TIMEOUT
 
 
 CommandUpdateValue = str | tuple[CommandParameterDTO, ...] | tuple[str, ...] | None

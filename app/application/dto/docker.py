@@ -5,6 +5,8 @@ from dataclasses import dataclass
 from typing import Literal
 from uuid import UUID
 
+from app.core.constants import DEFAULT_TIMEOUT
+
 
 @dataclass(frozen=True, slots=True)
 class DockerContainerDTO:
@@ -69,7 +71,7 @@ class DockerExecRequestDTO:
     node_id: UUID
     container_id: str
     command: str
-    timeout: int = 30
+    timeout: int = DEFAULT_TIMEOUT
 
 
 @dataclass(frozen=True, slots=True)
@@ -157,7 +159,7 @@ class DockerImageDTO:
 class DockerImagePullRequestDTO:
     node_id: UUID
     image: str
-    timeout: int = 300
+    timeout: int = DEFAULT_TIMEOUT
 
 
 @dataclass(frozen=True, slots=True)

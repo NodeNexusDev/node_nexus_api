@@ -9,6 +9,7 @@ from uuid import UUID
 
 import structlog
 
+from app.core.constants import DEFAULT_TIMEOUT
 from app.application.command_policy import command_fingerprint
 from app.application.dto.node_connection import NodeConnectionDTO
 from app.application.dto.script_execution import (

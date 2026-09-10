@@ -7,6 +7,7 @@ from uuid import UUID
 
 from app.application.dto.node_connection import NodeConnectionDTO
 from app.application.types import JsonValue
+from app.core.constants import DEFAULT_TIMEOUT
 
 ScriptExecutionStatus = Literal[
     "pending",
@@ -48,7 +49,7 @@ class ScriptExecutionTargetDTO:
     script_id: UUID
     node: NodeConnectionDTO
     steps: tuple[ResolvedScriptStepDTO, ...]
-    timeout: int = 30
+    timeout: int = DEFAULT_TIMEOUT
 
 
 @dataclass(frozen=True, slots=True)

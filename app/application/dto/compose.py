@@ -1,6 +1,7 @@
 """Immutable application DTOs for compose projects."""
 
 from __future__ import annotations
+from app.core.constants import DEFAULT_TIMEOUT
 
 import uuid
 from dataclasses import dataclass, field
@@ -87,7 +88,7 @@ class ComposeExecRequestDTO:
     project_name: str
     service: str
     command: str
-    timeout: int = 30
+    timeout: int = DEFAULT_TIMEOUT
 
 
 @dataclass(frozen=True, slots=True)

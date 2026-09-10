@@ -12,6 +12,7 @@ import structlog
 from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
 from fastapi import APIRouter, HTTPException, Query, Response, Security
 
+from app.core.constants import DEFAULT_TIMEOUT
 from app.api.deps import Principal, get_current_principal, require_write_or_jwt_scope
 from app.api.pagination import decode_offset, encode_offset
 from app.api.v2._bulk import set_bulk_status
@@ -176,7 +177,7 @@ async def bulk_create_commands(
                 command=item.command,
                 parameters=tuple(_parameter_dto(p) for p in item.parameters),
                 tags=tuple(item.tags),
-                timeout=item.timeout if item.timeout is not None else 30,
+                timeout=item.timeout if item.timeout is not None else DEFAULT_TIMEOUT,
             )
             created = await service.create_command(dto)
             return CommandBulkCreateResult(

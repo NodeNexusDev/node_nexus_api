@@ -7,6 +7,7 @@ from uuid import UUID
 
 import structlog
 
+from app.core.constants import DEFAULT_TIMEOUT
 from app.application.dto.command_execution import CommandResultDTO
 from app.application.dto.command_management import CommandExecuteRequestDTO
 from app.application.services.ssh_executor import (
