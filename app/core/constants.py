@@ -12,5 +12,7 @@ Timeout = Annotated[  # noqa: E501
 
 OptionalTimeout = Annotated[  # noqa: E501
     int | None,
-    Field(default=None, ge=1, le=3600, description="Optional timeout override (1..3600)"),
+    Field(  # noqa: E501
+        default=None, ge=1, le=3600, description="Optional timeout override (1..3600)"
+    ),
 ]
