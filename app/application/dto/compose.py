@@ -1,12 +1,13 @@
 """Immutable application DTOs for compose projects."""
 
 from __future__ import annotations
-from app.core.constants import DEFAULT_TIMEOUT
 
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
 from uuid import UUID
+
+from app.core.constants import DEFAULT_TIMEOUT
 
 
 @dataclass(frozen=True, slots=True)

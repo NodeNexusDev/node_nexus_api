@@ -11,13 +11,13 @@ from typing import TYPE_CHECKING
 import structlog
 
 if TYPE_CHECKING:
-    from app.core.constants import DEFAULT_TIMEOUT
-from app.application.dto.node_connection import NodeConnectionDTO
     from app.application.ports.audit_sink import AuditEventSink
     from app.application.ports.command_history import CommandHistoryWriter
     from app.application.ports.credential_cipher import CredentialCipher
     from app.application.ports.node_reader import NodeConnectionReader
     from app.application.ports.remote_command import RemoteConnectorFactory
+
+from app.application.dto.node_connection import NodeConnectionDTO
 
 from app.application.command_policy import command_fingerprint
 from app.application.dto.bulk_node_operation import BulkValidateCredentialsResultDTO

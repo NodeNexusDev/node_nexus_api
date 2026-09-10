@@ -1,10 +1,10 @@
 """Immutable command template used by remote execution."""
 
 from dataclasses import dataclass
-from app.core.constants import DEFAULT_TIMEOUT
 from uuid import UUID
 
 from app.application.dto.command_management import CommandParameterDTO
+from app.core.constants import DEFAULT_TIMEOUT
 
 
 @dataclass(frozen=True, slots=True)

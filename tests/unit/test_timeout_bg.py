@@ -1454,3 +1454,28 @@ class TestAdditionalCoverage:
         r3 = RawExecutionsRequest(commands=["echo hi"], node_ids=[uuid.uuid4()], timeout=100)
         assert r3.timeout == 100
 
+    def test_timeout_boundary_1_and_3600(self):
+        from app.schemas.command import CommandCreate, CommandExecuteRequest, RawExecutionsRequest
+        from app.schemas.script import ScriptCreate, ScriptExecuteRequest
+
+        # lower bound 1 and upper 3600 should pass
+        assert CommandCreate(name="n", command="echo hi", timeout=1).timeout == 1
+        assert CommandCreate(name="n", command="echo hi", timeout=3600).timeout == 3600
+        assert ScriptCreate(name="s", steps=[{"label": "a", "type": "inline", "command": "echo hi", "params": {}, "on_failure": "stop"}], timeout=1).timeout == 1  # type: ignore[arg-type]
+        assert ScriptCreate(name="s", steps=[{"label": "a", "type": "inline", "command": "echo hi", "params": {}, "on_failure": "stop"}], timeout=3600).timeout == 3600  # type: ignore[arg-type]
+        assert CommandExecuteRequest(node_id=uuid.uuid4(), timeout=1).timeout == 1
+        assert CommandExecuteRequest(node_id=uuid.uuid4(), timeout=3600).timeout == 3600
+        assert ScriptExecuteRequest(node_ids=[uuid.uuid4()], timeout=1).timeout == 1
+        assert ScriptExecuteRequest(node_ids=[uuid.uuid4()], timeout=3600).timeout == 3600
+        assert RawExecutionsRequest(commands=["echo hi"], timeout=1).timeout == 1
+        assert RawExecutionsRequest(commands=["echo hi"], timeout=3600).timeout == 3600
+        # 0 and 3601 should fail
+        with pytest.raises(Exception):
+            CommandCreate(name="n", command="echo hi", timeout=0)
+        with pytest.raises(Exception):
+            CommandCreate(name="n", command="echo hi", timeout=3601)
+        with pytest.raises(Exception):
+            CommandExecuteRequest(node_id=uuid.uuid4(), timeout=0)
+        with pytest.raises(Exception):
+            ScriptExecuteRequest(node_ids=[uuid.uuid4()], timeout=3601)
+
