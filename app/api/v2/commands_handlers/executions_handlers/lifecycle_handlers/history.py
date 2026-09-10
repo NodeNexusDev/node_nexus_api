@@ -13,6 +13,7 @@ from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
 from fastapi import APIRouter, HTTPException, Query, Response, Security
 
 from app.api.deps import Principal, get_current_principal, require_write_or_jwt_scope
+from app.api.v2._shared import command_response, script_response
 from app.api.pagination import decode_offset, encode_offset
 from app.api.v2._bulk import set_bulk_status
 from app.application.dto.command_execution import BulkCommandRequestDTO
@@ -60,8 +61,6 @@ from app.schemas.node import (
 audit = structlog.get_logger("audit")
 
 # Compatibility aliases for tests importing private helpers
-_encode_offset = encode_offset  # noqa: N816
-_decode_offset = decode_offset  # noqa: N816
 
 router = APIRouter(route_class=DishkaRoute)
 
@@ -81,20 +80,6 @@ def _parameter_dto(parameter: CommandParameter) -> CommandParameterDTO:
     )
 
 
-def _command_response(command: CommandViewDTO) -> CommandResponse:
-    return CommandResponse(
-        id=command.id,
-        name=command.name,
-        description=command.description,
-        command=command.command,
-        parameters=[
-            CommandParameter(
-                name=parameter.name,
-                type=parameter.type,
-                required=parameter.required,
-                default=parameter.default,
-                description=parameter.description,
-            )
             for parameter in command.parameters
         ],
         tags=list(command.tags),

@@ -14,6 +14,7 @@ from fastapi import APIRouter, HTTPException, Query, Response, Security
 
 from app.core.constants import DEFAULT_TIMEOUT
 from app.api.deps import Principal, get_current_principal, require_write_or_jwt_scope
+from app.api.v2._shared import command_response, script_response
 from app.api.pagination import decode_offset, encode_offset
 from app.application.dto.execution_lifecycle import CancelExecutionDTO, RetryScriptDTO
 from app.application.dto.schedule import ScheduleRequestDTO, ScheduleViewDTO
@@ -66,8 +67,6 @@ from app.schemas.script_execution import (
 audit = structlog.get_logger("audit")
 
 # Compatibility aliases for tests importing private helpers
-_encode_offset = encode_offset  # noqa: N816
-_decode_offset = decode_offset  # noqa: N816
 
 router = APIRouter(route_class=DishkaRoute)
 
@@ -88,27 +87,6 @@ def _step_dto(step: ScriptStep) -> ScriptStepDTO:
     )
 
 
-def _script_response(script: ScriptViewDTO) -> ScriptResponse:
-    return ScriptResponse(
-        id=script.id,
-        name=script.name,
-        description=script.description,
-        steps=[
-            {
-                "label": step.label,
-                "type": step.type,
-                "command": step.command,
-                "command_id": step.command_id,
-                "params": dict(step.params),
-                "on_failure": step.on_failure,
-            }
-            for step in script.steps
-        ],
-        tags=list(script.tags),
-        timeout=script.timeout,
-        created_at=script.created_at,
-        updated_at=script.updated_at,
-    )
 
 
 def _execution_response(execution: ScriptExecutionDTO) -> ScriptExecutionResponse:
@@ -194,7 +172,7 @@ async def list_scripts(
     )
     if remainder:
         scripts = scripts[remainder : remainder + limit]
-    items = [_script_response(s) for s in scripts]
+    items = [script_response(s) for s in scripts]
     has_more = (offset + len(items)) < total
     next_cursor = encode_offset(offset + limit) if has_more else None
     return CursorPage[ScriptResponse](

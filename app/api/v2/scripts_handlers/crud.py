@@ -13,6 +13,7 @@ from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
 from fastapi import APIRouter, HTTPException, Query, Response, Security
 
 from app.api.deps import Principal, get_current_principal, require_write_or_jwt_scope
+from app.api.v2._shared import command_response, script_response
 from app.api.pagination import decode_offset, encode_offset
 from app.application.dto.execution_lifecycle import CancelExecutionDTO, RetryScriptDTO
 from app.application.dto.schedule import ScheduleRequestDTO, ScheduleViewDTO
@@ -69,8 +70,6 @@ from app.schemas.script_execution import (
 audit = structlog.get_logger("audit")
 
 # Compatibility aliases for tests importing private helpers
-_encode_offset = encode_offset  # noqa: N816
-_decode_offset = decode_offset  # noqa: N816
 
 router = APIRouter(route_class=DishkaRoute)
 
@@ -91,27 +90,6 @@ def _step_dto(step: ScriptStep) -> ScriptStepDTO:
     )
 
 
-def _script_response(script: ScriptViewDTO) -> ScriptResponse:
-    return ScriptResponse(
-        id=script.id,
-        name=script.name,
-        description=script.description,
-        steps=[
-            {
-                "label": step.label,
-                "type": step.type,
-                "command": step.command,
-                "command_id": step.command_id,
-                "params": dict(step.params),
-                "on_failure": step.on_failure,
-            }
-            for step in script.steps
-        ],
-        tags=list(script.tags),
-        timeout=script.timeout,
-        created_at=script.created_at,
-        updated_at=script.updated_at,
-    )
 
 
 def _execution_response(execution: ScriptExecutionDTO) -> ScriptExecutionResponse:
@@ -243,7 +221,7 @@ async def get_script(
 ) -> ScriptResponse:
     """Get a script by ID."""
     audit.info("api.v2.scripts.get", script_id=str(script_id))
-    return _script_response(await service.get_script(script_id))
+    return script_response(await service.get_script(script_id))
 
 
 @router.patch("/{script_id}", response_model=ScriptResponse)
@@ -265,7 +243,7 @@ async def update_script(
         script_id,
         ScriptUpdateDTO(changes=tuple(changes.items())),
     )
-    return _script_response(result)
+    return script_response(result)
 
 
 @router.delete("/{script_id}", status_code=204)
@@ -291,7 +269,7 @@ async def clone_script(
     """Clone a script."""
     audit.info("api.v2.scripts.clone", script_id=str(script_id))
     cloned = await service.clone_script(script_id, new_name=new_name)
-    return _script_response(cloned)
+    return script_response(cloned)
 
 
 # ---------------------------------------------------------------------------

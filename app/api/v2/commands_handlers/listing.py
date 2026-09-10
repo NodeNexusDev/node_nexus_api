@@ -14,6 +14,7 @@ from fastapi import APIRouter, HTTPException, Query, Response, Security
 
 from app.core.constants import DEFAULT_TIMEOUT
 from app.api.deps import Principal, get_current_principal, require_write_or_jwt_scope
+from app.api.v2._shared import command_response, script_response
 from app.api.pagination import decode_offset, encode_offset
 from app.api.v2._bulk import set_bulk_status
 from app.application.dto.command_execution import BulkCommandRequestDTO
@@ -61,8 +62,6 @@ from app.schemas.node import (
 audit = structlog.get_logger("audit")
 
 # Compatibility aliases for tests importing private helpers
-_encode_offset = encode_offset  # noqa: N816
-_decode_offset = decode_offset  # noqa: N816
 
 router = APIRouter(route_class=DishkaRoute)
 
@@ -79,29 +78,6 @@ def _parameter_dto(parameter: CommandParameter) -> CommandParameterDTO:
         required=parameter.required,
         default=parameter.default,
         description=parameter.description,
-    )
-
-
-def _command_response(command: CommandViewDTO) -> CommandResponse:
-    return CommandResponse(
-        id=command.id,
-        name=command.name,
-        description=command.description,
-        command=command.command,
-        parameters=[
-            CommandParameter(
-                name=parameter.name,
-                type=parameter.type,
-                required=parameter.required,
-                default=parameter.default,
-                description=parameter.description,
-            )
-            for parameter in command.parameters
-        ],
-        tags=list(command.tags),
-        timeout=command.timeout,
-        created_at=command.created_at,
-        updated_at=command.updated_at,
     )
 
 
@@ -142,7 +118,7 @@ async def list_commands(
     )
     if remainder:
         commands = commands[remainder : remainder + limit]
-    items = [_command_response(c) for c in commands]
+    items = [command_response(c) for c in commands]
     has_more = (offset + len(items)) < total
     next_cursor = encode_offset(offset + limit) if has_more else None
     return CursorPage[CommandResponse](
