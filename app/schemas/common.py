@@ -68,6 +68,14 @@ AUTHENTICATED_ERROR_RESPONSES: dict[int | str, dict[str, Any]] = {
         "model": ErrorResponse,
         "description": "The request or a domain value failed validation.",
     },
+    500: {
+        "model": ErrorResponse,
+        "description": "An unexpected server error occurred.",
+    },
+    501: {
+        "model": ErrorResponse,
+        "description": "The requested capability is not implemented.",
+    },
     429: {
         "model": ErrorResponse,
         "description": "The configured request rate limit was exceeded.",

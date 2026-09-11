@@ -117,6 +117,18 @@ class AuditWriteError(DomainError):
     """Raised when an obligatory audit event cannot be persisted."""
 
 
+class AuditStatsUnavailableError(DomainError):
+    """Raised when audit stats cannot be served (capability missing)."""
+
+
+class AuditReadError(DomainError):
+    """Raised when an audit read or mapping fails unexpectedly."""
+
+
+class CommitFailedError(DomainError):
+    """Raised when the request transaction commit fails."""
+
+
 class FavoriteNotFoundError(DomainError):
     """Raised when a favorite is not found."""
 
