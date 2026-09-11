@@ -7,9 +7,8 @@ import sqlalchemy as sa
 from sqlalchemy import ARRAY, JSON, DateTime, ForeignKey, Index, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.core.constants import DEFAULT_TIMEOUT
 from app.models.base import Base, _utcnow
-from app.models.types import JsonObject
+from app.models.types import DEFAULT_TIMEOUT, JsonObject
 
 
 class ScriptModel(Base):
