@@ -152,7 +152,7 @@ async def bulk_update_scripts(
     """Bulk update scripts via PATCH /."""
     audit.info("api.v2.scripts.bulk_update", count=len(data.updates))
 
-    async def _update_one(item: ScriptBulkUpdateItem) -> ScriptBulkUpdateResult:  # type: ignore[no-redef]
+    async def _update_one(item: ScriptBulkUpdateItem) -> ScriptBulkUpdateResult:
         try:
             changes = item.changes.model_dump(exclude_unset=True)
             if isinstance(changes.get("steps"), list):

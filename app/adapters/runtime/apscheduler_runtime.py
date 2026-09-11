@@ -183,9 +183,7 @@ class ApschedulerRuntime:
     @overload
     async def acquire_ownership(self, engine: AsyncEngine) -> bool: ...
 
-    async def acquire_ownership(
-        self, engine: AsyncEngine | None = None
-    ) -> bool:
+    async def acquire_ownership(self, engine: AsyncEngine | None = None) -> bool:
         """Acquire the PostgreSQL session advisory lock for this replica."""
         # Preferred path via ownership port
         if self._ownership is not None:
@@ -229,9 +227,7 @@ class ApschedulerRuntime:
     @overload
     def start_ownership_monitor(self, engine: AsyncEngine) -> None: ...
 
-    def start_ownership_monitor(
-        self, engine: AsyncEngine | None = None
-    ) -> None:
+    def start_ownership_monitor(self, engine: AsyncEngine | None = None) -> None:
         """Continuously acquire ownership after startup or owner failover."""
         # Preferred port path
         if self._ownership is not None:

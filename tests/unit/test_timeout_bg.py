@@ -328,7 +328,7 @@ class TestCommandGatewayTimeout:
         cmd = make_orm_command(timeout=30)
         cmd.timeout = 90  # type: ignore[attr-defined]
         cmd_id = uuid.uuid4()
-        data = CommandUpdateDTO(changes=(("timeout", 90),))  # type: ignore[arg-type]
+        data = CommandUpdateDTO(changes=(("timeout", 90),))  # type: ignore[arg-type]  # ty:ignore[invalid-argument-type]
         with patch(
             "app.adapters.persistence.command_management.CommandRepository"
         ) as repo_cls:
@@ -810,7 +810,7 @@ class TestScriptExecutionTimeout:
                 steps=(),
             )
 
-        svc._run_remote = _slow  # type: ignore[method-assign]
+        svc._run_remote = _slow  # type: ignore[method-assign]  # ty:ignore[invalid-assignment]
         with pytest.raises(TimeoutError, match="timed out after 1s"):
             await svc.execute_script(
                 script_id, ScriptExecutionRequestDTO(node_ids=(node_id,), timeout=1)
@@ -1377,7 +1377,7 @@ class TestNodeHistoryAlias:
         svc.get_history.return_value = NodeStatusHistoryPageDTO(items=(dto,), total=1)
         node_id = uuid.uuid4()
         # Call alias via its original function to avoid dishka wrapper
-        alias_orig = get_node_history_alias.__dishka_orig_func__  # type: ignore[attr-defined]
+        alias_orig = get_node_history_alias.__dishka_orig_func__  # type: ignore[attr-defined]  # ty:ignore[unresolved-attribute]
         mock_inner = AsyncMock(return_value=MagicMock(items=[dto]))
         with patch(
             "app.api.v2.nodes_handlers.history.get_node_status_history", mock_inner
@@ -1405,7 +1405,7 @@ class TestNodeHistoryAlias:
 
         svc = AsyncMock()
         node_id = uuid.uuid4()
-        orig = get_node_status_history.__dishka_orig_func__  # type: ignore[attr-defined]
+        orig = get_node_status_history.__dishka_orig_func__  # type: ignore[attr-defined]  # ty:ignore[unresolved-attribute]
         with pytest.raises(Exception) as exc:
             await orig(node_id, svc, cursor="bad!!", limit=20, _principal=MagicMock())  # type: ignore[arg-type]
         assert "422" in str(exc.value) or "Invalid cursor" in str(exc.value)
@@ -1772,7 +1772,7 @@ class TestAdditionalCoverage:
         svc.get_history.return_value = NodeStatusHistoryPageDTO(items=(dto,), total=1)
         # cursor that is valid for decode_cursor but not decode_offset
         cursor = encode_cursor(now, uuid.uuid4())
-        orig = get_node_status_history.__dishka_orig_func__  # type: ignore[attr-defined]
+        orig = get_node_status_history.__dishka_orig_func__  # type: ignore[attr-defined]  # ty:ignore[unresolved-attribute]
         result = await orig(
             uuid.uuid4(), svc, cursor=cursor, limit=20, _principal=MagicMock()
         )  # type: ignore[arg-type]
@@ -1829,7 +1829,7 @@ class TestAdditionalCoverage:
                 steps=(),
             )
 
-        svc._run_remote = _slow  # type: ignore[method-assign]
+        svc._run_remote = _slow  # type: ignore[method-assign]  # ty:ignore[invalid-assignment]
         with pytest.raises(TimeoutError):
             await svc.execute_script(
                 script_id, ScriptExecutionRequestDTO(node_ids=(node_id,), timeout=1)
