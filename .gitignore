@@ -234,3 +234,6 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# e2e-generated ssh test keys (fixture-created, never commit)
+tests/ssh-keys/
