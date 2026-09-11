@@ -13,9 +13,7 @@ from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
 from fastapi import APIRouter, HTTPException, Query, Response, Security
 
 from app.api.deps import Principal, get_current_principal, require_write_or_jwt_scope
-from app.api.v2._shared import command_response, script_response
-from app.api.pagination import decode_offset, encode_offset
-from app.api.v2._bulk import set_bulk_status
+from app.api.v2._bulk import BulkResponder
 from app.application.dto.command_execution import BulkCommandRequestDTO
 from app.application.dto.command_management import (
     CommandCreateDTO,
@@ -113,15 +111,7 @@ async def bulk_retry_executions(
     results = list(
         await asyncio.gather(*(_retry_one(eid) for eid in data.execution_ids))
     )  # noqa: E501
-    succeeded = sum(1 for r in results if r.status == "retry_scheduled")
-    failed = len(results) - succeeded
-    set_bulk_status(response, succeeded, failed)
-    return BulkResult[BulkRetryCommandResult](
-        total=len(results),
-        succeeded=succeeded,
-        failed=failed,
-        results=results,
-    )
+    return BulkResponder(response, success_status="retry_scheduled").result(results)
 
 
 @router.post("/executions/cancels", response_model=BulkResult[BulkCancelCommandResult])
@@ -154,15 +144,7 @@ async def bulk_cancel_executions(
     results = list(
         await asyncio.gather(*(_cancel_one(eid) for eid in data.execution_ids))
     )  # noqa: E501
-    succeeded = sum(1 for r in results if r.status == "cancelled")
-    failed = len(results) - succeeded
-    set_bulk_status(response, succeeded, failed)
-    return BulkResult[BulkCancelCommandResult](
-        total=len(results),
-        succeeded=succeeded,
-        failed=failed,
-        results=results,
-    )
+    return BulkResponder(response, success_status="cancelled").result(results)
 
 
 # ---------------------------------------------------------------------------

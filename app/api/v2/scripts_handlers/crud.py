@@ -13,8 +13,8 @@ from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
 from fastapi import APIRouter, HTTPException, Query, Response, Security
 
 from app.api.deps import Principal, get_current_principal, require_write_or_jwt_scope
-from app.api.v2._shared import command_response, script_response
-from app.api.pagination import decode_offset, encode_offset
+from app.api.v2._bulk import BulkResponder
+from app.api.v2._shared import script_response
 from app.application.dto.execution_lifecycle import CancelExecutionDTO, RetryScriptDTO
 from app.application.dto.schedule import ScheduleRequestDTO, ScheduleViewDTO
 from app.application.dto.script_execution import (
@@ -36,7 +36,6 @@ from app.application.services.schedule_management import ScheduleManagementServi
 from app.application.services.script_execution_service import ScriptExecutionService
 from app.application.services.script_history_service import ScriptHistoryService
 from app.application.services.script_management_service import ScriptManagementService
-from app.api.v2._bulk import set_bulk_status
 from app.schemas.common import BulkResult, CursorPage
 from app.schemas.execution_stats import (
     ExecutionStatsResponse,
@@ -47,6 +46,7 @@ from app.schemas.scheduler import ScheduledJob, ScheduleRequest, ScheduleRespons
 from app.schemas.script import (
     ScriptBulkCreateRequest,
     ScriptBulkCreateResult,
+    ScriptBulkUpdateItem,
     ScriptBulkUpdateRequest,
     ScriptBulkUpdateResult,
     ScriptCreate,
@@ -152,7 +152,7 @@ async def bulk_update_scripts(
     """Bulk update scripts via PATCH /."""
     audit.info("api.v2.scripts.bulk_update", count=len(data.updates))
 
-    async def _update_one(item: Any) -> ScriptBulkUpdateResult:  # noqa: ANN401
+    async def _update_one(item: ScriptBulkUpdateItem) -> ScriptBulkUpdateResult:  # type: ignore[no-redef]
         try:
             changes = item.changes.model_dump(exclude_unset=True)
             if isinstance(changes.get("steps"), list):
@@ -171,12 +171,7 @@ async def bulk_update_scripts(
             )
 
     results = await asyncio.gather(*(_update_one(u) for u in data.updates))
-    succeeded = sum(1 for r in results if r.status == "success")
-    failed = len(results) - succeeded
-    set_bulk_status(response, succeeded, failed)
-    return BulkResult[ScriptBulkUpdateResult](
-        total=len(results), succeeded=succeeded, failed=failed, results=list(results)
-    )
+    return BulkResponder(response).result(list(results))
 
 
 @router.post("/deletions", response_model=BulkResult[ScriptBulkUpdateResult])
@@ -198,12 +193,7 @@ async def bulk_delete_scripts(
             return ScriptBulkUpdateResult(script_id=sid, status="error", error=str(exc))
 
     results = await asyncio.gather(*(_delete_one(sid) for sid in data.ids))
-    succeeded = sum(1 for r in results if r.status == "success")
-    failed = len(results) - succeeded
-    set_bulk_status(response, succeeded, failed)
-    return BulkResult[ScriptBulkUpdateResult](
-        total=len(results), succeeded=succeeded, failed=failed, results=list(results)
-    )
+    return BulkResponder(response).result(list(results))
 
 
 # ---------------------------------------------------------------------------

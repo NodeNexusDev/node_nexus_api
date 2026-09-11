@@ -6,16 +6,15 @@ from __future__ import annotations
 import asyncio
 import uuid
 from datetime import datetime
-from typing import Annotated, Any, Literal
+from typing import Annotated, Literal
 
 import structlog
 from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
 from fastapi import APIRouter, HTTPException, Query, Response, Security
 
 from app.api.deps import Principal, get_current_principal, require_write_or_jwt_scope
-from app.api.v2._shared import command_response, script_response
-from app.api.pagination import decode_offset, encode_offset
-from app.api.v2._bulk import set_bulk_status
+from app.api.v2._shared import command_response
+from app.api.v2._bulk import BulkResponder
 from app.application.dto.command_execution import BulkCommandRequestDTO
 from app.application.dto.command_management import (
     CommandCreateDTO,
@@ -37,6 +36,7 @@ from app.schemas.command import (
     BulkExecutionItem,
     CommandBulkCreateRequest,
     CommandBulkCreateResult,
+    CommandBulkUpdateItem,
     CommandBulkUpdateRequest,
     CommandBulkUpdateResult,
     CommandCreate,
@@ -65,7 +65,6 @@ audit = structlog.get_logger("audit")
 
 # Compatibility aliases for tests importing private helpers
 _command_response = command_response  # noqa: N816
-_script_response = script_response  # noqa: N816
 
 router = APIRouter(route_class=DishkaRoute)
 
@@ -101,7 +100,7 @@ async def bulk_update_commands(
     """Bulk update commands via PATCH / (bulk-first, no bulk keyword)."""
     audit.info("api.v2.commands.bulk_update", count=len(data.updates))
 
-    async def _update_one(item: Any) -> CommandBulkUpdateResult:  # noqa: ANN401
+    async def _update_one(item: CommandBulkUpdateItem) -> CommandBulkUpdateResult:
         try:
             changes = item.changes.model_dump(exclude_unset=True)
             if isinstance(changes.get("parameters"), list):
@@ -120,12 +119,7 @@ async def bulk_update_commands(
             )
 
     results = await asyncio.gather(*(_update_one(u) for u in data.updates))
-    succeeded = sum(1 for r in results if r.status == "success")
-    failed = len(results) - succeeded
-    set_bulk_status(response, succeeded, failed)
-    return BulkResult[CommandBulkUpdateResult](
-        total=len(results), succeeded=succeeded, failed=failed, results=list(results)
-    )
+    return BulkResponder(response).result(list(results))
 
 
 @router.post("/deletions", response_model=BulkResult[CommandBulkUpdateResult])
@@ -149,12 +143,7 @@ async def bulk_delete_commands(
             )
 
     results = await asyncio.gather(*(_delete_one(cid) for cid in data.ids))
-    succeeded = sum(1 for r in results if r.status == "success")
-    failed = len(results) - succeeded
-    set_bulk_status(response, succeeded, failed)
-    return BulkResult[CommandBulkUpdateResult](
-        total=len(results), succeeded=succeeded, failed=failed, results=list(results)
-    )
+    return BulkResponder(response).result(list(results))
 
 
 # ---------------------------------------------------------------------------

@@ -12,11 +12,9 @@ import structlog
 from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
 from fastapi import APIRouter, HTTPException, Query, Response, Security
 
-from app.core.constants import DEFAULT_TIMEOUT
 from app.api.deps import Principal, get_current_principal, require_write_or_jwt_scope
-from app.api.v2._shared import command_response, script_response
-from app.api.pagination import decode_offset, encode_offset
-from app.api.v2._bulk import set_bulk_status
+from app.api.v2._bulk import HTTP_207_MULTI_STATUS
+from app.core.constants import DEFAULT_TIMEOUT
 from app.application.dto.command_execution import BulkCommandRequestDTO
 from app.application.dto.command_management import (
     CommandCreateDTO,
@@ -173,7 +171,8 @@ async def bulk_executions(
     flat: list[BulkExecutionItem] = [it for sub in nested for it in sub]
     succeeded = sum(1 for r in flat if r.status == "success")
     failed = len(flat) - succeeded
-    set_bulk_status(response, succeeded, failed)
+    if failed > 0 and succeeded > 0:
+        response.status_code = HTTP_207_MULTI_STATUS
     return BulkExecutionBatchResponse(
         batch_id=batch_id,
         total=len(flat),
@@ -253,7 +252,8 @@ async def bulk_raw_executions(
     flat: list[BulkExecutionItem] = [it for sub in nested for it in sub]
     succeeded = sum(1 for r in flat if r.status == "success")
     failed = len(flat) - succeeded
-    set_bulk_status(response, succeeded, failed)
+    if failed > 0 and succeeded > 0:
+        response.status_code = HTTP_207_MULTI_STATUS
     return BulkExecutionBatchResponse(
         batch_id=batch_id,
         total=len(flat),

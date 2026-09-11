@@ -10,7 +10,9 @@ from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
 from fastapi import APIRouter, HTTPException, Response, Security
 
 from app.api.deps import Principal, get_current_principal, require_write_or_jwt_scope
-from app.application.dto.template_pack import PackUpdateDTO, PackViewDTO
+from app.api.v2._bulk import HTTP_207_MULTI_STATUS
+from app.api.v2._shared import pack_response
+from app.application.dto.template_pack import PackUpdateDTO
 from app.application.services.template_pack_service import (
     PackNotFoundError,
     TemplatePackService,
@@ -28,24 +30,7 @@ audit = structlog.get_logger("audit")
 
 router = APIRouter(route_class=DishkaRoute)
 
-
-def _pack_response(view: PackViewDTO) -> PackResponse:
-    return PackResponse(
-        id=view.id,
-        registry_id=view.registry_id,
-        pack_id=view.pack_id,
-        name=view.name,
-        description=view.description,
-        version=view.version,
-        author=view.author,
-        tags=list(view.tags) if view.tags else [],
-        manifest_sha=view.manifest_sha,
-        readme=view.readme,
-        installed_version=view.installed_version,
-        installed_at=view.installed_at,
-        created_at=view.created_at,
-        updated_at=view.updated_at,
-    )
+_pack_response = pack_response  # noqa: N816
 
 
 @router.patch("/packs/{pack_id}", response_model=PackResponse)
@@ -115,7 +100,7 @@ async def bulk_delete_packs(
     succeeded = sum(1 for r in results if r.status == "success")
     failed = len(results) - succeeded
     if failed > 0 and succeeded > 0:
-        response.status_code = 207
+        response.status_code = HTTP_207_MULTI_STATUS
     return BulkPackDeleteResponse(
         total=len(results), succeeded=succeeded, failed=failed, results=results
     )

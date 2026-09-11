@@ -13,7 +13,14 @@ from fastapi import APIRouter, HTTPException, Query, Response, Security
 from fastapi.responses import StreamingResponse
 
 from app.api.deps import Principal, get_current_principal, require_write_or_jwt_scope
-from app.api.pagination import decode_offset, encode_offset
+from app.api.v2._shared import (
+    _decode_offset,  # noqa: F401
+    _encode_offset,  # noqa: F401
+    pack_detail_response,
+    pack_response,
+    parse_cursor_offset,
+    registry_response,
+)
 from app.application.dto.template_pack import (
     PackAssetCreateDTO,
     PackCreateDTO,
@@ -51,80 +58,12 @@ from app.schemas.template_registry import (
 
 audit = structlog.get_logger("audit")
 
-# Compatibility aliases for tests importing private helpers
-_encode_offset = encode_offset  # noqa: N816
-_decode_offset = decode_offset  # noqa: N816
-
 router = APIRouter(route_class=DishkaRoute)
 
-
-# ---------------------------------------------------------------------------
-# Helpers to map DTO -> response
-# ---------------------------------------------------------------------------
-
-
-def _registry_response(view: Any) -> RegistryResponse:  # noqa: ANN401
-    return RegistryResponse(
-        id=view.id,
-        owner=view.owner,
-        name=view.name,
-        default_branch=view.default_branch,
-        last_synced_at=view.last_synced_at,
-        created_at=view.created_at,
-        updated_at=view.updated_at,
-    )
-
-
-def _pack_response(view: Any) -> PackResponse:  # noqa: ANN401
-    return PackResponse(
-        id=view.id,
-        registry_id=view.registry_id,
-        pack_id=view.pack_id,
-        name=view.name,
-        description=view.description,
-        version=view.version,
-        author=view.author,
-        tags=list(view.tags) if view.tags else [],
-        manifest_sha=view.manifest_sha,
-        readme=view.readme,
-        installed_version=view.installed_version,
-        installed_at=view.installed_at,
-        created_at=view.created_at,
-        updated_at=view.updated_at,
-    )
-
-
-def _pack_detail_response(detail: Any) -> PackDetailWithAssetsResponse:  # noqa: ANN401
-    view = detail.pack
-    assets = [
-        PackAssetResponse(
-            id=a.id,
-            pack_id=a.pack_id,
-            path=a.path,
-            size=a.size,
-            sha=a.sha,
-            created_at=a.created_at,
-            updated_at=a.updated_at,
-        )
-        for a in detail.assets
-    ]
-    return PackDetailWithAssetsResponse(
-        id=view.id,
-        registry_id=view.registry_id,
-        pack_id=view.pack_id,
-        name=view.name,
-        description=view.description,
-        version=view.version,
-        author=view.author,
-        tags=list(view.tags) if view.tags else [],
-        manifest_sha=view.manifest_sha,
-        readme=view.readme,
-        installed_version=view.installed_version,
-        installed_at=view.installed_at,
-        created_at=view.created_at,
-        updated_at=view.updated_at,
-        assets=assets,
-    )
+# Compatibility aliases for tests importing private helpers
+_registry_response = registry_response  # noqa: N816
+_pack_response = pack_response  # noqa: N816
+_pack_detail_response = pack_detail_response  # noqa: N816
 
 
 # ---------------------------------------------------------------------------
@@ -155,12 +94,7 @@ async def list_packs(
         tag=tag,
         installed=installed,
     )
-    offset = 0
-    if cursor is not None:
-        try:
-            offset = decode_offset(cursor)
-        except ValueError:
-            raise HTTPException(status_code=422, detail="Invalid cursor") from None
+    offset = parse_cursor_offset(cursor)
     page_dto = await service.list_packs(
         PackListQueryDTO(
             offset=offset,
@@ -171,9 +105,11 @@ async def list_packs(
             search=search,
         )
     )
-    items = [_pack_response(v) for v in page_dto.items]
+    items = [pack_response(v) for v in page_dto.items]
     has_more = (offset + len(items)) < page_dto.total
-    next_cursor = encode_offset(offset + limit) if has_more else None
+    from app.api.pagination import encode_offset as _enc
+
+    next_cursor = _enc(offset + limit) if has_more else None
     return CursorPage[PackResponse](
         items=items,
         next_cursor=next_cursor,
