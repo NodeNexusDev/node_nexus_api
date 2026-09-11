@@ -21,7 +21,7 @@ from starlette.responses import Response
 from app.adapters.lifecycle.application_startup import ApplicationStartup
 from app.adapters.lifecycle.commit_middleware import CommitOnResponseMiddleware
 from app.adapters.telemetry import init_telemetry
-from app.api.error_mapping import domain_error_handler
+from app.api.error_mapping import domain_error_handler, problem_content
 from app.api.middleware import (
     RateLimitMiddleware,
     RequestIdMiddleware,
@@ -164,16 +164,18 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         """Return HTTPException detail together with the request id."""
         request_id = getattr(request.state, "request_id", None)
         message = exc.detail if isinstance(exc.detail, str) else "HTTP request failed"
-        content: dict[str, object] = {
-            "code": f"HTTP_{exc.status_code}",
-            "message": message,
-            "detail": exc.detail,
-            "request_id": request_id,
-        }
+        content = problem_content(
+            status_code=exc.status_code,
+            code=f"HTTP_{exc.status_code}",
+            detail=message,
+            request_id=request_id,
+            path=request.url.path,
+        )
         return JSONResponse(
             status_code=exc.status_code,
             content=content,
             headers=exc.headers or {},
+            media_type="application/problem+json",
         )
 
     @app.exception_handler(RequestValidationError)
@@ -182,15 +184,23 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     ) -> JSONResponse:
         """Return validation errors together with the request id."""
         request_id = getattr(request.state, "request_id", None)
+        detail = "Request validation failed: " + "; ".join(
+            f"{'.'.join(map(str, e['loc']))}: {e['msg']}" for e in exc.errors()
+        )
         content: dict[str, object] = {
-            "code": "RequestValidationError",
-            "message": "Request validation failed",
-            "detail": jsonable_encoder(exc.errors()),
-            "request_id": request_id,
+            **problem_content(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                code="RequestValidationError",
+                detail=detail,
+                request_id=request_id,
+                path=request.url.path,
+            ),
+            "errors": jsonable_encoder(exc.errors()),
         }
         return JSONResponse(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             content=content,
+            media_type="application/problem+json",
         )
 
     @app.exception_handler(StarletteHTTPException)
@@ -200,16 +210,18 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         """Return Starlette HTTPException detail together with the request id."""
         request_id = getattr(request.state, "request_id", None)
         message = exc.detail if isinstance(exc.detail, str) else "HTTP request failed"
-        content: dict[str, object] = {
-            "code": f"HTTP_{exc.status_code}",
-            "message": message,
-            "detail": exc.detail,
-            "request_id": request_id,
-        }
+        content = problem_content(
+            status_code=exc.status_code,
+            code=f"HTTP_{exc.status_code}",
+            detail=message,
+            request_id=request_id,
+            path=request.url.path,
+        )
         return JSONResponse(
             status_code=exc.status_code,
             content=content,
             headers=exc.headers or {},
+            media_type="application/problem+json",
         )
 
     @app.exception_handler(Exception)
@@ -226,15 +238,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             exc_info=exc,
         )
         request_id = getattr(request.state, "request_id", None)
-        content: dict[str, object] = {
-            "code": "InternalError",
-            "message": "Internal server error",
-            "detail": None,
-            "request_id": request_id,
-        }
+        content = problem_content(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            code="InternalError",
+            detail="Internal server error",
+            request_id=request_id,
+            path=request.url.path,
+        )
         return JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             content=content,
+            media_type="application/problem+json",
         )
 
     app.add_exception_handler(DomainError, domain_error_handler)

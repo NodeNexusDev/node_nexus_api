@@ -1,5 +1,6 @@
 """Central mapping of domain errors to HTTP responses."""
 
+from http import HTTPStatus
 from typing import cast
 
 import structlog
@@ -54,6 +55,38 @@ from app.core.exceptions import (
 )
 
 logger = structlog.get_logger()
+
+ERROR_TYPE_BASE = "https://nodenexusdev.github.io/node_nexus_api/en/errors"
+
+
+def _error_slug(code: str) -> str:
+    out = []
+    for i, ch in enumerate(code):
+        if ch.isupper() and i:
+            out.append("-")
+        out.append(ch.lower())
+    return "".join(out)
+
+
+def problem_content(
+    *,
+    status_code: int,
+    code: str,
+    detail: str,
+    request_id: str | None,
+    path: str,
+) -> dict[str, object]:
+    return {
+        "type": f"{ERROR_TYPE_BASE}/{_error_slug(code)}",
+        "title": HTTPStatus(status_code).phrase,
+        "status": status_code,
+        "detail": detail,
+        "code": code,
+        "message": detail,
+        "request_id": request_id,
+        "instance": path,
+    }
+
 
 DOMAIN_ERROR_STATUS: dict[type[DomainError], int] = {
     NodeNotFoundError: 404,
@@ -152,12 +185,14 @@ async def domain_error_handler(request: Request, exc: Exception) -> JSONResponse
     request_id = getattr(request.state, "request_id", None)
     return JSONResponse(
         status_code=status_code,
-        content={
-            "code": type(exc).__name__,
-            "message": message,
-            "request_id": request_id,
-            "detail": message,
-        },
+        content=problem_content(
+            status_code=status_code,
+            code=type(exc).__name__,
+            detail=message,
+            request_id=request_id,
+            path=request.url.path,
+        ),
+        media_type="application/problem+json",
     )
 
 
@@ -179,10 +214,12 @@ async def internal_error_handler(request: Request, exc: Exception) -> JSONRespon
     request_id = getattr(request.state, "request_id", None)
     return JSONResponse(
         status_code=500,
-        content={
-            "code": "InternalError",
-            "message": "Internal server error",
-            "request_id": request_id,
-            "detail": "Internal server error",
-        },
+        content=problem_content(
+            status_code=500,
+            code="InternalError",
+            detail="Internal server error",
+            request_id=request_id,
+            path=request.url.path,
+        ),
+        media_type="application/problem+json",
     )

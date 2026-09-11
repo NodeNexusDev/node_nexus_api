@@ -219,9 +219,18 @@ class TestDomainErrorHandler:
             transport=ASGITransport(app=app), base_url="http://test"
         ) as client:
             resp = await client.get(path)
+        from http import HTTPStatus
+
         body = resp.json()
         assert "code" in body
         assert "message" in body
         assert "detail" in body
         assert "request_id" in body
         assert body["message"] == body["detail"]
+        assert body["type"].startswith(
+            "https://nodenexusdev.github.io/node_nexus_api/en/errors/"
+        )
+        assert body["title"] == HTTPStatus(resp.status_code).phrase
+        assert body["status"] == resp.status_code
+        assert body["instance"] == path
+        assert resp.headers["content-type"] == "application/problem+json"
