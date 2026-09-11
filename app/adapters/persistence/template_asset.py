@@ -127,19 +127,32 @@ class SqlAlchemyTemplateAssetGateway:
                                 decoded = base64.b64decode(content, validate=True)
                                 if len(decoded) == size:
                                     raw = decoded
-                            except Exception as exc:
-                                logger.debug(
+                                else:
+                                    logger.warning(
+                                        "template_asset.base64_size_mismatch",
+                                        path=path,
+                                        expected=size,
+                                        actual=len(decoded),
+                                    )
+                            except Exception as exc:  # noqa: BLE001
+                                logger.warning(
                                     "template_asset.base64_fallback_failed",
                                     path=path,
                                     error=str(exc),
+                                    error_type=type(exc).__name__,
                                 )
-                    except Exception as exc:
+                    except Exception as exc:  # noqa: BLE001
                         logger.warning(
                             "template_asset.content_encode_failed",
                             path=path,
                             error=str(exc),
+                            error_type=type(exc).__name__,
                         )
-                        raw = b""
+                        # Fallback: try base64 decode as last resort
+                        try:
+                            raw = base64.b64decode(content, validate=True)
+                        except Exception:
+                            raw = b""
                     info = tarfile.TarInfo(name=path)
                     info.size = len(raw)
                     info.mtime = int(mtime)

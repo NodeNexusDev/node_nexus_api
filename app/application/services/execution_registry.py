@@ -6,7 +6,7 @@ import asyncio
 import time
 from uuid import UUID
 
-_tasks: dict[UUID, tuple[asyncio.Task[None], float]] = {}
+_tasks: dict[UUID, tuple[asyncio.Task[None], float] | asyncio.Task[None]] = {}
 _TTL_SECONDS = 3600  # 1h expire for completed/cancelled tasks
 
 
@@ -42,7 +42,7 @@ def get_execution_task(execution_id: UUID) -> asyncio.Task[None] | None:
     # Support both tuple (new) and direct Task (legacy test direct assignment)
     if isinstance(entry, tuple):
         return entry[0]
-    return entry  # type: ignore[return-value]
+    return entry
 
 
 def cancel_execution_task(execution_id: UUID) -> bool:
@@ -50,7 +50,7 @@ def cancel_execution_task(execution_id: UUID) -> bool:
     entry = _tasks.get(execution_id)
     if entry is None:
         return False
-    task = entry[0] if isinstance(entry, tuple) else entry  # type: ignore[assignment]
+    task = entry[0] if isinstance(entry, tuple) else entry
     if task.done():
         return False
     task.cancel()

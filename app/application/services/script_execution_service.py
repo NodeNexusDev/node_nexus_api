@@ -144,8 +144,12 @@ class ScriptExecutionService:
                             "timeout": effective_timeout,
                         },
                     )
-                except Exception:
-                    pass
+                except Exception as exc:  # noqa: BLE001
+                    audit.warning(
+                        "script.timeout.persist_failed",
+                        execution_id=str(target.execution_id),
+                        error=str(exc),
+                    )
             raise TimeoutError(f"Script execution timed out after {effective_timeout}s")
         for result in results:
             try:

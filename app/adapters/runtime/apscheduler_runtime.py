@@ -6,7 +6,7 @@ import asyncio
 import time
 from collections.abc import Awaitable, Callable
 from datetime import datetime
-from typing import TYPE_CHECKING, TypedDict
+from typing import TYPE_CHECKING, TypedDict, overload
 from zoneinfo import ZoneInfo
 
 import structlog
@@ -177,7 +177,15 @@ class ApschedulerRuntime:
             self._scheduler.start()
             logger.info("scheduler.started")
 
-    async def acquire_ownership(self, engine: AsyncEngine | None = None) -> bool:
+    @overload
+    async def acquire_ownership(self, engine: None = None) -> bool: ...
+
+    @overload
+    async def acquire_ownership(self, engine: AsyncEngine) -> bool: ...
+
+    async def acquire_ownership(
+        self, engine: AsyncEngine | None = None
+    ) -> bool:
         """Acquire the PostgreSQL session advisory lock for this replica."""
         # Preferred path via ownership port
         if self._ownership is not None:
@@ -194,19 +202,19 @@ class ApschedulerRuntime:
         sa_text = __import__("sqlalchemy").text  # type: ignore[attr-defined]
         self._owns_execution = False
         SCHEDULER_OWNER.set(0)
-        if engine.dialect.name != "postgresql":  # type: ignore[union-attr]
+        if engine.dialect.name != "postgresql":
             self._owns_execution = True
             SCHEDULER_OWNER.set(1)
             return True
-        connection = await engine.connect()  # type: ignore[union-attr]
+        connection = await engine.connect()
         acquired = bool(
-            await connection.scalar(  # type: ignore[union-attr]
+            await connection.scalar(
                 sa_text("SELECT pg_try_advisory_lock(:lock_id)"),
                 {"lock_id": _SCHEDULER_LOCK_ID},
             )
         )
         if not acquired:
-            await connection.close()  # type: ignore[union-attr]
+            await connection.close()
             logger.info("scheduler.owner.rejected")
             return False
         self._owner_connection = connection  # type: ignore[assignment]
@@ -215,7 +223,15 @@ class ApschedulerRuntime:
         logger.info("scheduler.owner.acquired")
         return True
 
-    def start_ownership_monitor(self, engine: AsyncEngine | None = None) -> None:
+    @overload
+    def start_ownership_monitor(self, engine: None = None) -> None: ...
+
+    @overload
+    def start_ownership_monitor(self, engine: AsyncEngine) -> None: ...
+
+    def start_ownership_monitor(
+        self, engine: AsyncEngine | None = None
+    ) -> None:
         """Continuously acquire ownership after startup or owner failover."""
         # Preferred port path
         if self._ownership is not None:
@@ -230,7 +246,7 @@ class ApschedulerRuntime:
             engine is None
             or engine.dialect.name != "postgresql"
             or self._ownership_task is not None
-        ):  # type: ignore[union-attr]
+        ):
             return
         self._ownership_task = asyncio.create_task(self._monitor_ownership(engine))
 
