@@ -1,8 +1,13 @@
 """Request-scoped DB commit middleware (infrastructure)."""
 
+import structlog
 from fastapi import Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
+
+from app.core.exceptions import CommitFailedError
+
+logger = structlog.get_logger(__name__)
 
 
 class CommitOnResponseMiddleware:
@@ -41,9 +46,14 @@ class CommitOnResponseMiddleware:
                 if session.new or session.dirty or session.deleted:
                     try:
                         await session.commit()
-                    except Exception:
+                    except Exception as exc:  # noqa: BLE001
+                        logger.exception(
+                            "commit_middleware.commit_failed",
+                            error=str(exc),
+                            error_type=type(exc).__name__,
+                        )
                         await session.rollback()
-                        raise
+                        raise CommitFailedError("Commit failed") from exc
 
                 committed = True
 

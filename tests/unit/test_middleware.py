@@ -19,6 +19,7 @@ from app.api.middleware import (
     RequestLoggingMiddleware,
     TimeoutMiddleware,
 )
+from app.core.exceptions import CommitFailedError
 from app.main import create_app
 
 
@@ -500,7 +501,7 @@ class TestCommitOnResponseMiddleware:
 
         app = self._make_app(container, handler)
 
-        with pytest.raises(RuntimeError, match="commit failed"):
+        with pytest.raises(CommitFailedError, match="Commit failed"):
             await app(
                 {"type": "http", "path": "/api/v1/notes"},
                 self._receive,
