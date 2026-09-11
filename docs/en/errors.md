@@ -432,20 +432,20 @@ with the previous message text as `detail`:
 
 | `type` suffix | Status | Title |
 |---|---|---|
-| `h-t-t-p_400` | `400` | Bad Request |
-| `h-t-t-p_401` | `401` | Unauthorized |
-| `h-t-t-p_403` | `403` | Forbidden |
-| `h-t-t-p_404` | `404` | Not Found |
-| `h-t-t-p_405` | `405` | Method Not Allowed |
-| `h-t-t-p_409` | `409` | Conflict |
-| `h-t-t-p_410` | `410` | Gone |
-| `h-t-t-p_422` | `422` | Unprocessable Content |
-| `h-t-t-p_429` | `429` | Too Many Requests |
-| `h-t-t-p_500` | `500` | Internal Server Error |
-| `h-t-t-p_501` | `501` | Not Implemented |
-| `h-t-t-p_502` | `502` | Bad Gateway |
-| `h-t-t-p_503` | `503` | Service Unavailable |
-| `h-t-t-p_504` | `504` | Gateway Timeout |
+| `http-400` | `400` | Bad Request |
+| `http-401` | `401` | Unauthorized |
+| `http-403` | `403` | Forbidden |
+| `http-404` | `404` | Not Found |
+| `http-405` | `405` | Method Not Allowed |
+| `http-409` | `409` | Conflict |
+| `http-410` | `410` | Gone |
+| `http-422` | `422` | Unprocessable Content |
+| `http-429` | `429` | Too Many Requests |
+| `http-500` | `500` | Internal Server Error |
+| `http-501` | `501` | Not Implemented |
+| `http-502` | `502` | Bad Gateway |
+| `http-503` | `503` | Service Unavailable |
+| `http-504` | `504` | Gateway Timeout |
 
-Example: `https://nodenexusdev.github.io/node_nexus_api/en/errors/h-t-t-p_404`
+Example: `https://nodenexusdev.github.io/node_nexus_api/en/errors/http-404`
 with `code: HTTP_404`.

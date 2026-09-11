@@ -1,5 +1,6 @@
 """Central mapping of domain errors to HTTP responses."""
 
+import re
 from http import HTTPStatus
 from typing import cast
 
@@ -60,12 +61,9 @@ ERROR_TYPE_BASE = "https://nodenexusdev.github.io/node_nexus_api/en/errors"
 
 
 def _error_slug(code: str) -> str:
-    out = []
-    for i, ch in enumerate(code):
-        if ch.isupper() and i:
-            out.append("-")
-        out.append(ch.lower())
-    return "".join(out)
+    s = code.replace("_", "-")
+    s = re.sub(r"(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])", "-", s)
+    return s.lower()
 
 
 def problem_content(

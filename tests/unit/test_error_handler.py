@@ -6,7 +6,7 @@ import pytest
 from fastapi import FastAPI
 from httpx2 import ASGITransport, AsyncClient
 
-from app.api.error_mapping import domain_error_handler
+from app.api.error_mapping import _error_slug, domain_error_handler, problem_content
 from app.core.exceptions import (
     APIKeyExpiredError,
     APIKeyNotFoundError,
@@ -234,3 +234,37 @@ class TestDomainErrorHandler:
         assert body["status"] == resp.status_code
         assert body["instance"] == path
         assert resp.headers["content-type"] == "application/problem+json"
+
+
+@pytest.mark.parametrize(
+    ("code", "expected"),
+    [
+        pytest.param("AuditReadError", "audit-read-error", id="camel"),
+        pytest.param("HTTP_404", "http-404", id="acronym-status"),
+        pytest.param(
+            "RequestValidationError",
+            "request-validation-error",
+            id="acronym-word",
+        ),
+        pytest.param(
+            "APIKeyExpiredError", "api-key-expired-error", id="leading-acronym"
+        ),
+        pytest.param("InternalError", "internal-error", id="plain"),
+    ],
+)
+def test_error_slug_handles_acronyms(code: str, expected: str) -> None:
+    assert _error_slug(code) == expected
+
+
+def test_problem_content_type_uses_http_slug() -> None:
+    body = problem_content(
+        status_code=404,
+        code="HTTP_404",
+        detail="Not found",
+        request_id="r1",
+        path="/x",
+    )
+    assert body["status"] == 404
+    type_uri = body["type"]
+    assert isinstance(type_uri, str)
+    assert type_uri.endswith("/http-404")
