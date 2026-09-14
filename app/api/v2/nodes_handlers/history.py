@@ -27,6 +27,7 @@ from app.application.services.node_metrics_service import NodeMetricsService
 from app.application.services.node_status_history_service import (
     NodeStatusHistoryService,
 )
+from app.core.exceptions import DomainError
 from app.schemas.common import BulkResult, CursorPage, decode_cursor, encode_cursor
 from app.schemas.node import (
     BulkNodeMetricsResult,
@@ -116,8 +117,12 @@ async def get_node_status_history(
                 offset = 0
             except ValueError:
                 raise HTTPException(status_code=422, detail="Invalid cursor") from None
+            except DomainError:
+                raise
             except Exception as exc:  # noqa: BLE001
                 raise HTTPException(status_code=422, detail="Invalid cursor") from exc
+        except DomainError:
+            raise
         except Exception as exc:  # noqa: BLE001
             raise HTTPException(status_code=422, detail="Invalid cursor") from exc
     query = NodeStatusHistoryQueryDTO(node_id=node_id, offset=offset, limit=limit)

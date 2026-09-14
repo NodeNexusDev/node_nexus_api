@@ -27,6 +27,7 @@ from app.application.services.template_pack_service import (
     PackNotFoundError,
     TemplatePackService,
 )
+from app.core.exceptions import DomainError
 from app.application.services.template_registry_service import (
     RegistryConflictError,
     RegistryNotFoundError,
@@ -117,6 +118,8 @@ async def create_pack(
                 registry_id=data.registry_id,
             )
         )
+    except DomainError:
+        raise
     except Exception as exc:  # noqa: BLE001
         # DomainError maps to 422 via handler, but local create conflict -> 409
         if "already exists" in str(exc):
