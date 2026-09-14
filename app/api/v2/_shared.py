@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
-from fastapi import HTTPException
-
-from app.api.pagination import decode_offset, encode_offset
+from app.api.pagination import (
+    cursor_next,
+    decode_offset,
+    encode_offset,
+    pagination_params,
+    parse_cursor_offset,
+)
 from app.application.dto.command_management import CommandViewDTO
 from app.application.dto.script_management import ScriptViewDTO
 from app.application.dto.template_pack import PackDetailDTO, PackViewDTO
@@ -171,38 +175,3 @@ def pack_detail_response(detail: PackDetailDTO) -> PackDetailWithAssetsResponse:
 
 
 _pack_detail_response = pack_detail_response  # noqa: N816
-
-
-# ---------------------------------------------------------------------------
-# Pagination offset helpers (cursor = base64 offset)
-# ---------------------------------------------------------------------------
-
-
-def parse_cursor_offset(cursor: str | None) -> int:
-    """Parse cursor to offset, raising 422 on invalid."""
-    if cursor is None or cursor == "":
-        return 0
-    try:
-        return decode_offset(cursor)
-    except ValueError:
-        raise HTTPException(status_code=422, detail="Invalid cursor") from None
-
-
-def pagination_params(offset: int, limit: int) -> tuple[int, int, int]:
-    """Translate offset/limit to page/fetch_size/remainder for offset-based services.
-
-    Returns (page, fetch_size, remainder) where page is 1-based.
-    """
-    remainder = offset % limit if limit else 0
-    page = offset // limit + 1 if limit else 1
-    fetch_size = limit + remainder if remainder else limit
-    return page, fetch_size, remainder
-
-
-def cursor_next(  # noqa: E501
-    offset: int, limit: int, total: int, returned: int
-) -> tuple[str | None, bool]:
-    """Build next_cursor and has_more from offset/limit/total."""
-    has_more = (offset + returned) < total
-    next_cursor = encode_offset(offset + limit) if has_more else None
-    return next_cursor, has_more

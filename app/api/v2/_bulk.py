@@ -8,7 +8,6 @@ from typing import Protocol
 
 from fastapi import Response
 
-from app.api.pagination import decode_offset, encode_offset
 from app.schemas.common import BulkResult
 
 HTTP_207_MULTI_STATUS: int = 207
@@ -21,15 +20,7 @@ __all__ = [
     "execute_vert_bulk",
     "execute_vert_bulk_simple",
     "build_bulk_result",
-    "pagination_offset_params",
-    "pagination_cursor_next",
-    "decode_offset",
-    "encode_offset",
 ]
-
-# Compatibility aliases for N816
-_encode_offset = encode_offset  # noqa: N816
-_decode_offset = decode_offset  # noqa: N816
 
 
 def set_bulk_status(response: Response, succeeded: int, failed: int) -> None:
@@ -113,39 +104,3 @@ class BulkResponder:
     def status(self, succeeded: int, failed: int) -> None:
         """Directly apply 207 logic without building result."""
         set_bulk_status(self.response, succeeded, failed)
-
-
-# ---------------------------------------------------------------------------
-# Pagination offset helpers — DRY for cursor pagination
-# ---------------------------------------------------------------------------
-
-
-def pagination_offset_params(  # noqa: E501
-    cursor: str | None, limit: int
-) -> tuple[int, int, int, int]:
-    """Parse cursor to offset and compute page/fetch/remainder.
-
-    Raises HTTPException 422 on invalid cursor (via decode_offset).
-    Returns (offset, page, fetch_size, remainder).
-    """
-    from fastapi import HTTPException
-
-    offset = 0
-    if cursor is not None and cursor != "":
-        try:
-            offset = decode_offset(cursor)
-        except ValueError:
-            raise HTTPException(status_code=422, detail="Invalid cursor") from None
-    remainder = offset % limit if limit else 0
-    page = offset // limit + 1 if limit else 1
-    fetch_size = limit + remainder if remainder else limit
-    return offset, page, fetch_size, remainder
-
-
-def pagination_cursor_next(  # noqa: E501
-    offset: int, limit: int, total: int, returned: int
-) -> tuple[str | None, bool]:
-    """Compute next_cursor and has_more for cursor pagination."""
-    has_more = (offset + returned) < total
-    next_cursor = encode_offset(offset + limit) if has_more else None
-    return next_cursor, has_more
