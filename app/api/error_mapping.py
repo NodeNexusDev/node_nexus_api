@@ -74,9 +74,13 @@ def problem_content(
     request_id: str | None,
     path: str,
 ) -> dict[str, object]:
+    try:
+        title = HTTPStatus(status_code).phrase
+    except ValueError:
+        title = f"HTTP {status_code}"
     return {
         "type": f"{ERROR_TYPE_BASE}/{_error_slug(code)}",
-        "title": HTTPStatus(status_code).phrase,
+        "title": title,
         "status": status_code,
         "detail": detail,
         "code": code,
@@ -171,7 +175,10 @@ async def domain_error_handler(request: Request, exc: Exception) -> JSONResponse
             path=request.url.path,
             error_type=type(exc).__name__,
             status_code=status_code,
+            detail=str(exc),
+            exc_info=exc,
         )
+        message = PUBLIC_ERROR_MESSAGES.get(type(exc), "Internal server error")
     else:
         logger.warning(
             "http.domain_error",
@@ -179,7 +186,7 @@ async def domain_error_handler(request: Request, exc: Exception) -> JSONResponse
             error_type=type(exc).__name__,
             status_code=status_code,
         )
-    message = PUBLIC_ERROR_MESSAGES.get(type(exc), str(exc))
+        message = PUBLIC_ERROR_MESSAGES.get(type(exc), str(exc))
     request_id = getattr(request.state, "request_id", None)
     return JSONResponse(
         status_code=status_code,
