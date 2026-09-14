@@ -991,7 +991,9 @@ class TestAuditStats:
             ) as client:
                 resp = await client.get("/api/v2/audit/stats")
         assert resp.status_code == 501
-        assert "not available" in resp.json()["detail"].lower()
+        body = resp.json()
+        assert body["detail"] == "Internal server error"
+        assert body["code"] == "AuditStatsUnavailableError"
 
     async def test_stats_generic_exception_500(self) -> None:
         svc = AsyncMock()
@@ -1008,7 +1010,9 @@ class TestAuditStats:
             ) as client:
                 resp = await client.get("/api/v2/audit/stats?group_by=day")
         assert resp.status_code == 500
-        assert resp.json()["detail"] == "Audit stats request failed"
+        body = resp.json()
+        assert body["detail"] == "Internal server error"
+        assert body["code"] == "AuditReadError"
         assert "boom" not in resp.text
 
     async def test_stats_aggregate_object_total_as_attr_buckets_dict(self) -> None:
@@ -1198,7 +1202,9 @@ class TestGetAuditLog:
             ) as client:
                 resp = await client.get(f"/api/v2/audit/{uuid.uuid4()}")
         assert resp.status_code == 500
-        assert resp.json()["detail"] == "Audit log request failed"
+        body = resp.json()
+        assert body["detail"] == "Internal server error"
+        assert body["code"] == "AuditReadError"
         assert "db down" not in resp.text
 
     async def test_get_single_success_via_model_validate(self) -> None:
@@ -1245,7 +1251,9 @@ class TestGetAuditLog:
             ) as client:
                 resp = await client.get(f"/api/v2/audit/{uuid.uuid4()}")
         assert resp.status_code == 500
-        assert "Failed to map" in resp.json()["detail"]
+        body = resp.json()
+        assert body["detail"] == "Internal server error"
+        assert body["code"] == "AuditReadError"
 
     async def test_get_single_invalid_uuid_422(self) -> None:
         svc = AsyncMock()
