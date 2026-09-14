@@ -56,6 +56,8 @@ def _cleanup_orphaned_containers() -> None:
             ["docker", "ps", "-a", "--format", "{{.Names}}"],
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             timeout=10,
         )
         names = result.stdout.strip().split("\n") if result.stdout.strip() else []
@@ -70,6 +72,8 @@ def _cleanup_orphaned_containers() -> None:
             ["docker", "network", "ls", "--format", "{{.Name}}"],
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             timeout=10,
         )
         networks = result.stdout.strip().split("\n") if result.stdout.strip() else []
