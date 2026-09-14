@@ -185,7 +185,7 @@ async def test_create_pack_no_in_session_attr_fallback(engine: AsyncEngine) -> N
         created_at=now,
         updated_at=now,
     )
-    gw._asset_gateway = SimpleNamespace(  # type: ignore
+    gw._asset_gateway = SimpleNamespace(  # ty: ignore[invalid-assignment]
         write_assets=AsyncMock(return_value=[fake_asset])
     )
     detail = await gw.create_pack(
