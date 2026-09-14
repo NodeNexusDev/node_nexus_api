@@ -3,17 +3,26 @@
 import re
 import shlex
 from collections.abc import Mapping, Sequence
+from typing import Protocol
 
-from app.application.dto.command_management import CommandParameterDTO
 from app.core.exceptions import TemplateRenderError
 from app.core.types import JsonValue
+
+
+class TemplateParameter(Protocol):
+    """Structural parameter definition needed by the template renderer."""
+
+    name: str
+    required: bool
+    default: JsonValue
+
 
 PLACEHOLDER_RE = re.compile(r"\{(\w+)\}")
 
 
 def render_command(
     template: str,
-    parameters: Sequence[CommandParameterDTO],
+    parameters: Sequence[TemplateParameter],
     params: Mapping[str, JsonValue],
 ) -> str:
     """Render a command template by substituting {placeholder} values.
