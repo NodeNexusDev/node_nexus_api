@@ -63,10 +63,13 @@ def test_configure_ownership_and_flags():
 
 def test_configure_executor_and_reconciler():
     r = ApschedulerRuntime()
+
     async def ex(a, b, c):
         return None
+
     async def rec():
         return (1, 0)
+
     r.configure_executor(ex)
     assert r._executor is ex
     r.configure_reconciler(rec)
@@ -268,9 +271,11 @@ def test_start_ownership_monitor_legacy_noops():
 async def test_start_ownership_monitor_legacy_task_exists():
     r = ApschedulerRuntime()
     engine = _pg_engine(AsyncMock())
+
     # Pre-seed a task so the second call is a noop.
     async def _never():
         await asyncio.sleep(3600)
+
     r._ownership_task = asyncio.create_task(_never())  # type: ignore[assignment]
     first = r._ownership_task
     r.start_ownership_monitor(engine)
@@ -518,8 +523,13 @@ def test_schedule_script_default_and_replace():
     assert jid == str(sid)
     # Replace existing triggers remove path.
     jid2 = r.schedule_script(
-        sid, "0 18 * * *", nids, params={"a": 1}, timezone="UTC",
-        misfire_grace_seconds=30, schedule_id=uuid4(),
+        sid,
+        "0 18 * * *",
+        nids,
+        params={"a": 1},
+        timezone="UTC",
+        misfire_grace_seconds=30,
+        schedule_id=uuid4(),
     )
     assert jid2 == str(sid)
     assert r.get_schedule(sid) is not None

@@ -12,6 +12,7 @@ import tarfile
 import uuid
 from datetime import UTC, datetime
 from types import SimpleNamespace
+from typing import Any
 from unittest.mock import AsyncMock
 from uuid import uuid4
 
@@ -77,7 +78,7 @@ def _b64(text: str) -> str:
 
 
 def _manifest(**over) -> PackManifestDTO:
-    base: dict = {
+    base: dict[str, Any] = {
         "pack_id": f"pack-{uuid.uuid4().hex[:8]}",
         "name": "Pack",
         "version": "1.0.0",
@@ -91,7 +92,7 @@ def _manifest(**over) -> PackManifestDTO:
 
 
 def _create(**over) -> PackCreateDTO:
-    base: dict = {"manifest": _manifest()}
+    base: dict[str, Any] = {"manifest": _manifest()}
     base.update(over)
     return PackCreateDTO(**base)
 
@@ -316,7 +317,9 @@ class TestTemplateTar:
         buf = io.BytesIO(data)
         with tarfile.open(fileobj=buf, mode="r") as tar:
             assert tar.getnames() == ["a.txt"]
-            assert tar.extractfile("a.txt").read() == b"hello"
+            member = tar.extractfile("a.txt")
+            assert member is not None
+            assert member.read() == b"hello"
 
     async def test_tar_missing_raw_falls_back_empty(self) -> None:
         svc = TemplatePackService()
@@ -330,7 +333,9 @@ class TestTemplateTar:
         buf = io.BytesIO(data)
         with tarfile.open(fileobj=buf, mode="r") as tar:
             assert tar.getnames() == ["a.txt"]
-            assert tar.extractfile("a.txt").read() == b""
+            member = tar.extractfile("a.txt")
+            assert member is not None
+            assert member.read() == b""
 
     async def test_tar_missing_pack(self) -> None:
         svc = TemplatePackService()

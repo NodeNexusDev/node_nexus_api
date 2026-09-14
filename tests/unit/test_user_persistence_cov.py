@@ -30,8 +30,8 @@ class _Hasher:
     def hash(self, password: str) -> str:
         return f"hashed:{password}"
 
-    def verify(self, plain: str, hashed: str) -> bool:
-        return hashed == f"hashed:{plain}"
+    def verify(self, plain_password: str, hashed_password: str) -> bool:
+        return hashed_password == f"hashed:{plain_password}"
 
 
 @pytest_asyncio.fixture
@@ -49,7 +49,9 @@ async def maker(engine: AsyncEngine) -> async_sessionmaker[AsyncSession]:
 
 
 @pytest_asyncio.fixture
-async def session(maker: async_sessionmaker[AsyncSession]) -> AsyncGenerator[AsyncSession]:
+async def session(
+    maker: async_sessionmaker[AsyncSession],
+) -> AsyncGenerator[AsyncSession]:
     async with maker() as s:
         yield s
 
@@ -124,7 +126,9 @@ async def test_dao_update(session: AsyncSession) -> None:
     assert await repo.update(uuid.uuid4(), {"email": "x@y.z"}) is None
     user = await repo.create({"email": _email(), "hashed_password": "h"})
     await session.flush()
-    updated = await repo.update(user.id, {"email": "new@example.com", "is_active": False})
+    updated = await repo.update(
+        user.id, {"email": "new@example.com", "is_active": False}
+    )
     assert updated is not None
     assert updated.email == "new@example.com"
     assert updated.is_active is False
@@ -134,10 +138,12 @@ async def test_dao_update(session: AsyncSession) -> None:
 
 
 def _gateway(maker: async_sessionmaker[AsyncSession]) -> SqlAlchemyUserGateway:
-    return SqlAlchemyUserGateway(maker, _Hasher())  # type: ignore[arg-type]
+    return SqlAlchemyUserGateway(maker, _Hasher())
 
 
-async def test_gateway_create_and_get_user(maker: async_sessionmaker[AsyncSession]) -> None:
+async def test_gateway_create_and_get_user(
+    maker: async_sessionmaker[AsyncSession],
+) -> None:
     gw = _gateway(maker)
     created = await gw.create_user(UserCreateDTO(email=_email(), password="secret"))
     assert created.hashed_password if hasattr(created, "hashed_password") else True
@@ -150,7 +156,9 @@ async def test_gateway_create_and_get_user(maker: async_sessionmaker[AsyncSessio
     assert await gw.get_user(uuid.uuid4()) is None
 
 
-async def test_gateway_create_superuser_flag(maker: async_sessionmaker[AsyncSession]) -> None:
+async def test_gateway_create_superuser_flag(
+    maker: async_sessionmaker[AsyncSession],
+) -> None:
     gw = _gateway(maker)
     created = await gw.create_user(
         UserCreateDTO(email=_email(), password="pw", is_superuser=True)
@@ -299,13 +307,16 @@ async def test_gateway_update_returns_none_when_repo_update_none(
     gw = _gateway(maker)
     created = await gw.create_user(UserCreateDTO(email=_email(), password="pw"))
     with patch(
-        "app.adapters.persistence.user.UserRepository.update", new=AsyncMock(return_value=None)
+        "app.adapters.persistence.user.UserRepository.update",
+        new=AsyncMock(return_value=None),
     ):
         result = await gw.update_user(created.id, UserUpdateDTO(email=_email()))
     assert result is None
 
 
-async def test_gateway_update_uses_hasher(maker: async_sessionmaker[AsyncSession]) -> None:
+async def test_gateway_update_uses_hasher(
+    maker: async_sessionmaker[AsyncSession],
+) -> None:
     hasher = MagicMock()
     hasher.hash.return_value = "HASHED"
     gw = SqlAlchemyUserGateway(maker, hasher)
@@ -338,7 +349,7 @@ async def test_gateway_to_view_direct() -> None:
     assert view.email == "a@b.com"
 
 
-# ---------- Gateway: SqlAlchemyRefreshTokenGateway (same file, needed for 100%) ----------
+# ---------- Gateway: SqlAlchemyRefreshTokenGateway (same file) ----------
 
 
 async def test_refresh_gateway_crud(maker: async_sessionmaker[AsyncSession]) -> None:

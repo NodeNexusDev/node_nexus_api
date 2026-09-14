@@ -2,6 +2,7 @@
 
 import asyncio
 from http import HTTPStatus
+from typing import Any
 
 from httpx2 import ASGITransport, AsyncClient
 from starlette.applications import Starlette
@@ -35,7 +36,7 @@ async def _slow_handler(request):  # noqa: ANN001, ANN202
     return JSONResponse({"status": "ok"})
 
 
-def _assert_problem_shape(body: dict, *, status: int, path: str) -> None:
+def _assert_problem_shape(body: dict[str, Any], *, status: int, path: str) -> None:
     assert PROBLEM_FIELDS.issubset(body.keys())
     assert body["status"] == status
     assert body["title"] == HTTPStatus(status).phrase

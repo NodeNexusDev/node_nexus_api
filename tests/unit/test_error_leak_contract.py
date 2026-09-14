@@ -1,6 +1,7 @@
 """Contract: 5xx DomainError details must not leak exception text."""
 
 import json
+from typing import Any
 from unittest.mock import MagicMock
 
 from fastapi import Request
@@ -21,10 +22,10 @@ def _mock_request(path: str = "/test") -> MagicMock:
     return req
 
 
-async def _body_for(exc: Exception, path: str = "/test") -> tuple[int, dict]:
+async def _body_for(exc: Exception, path: str = "/test") -> tuple[int, dict[str, Any]]:
     req = _mock_request(path)
     resp = await domain_error_handler(req, exc)  # type: ignore[arg-type]
-    raw = resp.body.decode()
+    raw = bytes(resp.body).decode()
     return resp.status_code, json.loads(raw)
 
 

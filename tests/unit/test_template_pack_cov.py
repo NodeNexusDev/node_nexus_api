@@ -87,6 +87,7 @@ def b64(text: str) -> str:
 
 # ---------------------------------------------------------------- _unique_name
 
+
 def test_unique_name_free() -> None:
     assert _unique_name("cmd", {"other"}) == "cmd"
 
@@ -100,6 +101,7 @@ def test_unique_name_collision_multiple() -> None:
 
 
 # --------------------------------------------------------------- create_pack
+
 
 async def test_create_pack_no_assets(engine: AsyncEngine) -> None:
     gw = SqlAlchemyTemplatePackGateway(make_sm(engine))
@@ -153,12 +155,15 @@ async def test_create_pack_typeerror_fallback(engine: AsyncEngine) -> None:
         created_at=now,
         updated_at=now,
     )
-    with patch.object(
-        gw._asset_gateway,
-        "write_assets_in_session",
-        side_effect=TypeError("no session arg"),
-    ), patch.object(
-        gw._asset_gateway, "write_assets", new=AsyncMock(return_value=[fake_asset])
+    with (
+        patch.object(
+            gw._asset_gateway,
+            "write_assets_in_session",
+            side_effect=TypeError("no session arg"),
+        ),
+        patch.object(
+            gw._asset_gateway, "write_assets", new=AsyncMock(return_value=[fake_asset])
+        ),
     ):
         detail = await gw.create_pack(
             make_create(
@@ -180,7 +185,7 @@ async def test_create_pack_no_in_session_attr_fallback(engine: AsyncEngine) -> N
         created_at=now,
         updated_at=now,
     )
-    gw._asset_gateway = SimpleNamespace(  # type: ignore[assignment]
+    gw._asset_gateway = SimpleNamespace(  # type: ignore
         write_assets=AsyncMock(return_value=[fake_asset])
     )
     detail = await gw.create_pack(
@@ -208,6 +213,7 @@ async def test_create_pack_in_session_success_path(engine: AsyncEngine) -> None:
 
 # ------------------------------------------------------------------ get_pack
 
+
 async def test_get_pack_found_and_missing(engine: AsyncEngine) -> None:
     gw = SqlAlchemyTemplatePackGateway(make_sm(engine))
     data = make_create(
@@ -225,6 +231,7 @@ async def test_get_pack_found_and_missing(engine: AsyncEngine) -> None:
 
 
 # -------------------------------------------------------------- install_pack
+
 
 async def test_install_pack_not_found(engine: AsyncEngine) -> None:
     gw = SqlAlchemyTemplatePackGateway(make_sm(engine))
@@ -257,6 +264,7 @@ async def test_install_pack_already_installed(engine: AsyncEngine) -> None:
 
 
 # ------------------------------------------------------------ uninstall_pack
+
 
 async def test_uninstall_pack_not_found(engine: AsyncEngine) -> None:
     gw = SqlAlchemyTemplatePackGateway(make_sm(engine))
@@ -315,6 +323,7 @@ async def test_uninstall_pack_no_installations(engine: AsyncEngine) -> None:
 
 # --------------------------------------------------------------- list_packs
 
+
 async def test_list_packs_empty(engine: AsyncEngine) -> None:
     gw = SqlAlchemyTemplatePackGateway(make_sm(engine))
     page = await gw.list_packs(PackListQueryDTO(offset=0, limit=20))
@@ -325,9 +334,7 @@ async def test_list_packs_empty(engine: AsyncEngine) -> None:
 async def test_list_packs_pagination_and_order(engine: AsyncEngine) -> None:
     gw = SqlAlchemyTemplatePackGateway(make_sm(engine))
     for i in range(3):
-        await gw.create_pack(
-            make_create(manifest=make_manifest(name=f"p-{i}"))
-        )
+        await gw.create_pack(make_create(manifest=make_manifest(name=f"p-{i}")))
     page = await gw.list_packs(PackListQueryDTO(offset=0, limit=2))
     assert page.total == 3
     assert len(page.items) == 2
@@ -380,9 +387,7 @@ async def test_list_packs_tag_sqlite(engine: AsyncEngine) -> None:
     assert empty.total == 0
 
 
-def _mock_sessionmaker(
-    packs: list[Any], *, count_value: Any = None
-) -> MagicMock:
+def _mock_sessionmaker(packs: list[Any], *, count_value: Any = None) -> MagicMock:
     session = MagicMock()
     session.get_bind = MagicMock(return_value=MagicMock())
     # default: non-str dialect -> is_mock True unless overridden
@@ -447,7 +452,9 @@ async def test_list_packs_mock_fallback_tag_and_search() -> None:
 
 async def _enter(sm: MagicMock) -> MagicMock:
     ctx = sm.return_value
-    return await ctx.__aenter__()
+    result = await ctx.__aenter__()
+    assert isinstance(result, MagicMock)
+    return result
 
 
 async def test_list_packs_mock_postgres_tag_branch() -> None:
@@ -508,6 +515,7 @@ async def test_list_packs_sql_count_non_int_raises() -> None:
 
 
 # ---------------------------------------------------------------- get_stats
+
 
 async def test_get_stats_empty(engine: AsyncEngine) -> None:
     gw = SqlAlchemyTemplatePackGateway(make_sm(engine))
@@ -604,6 +612,7 @@ async def test_get_stats_total_non_int_falls_back() -> None:
 
 # ------------------------------------------------------- list_installations
 
+
 async def test_list_installations_not_found(engine: AsyncEngine) -> None:
     gw = SqlAlchemyTemplatePackGateway(make_sm(engine))
     with pytest.raises(PackNotFoundError):
@@ -663,7 +672,7 @@ async def test_list_installations_count_fallback() -> None:
     assert page.items[0].entity_type == "command"
 
 
-class _FalsyTuple(tuple):  # type: ignore[type-arg]
+class _FalsyTuple(tuple):  # type: ignore[type-arg]  # ty: ignore[missing-type-argument]
     """Tuple that is falsy but non-empty (covers legacy inline-asset branch)."""
 
     def __bool__(self) -> bool:
@@ -703,9 +712,10 @@ async def test_install_pack_marks_installed_when_succeeded(
 
     def fake_sum(iterable: Any, *args: Any, **kwargs: Any) -> Any:
         frame = getattr(iterable, "gi_frame", None)
-        if frame is not None and os.path.normcase(
-            os.path.abspath(frame.f_code.co_filename)
-        ) == target:
+        if (
+            frame is not None
+            and os.path.normcase(os.path.abspath(frame.f_code.co_filename)) == target
+        ):
             return 1
         return real_sum(iterable, *args, **kwargs)
 

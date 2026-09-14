@@ -75,9 +75,7 @@ class TestStatsDomainReraise:
 
     async def test_stats_audit_read_error_stays_unmapped(self) -> None:
         svc = AsyncMock()
-        svc.get_stats = AsyncMock(
-            side_effect=_SentinelReadError("sentinel-stats-read")
-        )
+        svc.get_stats = AsyncMock(side_effect=_SentinelReadError("sentinel-stats-read"))
         app = _create_audit_app(service_mock=svc)
         resp = await _get(app, "/api/v2/audit/stats")
         assert resp.status_code == 500
