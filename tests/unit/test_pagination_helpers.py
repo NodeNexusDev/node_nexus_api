@@ -11,7 +11,6 @@ from app.api import pagination
 from app.api.pagination import (
     cursor_next,
     encode_offset,
-    paginate_offset,
     pagination_params,
     parse_cursor_offset,
 )
@@ -37,13 +36,6 @@ def test_parse_invalid_via_shared_reexport_raises_422():
     with pytest.raises(HTTPException) as exc:
         shared_module.parse_cursor_offset("not-a-cursor!!!")
     assert exc.value.status_code == 422
-
-
-def test_paginate_invalid_raises_422():
-    with pytest.raises(HTTPException) as exc:
-        paginate_offset([1, 2, 3], "not-a-cursor!!!", 2)
-    assert exc.value.status_code == 422
-    assert exc.value.detail == "Invalid cursor"
 
 
 def test_pagination_params_values():
@@ -85,13 +77,13 @@ def test_bulk_duplicates_removed():
         ([], None, 5),
     ],
 )
-def test_paginate_offset_matches_manual_composition(items, cursor, limit):
+def test_manual_composition_slices(items, cursor, limit):
     offset = parse_cursor_offset(cursor)
-    expected_sliced = items[offset : offset + limit]
-    expected_next, expected_has = cursor_next(
-        offset, limit, len(items), len(expected_sliced)
-    )
-    sliced, next_cursor, has_more = paginate_offset(items, cursor, limit)
-    assert sliced == expected_sliced
-    assert next_cursor == expected_next
-    assert has_more == expected_has
+    sliced = items[offset : offset + limit]
+    next_cursor, has_more = cursor_next(offset, limit, len(items), len(sliced))
+    assert sliced == items[offset : offset + limit]
+    assert has_more == ((offset + len(sliced)) < len(items))
+    if has_more:
+        assert next_cursor == encode_offset(offset + limit)
+    else:
+        assert next_cursor is None

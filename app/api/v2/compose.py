@@ -7,7 +7,6 @@ from fastapi import APIRouter
 
 from app.api.pagination import decode_offset as _decode_offset
 from app.api.pagination import encode_offset as _encode_offset
-from app.api.pagination import paginate_offset as _paginate_offset
 from app.api.v2.compose_handlers.bulk import router as bulk_router
 from app.api.v2.compose_handlers.projects import (
     _bulk_to_response,
@@ -23,7 +22,6 @@ __all__ = [
     "_bulk_to_response",
     "_decode_offset",
     "_encode_offset",
-    "_paginate_offset",
     "_to_response",
     "_validate_project_name",
     "router",

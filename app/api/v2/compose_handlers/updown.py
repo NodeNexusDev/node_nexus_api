@@ -12,7 +12,7 @@ from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
 from fastapi import APIRouter, HTTPException, Query, Response, Security, status
 
 from app.api.deps import Principal, get_current_principal, require_write_or_jwt_scope
-from app.api.pagination import decode_offset, encode_offset, paginate_offset
+from app.api.pagination import decode_offset, encode_offset
 from app.application.dto.compose import ComposeCreateDTO, ComposeUpdateDTO
 from app.application.services.compose_service import ComposeService
 from app.core.exceptions import (
@@ -48,7 +48,6 @@ audit = structlog.get_logger("audit")
 # Compatibility aliases for tests importing private helpers
 _encode_offset = encode_offset  # noqa: N816
 _decode_offset = decode_offset  # noqa: N816
-_paginate_offset = paginate_offset  # noqa: N816
 router = APIRouter(tags=["docker-compose"], route_class=DishkaRoute)
 
 _PROJECT_NAME_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9_.-]*$")

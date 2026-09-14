@@ -12,7 +12,7 @@ from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
 from fastapi import APIRouter, Query, Response, Security, status
 
 from app.api.deps import Principal, get_current_principal, require_write_or_jwt_scope
-from app.api.pagination import decode_offset, encode_offset, paginate_offset
+from app.api.v2._shared import cursor_next, parse_cursor_offset
 from app.api.v2._bulk import execute_vert_bulk
 from app.application.command_policy import command_fingerprint
 from app.application.dto.docker import (
@@ -101,10 +101,6 @@ from app.schemas.docker import (
 
 audit = structlog.get_logger("audit")
 
-# Compatibility aliases for tests importing private helpers
-_encode_offset = encode_offset  # noqa: N816
-_decode_offset = decode_offset  # noqa: N816
-_paginate_offset = paginate_offset  # noqa: N816
 router = APIRouter(tags=["docker"], route_class=DishkaRoute)
 
 
@@ -128,7 +124,9 @@ async def list_volumes(
         DockerVolume.model_validate(item, from_attributes=True)
         for item in await service.list_volumes(node_id)
     ]
-    sliced, next_cursor, has_more = paginate_offset(items, cursor, limit)
+    offset = parse_cursor_offset(cursor)
+    sliced = items[offset : offset + limit]
+    next_cursor, has_more = cursor_next(offset, limit, len(items), len(sliced))
     return CursorPage[DockerVolume](
         items=sliced, next_cursor=next_cursor, has_more=has_more, limit=limit
     )

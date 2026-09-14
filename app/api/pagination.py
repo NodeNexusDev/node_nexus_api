@@ -52,13 +52,3 @@ def cursor_next(  # noqa: E501
     has_more = (offset + returned) < total
     next_cursor = encode_offset(offset + limit) if has_more else None
     return next_cursor, has_more
-
-
-def paginate_offset[T](
-    items: list[T], cursor: str | None, limit: int
-) -> tuple[list[T], str | None, bool]:
-    """Slice items by offset cursor."""
-    offset = parse_cursor_offset(cursor)
-    sliced = items[offset : offset + limit]
-    next_cursor, has_more = cursor_next(offset, limit, len(items), len(sliced))
-    return sliced, next_cursor, has_more

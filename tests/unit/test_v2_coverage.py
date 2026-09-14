@@ -1581,24 +1581,27 @@ class TestComposeApiV2:
         assert resp.status_code == 200
 
     async def test_compose_helpers(self) -> None:
-        from app.api.v2.compose import (
-            _decode_offset,
-            _encode_offset,
-            _paginate_offset,
-            _validate_project_name,
+        from app.api.pagination import (
+            cursor_next,
+            decode_offset,
+            encode_offset,
+            parse_cursor_offset,
         )
+        from app.api.v2.compose import _validate_project_name
 
         assert _validate_project_name("valid-1") == "valid-1"
         with pytest.raises(Exception):
             _validate_project_name("bad/name")
-        cur = _encode_offset(5)
-        assert _decode_offset(cur) == 5
+        cur = encode_offset(5)
+        assert decode_offset(cur) == 5
         items = list(range(10))
-        sliced, nxt, has_more = _paginate_offset(items, None, 3)
+        offset = parse_cursor_offset(None)
+        sliced = items[offset : offset + 3]
+        nxt, has_more = cursor_next(offset, 3, len(items), len(sliced))
         assert len(sliced) == 3
         assert has_more is True
         with pytest.raises(Exception):
-            _paginate_offset(items, "invalid", 3)
+            parse_cursor_offset("invalid")
 
     async def test_compose_bulk_to_response(self) -> None:
         from app.api.v2.compose import _bulk_to_response
@@ -2934,16 +2937,23 @@ class TestDockerBulkApiV2:
                 assert resp.status_code == 200
 
     async def test_docker_helpers(self) -> None:
-        from app.api.v2.docker import _decode_offset, _encode_offset, _paginate_offset
+        from app.api.pagination import (
+            cursor_next,
+            decode_offset,
+            encode_offset,
+            parse_cursor_offset,
+        )
 
-        cur = _encode_offset(3)
-        assert _decode_offset(cur) == 3
+        cur = encode_offset(3)
+        assert decode_offset(cur) == 3
         items = [1, 2, 3, 4]
-        sliced, nxt, has_more = _paginate_offset(items, None, 2)
+        offset = parse_cursor_offset(None)
+        sliced = items[offset : offset + 2]
+        nxt, has_more = cursor_next(offset, 2, len(items), len(sliced))
         assert len(sliced) == 2
         assert has_more is True
         with pytest.raises(Exception):
-            _paginate_offset(items, "bad", 2)
+            parse_cursor_offset("bad")
 
     async def test_image_bulk_pulls(self) -> None:
         from app.application.dto.docker import DockerPullResultDTO
