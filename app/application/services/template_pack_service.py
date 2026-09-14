@@ -105,7 +105,7 @@ class TemplatePackService:
                 existing.pack.registry_id == data.registry_id
                 and existing.pack.pack_id == data.manifest.pack_id
             ):
-                raise DomainError(
+                raise PackConflictError(
                     f"Pack {data.manifest.pack_id} already exists for registry"
                 )
         now = datetime.now(UTC)

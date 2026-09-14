@@ -56,6 +56,7 @@ from app.core.exceptions import (
     ComposeProjectNotFoundError,
     DockerValidationError,
     DomainError,
+    PackConflictError,
 )
 from tests.typing import as_typed_mock
 from tests.unit.conftest import MockAuthServiceProvider, _mock_settings
@@ -1890,7 +1891,7 @@ class TestTemplatesApiV2:
     async def test_create_pack_conflict(self) -> None:
         mock_reg = AsyncMock()
         mock_pack = AsyncMock()
-        mock_pack.create_pack.side_effect = DomainError(
+        mock_pack.create_pack.side_effect = PackConflictError(
             "Pack p1 already exists for registry"
         )
         app = _create_templates_app(mock_reg, mock_pack)
