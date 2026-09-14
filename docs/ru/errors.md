@@ -43,29 +43,29 @@ source_revision: "2026-09-11"
 никогда не попадают в клиентские поля; они уходят в серверные логи
 с корреляцией по `request_id`.
 
-## a-p-i-key-expired-error
+## api-key-expired-error
 
 | Status | Title | Когда |
 |---|---|---|
 | `401` | Unauthorized | API key истёк (`code: APIKeyExpiredError`) |
 
-Type: `https://nodenexusdev.github.io/node_nexus_api/en/errors/a-p-i-key-expired-error`
+Type: `https://nodenexusdev.github.io/node_nexus_api/en/errors/api-key-expired-error`
 
-## a-p-i-key-not-found-error
+## api-key-not-found-error
 
 | Status | Title | Когда |
 |---|---|---|
 | `404` | Not Found | API key не существует (`code: APIKeyNotFoundError`) |
 
-Type: `https://nodenexusdev.github.io/node_nexus_api/en/errors/a-p-i-key-not-found-error`
+Type: `https://nodenexusdev.github.io/node_nexus_api/en/errors/api-key-not-found-error`
 
-## a-p-i-key-revoked-error
+## api-key-revoked-error
 
 | Status | Title | Когда |
 |---|---|---|
 | `401` | Unauthorized | API key отозван (`code: APIKeyRevokedError`) |
 
-Type: `https://nodenexusdev.github.io/node_nexus_api/en/errors/a-p-i-key-revoked-error`
+Type: `https://nodenexusdev.github.io/node_nexus_api/en/errors/api-key-revoked-error`
 
 ## audit-read-error
 

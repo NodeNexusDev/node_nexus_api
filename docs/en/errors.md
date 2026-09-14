@@ -43,29 +43,29 @@ Client logic should branch on HTTP `status` and `code`, never on
 rendered into client-facing fields; they go to server logs correlated
 by `request_id`.
 
-## a-p-i-key-expired-error
+## api-key-expired-error
 
 | Status | Title | When |
 |---|---|---|
 | `401` | Unauthorized | The API key has expired (`code: APIKeyExpiredError`) |
 
-Type: `https://nodenexusdev.github.io/node_nexus_api/en/errors/a-p-i-key-expired-error`
+Type: `https://nodenexusdev.github.io/node_nexus_api/en/errors/api-key-expired-error`
 
-## a-p-i-key-not-found-error
+## api-key-not-found-error
 
 | Status | Title | When |
 |---|---|---|
 | `404` | Not Found | The API key does not exist (`code: APIKeyNotFoundError`) |
 
-Type: `https://nodenexusdev.github.io/node_nexus_api/en/errors/a-p-i-key-not-found-error`
+Type: `https://nodenexusdev.github.io/node_nexus_api/en/errors/api-key-not-found-error`
 
-## a-p-i-key-revoked-error
+## api-key-revoked-error
 
 | Status | Title | When |
 |---|---|---|
 | `401` | Unauthorized | The API key has been revoked (`code: APIKeyRevokedError`) |
 
-Type: `https://nodenexusdev.github.io/node_nexus_api/en/errors/a-p-i-key-revoked-error`
+Type: `https://nodenexusdev.github.io/node_nexus_api/en/errors/api-key-revoked-error`
 
 ## audit-read-error
 
