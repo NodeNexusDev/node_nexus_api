@@ -20,7 +20,7 @@ from app.application.dto.export import AuditExportFormat, AuditExportQueryDTO
 from app.application.export_utils import rows_to_csv, rows_to_json
 from app.application.ports.export import AuditExporter
 from app.application.services.audit_log_service import AuditLogService
-from app.core.exceptions import AuditReadError, AuditStatsUnavailableError
+from app.core.exceptions import AuditReadError, AuditStatsUnavailableError, DomainError
 from app.schemas.audit_log import AuditLogResponse, AuditStatsBucket, AuditStatsResponse
 from app.schemas.common import BulkResult, CursorPage
 
@@ -82,6 +82,8 @@ async def get_audit_stats(
             date_to=date_to,
             group_by=group_by,
         )
+    except DomainError:
+        raise
     except AttributeError as exc:
         # Fallback: compute total via get_logs when get_stats is not yet implemented
         raise AuditStatsUnavailableError("Audit stats not available") from exc
