@@ -47,8 +47,9 @@ htmlcov/
 .tox/
 .nox/
 .coverage
-.coverage.*
+.coverage*
 .cache
+MagicMock/
 nosetests.xml
 coverage.xml
 *.cover
