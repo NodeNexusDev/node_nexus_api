@@ -7,7 +7,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.schemas.command import CommandCreate
-from app.schemas.common import BulkResult, CursorPage, PaginatedResponse
+from app.schemas.common import BulkResult
 from app.schemas.script import ScriptCreate
 
 # --- Asset schemas ---
@@ -104,14 +104,6 @@ class PackResponse(BaseModel):
     installed_at: datetime | None
     created_at: datetime
     updated_at: datetime
-
-
-class PackListResponse(PaginatedResponse[PackResponse]):
-    """Offset-based paginated list of packs."""
-
-
-class PackCursorListResponse(CursorPage[PackResponse]):
-    """Cursor-based paginated list of packs."""
 
 
 # --- Bulk operation schemas (2.0 bulk-first, 207 Multi-Status) ---

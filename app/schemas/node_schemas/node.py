@@ -93,10 +93,6 @@ class NodeResponse(BaseModel):
     updated_at: datetime
 
 
-class NodeOffsetListResponse(PaginatedResponse[NodeResponse]):
-    """Offset-based paginated list of nodes."""
-
-
 class NodeCursorListResponse(CursorPage[NodeResponse]):
     """Cursor-based paginated list of nodes."""
 

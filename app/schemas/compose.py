@@ -6,7 +6,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.schemas.common import BulkResult, CursorPage, PaginatedResponse
+from app.schemas.common import BulkResult
 
 
 class ComposeCreate(BaseModel):
@@ -66,17 +66,6 @@ class ComposeResponse(BaseModel):
     template_pack_id: uuid.UUID | None
     created_at: datetime
     updated_at: datetime
-
-
-# --- List / pagination ---
-
-
-class ComposeListResponse(PaginatedResponse[ComposeResponse]):
-    """Offset-based paginated list of compose projects."""
-
-
-class ComposeCursorListResponse(CursorPage[ComposeResponse]):
-    """Cursor-based paginated list of compose projects."""
 
 
 # --- Bulk operation schemas (2.0 bulk-first, 207 Multi-Status) ---
