@@ -159,13 +159,13 @@ def test_infrastructure_packages_are_adapter_only(
 ) -> None:
     """Infrastructure libraries may only be imported by outbound adapters."""
     violations = [
-        str(path.relative_to(APP_ROOT))
+        path.relative_to(APP_ROOT).as_posix()
         for path in APP_ROOT.rglob("*.py")
         if any(
             imported == dependency or imported.startswith(f"{dependency}.")
             for imported in _imports(path)
         )
-        and not str(path.relative_to(APP_ROOT)).startswith(allowed_prefix)
+        and not path.relative_to(APP_ROOT).as_posix().startswith(allowed_prefix)
     ]
     assert not violations
 
