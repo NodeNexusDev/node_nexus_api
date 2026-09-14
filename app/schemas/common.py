@@ -8,8 +8,6 @@ from uuid import UUID
 
 from pydantic import BaseModel
 
-from app.core.types import JsonValue
-
 
 class PaginatedResponse[T](BaseModel):
     """Paginated response with total count."""
@@ -27,16 +25,6 @@ class CursorPage[T](BaseModel):
     next_cursor: str | None = None
     has_more: bool = False
     limit: int = 20
-
-
-class ErrorResponse(BaseModel):
-    """Unified error response schema — always 4 fields."""
-
-    # deprecated: kept for transition, do not use in new code
-    code: str
-    message: str
-    request_id: str | None = None
-    detail: JsonValue | None = None
 
 
 class ProblemResponse(BaseModel):
