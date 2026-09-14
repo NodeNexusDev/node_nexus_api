@@ -12,9 +12,14 @@ from app.core.types import JsonValue
 class TemplateParameter(Protocol):
     """Structural parameter definition needed by the template renderer."""
 
-    name: str
-    required: bool
-    default: JsonValue
+    @property
+    def name(self) -> str: ...
+
+    @property
+    def required(self) -> bool: ...
+
+    @property
+    def default(self) -> JsonValue: ...
 
 
 PLACEHOLDER_RE = re.compile(r"\{(\w+)\}")
