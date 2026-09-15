@@ -14,6 +14,7 @@ from fastapi.responses import StreamingResponse
 
 from app.api.deps import Principal, get_current_principal, require_write_or_jwt_scope
 from app.api.pagination import decode_offset, encode_offset
+from app.api.v2._shared import pack_detail_response, pack_response, registry_response
 from app.application.dto.template_pack import (
     PackAssetCreateDTO,
     PackCreateDTO,
@@ -59,72 +60,12 @@ router = APIRouter(route_class=DishkaRoute)
 
 
 # ---------------------------------------------------------------------------
-# Helpers to map DTO -> response
+# Helpers to map DTO -> response (centralized in _shared)
 # ---------------------------------------------------------------------------
 
-
-def _registry_response(view: Any) -> RegistryResponse:  # noqa: ANN401
-    return RegistryResponse(
-        id=view.id,
-        owner=view.owner,
-        name=view.name,
-        default_branch=view.default_branch,
-        last_synced_at=view.last_synced_at,
-        created_at=view.created_at,
-        updated_at=view.updated_at,
-    )
-
-
-def _pack_response(view: Any) -> PackResponse:  # noqa: ANN401
-    return PackResponse(
-        id=view.id,
-        registry_id=view.registry_id,
-        pack_id=view.pack_id,
-        name=view.name,
-        description=view.description,
-        version=view.version,
-        author=view.author,
-        tags=list(view.tags) if view.tags else [],
-        manifest_sha=view.manifest_sha,
-        readme=view.readme,
-        installed_version=view.installed_version,
-        installed_at=view.installed_at,
-        created_at=view.created_at,
-        updated_at=view.updated_at,
-    )
-
-
-def _pack_detail_response(detail: Any) -> PackDetailWithAssetsResponse:  # noqa: ANN401
-    view = detail.pack
-    assets = [
-        PackAssetResponse(
-            id=a.id,
-            pack_id=a.pack_id,
-            path=a.path,
-            size=a.size,
-            sha=a.sha,
-            created_at=a.created_at,
-            updated_at=a.updated_at,
-        )
-        for a in detail.assets
-    ]
-    return PackDetailWithAssetsResponse(
-        id=view.id,
-        registry_id=view.registry_id,
-        pack_id=view.pack_id,
-        name=view.name,
-        description=view.description,
-        version=view.version,
-        author=view.author,
-        tags=list(view.tags) if view.tags else [],
-        manifest_sha=view.manifest_sha,
-        readme=view.readme,
-        installed_version=view.installed_version,
-        installed_at=view.installed_at,
-        created_at=view.created_at,
-        updated_at=view.updated_at,
-        assets=assets,
-    )
+_pack_response = pack_response  # noqa: N816
+_registry_response = registry_response  # noqa: N816
+_pack_detail_response = pack_detail_response  # noqa: N816
 
 
 # ---------------------------------------------------------------------------

@@ -2,6 +2,37 @@
 
 > Breaking — no compatibility. `1.7.2` → `2.0.0` `MAJOR` (`versioning.md`), prefix `/api/v1` → `/api/v2`.
 
+## Error envelope: RFC 9457 problem+json (unreleased)
+
+```
+What changed: every error response now uses media type
+application/problem+json with an RFC 9457 envelope. New typed statuses:
+501 AuditStatsUnavailableError (audit stats not available),
+500 AuditReadError (audit read/mapping failure),
+503 CommitFailedError (request commit failed).
+Docs: docs/en/errors.md + docs/ru/errors.md (one section per type slug).
+```
+
+Old → new field map:
+
+```
+code    -> code (unchanged, still the exception class name)
+message -> detail + message (detail carries today's message text verbatim,
+           message duplicates detail for backward compatibility)
+detail (array, FastAPI 422) -> errors (raw FastAPI error list);
+           detail becomes a "Request validation failed: ..." string
+new: type (docs URI .../en/errors/<slug>), title (HTTP reason phrase),
+     status (HTTP code), instance (request path)
+```
+
+Panel dual-read note: panel `toApiError` accepts both shapes — problem+json
+(`type`/`title`/`status` present) and the legacy `{code, message, detail,
+request_id}` envelope, so old and new API responses both render.
+
+Legacy-removal follow-up: dropping the legacy `code`/`message`/`request_id`
+duplicates and the deprecated `ErrorResponse` schema is deferred to a
+versioned follow-up set at release time.
+
 ## Prefix
 
 ```

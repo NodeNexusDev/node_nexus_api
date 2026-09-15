@@ -2,7 +2,7 @@
 title: Начальная конфигурация
 status: stable
 translation_key: getting-started.configuration
-source_revision: "2026-07-29"
+source_revision: "2026-09-09"
 ---
 
 # Начальная конфигурация

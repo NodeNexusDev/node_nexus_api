@@ -26,9 +26,15 @@ router = APIRouter(
 @inject
 async def pause_background_tasks(
     audit_worker: FromDishka[AuditOutboxController],
+    settings: FromDishka[Settings],
     _api_key: Principal = Security(get_current_principal),
 ) -> dict[str, str]:
     """Pause audit outbox worker for clean E2E DB truncation."""
+    if not settings.E2E_ENABLED:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="E2E endpoints are disabled",
+        )
     await audit_worker.stop()
     return {"status": "paused"}
 
@@ -37,9 +43,15 @@ async def pause_background_tasks(
 @inject
 async def resume_background_tasks(
     audit_worker: FromDishka[AuditOutboxController],
+    settings: FromDishka[Settings],
     _api_key: Principal = Security(get_current_principal),
 ) -> dict[str, str]:
     """Resume audit outbox worker after E2E DB truncation."""
+    if not settings.E2E_ENABLED:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="E2E endpoints are disabled",
+        )
     audit_worker.start()
     return {"status": "resumed"}
 

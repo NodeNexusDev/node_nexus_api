@@ -66,6 +66,7 @@ def _make_script_view(**overrides: object) -> ScriptViewDTO:
         "description": "desc",
         "steps": (),
         "tags": ("ops",),
+        "timeout": 30,
         "created_at": now,
         "updated_at": now,
     }
@@ -123,7 +124,7 @@ def _make_execution_dto(**overrides: object) -> ScriptExecutionDTO:
         "finished_at": now,
     }
     defaults.update(overrides)
-    return ScriptExecutionDTO(**defaults)  # type: ignore[arg-type]
+    return ScriptExecutionDTO(**defaults)  # type: ignore[arg-type]  # ty:ignore[invalid-argument-type]
 
 
 def _make_schedule_view(**overrides: object) -> ScheduleViewDTO:

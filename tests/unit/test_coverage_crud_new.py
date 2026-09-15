@@ -879,6 +879,7 @@ class TestCommandsBulk:
             command="echo",
             parameters=(),
             tags=(),
+            timeout=30,
             created_at=datetime.now(UTC),
             updated_at=datetime.now(UTC),
         )
@@ -938,6 +939,7 @@ class TestCommandsBulk:
             command="echo hi",
             parameters=(),
             tags=(),
+            timeout=30,
             created_at=datetime.now(UTC),
             updated_at=datetime.now(UTC),
         )
@@ -1025,6 +1027,7 @@ class TestCommandsBulk:
             description=None,
             steps=(),
             tags=(),
+            timeout=30,
             created_at=datetime.now(UTC),
             updated_at=datetime.now(UTC),
         )
@@ -1081,6 +1084,7 @@ class TestCommandsBulk:
             description=None,
             steps=(),
             tags=(),
+            timeout=30,
             created_at=datetime.now(UTC),
             updated_at=datetime.now(UTC),
         )

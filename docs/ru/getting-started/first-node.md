@@ -2,7 +2,7 @@
 title: Регистрация первой ноды
 status: stable
 translation_key: getting-started.first-node
-source_revision: "2026-07-29"
+source_revision: "2026-09-09"
 ---
 
 # Регистрация первой ноды

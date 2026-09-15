@@ -34,7 +34,8 @@ class TestRequestIdAndErrors:
         body = resp.json()
         assert "request_id" in body
         assert body["request_id"] == resp.headers["x-request-id"]
-        assert isinstance(body["detail"], list)
+        assert isinstance(body["detail"], str)
+        assert isinstance(body["errors"], list)
 
     def test_request_id_in_401_body(self, e2e_client_no_auth: httpx.Client) -> None:
         """Missing API key errors include the request id."""

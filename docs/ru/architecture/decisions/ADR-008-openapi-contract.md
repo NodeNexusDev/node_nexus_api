@@ -2,7 +2,7 @@
 title: "ADR-008: HTTP contract в OpenAPI"
 status: accepted
 translation_key: architecture.decisions.008
-source_revision: "2026-07-29"
+source_revision: "2026-09-09"
 ---
 
 # ADR-008: HTTP contract в OpenAPI

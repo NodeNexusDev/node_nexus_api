@@ -13,8 +13,7 @@ from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
 from fastapi import APIRouter, HTTPException, Query, Response, Security
 
 from app.api.deps import Principal, get_current_principal, require_write_or_jwt_scope
-from app.api.pagination import decode_offset, encode_offset
-from app.api.v2._bulk import set_bulk_status
+from app.api.v2._shared import cursor_next, pagination_params, parse_cursor_offset
 from app.application.dto.command_execution import BulkCommandRequestDTO
 from app.application.dto.command_management import (
     CommandCreateDTO,
@@ -60,8 +59,6 @@ from app.schemas.node import (
 audit = structlog.get_logger("audit")
 
 # Compatibility aliases for tests importing private helpers
-_encode_offset = encode_offset  # noqa: N816
-_decode_offset = decode_offset  # noqa: N816
 
 router = APIRouter(route_class=DishkaRoute)
 
@@ -81,28 +78,6 @@ def _parameter_dto(parameter: CommandParameter) -> CommandParameterDTO:
     )
 
 
-def _command_response(command: CommandViewDTO) -> CommandResponse:
-    return CommandResponse(
-        id=command.id,
-        name=command.name,
-        description=command.description,
-        command=command.command,
-        parameters=[
-            CommandParameter(
-                name=parameter.name,
-                type=parameter.type,
-                required=parameter.required,
-                default=parameter.default,
-                description=parameter.description,
-            )
-            for parameter in command.parameters
-        ],
-        tags=list(command.tags),
-        created_at=command.created_at,
-        updated_at=command.updated_at,
-    )
-
-
 # ---------------------------------------------------------------------------
 # List — cursor pagination (translate cursor -> page)
 # ---------------------------------------------------------------------------
@@ -118,21 +93,43 @@ async def get_executions_history(
     _principal: Principal = Security(get_current_principal),
 ) -> CursorPage[CommandHistoryResponse]:
     """Return paginated execution history for one bulk batch with cursor."""
+
+    return await _get_batch_history(service, batch_id, cursor, limit)
+
+
+@router.get(
+    "/executions",
+    response_model=CursorPage[CommandHistoryResponse],
+    include_in_schema=False,
+)
+@inject
+async def get_executions_by_batch_alias(
+    batch_id: Annotated[uuid.UUID, Query(description="Batch ID to retrieve")],
+    service: FromDishka[ExecutionHistoryService],
+    cursor: str | None = Query(None, description="Opaque cursor for pagination"),
+    limit: int = Query(20, ge=1, le=100),
+    _principal: Principal = Security(get_current_principal),
+) -> CursorPage[CommandHistoryResponse]:
+    """RESTful alias for GET /executions/history (bulk-first consistency)."""
+
+    return await _get_batch_history(service, batch_id, cursor, limit)
+
+
+async def _get_batch_history(
+    service: ExecutionHistoryService,
+    batch_id: uuid.UUID,
+    cursor: str | None,
+    limit: int,
+) -> CursorPage[CommandHistoryResponse]:
+    """Internal helper for batch history pagination."""
     audit.info(
         "api.v2.commands.executions.history",
         batch_id=str(batch_id),
         cursor=cursor,
         limit=limit,
     )  # noqa: E501
-    offset = 0
-    if cursor is not None and cursor != "":
-        try:
-            offset = decode_offset(cursor)
-        except ValueError:
-            raise HTTPException(status_code=422, detail="Invalid cursor") from None
-    remainder = offset % limit if limit else 0
-    page = offset // limit + 1 if limit else 1
-    fetch_size = limit + remainder if remainder else limit
+    offset = parse_cursor_offset(cursor)
+    page, fetch_size, remainder = pagination_params(offset, limit)
     result = await service.get_batch_history(batch_id, page=page, size=fetch_size)
     items = [
         CommandHistoryResponse(
@@ -152,8 +149,7 @@ async def get_executions_history(
     ]
     if remainder:
         items = items[remainder : remainder + limit]
-    has_more = (offset + len(items)) < result.total
-    next_cursor = encode_offset(offset + limit) if has_more else None
+    next_cursor, has_more = cursor_next(offset, limit, result.total, len(items))
     return CursorPage[CommandHistoryResponse](
         items=items,
         next_cursor=next_cursor,

@@ -84,6 +84,21 @@ class SqlAlchemyCommandHistoryGateway:
             )
             return self._to_dto(execution) if execution is not None else None
 
+    async def list_by_command(
+        self, command_id: UUID, offset: int, limit: int
+    ) -> CommandHistoryPageDTO:
+        """Return one paginated page for a command template."""
+        async with self._sessionmaker() as session:
+            repository = CommandExecutionRepository(session)
+            executions = await repository.list_by_command(
+                command_id, skip=offset, limit=limit
+            )
+            total = await repository.count_by_command(command_id)
+            return CommandHistoryPageDTO(
+                items=tuple(self._to_dto(execution) for execution in executions),
+                total=total,
+            )
+
     @staticmethod
     def _to_dto(execution: CommandExecutionModel) -> CommandHistoryDTO:
         """Map an ORM execution record to an immutable application DTO."""

@@ -2,7 +2,7 @@
 title: Переиспользуемые команды
 status: stable
 translation_key: guides.commands
-source_revision: "2026-09-02"
+source_revision: "2026-09-09"
 ---
 
 # Переиспользуемые команды
@@ -19,7 +19,7 @@ stdout и stderr. Параметры валидируются до удалён�
 `201` при полном успехе или `207 Multi-Status` при частичном. Каждый
 `CommandCreate` содержит `name`, `command` (с плейсхолдерами `{{ param }}`),
 `parameters` (`{name, type:"string"|"integer"|"boolean", required, default, description}`),
-`tags` и `description`. Одиночное создание — `items` с одним элементом.
+`tags`, `timeout` (секунды, `1..3600`, default `30`) и `description`. Одиночное создание — `items` с одним элементом.
 
 ```bash
 curl --fail-with-body -X POST "${NODE_NEXUS_URL}/api/v2/commands/" \
@@ -36,6 +36,7 @@ curl --fail-with-body -X POST "${NODE_NEXUS_URL}/api/v2/commands/" \
           "required": true,
           "description": "Absolute mount path"
         }],
+        "timeout": 60,
         "tags": ["diagnostics"],
         "description": "Show disk usage"
       },
@@ -76,7 +77,7 @@ curl --fail-with-body --get \
   --data-urlencode 'tag=diagnostics' \
   --data-urlencode 'search=disk' \
   "${NODE_NEXUS_URL}/api/v2/commands/?limit=20"
-  # -> {items:[{id,name,command,parameters,tags,description,created_at,updated_at}], next_cursor, has_more, limit}
+  # -> {items:[{id,name,command,parameters,tags,description,timeout,created_at,updated_at}], next_cursor, has_more, limit}
 ```
 
 Cursor кодирует `{"offset": N}` как base64url JSON; неверный cursor → `422`. Итерируйтесь пока `has_more == true`.
@@ -113,6 +114,7 @@ curl --fail-with-body -X POST \
     "command_ids": ["<cmd-1>", "<cmd-2>"],
     "node_ids": ["<node-1>", "<node-2>"],
     "node_tags": [],
+    "timeout": 60,
     "params": {
       "<cmd-1>": {"mount": "/"},
       "<cmd-2>": {}
@@ -134,7 +136,7 @@ curl --fail-with-body -X POST \
   }'
 ```
 
-Ограничение `M×N`: `len(command_ids) * max(len(node_ids), len(node_tags) or 1) ≤100`, иначе `422`.
+Ограничение `M×N`: `len(command_ids) * max(len(node_ids), len(node_tags) or 1) ≤100`, иначе `422`. Запрос принимает опциональный `timeout` (`1..3600`), который переопределяет timeout каждой команды в batch.
 
 ### Raw-выполнения M×N
 
@@ -148,12 +150,31 @@ curl --fail-with-body -X POST \
   -d '{
     "commands": ["df -h /", "uptime"],
     "node_ids": ["<node-1>"],
-    "node_tags": []
+    "node_tags": [],
+    "timeout": 30
   }'
   # -> {batch_id, total, succeeded, failed, results:[{command,node_id,node_name,stdout,stderr,exit_code,status,error}]}
 ```
 
 То же ограничение `M×N ≤100` и обработка `207`.
+
+## Таймауты
+
+Каждый шаблон команды хранит `timeout` в секундах (`1..3600`, default `30`),
+ограничивающий одно удалённое выполнение по SSH. `CommandCreate` и
+`CommandUpdate` принимают `timeout`; `CommandResponse` всегда возвращает
+фактическое значение.
+
+Bulk-запросы на выполнение принимают batch-level override:
+
+- `POST /api/v2/commands/executions` — опциональный `timeout` (`1..3600`),
+  применяемый ко всем командам в batch.
+- `POST /api/v2/commands/raw-executions` — опциональный `timeout` (`1..3600`,
+  default `30`) для raw-команд.
+
+Фактический timeout для одного выполнения —
+`request override → timeout шаблона → 30`. При превышении границы удалённый
+процесс прерывается, а результат выполнения помечается как `error`.
 
 ## Retries и cancels (bulk)
 

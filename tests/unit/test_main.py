@@ -145,6 +145,8 @@ class TestCreateApp:
             resp = await ac.get("/need-param?required=not-an-int")
             assert resp.status_code == 422
             assert "x-request-id" in resp.headers
+            assert resp.headers["content-type"] == "application/problem+json"
             body = resp.json()
             assert body["request_id"] == resp.headers["x-request-id"]
-            assert isinstance(body["detail"], list)
+            assert isinstance(body["detail"], str)
+            assert isinstance(body["errors"], list)

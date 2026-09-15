@@ -6,15 +6,15 @@ from __future__ import annotations
 import asyncio
 import uuid
 from datetime import datetime
-from typing import Annotated, Any, Literal
+from typing import Annotated, Literal
 
 import structlog
 from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
 from fastapi import APIRouter, HTTPException, Query, Response, Security
 
 from app.api.deps import Principal, get_current_principal, require_write_or_jwt_scope
-from app.api.pagination import decode_offset, encode_offset
-from app.api.v2._bulk import set_bulk_status
+from app.api.v2._shared import command_response
+from app.api.v2._bulk import BulkResponder
 from app.application.dto.command_execution import BulkCommandRequestDTO
 from app.application.dto.command_management import (
     CommandCreateDTO,
@@ -36,6 +36,7 @@ from app.schemas.command import (
     BulkExecutionItem,
     CommandBulkCreateRequest,
     CommandBulkCreateResult,
+    CommandBulkUpdateItem,
     CommandBulkUpdateRequest,
     CommandBulkUpdateResult,
     CommandCreate,
@@ -63,8 +64,7 @@ from app.schemas.node import (
 audit = structlog.get_logger("audit")
 
 # Compatibility aliases for tests importing private helpers
-_encode_offset = encode_offset  # noqa: N816
-_decode_offset = decode_offset  # noqa: N816
+_command_response = command_response  # noqa: N816
 
 router = APIRouter(route_class=DishkaRoute)
 
@@ -84,28 +84,6 @@ def _parameter_dto(parameter: CommandParameter) -> CommandParameterDTO:
     )
 
 
-def _command_response(command: CommandViewDTO) -> CommandResponse:
-    return CommandResponse(
-        id=command.id,
-        name=command.name,
-        description=command.description,
-        command=command.command,
-        parameters=[
-            CommandParameter(
-                name=parameter.name,
-                type=parameter.type,
-                required=parameter.required,
-                default=parameter.default,
-                description=parameter.description,
-            )
-            for parameter in command.parameters
-        ],
-        tags=list(command.tags),
-        created_at=command.created_at,
-        updated_at=command.updated_at,
-    )
-
-
 # ---------------------------------------------------------------------------
 # Bulk update — PATCH /  (bulk-first, 207 on partial)
 # ---------------------------------------------------------------------------
@@ -122,7 +100,7 @@ async def bulk_update_commands(
     """Bulk update commands via PATCH / (bulk-first, no bulk keyword)."""
     audit.info("api.v2.commands.bulk_update", count=len(data.updates))
 
-    async def _update_one(item: Any) -> CommandBulkUpdateResult:  # noqa: ANN401
+    async def _update_one(item: CommandBulkUpdateItem) -> CommandBulkUpdateResult:
         try:
             changes = item.changes.model_dump(exclude_unset=True)
             if isinstance(changes.get("parameters"), list):
@@ -141,12 +119,7 @@ async def bulk_update_commands(
             )
 
     results = await asyncio.gather(*(_update_one(u) for u in data.updates))
-    succeeded = sum(1 for r in results if r.status == "success")
-    failed = len(results) - succeeded
-    set_bulk_status(response, succeeded, failed)
-    return BulkResult[CommandBulkUpdateResult](
-        total=len(results), succeeded=succeeded, failed=failed, results=list(results)
-    )
+    return BulkResponder(response).result(list(results))
 
 
 @router.post("/deletions", response_model=BulkResult[CommandBulkUpdateResult])
@@ -170,12 +143,7 @@ async def bulk_delete_commands(
             )
 
     results = await asyncio.gather(*(_delete_one(cid) for cid in data.ids))
-    succeeded = sum(1 for r in results if r.status == "success")
-    failed = len(results) - succeeded
-    set_bulk_status(response, succeeded, failed)
-    return BulkResult[CommandBulkUpdateResult](
-        total=len(results), succeeded=succeeded, failed=failed, results=list(results)
-    )
+    return BulkResponder(response).result(list(results))
 
 
 # ---------------------------------------------------------------------------
@@ -192,7 +160,7 @@ async def get_command(
 ) -> CommandResponse:
     """Get a command by ID."""
     audit.info("api.v2.commands.get", command_id=str(command_id))
-    return _command_response(await service.get_command(command_id))
+    return command_response(await service.get_command(command_id))
 
 
 @router.patch("/{command_id}", response_model=CommandResponse)
@@ -216,7 +184,7 @@ async def update_command(
         command_id,
         CommandUpdateDTO(changes=tuple(changes.items())),
     )
-    return _command_response(result)
+    return command_response(result)
 
 
 @router.delete("/{command_id}", status_code=204)
@@ -242,7 +210,7 @@ async def clone_command(
     """Clone a command template."""
     audit.info("api.v2.commands.clone", command_id=str(command_id))
     cloned = await service.clone_command(command_id, new_name=new_name)
-    return _command_response(cloned)
+    return command_response(cloned)
 
 
 # ---------------------------------------------------------------------------

@@ -2,7 +2,7 @@
 title: Reusable commands
 status: stable
 translation_key: guides.commands
-source_revision: "2026-09-02"
+source_revision: "2026-09-09"
 ---
 
 # Reusable commands
@@ -19,7 +19,7 @@ envelope `{items: [CommandCreate, ...]}` (1..20 items) and receive a `BulkResult
 with HTTP `201` when all succeed or `207 Multi-Status` on partial success.
 Each `CommandCreate` carries `name`, `command` (with `{{ param }}` placeholders),
 `parameters` (`{name, type:"string"|"integer"|"boolean", required, default, description}`),
-`tags` (array), and `description`. Single creation is `items` with one element.
+`tags` (array), `timeout` (seconds, `1..3600`, default `30`), and `description`. Single creation is `items` with one element.
 
 ```bash
 curl --fail-with-body -X POST "${NODE_NEXUS_URL}/api/v2/commands/" \
@@ -36,6 +36,7 @@ curl --fail-with-body -X POST "${NODE_NEXUS_URL}/api/v2/commands/" \
           "required": true,
           "description": "Absolute mount path"
         }],
+        "timeout": 60,
         "tags": ["diagnostics"],
         "description": "Show disk usage"
       },
@@ -76,7 +77,7 @@ curl --fail-with-body --get \
   --data-urlencode 'tag=diagnostics' \
   --data-urlencode 'search=disk' \
   "${NODE_NEXUS_URL}/api/v2/commands/?limit=20"
-  # -> {items:[{id,name,command,parameters,tags,description,created_at,updated_at}], next_cursor, has_more, limit}
+  # -> {items:[{id,name,command,parameters,tags,description,timeout,created_at,updated_at}], next_cursor, has_more, limit}
 ```
 
 The cursor encodes `{"offset": N}` as base64url JSON; `422` on invalid cursor. Iterate while `has_more` is true.
@@ -113,6 +114,7 @@ curl --fail-with-body -X POST \
     "command_ids": ["<cmd-1>", "<cmd-2>"],
     "node_ids": ["<node-1>", "<node-2>"],
     "node_tags": [],
+    "timeout": 60,
     "params": {
       "<cmd-1>": {"mount": "/"},
       "<cmd-2>": {}
@@ -134,7 +136,7 @@ curl --fail-with-body -X POST \
   }'
 ```
 
-`M×N` guard: `len(command_ids) * max(len(node_ids), len(node_tags) or 1) ≤100`, else `422`.
+`M×N` guard: `len(command_ids) * max(len(node_ids), len(node_tags) or 1) ≤100`, else `422`. The request accepts an optional `timeout` (`1..3600`) that overrides the per-command timeout for every command in the batch.
 
 ### Raw executions M×N
 
@@ -148,12 +150,32 @@ curl --fail-with-body -X POST \
   -d '{
     "commands": ["df -h /", "uptime"],
     "node_ids": ["<node-1>"],
-    "node_tags": []
+    "node_tags": [],
+    "timeout": 30
   }'
   # -> {batch_id, total, succeeded, failed, results:[{command,node_id,node_name,stdout,stderr,exit_code,status,error}]}
 ```
 
 Same `M×N ≤100` guard and `207` handling.
+
+## Timeouts
+
+Every command template stores a `timeout` in seconds (`1..3600`, default `30`)
+that bounds a single remote execution over SSH. `CommandCreate` and
+`CommandUpdate` accept `timeout`; `CommandResponse` always exposes the effective
+value.
+
+Bulk execution requests accept a batch-level override:
+
+- `POST /api/v2/commands/executions` — optional `timeout` (`1..3600`) applied to
+  every command in the batch.
+- `POST /api/v2/commands/raw-executions` — optional `timeout` (`1..3600`, default
+  `30`) for the raw commands.
+
+The effective timeout per execution is
+`request override → template timeout → 30`. When the bound is exceeded the
+remote process is aborted and the execution result is reported with an `error`
+status.
 
 ## Retries and cancels (bulk)
 

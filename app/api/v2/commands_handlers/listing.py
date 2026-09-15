@@ -13,8 +13,14 @@ from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
 from fastapi import APIRouter, HTTPException, Query, Response, Security
 
 from app.api.deps import Principal, get_current_principal, require_write_or_jwt_scope
-from app.api.pagination import decode_offset, encode_offset
-from app.api.v2._bulk import set_bulk_status
+from app.api.v2._bulk import BulkResponder
+from app.api.v2._shared import (
+    command_response,
+    cursor_next,
+    pagination_params,
+    parse_cursor_offset,
+)
+from app.core.constants import DEFAULT_TIMEOUT
 from app.application.dto.command_execution import BulkCommandRequestDTO
 from app.application.dto.command_management import (
     CommandCreateDTO,
@@ -60,8 +66,6 @@ from app.schemas.node import (
 audit = structlog.get_logger("audit")
 
 # Compatibility aliases for tests importing private helpers
-_encode_offset = encode_offset  # noqa: N816
-_decode_offset = decode_offset  # noqa: N816
 
 router = APIRouter(route_class=DishkaRoute)
 
@@ -78,28 +82,6 @@ def _parameter_dto(parameter: CommandParameter) -> CommandParameterDTO:
         required=parameter.required,
         default=parameter.default,
         description=parameter.description,
-    )
-
-
-def _command_response(command: CommandViewDTO) -> CommandResponse:
-    return CommandResponse(
-        id=command.id,
-        name=command.name,
-        description=command.description,
-        command=command.command,
-        parameters=[
-            CommandParameter(
-                name=parameter.name,
-                type=parameter.type,
-                required=parameter.required,
-                default=parameter.default,
-                description=parameter.description,
-            )
-            for parameter in command.parameters
-        ],
-        tags=list(command.tags),
-        created_at=command.created_at,
-        updated_at=command.updated_at,
     )
 
 
@@ -123,15 +105,8 @@ async def list_commands(
     Cursor encodes an offset. Translated to page/size for the offset-based service.
     """
     tag_list = [tag] if tag else None
-    offset = 0
-    if cursor is not None and cursor != "":
-        try:
-            offset = decode_offset(cursor)
-        except ValueError:
-            raise HTTPException(status_code=422, detail="Invalid cursor") from None
-    remainder = offset % limit if limit else 0
-    page = offset // limit + 1 if limit else 1
-    fetch_size = limit + remainder if remainder else limit
+    offset = parse_cursor_offset(cursor)
+    page, fetch_size, remainder = pagination_params(offset, limit)
     audit.info(
         "api.v2.commands.list", cursor=cursor, limit=limit, tag=tag, search=search
     )  # noqa: E501
@@ -140,9 +115,8 @@ async def list_commands(
     )
     if remainder:
         commands = commands[remainder : remainder + limit]
-    items = [_command_response(c) for c in commands]
-    has_more = (offset + len(items)) < total
-    next_cursor = encode_offset(offset + limit) if has_more else None
+    items = [command_response(c) for c in commands]
+    next_cursor, has_more = cursor_next(offset, limit, total, len(items))
     return CursorPage[CommandResponse](
         items=items,
         next_cursor=next_cursor,
@@ -175,6 +149,7 @@ async def bulk_create_commands(
                 command=item.command,
                 parameters=tuple(_parameter_dto(p) for p in item.parameters),
                 tags=tuple(item.tags),
+                timeout=item.timeout if item.timeout is not None else DEFAULT_TIMEOUT,
             )
             created = await service.create_command(dto)
             return CommandBulkCreateResult(
@@ -186,15 +161,7 @@ async def bulk_create_commands(
             )  # noqa: E501
 
     results = await asyncio.gather(*(_create_one(item) for item in data.items))
-    succeeded = sum(1 for r in results if r.status == "success")
-    failed = len(results) - succeeded
-    set_bulk_status(response, succeeded, failed)
-    return BulkResult[CommandBulkCreateResult](
-        total=len(results),
-        succeeded=succeeded,
-        failed=failed,
-        results=list(results),
-    )
+    return BulkResponder(response).result(list(results))
 
 
 # ---------------------------------------------------------------------------

@@ -1,7 +1,6 @@
 """HTTP request id, logging, timeout, and rate limiting middleware."""
 
 import asyncio
-import json
 import time
 import uuid
 from collections import OrderedDict, deque
@@ -9,12 +8,14 @@ from typing import override
 
 import structlog
 from fastapi import Request, Response
+from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.types import ASGIApp
 
 from app.adapters.lifecycle.commit_middleware import (  # noqa: F401
     CommitOnResponseMiddleware,
 )
+from app.api.error_mapping import problem_content
 
 logger = structlog.get_logger()
 
@@ -95,19 +96,24 @@ class TimeoutMiddleware(BaseHTTPMiddleware):
             response = await asyncio.wait_for(call_next(request), timeout=self._timeout)
             return response
         except TimeoutError:
-            request_id = getattr(request.state, "request_id", None) or ""
+            request_id = getattr(request.state, "request_id", None) or None
             logger.warning(
                 "http.request.timeout",
                 path=request.url.path,
                 timeout=self._timeout,
             )
-            return Response(
-                content=json.dumps(
-                    {"detail": "Request timed out", "request_id": request_id}
-                ),
+            content = problem_content(
                 status_code=504,
+                code="HTTP_504",
+                detail="Request timed out",
+                request_id=request_id,
+                path=request.url.path,
+            )
+            return JSONResponse(
+                status_code=504,
+                content=content,
                 headers={"X-Request-ID": request_id} if request_id else {},
-                media_type="application/json",
+                media_type="application/problem+json",
             )
 
 
@@ -127,7 +133,8 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         self._requests = requests
         self._window = window
         self._max_clients = max_clients
-        # TODO: consider Redis-backed rate limiting for multi-replica deployments
+        # Single-replica in-memory rate limiting. For multi-replica, use Redis-backed
+        # backend (see execution_registry TTL doc). Kept as in-memory fallback for dev.
         self._ip_counts: OrderedDict[str, deque[float]] = OrderedDict()
 
     def clear(self) -> None:
@@ -166,7 +173,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
         if current_count >= self._requests:
             retry_after = int(self._window - (now - self._ip_counts[client_ip][0]))
-            request_id = getattr(request.state, "request_id", None) or ""
+            request_id = getattr(request.state, "request_id", None) or None
             logger.warning(
                 "http.request.rate_limited",
                 ip=client_ip,
@@ -180,13 +187,18 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             }
             if request_id:
                 headers["X-Request-ID"] = request_id
-            return Response(
-                content=json.dumps(
-                    {"detail": "Rate limit exceeded", "request_id": request_id}
-                ),
+            content = problem_content(
                 status_code=429,
+                code="HTTP_429",
+                detail="Rate limit exceeded",
+                request_id=request_id,
+                path=request.url.path,
+            )
+            return JSONResponse(
+                status_code=429,
+                content=content,
                 headers=headers,
-                media_type="application/json",
+                media_type="application/problem+json",
             )
 
         self._ip_counts[client_ip].append(now)

@@ -15,6 +15,7 @@ from dishka.integrations.fastapi import setup_dishka
 from fastapi import FastAPI
 from httpx2 import ASGITransport, AsyncClient
 
+from app.api.error_mapping import domain_error_handler
 from app.api.v2 import audit as audit_module
 from app.api.v2.audit import _decode_offset, _encode_offset, _to_response, router
 from app.application.dto.audit import AuditLogDTO, AuditLogPageDTO
@@ -22,6 +23,7 @@ from app.application.dto.export import AuditExportRowDTO
 from app.application.ports.export import AuditExporter
 from app.application.services.audit_log_service import AuditLogService
 from app.core.config import Settings
+from app.core.exceptions import DomainError
 from app.schemas.common import BulkResult
 from tests.typing import as_typed_mock
 from tests.unit.conftest import MockAuthServiceProvider, _mock_settings
@@ -58,6 +60,7 @@ def _create_audit_app(
     exporter_mock: AsyncMock | MagicMock | None = None,
 ) -> FastAPI:
     app = FastAPI()
+    app.add_exception_handler(DomainError, domain_error_handler)
     app.include_router(router, prefix="/api/v2")
 
     svc = service_mock if service_mock is not None else AsyncMock()
@@ -972,7 +975,7 @@ class TestAuditStats:
         assert kwargs["date_from"] is not None
         assert kwargs["date_to"] is not None
 
-    async def test_stats_attribute_error_500(self) -> None:
+    async def test_stats_unavailable_501(self) -> None:
         svc = MagicMock()
         # get_stats will raise AttributeError
         svc.get_stats = AsyncMock(side_effect=AttributeError("no get_stats"))
@@ -987,8 +990,10 @@ class TestAuditStats:
                 headers={"X-API-Key": "test-master"},
             ) as client:
                 resp = await client.get("/api/v2/audit/stats")
-        assert resp.status_code == 500
-        assert "not available" in resp.json()["detail"].lower()
+        assert resp.status_code == 501
+        body = resp.json()
+        assert body["detail"] == "Internal server error"
+        assert body["code"] == "AuditStatsUnavailableError"
 
     async def test_stats_generic_exception_500(self) -> None:
         svc = AsyncMock()
@@ -1005,7 +1010,10 @@ class TestAuditStats:
             ) as client:
                 resp = await client.get("/api/v2/audit/stats?group_by=day")
         assert resp.status_code == 500
-        assert "boom" in resp.json()["detail"]
+        body = resp.json()
+        assert body["detail"] == "Internal server error"
+        assert body["code"] == "AuditReadError"
+        assert "boom" not in resp.text
 
     async def test_stats_aggregate_object_total_as_attr_buckets_dict(self) -> None:
         # covers lines 260-276 with dict buckets and getattr fallback
@@ -1194,7 +1202,10 @@ class TestGetAuditLog:
             ) as client:
                 resp = await client.get(f"/api/v2/audit/{uuid.uuid4()}")
         assert resp.status_code == 500
-        assert "db down" in resp.json()["detail"]
+        body = resp.json()
+        assert body["detail"] == "Internal server error"
+        assert body["code"] == "AuditReadError"
+        assert "db down" not in resp.text
 
     async def test_get_single_success_via_model_validate(self) -> None:
         svc = AsyncMock()
@@ -1240,7 +1251,9 @@ class TestGetAuditLog:
             ) as client:
                 resp = await client.get(f"/api/v2/audit/{uuid.uuid4()}")
         assert resp.status_code == 500
-        assert "Failed to map" in resp.json()["detail"]
+        body = resp.json()
+        assert body["detail"] == "Internal server error"
+        assert body["code"] == "AuditReadError"
 
     async def test_get_single_invalid_uuid_422(self) -> None:
         svc = AsyncMock()

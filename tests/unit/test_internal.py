@@ -71,7 +71,10 @@ class TestPauseBackground:
     async def test_pause_background_tasks(self) -> None:
         svc = AsyncMock()
         svc.pause.return_value = None
-        app = _create_internal_app(audit_controller=svc)
+        settings = MagicMock()
+        settings.E2E_ENABLED = True
+        settings.MASTER_API_KEY = "test-master"
+        app = _create_internal_app(audit_controller=svc, settings=settings)
         with _settings_patcher:
             async with AsyncClient(
                 transport=ASGITransport(app=app),
@@ -81,6 +84,22 @@ class TestPauseBackground:
                 resp = await ac.post("/api/v1/internal/e2e/pause-background")
         assert resp.status_code == 200
 
+    @pytest.mark.asyncio
+    async def test_pause_background_tasks_disabled(self) -> None:
+        svc = AsyncMock()
+        settings = MagicMock()
+        settings.E2E_ENABLED = False
+        settings.MASTER_API_KEY = "test-master"
+        app = _create_internal_app(audit_controller=svc, settings=settings)
+        with _settings_patcher:
+            async with AsyncClient(
+                transport=ASGITransport(app=app),
+                base_url="http://test",
+                headers={"X-API-Key": "test-master"},
+            ) as ac:
+                resp = await ac.post("/api/v1/internal/e2e/pause-background")
+        assert resp.status_code == 403
+
 
 class TestResumeBackground:
     @pytest.mark.asyncio
@@ -88,7 +107,10 @@ class TestResumeBackground:
         svc = AsyncMock()
         svc.start = MagicMock()
         svc.resume.return_value = None
-        app = _create_internal_app(audit_controller=svc)
+        settings = MagicMock()
+        settings.E2E_ENABLED = True
+        settings.MASTER_API_KEY = "test-master"
+        app = _create_internal_app(audit_controller=svc, settings=settings)
         with _settings_patcher:
             async with AsyncClient(
                 transport=ASGITransport(app=app),
@@ -97,6 +119,23 @@ class TestResumeBackground:
             ) as ac:
                 resp = await ac.post("/api/v1/internal/e2e/resume-background")
         assert resp.status_code == 200
+
+    @pytest.mark.asyncio
+    async def test_resume_background_tasks_disabled(self) -> None:
+        svc = AsyncMock()
+        svc.start = MagicMock()
+        settings = MagicMock()
+        settings.E2E_ENABLED = False
+        settings.MASTER_API_KEY = "test-master"
+        app = _create_internal_app(audit_controller=svc, settings=settings)
+        with _settings_patcher:
+            async with AsyncClient(
+                transport=ASGITransport(app=app),
+                base_url="http://test",
+                headers={"X-API-Key": "test-master"},
+            ) as ac:
+                resp = await ac.post("/api/v1/internal/e2e/resume-background")
+        assert resp.status_code == 403
 
 
 class TestTriggerScheduledScript:

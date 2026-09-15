@@ -27,6 +27,7 @@ from app.application.services.node_metrics_service import NodeMetricsService
 from app.application.services.node_status_history_service import (
     NodeStatusHistoryService,
 )
+from app.core.exceptions import DomainError
 from app.schemas.common import BulkResult, CursorPage, decode_cursor, encode_cursor
 from app.schemas.node import (
     BulkNodeMetricsResult,
@@ -116,8 +117,12 @@ async def get_node_status_history(
                 offset = 0
             except ValueError:
                 raise HTTPException(status_code=422, detail="Invalid cursor") from None
+            except DomainError:
+                raise
             except Exception as exc:  # noqa: BLE001
                 raise HTTPException(status_code=422, detail="Invalid cursor") from exc
+        except DomainError:
+            raise
         except Exception as exc:  # noqa: BLE001
             raise HTTPException(status_code=422, detail="Invalid cursor") from exc
     query = NodeStatusHistoryQueryDTO(node_id=node_id, offset=offset, limit=limit)
@@ -141,6 +146,24 @@ async def get_node_status_history(
         has_more=has_more,
         limit=limit,
     )
+
+
+@router.get(
+    "/{node_id}/history",
+    response_model=CursorPage[NodeStatusHistoryItem],
+    include_in_schema=False,
+)
+@inject
+async def get_node_history_alias(
+    node_id: uuid.UUID,
+    service: FromDishka[NodeStatusHistoryService],
+    cursor: str | None = Query(None, description="Opaque cursor for pagination"),
+    limit: int = Query(20, ge=1, le=100),
+    _principal: Principal = Security(get_current_principal),
+) -> CursorPage[NodeStatusHistoryItem]:
+    """RESTful alias for GET /{id}/history (bulk-first consistency)."""
+
+    return await get_node_status_history(node_id, service, cursor, limit, _principal)
 
 
 # ---------------------------------------------------------------------------

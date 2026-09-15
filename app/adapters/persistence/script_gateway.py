@@ -38,7 +38,11 @@ class ScopedScriptDefinitionReader:
             script = await ScriptRepository(session).get_by_id(script_id)
             if script is None:
                 return None
-            return ScriptDefinitionDTO(id=script.id, steps=tuple(script.steps or []))
+            return ScriptDefinitionDTO(
+                id=script.id,
+                steps=tuple(script.steps or []),
+                timeout=script.timeout,
+            )
 
 
 class ScopedScriptExecutionWriter:
@@ -99,6 +103,7 @@ class SqlAlchemyScriptGateway:
                     "description": data.description,
                     "steps": [self._step_to_dict(step) for step in data.steps],
                     "tags": list(data.tags),
+                    "timeout": data.timeout,
                 }
             )
             return self._to_view(script)
@@ -133,7 +138,11 @@ class SqlAlchemyScriptGateway:
             script = await ScriptRepository(session).get_by_id(script_id)
             if script is None:
                 return None
-            return ScriptDefinitionDTO(id=script.id, steps=tuple(script.steps or ()))
+            return ScriptDefinitionDTO(
+                id=script.id,
+                steps=tuple(script.steps or ()),
+                timeout=script.timeout,
+            )
 
     async def list_executions(
         self, query: ScriptExecutionQueryDTO
@@ -162,6 +171,7 @@ class SqlAlchemyScriptGateway:
             description=script.description,
             steps=tuple(cls._step_from_dict(step) for step in script.steps),
             tags=tuple(script.tags or ()),
+            timeout=script.timeout,
             created_at=script.created_at,
             updated_at=script.updated_at,
         )
@@ -222,6 +232,7 @@ class SqlAlchemyScriptGateway:
             steps=step_results,
             started_at=execution.started_at,
             finished_at=execution.finished_at,
+            timeout=execution.timeout,
         )
 
 

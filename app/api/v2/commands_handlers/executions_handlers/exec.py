@@ -13,8 +13,8 @@ from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
 from fastapi import APIRouter, HTTPException, Query, Response, Security
 
 from app.api.deps import Principal, get_current_principal, require_write_or_jwt_scope
-from app.api.pagination import decode_offset, encode_offset
-from app.api.v2._bulk import set_bulk_status
+from app.api.v2._bulk import HTTP_207_MULTI_STATUS
+from app.core.constants import DEFAULT_TIMEOUT
 from app.application.dto.command_execution import BulkCommandRequestDTO
 from app.application.dto.command_management import (
     CommandCreateDTO,
@@ -60,8 +60,6 @@ from app.schemas.node import (
 audit = structlog.get_logger("audit")
 
 # Compatibility aliases for tests importing private helpers
-_encode_offset = encode_offset  # noqa: N816
-_decode_offset = decode_offset  # noqa: N816
 
 router = APIRouter(route_class=DishkaRoute)
 
@@ -78,28 +76,6 @@ def _parameter_dto(parameter: CommandParameter) -> CommandParameterDTO:
         required=parameter.required,
         default=parameter.default,
         description=parameter.description,
-    )
-
-
-def _command_response(command: CommandViewDTO) -> CommandResponse:
-    return CommandResponse(
-        id=command.id,
-        name=command.name,
-        description=command.description,
-        command=command.command,
-        parameters=[
-            CommandParameter(
-                name=parameter.name,
-                type=parameter.type,
-                required=parameter.required,
-                default=parameter.default,
-                description=parameter.description,
-            )
-            for parameter in command.parameters
-        ],
-        tags=list(command.tags),
-        created_at=command.created_at,
-        updated_at=command.updated_at,
     )
 
 
@@ -146,12 +122,16 @@ async def bulk_executions(
                 list(cmd.parameters),
                 raw_params,
             )
+            effective_timeout = (
+                data.timeout if data.timeout is not None else cmd.timeout
+            )
             result = await bulk_service.execute(
                 BulkCommandRequestDTO(
                     command=rendered,
                     node_ids=tuple(data.node_ids),
                     tags=tuple(data.node_tags),
                     command_id=command_id,
+                    timeout=effective_timeout,
                 )
             )
             items: list[BulkExecutionItem] = []
@@ -191,7 +171,8 @@ async def bulk_executions(
     flat: list[BulkExecutionItem] = [it for sub in nested for it in sub]
     succeeded = sum(1 for r in flat if r.status == "success")
     failed = len(flat) - succeeded
-    set_bulk_status(response, succeeded, failed)
+    if failed > 0 and succeeded > 0:
+        response.status_code = HTTP_207_MULTI_STATUS
     return BulkExecutionBatchResponse(
         batch_id=batch_id,
         total=len(flat),
@@ -224,11 +205,15 @@ async def bulk_raw_executions(
 
     async def _execute_raw(command: str) -> list[BulkExecutionItem]:
         try:
+            effective_timeout = (
+                data.timeout if data.timeout is not None else DEFAULT_TIMEOUT
+            )  # noqa: E501
             result = await bulk_service.execute(
                 BulkCommandRequestDTO(
                     command=command,
                     node_ids=tuple(data.node_ids),
                     tags=tuple(data.node_tags),
+                    timeout=effective_timeout,
                 )
             )
             items: list[BulkExecutionItem] = []
@@ -267,7 +252,8 @@ async def bulk_raw_executions(
     flat: list[BulkExecutionItem] = [it for sub in nested for it in sub]
     succeeded = sum(1 for r in flat if r.status == "success")
     failed = len(flat) - succeeded
-    set_bulk_status(response, succeeded, failed)
+    if failed > 0 and succeeded > 0:
+        response.status_code = HTTP_207_MULTI_STATUS
     return BulkExecutionBatchResponse(
         batch_id=batch_id,
         total=len(flat),

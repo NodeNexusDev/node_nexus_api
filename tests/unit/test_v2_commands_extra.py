@@ -60,6 +60,7 @@ def _make_cmd_view(**overrides: object) -> CommandViewDTO:
         "command": "df -h",
         "parameters": (),
         "tags": (),
+        "timeout": 30,
         "created_at": now,
         "updated_at": now,
     }

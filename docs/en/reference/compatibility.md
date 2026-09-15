@@ -2,7 +2,7 @@
 title: Compatibility and support
 status: stable
 translation_key: reference.compatibility
-source_revision: "2026-09-02"
+source_revision: "2026-09-09"
 ---
 
 # Compatibility and support
@@ -25,6 +25,7 @@ removed in 2.0. Health, readiness, and metrics endpoints remain unversioned.
 
 | Version | Date | Type | Highlights |
 |---------|------|------|------------|
+| 2.3.0 | 2026-09-08 | Minor | Timeout on commands/scripts: `CommandCreate`/`ScriptCreate`/`CommandUpdate`/`ScriptUpdate` `timeout` field (`1..3600`, default `30`), per-batch `timeout` override on bulk executions, `timeout` in responses; whole-script runs fail with `504 Gateway Timeout` on expiry; RESTful execution-history aliases (`GET /commands/{id}/executions`, `GET /nodes/{id}/history`, `GET /scripts/{id}/executions/history`) |
 | 2.0.0 | 2026-09-02 | Major | Breaking bulk-first: BulkResult 207 `{total,succeeded,failed,results}` (200 all ok, 207 partial, 422 all failed), `{items}` bulk create (1..20), cursor pagination (`cursor`/`limit` + `next_cursor`/`has_more`), docker vert-bulk + 9 ops (kill, update, archive, port, wait, system/version, system/prune, networks/prune, images/history, images/push), compose (persistent `compose_projects`), templates (registries, packs, installations), notes→description, unified stats (`/stats` snapshot and buckets), ErrorResponse `request_id` always present, removed `X-API-Version` |
 | 1.0.0 | 2026-08-25 | Major | First stable release: complete Docker CRUD (containers, images, networks, volumes, system, bulk), full documentation (bilingual), production CI/CD, 95% test coverage |
 | 0.17.1 | 2026-08-25 | Patch | Fix CPU metrics always returning 100% due to wrong vmstat column, remove Any from application layer |

@@ -6,6 +6,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.core.constants import DEFAULT_TIMEOUT, OptionalTimeout, Timeout
 from app.core.types import JsonObject, JsonValue
 
 
@@ -27,6 +28,7 @@ class CommandCreate(BaseModel):
     command: str = Field(..., min_length=1, max_length=4096)
     parameters: list[CommandParameter] = Field(default_factory=list)
     tags: list[str] = Field(default_factory=list)
+    timeout: Timeout = DEFAULT_TIMEOUT
 
 
 class CommandUpdate(BaseModel):
@@ -37,6 +39,7 @@ class CommandUpdate(BaseModel):
     command: str | None = Field(default=None, min_length=1, max_length=4096)
     parameters: list[CommandParameter] | None = None
     tags: list[str] | None = None
+    timeout: OptionalTimeout = None
 
 
 class CommandResponse(BaseModel):
@@ -50,6 +53,7 @@ class CommandResponse(BaseModel):
     command: str
     parameters: list[CommandParameter] | None
     tags: list[str]
+    timeout: int
     created_at: datetime
     updated_at: datetime
 
@@ -59,6 +63,7 @@ class CommandExecuteRequest(BaseModel):
 
     node_id: uuid.UUID
     params: JsonObject = Field(default_factory=dict)
+    timeout: OptionalTimeout = None
 
 
 class CommandResult(BaseModel):
@@ -91,6 +96,7 @@ class CommandExecutionsRequest(BaseModel):
     node_ids: list[uuid.UUID] = Field(default_factory=list)
     node_tags: list[str] = Field(default_factory=list)
     params: dict[str, JsonObject] = Field(default_factory=dict)
+    timeout: OptionalTimeout = None
 
     @property
     def _estimated_n(self) -> int:
@@ -105,6 +111,7 @@ class RawExecutionsRequest(BaseModel):
     commands: list[str] = Field(min_length=1, max_length=20)
     node_ids: list[uuid.UUID] = Field(default_factory=list)
     node_tags: list[str] = Field(default_factory=list)
+    timeout: OptionalTimeout = None
 
 
 class BulkExecutionItem(BaseModel):

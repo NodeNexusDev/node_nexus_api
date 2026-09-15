@@ -47,8 +47,9 @@ htmlcov/
 .tox/
 .nox/
 .coverage
-.coverage.*
+.coverage*
 .cache
+MagicMock/
 nosetests.xml
 coverage.xml
 *.cover
@@ -234,3 +235,6 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# e2e-generated ssh test keys (fixture-created, never commit)
+tests/ssh-keys/

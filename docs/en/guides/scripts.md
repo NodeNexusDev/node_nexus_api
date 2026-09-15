@@ -2,7 +2,7 @@
 title: Scripts and schedules
 status: stable
 translation_key: guides.scripts
-source_revision: "2026-09-02"
+source_revision: "2026-09-09"
 ---
 
 # Scripts and schedules
@@ -27,7 +27,7 @@ does not persist parameters, and truncates oversized output with byte counts.
 `POST /api/v2/scripts/` is bulk-first without the `bulk` keyword. Send an
 envelope `{items: [ScriptCreate, ...]}` (1..20 items) and receive a `BulkResult`
 with `201` when all succeed or `207 Multi-Status` on partial success. Each
-`ScriptCreate` carries `name`, `description`, `steps` (array of `{label, type:"command"|"command_id", command?, command_id?, params?, on_failure:"stop"|"continue"}`), and `tags`. Single creation is `items` with one element.
+`ScriptCreate` carries `name`, `description`, `steps` (array of `{label, type:"command"|"command_id", command?, command_id?, params?, on_failure:"stop"|"continue"}`), `tags`, and `timeout` (seconds, `1..3600`, default `30`). Single creation is `items` with one element.
 
 ```bash
 curl --fail-with-body -X POST "${NODE_NEXUS_URL}/api/v2/scripts/" \
@@ -38,6 +38,7 @@ curl --fail-with-body -X POST "${NODE_NEXUS_URL}/api/v2/scripts/" \
       {
         "name": "deploy",
         "description": "Deploy main branch",
+        "timeout": 120,
         "tags": ["deploy"],
         "steps": [
           {"label": "pull", "type": "command", "command": "git pull", "params": {}, "on_failure": "stop"},
@@ -72,7 +73,7 @@ curl --fail-with-body --get \
   --data-urlencode 'tag=deploy' \
   --data-urlencode 'search=deploy' \
   "${NODE_NEXUS_URL}/api/v2/scripts/?limit=20&tag=deploy&search=deploy"
-  # -> {items:[{id,name,description,steps,tags,created_at,updated_at}], next_cursor, has_more, limit}
+  # -> {items:[{id,name,description,steps,tags,timeout,created_at,updated_at}], next_cursor, has_more, limit}
 ```
 
 Cursor encodes `{"offset": N}` as base64url JSON; `422` on invalid cursor. Iterate while `has_more` is true. `search` matches `name` and `description` (ILIKE).
@@ -133,6 +134,7 @@ curl --fail-with-body -X POST \
     "script_ids": ["<script-1>", "<script-2>"],
     "node_ids": ["<node-1>", "<node-2>"],
     "node_tags": [],
+    "timeout": 120,
     "params": {
       "<script-1>": {"branch": "main"},
       "<script-2>": {}
@@ -154,7 +156,7 @@ curl --fail-with-body -X POST \
   }'
 ```
 
-`M×N` guard: `len(script_ids) * max(len(node_ids), len(node_tags) or 1) ≤100`, else `422`. Inspect `results[]` per `status`; partial failures do not roll back successful executions.
+`M×N` guard: `len(script_ids) * max(len(node_ids), len(node_tags) or 1) ≤100`, else `422`. The request accepts an optional `timeout` (`1..3600`) that overrides the per-script timeout for every script in the batch. Inspect `results[]` per `status`; partial failures do not roll back successful executions.
 
 Execution history for a script (cursor pagination):
 
@@ -164,6 +166,21 @@ curl --fail-with-body \
   "${NODE_NEXUS_URL}/api/v2/scripts/${SCRIPT_ID}/executions?cursor=eyJvZmZzZXQiOjIwfQ==&limit=20"
   # -> {items:[{id, script_id, node_id, params, status, steps:[...], started_at, finished_at}], next_cursor, has_more, limit}
 ```
+
+## Timeouts
+
+Every script stores a `timeout` in seconds (`1..3600`, default `30`).
+`ScriptCreate` and `ScriptUpdate` accept `timeout`; `ScriptResponse` always
+exposes the effective value.
+
+Bulk execution requests accept a batch-level override: `POST
+/api/v2/scripts/executions` takes an optional `timeout` (`1..3600`) applied to
+every script in the batch.
+
+The effective timeout per execution is
+`request override → script timeout → 30`. The timeout bounds the whole script
+run across all steps (not per step); when it is exceeded, all target-node
+executions are marked `error` and the batch fails with `504 Gateway Timeout`.
 
 ## Retries and cancels (bulk)
 

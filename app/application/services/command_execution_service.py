@@ -77,8 +77,14 @@ class CommandExecutionService:
         if node is None:
             raise NodeNotFoundError(f"Node {data.node_id} not found")
 
+        effective_timeout = (
+            data.timeout if data.timeout is not None else command.timeout
+        )
         connector = build_ssh_connector(
-            node, self._credential_cipher, self._connector_factory
+            node,
+            self._credential_cipher,
+            self._connector_factory,
+            timeout=effective_timeout,
         )
 
         try:

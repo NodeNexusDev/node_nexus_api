@@ -42,3 +42,10 @@ class ExecutionHistoryService:
                 limit=size,
             )
         )
+
+    async def get_command_history(
+        self, command_id: UUID, *, page: int = 1, size: int = 20
+    ) -> CommandHistoryPageDTO:
+        """Return paginated execution records for one command template."""
+        offset = (page - 1) * size
+        return await self._reader.list_by_command(command_id, offset=offset, limit=size)

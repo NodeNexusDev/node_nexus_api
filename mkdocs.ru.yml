@@ -92,6 +92,7 @@ nav:
       - Интерактивный API: reference/openapi.html
       - Конфигурация: reference/configuration.md
       - Каталог ошибок: reference/error-catalog.md
+      - Ошибки (problem+json): errors.md
       - Совместимость: reference/compatibility.md
       - Шпаргалка: reference/cheat-sheet.md
       - Глоссарий: reference/glossary.md

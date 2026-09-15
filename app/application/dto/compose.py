@@ -7,6 +7,8 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from uuid import UUID
 
+from app.core.constants import DEFAULT_TIMEOUT
+
 
 @dataclass(frozen=True, slots=True)
 class ComposeCreateDTO:
@@ -87,7 +89,7 @@ class ComposeExecRequestDTO:
     project_name: str
     service: str
     command: str
-    timeout: int = 30
+    timeout: int = DEFAULT_TIMEOUT
 
 
 @dataclass(frozen=True, slots=True)

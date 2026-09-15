@@ -2,7 +2,7 @@
 title: Обзор архитектуры
 status: stable
 translation_key: architecture.overview
-source_revision: "2026-09-02"
+source_revision: "2026-09-09"
 ---
 
 # Обзор архитектуры
@@ -82,6 +82,7 @@ erDiagram
         text command
         list parameters
         list tags
+        int timeout
         uuid template_pack_id FK
         datetime created_at
         datetime updated_at
@@ -93,6 +94,7 @@ erDiagram
         text description
         json steps
         list tags
+        int timeout
         uuid template_pack_id FK
         datetime created_at
         datetime updated_at
@@ -194,6 +196,7 @@ erDiagram
         json params
         string status
         json steps
+        int timeout
         datetime started_at
         datetime finished_at
     }
@@ -293,3 +296,6 @@ Bulk и пагинация (v2):
 - `BulkCommandRequestDTO.timeout` (опциональный `int`) прокидывается из API-запроса
   через `NodeBulkCommandService.execute(..., timeout=data.timeout)` в SSH executor
   для каждой ноды.
+- `CommandCreate`/`ScriptCreate` сохраняют колонку `timeout` (`NOT NULL`, default
+  `30`, диапазон `1..3600`); bulk-запросы `*/executions` могут переопределить её
+  для всего batch.

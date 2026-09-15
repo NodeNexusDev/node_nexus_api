@@ -2,7 +2,7 @@
 title: Скрипты и расписания
 status: stable
 translation_key: guides.scripts
-source_revision: "2026-09-02"
+source_revision: "2026-09-09"
 ---
 
 # Скрипты и расписания
@@ -28,7 +28,7 @@ runtime-проекцией. Реплики выбирают одного owner �
 `POST /api/v2/scripts/` — bulk-first без сегмента `bulk`. Отправьте envelope
 `{items: [ScriptCreate, ...]}` (1..20 элементов) и получите `BulkResult` с
 `201` при полном успехе или `207 Multi-Status` при частичном. Каждый
-`ScriptCreate` содержит `name`, `description`, `steps` (массив `{label, type:"command"|"command_id", command?, command_id?, params?, on_failure:"stop"|"continue"}`) и `tags`. Одиночное создание — `items` с одним элементом.
+`ScriptCreate` содержит `name`, `description`, `steps` (массив `{label, type:"command"|"command_id", command?, command_id?, params?, on_failure:"stop"|"continue"}`), `tags` и `timeout` (секунды, `1..3600`, default `30`). Одиночное создание — `items` с одним элементом.
 
 ```bash
 curl --fail-with-body -X POST "${NODE_NEXUS_URL}/api/v2/scripts/" \
@@ -39,6 +39,7 @@ curl --fail-with-body -X POST "${NODE_NEXUS_URL}/api/v2/scripts/" \
       {
         "name": "deploy",
         "description": "Deploy main branch",
+        "timeout": 120,
         "tags": ["deploy"],
         "steps": [
           {"label": "pull", "type": "command", "command": "git pull", "params": {}, "on_failure": "stop"},
@@ -73,7 +74,7 @@ curl --fail-with-body --get \
   --data-urlencode 'tag=deploy' \
   --data-urlencode 'search=deploy' \
   "${NODE_NEXUS_URL}/api/v2/scripts/?limit=20&tag=deploy&search=deploy"
-  # -> {items:[{id,name,description,steps,tags,created_at,updated_at}], next_cursor, has_more, limit}
+  # -> {items:[{id,name,description,steps,tags,timeout,created_at,updated_at}], next_cursor, has_more, limit}
 ```
 
 Cursor кодирует `{"offset": N}` как base64url JSON; неверный cursor → `422`. Итерируйтесь пока `has_more == true`. `search` ищет по `name` и `description` (ILIKE).
@@ -134,6 +135,7 @@ curl --fail-with-body -X POST \
     "script_ids": ["<script-1>", "<script-2>"],
     "node_ids": ["<node-1>", "<node-2>"],
     "node_tags": [],
+    "timeout": 120,
     "params": {
       "<script-1>": {"branch": "main"},
       "<script-2>": {}
@@ -155,7 +157,7 @@ curl --fail-with-body -X POST \
   }'
 ```
 
-Ограничение `M×N`: `len(script_ids) * max(len(node_ids), len(node_tags) or 1) ≤100`, иначе `422`. Проверяйте `results[]` по `status`; частичные ошибки не откатывают успешные выполнения.
+Ограничение `M×N`: `len(script_ids) * max(len(node_ids), len(node_tags) or 1) ≤100`, иначе `422`. Запрос принимает опциональный `timeout` (`1..3600`), который переопределяет timeout каждого скрипта в batch. Проверяйте `results[]` по `status`; частичные ошибки не откатывают успешные выполнения.
 
 История выполнений скрипта (cursor-пагинация):
 
@@ -165,6 +167,22 @@ curl --fail-with-body \
   "${NODE_NEXUS_URL}/api/v2/scripts/${SCRIPT_ID}/executions?cursor=eyJvZmZzZXQiOjIwfQ==&limit=20"
   # -> {items:[{id, script_id, node_id, params, status, steps:[...], started_at, finished_at}], next_cursor, has_more, limit}
 ```
+
+## Таймауты
+
+Каждый скрипт хранит `timeout` в секундах (`1..3600`, default `30`).
+`ScriptCreate` и `ScriptUpdate` принимают `timeout`; `ScriptResponse` всегда
+возвращает фактическое значение.
+
+Bulk-запросы на выполнение принимают batch-level override: `POST
+/api/v2/scripts/executions` принимает опциональный `timeout` (`1..3600`),
+применяемый ко всем скриптам в batch.
+
+Фактический timeout для одного выполнения —
+`request override → timeout скрипта → 30`. Timeout ограничивает весь запуск
+скрипта по всем шагам (не по одному шагу); при превышении все выполнения на
+целевых нодах помечаются как `error`, а batch завершается с
+`504 Gateway Timeout`.
 
 ## Retries и cancels (bulk)
 

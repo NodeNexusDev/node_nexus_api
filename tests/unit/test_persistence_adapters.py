@@ -94,7 +94,9 @@ async def test_script_reader_found_and_missing() -> None:
     repository = MagicMock()
     repository.get_by_id = AsyncMock(
         side_effect=[
-            SimpleNamespace(id=script_id, steps=[{"command_id": str(uuid4())}]),
+            SimpleNamespace(
+                id=script_id, steps=[{"command_id": str(uuid4())}], timeout=30
+            ),
             None,
         ]
     )

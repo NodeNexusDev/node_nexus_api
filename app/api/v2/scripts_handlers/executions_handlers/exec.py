@@ -12,6 +12,7 @@ import structlog
 from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
 from fastapi import APIRouter, HTTPException, Query, Response, Security
 
+from app.core.constants import DEFAULT_TIMEOUT
 from app.api.deps import Principal, get_current_principal, require_write_or_jwt_scope
 from app.api.pagination import decode_offset, encode_offset
 from app.application.dto.execution_lifecycle import CancelExecutionDTO, RetryScriptDTO
@@ -104,6 +105,7 @@ def _script_response(script: ScriptViewDTO) -> ScriptResponse:
             for step in script.steps
         ],
         tags=list(script.tags),
+        timeout=script.timeout,
         created_at=script.created_at,
         updated_at=script.updated_at,
     )
@@ -194,6 +196,7 @@ async def bulk_executions(
                     node_ids=tuple(data.node_ids),
                     tags=tuple(data.node_tags),
                     params=tuple(raw_params.items()),
+                    timeout=data.timeout,
                 ),
             )
             items: list[BulkScriptExecutionItem] = []

@@ -11,6 +11,11 @@ on:
       - "pyproject.toml"
       - "uv.lock"
       - ".github/workflows/docs.yml"
+  pull_request:
+    paths:
+      - "docs/**"
+      - "mkdocs.*.yml"
+      - "scripts/docs/**"
   workflow_dispatch:
 
 concurrency:

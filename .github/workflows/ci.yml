@@ -109,6 +109,12 @@ jobs:
       - name: Type check
         run: uv run ty check .
 
+      - name: Run bandit security scan
+        run: uv run bandit -r app/ -c pyproject.toml
+
+      - name: Check for vulnerable dependencies
+        run: uv run pip-audit
+
   test:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest

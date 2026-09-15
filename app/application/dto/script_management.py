@@ -6,6 +6,7 @@ from typing import Literal
 from uuid import UUID
 
 from app.application.types import JsonValue
+from app.core.constants import DEFAULT_TIMEOUT
 
 ScriptStepType = Literal["inline", "command"]
 ScriptFailurePolicy = Literal["stop", "continue"]
@@ -31,6 +32,7 @@ class ScriptCreateDTO:
     steps: tuple[ScriptStepDTO, ...]
     description: str | None = None
     tags: tuple[str, ...] = ()
+    timeout: int = DEFAULT_TIMEOUT
 
 
 @dataclass(frozen=True, slots=True)
@@ -49,6 +51,7 @@ class ScriptViewDTO:
     description: str | None
     steps: tuple[ScriptStepDTO, ...]
     tags: tuple[str, ...]
+    timeout: int
     created_at: datetime
     updated_at: datetime
 

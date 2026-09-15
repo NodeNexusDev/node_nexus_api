@@ -20,6 +20,7 @@ from app.application.dto.export import AuditExportFormat, AuditExportQueryDTO
 from app.application.export_utils import rows_to_csv, rows_to_json
 from app.application.ports.export import AuditExporter
 from app.application.services.audit_log_service import AuditLogService
+from app.core.exceptions import AuditReadError, DomainError
 from app.schemas.audit_log import AuditLogResponse, AuditStatsBucket, AuditStatsResponse
 from app.schemas.common import BulkResult, CursorPage
 
@@ -118,15 +119,17 @@ async def get_audit_log(
     audit.info("api.v2.audit.get", log_id=str(log_id))
     try:
         raw = await cast(Any, service).get_log(log_id)
+    except DomainError:
+        raise
     except AttributeError as exc:
         # Fallback when get_log not exposed
         raise HTTPException(status_code=404, detail="Audit log not found") from exc
     except Exception as exc:  # noqa: BLE001
-        # Map domain not found to 404, otherwise 500
+        # Map via AuditReadError → error_mapping (avoids 500 str(exc) leak)
         msg = str(exc).lower()
         if "not found" in msg:
             raise HTTPException(status_code=404, detail="Audit log not found") from exc
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        raise AuditReadError("Audit log request failed") from exc
     if raw is None:
         raise HTTPException(status_code=404, detail="Audit log not found")
     if isinstance(raw, AuditLogDTO):
@@ -134,5 +137,7 @@ async def get_audit_log(
     # Generic mapping for DTO or model with from_attributes
     try:
         return AuditLogResponse.model_validate(raw, from_attributes=True)
+    except DomainError:
+        raise
     except Exception as exc:  # noqa: BLE001
-        raise HTTPException(status_code=500, detail="Failed to map audit log") from exc
+        raise AuditReadError("Failed to map audit log") from exc

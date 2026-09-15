@@ -93,6 +93,11 @@ class SSHConnector:
                 host=self._host,
                 port=self._port,
             )
+            logger.warning(
+                "ssh.host_key.missing",
+                host=self._host,
+                known_hosts=self._known_hosts,
+            )
             raise ConnectionFailedError("SSH host verification is unavailable")
 
         kwargs: dict[str, object] = {
@@ -111,7 +116,13 @@ class SSHConnector:
                 )
                 kwargs["client_keys"] = [key_obj]  # type: ignore[assignment]
                 # Do not pass passphrase separately when key already decrypted
-            except Exception:  # noqa: BLE001
+            except Exception as exc:  # noqa: BLE001
+                logger.warning(
+                    "ssh.key.import_failed_fallback_file",
+                    host=self._host,
+                    error=str(exc),
+                    error_type=type(exc).__name__,
+                )
                 # Fallback: temp file for asyncssh (chmod 600)
                 import os
 
@@ -122,8 +133,12 @@ class SSHConnector:
                     self._temp_key_path = tf.name
                 try:
                     os.chmod(self._temp_key_path, 0o600)
-                except OSError:
-                    pass
+                except OSError as exc2:
+                    logger.warning(
+                        "ssh.key.chmod_failed",
+                        path=self._temp_key_path,
+                        error=str(exc2),
+                    )
                 kwargs["client_keys"] = [self._temp_key_path]
                 if self._passphrase:
                     kwargs["passphrase"] = self._passphrase

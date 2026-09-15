@@ -6,14 +6,17 @@ import pytest
 from fastapi import FastAPI
 from httpx2 import ASGITransport, AsyncClient
 
-from app.api.error_mapping import domain_error_handler
+from app.api.error_mapping import _error_slug, domain_error_handler, problem_content
 from app.core.exceptions import (
     APIKeyExpiredError,
     APIKeyNotFoundError,
     APIKeyRevokedError,
+    AuditReadError,
+    AuditStatsUnavailableError,
     AuditWriteError,
     AuthenticationError,
     CommandNotFoundError,
+    CommitFailedError,
     ConnectionFailedError,
     ContainerNotFoundError,
     CredentialDecryptionError,
@@ -66,6 +69,9 @@ _ROUTES: dict[str, type[DomainError]] = {
     "/test-scheduler-ownership": SchedulerOwnershipError,
     "/test-schedule-persistence": SchedulePersistenceError,
     "/test-audit-write": AuditWriteError,
+    "/test-audit-stats-unavailable": AuditStatsUnavailableError,
+    "/test-audit-read": AuditReadError,
+    "/test-commit-failed": CommitFailedError,
     "/test-execution-not-found": ExecutionNotFoundError,
     "/test-scheduled-script-execution": ScheduledScriptExecutionError,
     "/test-favorite-not-found": FavoriteNotFoundError,
@@ -174,6 +180,13 @@ class TestDomainErrorHandler:
                 "/test-schedule-persistence", 503, id="SchedulePersistenceError"
             ),
             pytest.param("/test-audit-write", 503, id="AuditWriteError"),
+            pytest.param(
+                "/test-audit-stats-unavailable",
+                501,
+                id="AuditStatsUnavailableError",
+            ),
+            pytest.param("/test-audit-read", 500, id="AuditReadError"),
+            pytest.param("/test-commit-failed", 503, id="CommitFailedError"),
             pytest.param("/test-execution-not-found", 404, id="ExecutionNotFoundError"),
             pytest.param(
                 "/test-scheduled-script-execution",
@@ -206,9 +219,52 @@ class TestDomainErrorHandler:
             transport=ASGITransport(app=app), base_url="http://test"
         ) as client:
             resp = await client.get(path)
+        from http import HTTPStatus
+
         body = resp.json()
         assert "code" in body
         assert "message" in body
         assert "detail" in body
         assert "request_id" in body
         assert body["message"] == body["detail"]
+        assert body["type"].startswith(
+            "https://nodenexusdev.github.io/node_nexus_api/en/errors/"
+        )
+        assert body["title"] == HTTPStatus(resp.status_code).phrase
+        assert body["status"] == resp.status_code
+        assert body["instance"] == path
+        assert resp.headers["content-type"] == "application/problem+json"
+
+
+@pytest.mark.parametrize(
+    ("code", "expected"),
+    [
+        pytest.param("AuditReadError", "audit-read-error", id="camel"),
+        pytest.param("HTTP_404", "http-404", id="acronym-status"),
+        pytest.param(
+            "RequestValidationError",
+            "request-validation-error",
+            id="acronym-word",
+        ),
+        pytest.param(
+            "APIKeyExpiredError", "api-key-expired-error", id="leading-acronym"
+        ),
+        pytest.param("InternalError", "internal-error", id="plain"),
+    ],
+)
+def test_error_slug_handles_acronyms(code: str, expected: str) -> None:
+    assert _error_slug(code) == expected
+
+
+def test_problem_content_type_uses_http_slug() -> None:
+    body = problem_content(
+        status_code=404,
+        code="HTTP_404",
+        detail="Not found",
+        request_id="r1",
+        path="/x",
+    )
+    assert body["status"] == 404
+    type_uri = body["type"]
+    assert isinstance(type_uri, str)
+    assert type_uri.endswith("/http-404")

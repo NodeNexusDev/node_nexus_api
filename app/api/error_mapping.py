@@ -1,5 +1,7 @@
 """Central mapping of domain errors to HTTP responses."""
 
+import re
+from http import HTTPStatus
 from typing import cast
 
 import structlog
@@ -10,9 +12,12 @@ from app.core.exceptions import (
     APIKeyExpiredError,
     APIKeyNotFoundError,
     APIKeyRevokedError,
+    AuditReadError,
+    AuditStatsUnavailableError,
     AuditWriteError,
     AuthenticationError,
     CommandNotFoundError,
+    CommitFailedError,
     ComposeProjectAlreadyExistsError,
     ComposeProjectNotFoundError,
     ConnectionFailedError,
@@ -52,6 +57,39 @@ from app.core.exceptions import (
 
 logger = structlog.get_logger()
 
+ERROR_TYPE_BASE = "https://nodenexusdev.github.io/node_nexus_api/en/errors"
+
+
+def _error_slug(code: str) -> str:
+    s = code.replace("_", "-")
+    s = re.sub(r"(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])", "-", s)
+    return s.lower()
+
+
+def problem_content(
+    *,
+    status_code: int,
+    code: str,
+    detail: str,
+    request_id: str | None,
+    path: str,
+) -> dict[str, object]:
+    try:
+        title = HTTPStatus(status_code).phrase
+    except ValueError:
+        title = f"HTTP {status_code}"
+    return {
+        "type": f"{ERROR_TYPE_BASE}/{_error_slug(code)}",
+        "title": title,
+        "status": status_code,
+        "detail": detail,
+        "code": code,
+        "message": detail,
+        "request_id": request_id,
+        "instance": path,
+    }
+
+
 DOMAIN_ERROR_STATUS: dict[type[DomainError], int] = {
     NodeNotFoundError: 404,
     NodeNameConflictError: 409,
@@ -80,6 +118,9 @@ DOMAIN_ERROR_STATUS: dict[type[DomainError], int] = {
     SchedulerOwnershipError: 503,
     SchedulePersistenceError: 503,
     AuditWriteError: 503,
+    AuditStatsUnavailableError: 501,
+    AuditReadError: 500,
+    CommitFailedError: 503,
     ExecutionNotFoundError: 404,
     ScheduledScriptExecutionError: 422,
     FavoriteNotFoundError: 404,
@@ -134,7 +175,10 @@ async def domain_error_handler(request: Request, exc: Exception) -> JSONResponse
             path=request.url.path,
             error_type=type(exc).__name__,
             status_code=status_code,
+            detail=str(exc),
+            exc_info=exc,
         )
+        message = PUBLIC_ERROR_MESSAGES.get(type(exc), "Internal server error")
     else:
         logger.warning(
             "http.domain_error",
@@ -142,16 +186,18 @@ async def domain_error_handler(request: Request, exc: Exception) -> JSONResponse
             error_type=type(exc).__name__,
             status_code=status_code,
         )
-    message = PUBLIC_ERROR_MESSAGES.get(type(exc), str(exc))
+        message = PUBLIC_ERROR_MESSAGES.get(type(exc), str(exc))
     request_id = getattr(request.state, "request_id", None)
     return JSONResponse(
         status_code=status_code,
-        content={
-            "code": type(exc).__name__,
-            "message": message,
-            "request_id": request_id,
-            "detail": message,
-        },
+        content=problem_content(
+            status_code=status_code,
+            code=type(exc).__name__,
+            detail=message,
+            request_id=request_id,
+            path=request.url.path,
+        ),
+        media_type="application/problem+json",
     )
 
 
@@ -173,10 +219,12 @@ async def internal_error_handler(request: Request, exc: Exception) -> JSONRespon
     request_id = getattr(request.state, "request_id", None)
     return JSONResponse(
         status_code=500,
-        content={
-            "code": "InternalError",
-            "message": "Internal server error",
-            "request_id": request_id,
-            "detail": "Internal server error",
-        },
+        content=problem_content(
+            status_code=500,
+            code="InternalError",
+            detail="Internal server error",
+            request_id=request_id,
+            path=request.url.path,
+        ),
+        media_type="application/problem+json",
     )

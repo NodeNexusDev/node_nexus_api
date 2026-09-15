@@ -6,7 +6,7 @@ from __future__ import annotations
 import json
 import uuid
 from datetime import datetime
-from typing import Any, Literal, cast
+from typing import Literal, Protocol, cast
 
 import structlog
 from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
@@ -20,6 +20,7 @@ from app.application.dto.export import AuditExportFormat, AuditExportQueryDTO
 from app.application.export_utils import rows_to_csv, rows_to_json
 from app.application.ports.export import AuditExporter
 from app.application.services.audit_log_service import AuditLogService
+from app.core.exceptions import AuditReadError, AuditStatsUnavailableError, DomainError
 from app.schemas.audit_log import AuditLogResponse, AuditStatsBucket, AuditStatsResponse
 from app.schemas.common import BulkResult, CursorPage
 
@@ -59,28 +60,36 @@ async def get_audit_stats(
         None, description="Group by period"
     ),
     _principal: Principal = Security(get_current_principal),
-) -> Any:  # noqa: ANN401
+) -> AuditStatsResponse | BulkResult[AuditStatsBucket]:
     """Get audit stats aggregated or bucketed.
 
     Without group_by returns aggregate. With group_by returns buckets.
     Delegates to AuditLogService.get_stats.
     """
     audit.info("api.v2.audit.stats", group_by=group_by)
-    # Use Any cast for get_stats to keep ty happy
+
+    class _StatsProto(Protocol):
+        async def get_stats(
+            self,
+            date_from: datetime | None,
+            date_to: datetime | None,
+            group_by: Literal["day", "hour", "week", "month"] | None,
+        ) -> object: ...
+
     try:
-        raw = await cast(Any, service).get_stats(
+        raw = await cast(_StatsProto, service).get_stats(
             date_from=date_from,
             date_to=date_to,
             group_by=group_by,
         )
+    except DomainError:
+        raise
     except AttributeError as exc:
         # Fallback: compute total via get_logs when get_stats is not yet implemented
-        raise HTTPException(
-            status_code=500, detail="Audit stats not available"
-        ) from exc
+        raise AuditStatsUnavailableError("Audit stats not available") from exc
     except Exception as exc:  # noqa: BLE001
-        # Let domain handler map or re-raise as 422/500
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        # Map via AuditReadError → error_mapping (avoids 500 str(exc) leak)
+        raise AuditReadError("Audit stats request failed") from exc
 
     # Normalize raw into typed response
     if group_by is None:
@@ -98,7 +107,7 @@ async def get_audit_stats(
             ]
             return AuditStatsResponse(total=total, buckets=buckets)
         total = int(getattr(raw, "total", 0))
-        buckets_attr = cast(list[Any], getattr(raw, "buckets", []))
+        buckets_attr = cast(list[object], getattr(raw, "buckets", []))
         buckets: list[AuditStatsBucket] = []
         for b in buckets_attr:
             if isinstance(b, dict):
@@ -136,7 +145,9 @@ async def get_audit_stats(
             results=buckets,
         )
     total = int(getattr(raw, "total", 0))
-    buckets_attr = cast(list[Any], getattr(raw, "buckets", getattr(raw, "items", [])))
+    buckets_attr = cast(
+        list[object], getattr(raw, "buckets", getattr(raw, "items", []))
+    )
     buckets = []
     for b in buckets_attr:
         if isinstance(b, dict):

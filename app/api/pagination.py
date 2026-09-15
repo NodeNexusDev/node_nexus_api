@@ -24,17 +24,31 @@ def decode_offset(cursor: str) -> int:
         raise ValueError(f"Invalid cursor: {cursor}") from exc
 
 
-def paginate_offset[T](
-    items: list[T], cursor: str | None, limit: int
-) -> tuple[list[T], str | None, bool]:
-    """Slice items by offset cursor."""
-    offset = 0
-    if cursor is not None:
-        try:
-            offset = decode_offset(cursor)
-        except ValueError:
-            raise HTTPException(status_code=422, detail="Invalid cursor") from None
-    sliced = items[offset : offset + limit]
-    has_more = (offset + len(sliced)) < len(items)
+def parse_cursor_offset(cursor: str | None) -> int:
+    """Parse cursor to offset, raising 422 on invalid."""
+    if cursor is None or cursor == "":
+        return 0
+    try:
+        return decode_offset(cursor)
+    except ValueError:
+        raise HTTPException(status_code=422, detail="Invalid cursor") from None
+
+
+def pagination_params(offset: int, limit: int) -> tuple[int, int, int]:
+    """Translate offset/limit to page/fetch_size/remainder for offset-based services.
+
+    Returns (page, fetch_size, remainder) where page is 1-based.
+    """
+    remainder = offset % limit if limit else 0
+    page = offset // limit + 1 if limit else 1
+    fetch_size = limit + remainder if remainder else limit
+    return page, fetch_size, remainder
+
+
+def cursor_next(  # noqa: E501
+    offset: int, limit: int, total: int, returned: int
+) -> tuple[str | None, bool]:
+    """Build next_cursor and has_more from offset/limit/total."""
+    has_more = (offset + returned) < total
     next_cursor = encode_offset(offset + limit) if has_more else None
-    return sliced, next_cursor, has_more
+    return next_cursor, has_more

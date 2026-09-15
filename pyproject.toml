@@ -1,6 +1,6 @@
 [project]
 name = "node-nexus-api"
-version = "2.2.9"
+version = "2.4.1"
 description = "REST API for managing server nodes"
 readme = "README.md"
 requires-python = ">=3.13"
@@ -70,6 +70,7 @@ extend-select = ["ANN"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*.py" = ["ANN"]
+"app/api/v2/**/*.py" = ["N816"]
 
 [tool.ty.environment]
 python-version = "3.13"

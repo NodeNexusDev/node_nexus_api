@@ -63,6 +63,7 @@ class SqlAlchemyCommandGateway:
                         for parameter in data.parameters
                     ],
                     "tags": list(data.tags),
+                    "timeout": data.timeout,
                 }
             )
             return self._to_view(command)
@@ -106,6 +107,7 @@ class SqlAlchemyCommandGateway:
                     self.parameter_from_json(parameter)
                     for parameter in (command.parameters or ())
                 ),
+                timeout=command.timeout,
             )
 
     @staticmethod
@@ -120,6 +122,7 @@ class SqlAlchemyCommandGateway:
                 for parameter in (command.parameters or ())
             ),
             tags=tuple(command.tags or ()),
+            timeout=command.timeout,
             created_at=command.created_at,
             updated_at=command.updated_at,
         )

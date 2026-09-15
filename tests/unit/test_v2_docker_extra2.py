@@ -20,10 +20,11 @@ from fastapi import FastAPI
 from httpx2 import ASGITransport, AsyncClient
 
 from app.api.error_mapping import domain_error_handler
-from app.api.v2.docker import (
-    _decode_offset,
-    _encode_offset,
-    _paginate_offset,
+from app.api.pagination import (
+    cursor_next,
+    decode_offset,
+    encode_offset,
+    parse_cursor_offset,
 )
 from app.api.v2.docker import (
     router as v2_docker_router,
@@ -196,37 +197,43 @@ def _volume_dto() -> DockerVolumeDTO:
 class TestDockerHelpers:
     def test_encode_decode_roundtrip(self) -> None:
         for offset in (0, 1, 20, 100):
-            cur = _encode_offset(offset)
-            assert _decode_offset(cur) == offset
+            cur = encode_offset(offset)
+            assert decode_offset(cur) == offset
 
     def test_encode_is_base64_json(self) -> None:
-        cur = _encode_offset(42)
+        cur = encode_offset(42)
         raw = base64.urlsafe_b64decode(cur.encode())
         data = json.loads(raw)
         assert data["offset"] == 42
 
     def test_decode_invalid(self) -> None:
         with pytest.raises(ValueError, match="Invalid cursor"):
-            _decode_offset("not-base64!!!")
+            decode_offset("not-base64!!!")
         bad = base64.urlsafe_b64encode(json.dumps({"bad": 1}).encode()).decode()
         with pytest.raises(ValueError):
-            _decode_offset(bad)
+            decode_offset(bad)
 
     def test_paginate_slice(self) -> None:
         items = list(range(10))
-        sliced, nxt, has_more = _paginate_offset(items, None, 3)
+        offset = parse_cursor_offset(None)
+        sliced = items[offset : offset + 3]
+        nxt, has_more = cursor_next(offset, 3, len(items), len(sliced))
         assert sliced == [0, 1, 2]
         assert has_more is True
         assert nxt is not None
-        sliced2, nxt2, has2 = _paginate_offset(items, nxt, 3)
+        offset2 = parse_cursor_offset(nxt)
+        sliced2 = items[offset2 : offset2 + 3]
+        nxt2, has2 = cursor_next(offset2, 3, len(items), len(sliced2))
         assert sliced2 == [3, 4, 5]
         assert has2 is True
         assert nxt2 is not None
 
     def test_paginate_last_page(self) -> None:
         items = list(range(5))
-        cur = _encode_offset(3)
-        sliced, nxt, has_more = _paginate_offset(items, cur, 5)
+        cur = encode_offset(3)
+        offset = parse_cursor_offset(cur)
+        sliced = items[offset : offset + 5]
+        nxt, has_more = cursor_next(offset, 5, len(items), len(sliced))
         assert sliced == [3, 4]
         assert has_more is False
         assert nxt is None
@@ -235,7 +242,7 @@ class TestDockerHelpers:
         from fastapi import HTTPException
 
         with pytest.raises(HTTPException) as ei:
-            _paginate_offset([1, 2, 3], "bad!!!", 2)
+            parse_cursor_offset("bad!!!")
         assert ei.value.status_code == 422
 
 

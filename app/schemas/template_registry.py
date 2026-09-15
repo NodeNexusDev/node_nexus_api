@@ -6,7 +6,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.schemas.common import BulkResult, CursorPage, PaginatedResponse
+from app.schemas.common import BulkResult
 
 
 class RegistryCreate(BaseModel):
@@ -58,14 +58,6 @@ class RegistryResponse(BaseModel):
     last_synced_at: datetime | None
     created_at: datetime
     updated_at: datetime
-
-
-class RegistryListResponse(PaginatedResponse[RegistryResponse]):
-    """Offset-based paginated list of registries."""
-
-
-class RegistryCursorListResponse(CursorPage[RegistryResponse]):
-    """Cursor-based paginated list of registries."""
 
 
 # --- Sync results (207 Multi-Status) ---

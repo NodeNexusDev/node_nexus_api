@@ -13,8 +13,11 @@ from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
 from fastapi import APIRouter, HTTPException, Query, Response, Security
 
 from app.api.deps import Principal, get_current_principal, require_write_or_jwt_scope
-from app.api.pagination import decode_offset, encode_offset
-from app.api.v2._bulk import set_bulk_status
+from app.api.v2._shared import (
+    cursor_next,
+    pagination_params,
+    parse_cursor_offset,
+)
 from app.application.dto.command_execution import BulkCommandRequestDTO
 from app.application.dto.command_management import (
     CommandCreateDTO,
@@ -60,8 +63,6 @@ from app.schemas.node import (
 audit = structlog.get_logger("audit")
 
 # Compatibility aliases for tests importing private helpers
-_encode_offset = encode_offset  # noqa: N816
-_decode_offset = decode_offset  # noqa: N816
 
 router = APIRouter(route_class=DishkaRoute)
 
@@ -81,28 +82,6 @@ def _parameter_dto(parameter: CommandParameter) -> CommandParameterDTO:
     )
 
 
-def _command_response(command: CommandViewDTO) -> CommandResponse:
-    return CommandResponse(
-        id=command.id,
-        name=command.name,
-        description=command.description,
-        command=command.command,
-        parameters=[
-            CommandParameter(
-                name=parameter.name,
-                type=parameter.type,
-                required=parameter.required,
-                default=parameter.default,
-                description=parameter.description,
-            )
-            for parameter in command.parameters
-        ],
-        tags=list(command.tags),
-        created_at=command.created_at,
-        updated_at=command.updated_at,
-    )
-
-
 # ---------------------------------------------------------------------------
 # List — cursor pagination (translate cursor -> page)
 # ---------------------------------------------------------------------------
@@ -118,18 +97,65 @@ async def get_command_history(
     _principal: Principal = Security(get_current_principal),
 ) -> CursorPage[CommandHistoryResponse]:
     """Get command execution history for a node with cursor pagination."""
+
+    return await _get_history(service, node_id, cursor, limit)
+
+
+@router.get(
+    "/{command_id}/executions",
+    response_model=CursorPage[CommandHistoryResponse],
+)
+@inject
+async def get_command_executions_by_command(
+    command_id: uuid.UUID,
+    service: FromDishka[ExecutionHistoryService],
+    cursor: str | None = Query(None, description="Opaque cursor for pagination"),
+    limit: int = Query(20, ge=1, le=100),
+    _principal: Principal = Security(get_current_principal),
+) -> CursorPage[CommandHistoryResponse]:
+    """RESTful alias for per-command executions (bulk-first consistency)."""
+    offset = parse_cursor_offset(cursor)
+    page, fetch_size, remainder = pagination_params(offset, limit)
+    page_dto = await service.get_command_history(command_id, page=page, size=fetch_size)
+    items = [
+        CommandHistoryResponse(
+            id=item.id,
+            command_fingerprint=item.command_fingerprint,
+            exit_code=item.exit_code,
+            stdout=item.stdout,
+            stderr=item.stderr,
+            stdout_bytes=item.stdout_bytes,
+            stderr_bytes=item.stderr_bytes,
+            truncated=item.truncated,
+            started_at=item.started_at,
+            finished_at=item.finished_at,
+            created_at=item.created_at,
+        )
+        for item in page_dto.items
+    ]
+    if remainder:
+        items = items[remainder : remainder + limit]
+    next_cursor, has_more = cursor_next(offset, limit, page_dto.total, len(items))
+    return CursorPage[CommandHistoryResponse](
+        items=items,
+        next_cursor=next_cursor,
+        has_more=has_more,
+        limit=limit,
+    )
+
+
+async def _get_history(
+    service: ExecutionHistoryService,
+    node_id: uuid.UUID,
+    cursor: str | None,
+    limit: int,
+) -> CursorPage[CommandHistoryResponse]:
+    """Internal helper for history pagination."""
     audit.info(
         "api.v2.commands.history", node_id=str(node_id), cursor=cursor, limit=limit
     )  # noqa: E501
-    offset = 0
-    if cursor is not None and cursor != "":
-        try:
-            offset = decode_offset(cursor)
-        except ValueError:
-            raise HTTPException(status_code=422, detail="Invalid cursor") from None
-    remainder = offset % limit if limit else 0
-    page = offset // limit + 1 if limit else 1
-    fetch_size = limit + remainder if remainder else limit
+    offset = parse_cursor_offset(cursor)
+    page, fetch_size, remainder = pagination_params(offset, limit)
     page_dto = await service.get_node_history(node_id, page=page, size=fetch_size)
     items = [
         CommandHistoryResponse(
@@ -149,8 +175,7 @@ async def get_command_history(
     ]
     if remainder:
         items = items[remainder : remainder + limit]
-    has_more = (offset + len(items)) < page_dto.total
-    next_cursor = encode_offset(offset + limit) if has_more else None
+    next_cursor, has_more = cursor_next(offset, limit, page_dto.total, len(items))
     return CursorPage[CommandHistoryResponse](
         items=items,
         next_cursor=next_cursor,

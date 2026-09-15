@@ -8,8 +8,6 @@ from uuid import UUID
 
 from pydantic import BaseModel
 
-from app.core.types import JsonValue
-
 
 class PaginatedResponse[T](BaseModel):
     """Paginated response with total count."""
@@ -29,13 +27,17 @@ class CursorPage[T](BaseModel):
     limit: int = 20
 
 
-class ErrorResponse(BaseModel):
-    """Unified error response schema — always 4 fields."""
+class ProblemResponse(BaseModel):
+    """RFC 9457 problem+json with legacy compat members."""
 
-    code: str
-    message: str
+    type: str
+    title: str
+    status: int
+    detail: str | None = None
+    code: str | None = None
+    message: str | None = None
     request_id: str | None = None
-    detail: JsonValue | None = None
+    instance: str | None = None
 
 
 class BulkResult[T](BaseModel):
@@ -49,39 +51,47 @@ class BulkResult[T](BaseModel):
 
 AUTHENTICATED_ERROR_RESPONSES: dict[int | str, dict[str, Any]] = {
     401: {
-        "model": ErrorResponse,
+        "model": ProblemResponse,
         "description": "Authentication credentials are missing or invalid.",
     },
     403: {
-        "model": ErrorResponse,
+        "model": ProblemResponse,
         "description": "The authenticated principal lacks the required permission.",
     },
     404: {
-        "model": ErrorResponse,
+        "model": ProblemResponse,
         "description": "The requested resource was not found.",
     },
     409: {
-        "model": ErrorResponse,
+        "model": ProblemResponse,
         "description": "The request conflicts with the current resource state.",
     },
     422: {
-        "model": ErrorResponse,
+        "model": ProblemResponse,
         "description": "The request or a domain value failed validation.",
     },
+    500: {
+        "model": ProblemResponse,
+        "description": "An unexpected server error occurred.",
+    },
+    501: {
+        "model": ProblemResponse,
+        "description": "The requested capability is not implemented.",
+    },
     429: {
-        "model": ErrorResponse,
+        "model": ProblemResponse,
         "description": "The configured request rate limit was exceeded.",
     },
     502: {
-        "model": ErrorResponse,
+        "model": ProblemResponse,
         "description": "Upstream Docker daemon returned a bad gateway.",
     },
     503: {
-        "model": ErrorResponse,
+        "model": ProblemResponse,
         "description": "A required backend or remote service is unavailable.",
     },
     504: {
-        "model": ErrorResponse,
+        "model": ProblemResponse,
         "description": "Remote operation timed out.",
     },
 }

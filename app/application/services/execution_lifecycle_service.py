@@ -55,9 +55,22 @@ class ExecutionLifecycleService:
         )
 
     async def cancel_execution(self, data: CancelExecutionDTO) -> bool:
-        """Cancel a running execution."""
+        """Cancel a running execution with real task abort."""
+        from app.application.services.execution_registry import cancel_execution_task
+        from app.application.services.sse_broadcaster import get_sse_broadcaster
+
+        # Try to cancel in-memory background task first (real kill)
+        task_cancelled = cancel_execution_task(data.execution_id)
+        if task_cancelled:
+            get_sse_broadcaster().publish(
+                "execution.cancelled", {"execution_id": str(data.execution_id)}
+            )
+            audit_logger.info(
+                "execution.cancelled.task", execution_id=str(data.execution_id)
+            )
+
         result = await self._manager.cancel_execution(data)
-        if not result:
+        if not result and not task_cancelled:
             raise ExecutionNotFoundError(
                 f"Execution {data.execution_id} not found or already completed"
             )

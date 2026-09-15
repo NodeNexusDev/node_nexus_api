@@ -6,7 +6,7 @@ from __future__ import annotations
 import asyncio
 import uuid
 from datetime import datetime
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
 import structlog
 from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
@@ -104,6 +104,7 @@ def _script_response(script: ScriptViewDTO) -> ScriptResponse:
             for step in script.steps
         ],
         tags=list(script.tags),
+        timeout=script.timeout,
         created_at=script.created_at,
         updated_at=script.updated_at,
     )
@@ -171,6 +172,35 @@ async def get_executions(
     _principal: Principal = Security(get_current_principal),
 ) -> CursorPage[ScriptExecutionResponse]:
     """Get execution history for a script with cursor pagination."""
+
+    return await _get_executions(service, script_id, cursor, limit)
+
+
+@router.get(
+    "/executions/history",
+    response_model=CursorPage[ScriptExecutionResponse],
+    include_in_schema=False,
+)
+@inject
+async def get_executions_history_alias(
+    script_id: Annotated[uuid.UUID, Query(description="Script ID to filter by")],
+    service: FromDishka[ScriptHistoryService],
+    cursor: str | None = Query(None, description="Opaque cursor for pagination"),
+    limit: int = Query(20, ge=1, le=100),
+    _principal: Principal = Security(get_current_principal),
+) -> CursorPage[ScriptExecutionResponse]:
+    """RESTful alias for GET /{id}/executions (bulk-first consistency)."""
+
+    return await _get_executions(service, script_id, cursor, limit)
+
+
+async def _get_executions(
+    service: ScriptHistoryService,
+    script_id: uuid.UUID,
+    cursor: str | None,
+    limit: int,
+) -> CursorPage[ScriptExecutionResponse]:
+    """Internal helper for per-script executions pagination."""
     audit.info(
         "api.v2.scripts.executions",
         script_id=str(script_id),

@@ -6,6 +6,7 @@ from typing import Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from app.core.constants import DEFAULT_TIMEOUT, OptionalTimeout, Timeout
 from app.core.types import JsonObject
 
 
@@ -36,6 +37,7 @@ class ScriptCreate(BaseModel):
     description: str | None = Field(default=None, max_length=1000)
     steps: list[ScriptStep] = Field(..., min_length=1)
     tags: list[str] = Field(default_factory=list)
+    timeout: Timeout = DEFAULT_TIMEOUT
 
 
 class ScriptUpdate(BaseModel):
@@ -45,6 +47,7 @@ class ScriptUpdate(BaseModel):
     description: str | None = Field(default=None, max_length=1000)
     steps: list[ScriptStep] | None = Field(default=None, min_length=1)
     tags: list[str] | None = None
+    timeout: OptionalTimeout = None
 
 
 class ScriptResponse(BaseModel):
@@ -57,6 +60,7 @@ class ScriptResponse(BaseModel):
     description: str | None
     steps: list[ScriptStep]
     tags: list[str]
+    timeout: int
     created_at: datetime
     updated_at: datetime
 
@@ -67,6 +71,7 @@ class ScriptExecuteRequest(BaseModel):
     node_ids: list[uuid.UUID] | None = Field(default=None, min_length=1)
     node_tags: list[str] | None = Field(default=None, min_length=1)
     params: JsonObject = Field(default_factory=dict)
+    timeout: OptionalTimeout = None
 
     @model_validator(mode="after")
     def check_targets(self) -> Self:
@@ -195,3 +200,4 @@ class ScriptExecutionsRequest(BaseModel):
     node_ids: list[uuid.UUID] = Field(default_factory=list)
     node_tags: list[str] = Field(default_factory=list)
     params: dict[str, JsonObject] = Field(default_factory=dict)
+    timeout: OptionalTimeout = None

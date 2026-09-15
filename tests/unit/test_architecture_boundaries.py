@@ -353,3 +353,8 @@ def test_core_does_not_import_infrastructure() -> None:
         if any(module == p or module.startswith(f"{p}.") for p in forbidden)
     ]
     assert not violations, "Core imports infrastructure:\n" + "\n".join(violations)
+
+
+def test_core_does_not_import_application() -> None:
+    """Core layer must not depend on the application layer."""
+    _assert_no_imports("core", ("app.application",))

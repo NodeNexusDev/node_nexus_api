@@ -33,6 +33,7 @@ class TestCommandManagementServiceClone:
             command="echo ok",
             parameters=(),
             tags=("prod",),
+            timeout=30,
             created_at=datetime.now(UTC),
             updated_at=datetime.now(UTC),
         )
@@ -45,6 +46,7 @@ class TestCommandManagementServiceClone:
             command="echo ok",
             parameters=(),
             tags=("prod",),
+            timeout=30,
             created_at=datetime.now(UTC),
             updated_at=datetime.now(UTC),
         )
@@ -67,6 +69,7 @@ class TestCommandManagementServiceClone:
             command="echo ok",
             parameters=(),
             tags=(),
+            timeout=30,
             created_at=datetime.now(UTC),
             updated_at=datetime.now(UTC),
         )
@@ -79,6 +82,7 @@ class TestCommandManagementServiceClone:
             command="echo ok",
             parameters=(),
             tags=(),
+            timeout=30,
             created_at=datetime.now(UTC),
             updated_at=datetime.now(UTC),
         )
@@ -111,6 +115,7 @@ class TestScriptManagementServiceClone:
             description="Backup DB",
             steps=(),
             tags=("db",),
+            timeout=30,
             created_at=datetime.now(UTC),
             updated_at=datetime.now(UTC),
         )
@@ -122,6 +127,7 @@ class TestScriptManagementServiceClone:
             description="Backup DB",
             steps=(),
             tags=("db",),
+            timeout=30,
             created_at=datetime.now(UTC),
             updated_at=datetime.now(UTC),
         )
@@ -143,6 +149,7 @@ class TestScriptManagementServiceClone:
             description=None,
             steps=(),
             tags=(),
+            timeout=30,
             created_at=datetime.now(UTC),
             updated_at=datetime.now(UTC),
         )
@@ -154,6 +161,7 @@ class TestScriptManagementServiceClone:
             description=None,
             steps=(),
             tags=(),
+            timeout=30,
             created_at=datetime.now(UTC),
             updated_at=datetime.now(UTC),
         )

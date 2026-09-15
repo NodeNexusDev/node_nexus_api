@@ -87,6 +87,7 @@ nav:
       - Interactive API reference: reference/openapi.html
       - Configuration: reference/configuration.md
       - Error catalog: reference/error-catalog.md
+      - Error responses (problem+json): errors.md
       - Compatibility: reference/compatibility.md
       - Cheat sheet: reference/cheat-sheet.md
       - Glossary: reference/glossary.md

@@ -13,7 +13,14 @@ from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
 from fastapi import APIRouter, HTTPException, Query, Response, Security
 
 from app.api.deps import Principal, get_current_principal, require_write_or_jwt_scope
-from app.api.pagination import decode_offset, encode_offset
+from app.api.v2._bulk import BulkResponder
+from app.api.v2._shared import (
+    cursor_next,
+    pagination_params,
+    parse_cursor_offset,
+    script_response,
+)
+from app.core.constants import DEFAULT_TIMEOUT
 from app.application.dto.execution_lifecycle import CancelExecutionDTO, RetryScriptDTO
 from app.application.dto.schedule import ScheduleRequestDTO, ScheduleViewDTO
 from app.application.dto.script_execution import (
@@ -65,8 +72,6 @@ from app.schemas.script_execution import (
 audit = structlog.get_logger("audit")
 
 # Compatibility aliases for tests importing private helpers
-_encode_offset = encode_offset  # noqa: N816
-_decode_offset = decode_offset  # noqa: N816
 
 router = APIRouter(route_class=DishkaRoute)
 
@@ -84,28 +89,6 @@ def _step_dto(step: ScriptStep) -> ScriptStepDTO:
         command_id=step.command_id,
         params=tuple(step.params.items()),
         on_failure=step.on_failure,
-    )
-
-
-def _script_response(script: ScriptViewDTO) -> ScriptResponse:
-    return ScriptResponse(
-        id=script.id,
-        name=script.name,
-        description=script.description,
-        steps=[
-            {
-                "label": step.label,
-                "type": step.type,
-                "command": step.command,
-                "command_id": step.command_id,
-                "params": dict(step.params),
-                "on_failure": step.on_failure,
-            }
-            for step in script.steps
-        ],
-        tags=list(script.tags),
-        created_at=script.created_at,
-        updated_at=script.updated_at,
     )
 
 
@@ -174,16 +157,8 @@ async def list_scripts(
     Cursor encodes an offset. Translated to page/size for the offset-based service.
     """
     tag_list = [tag] if tag else None
-    offset = 0
-    if cursor is not None and cursor != "":
-        try:
-            offset = decode_offset(cursor)
-        except ValueError:
-            raise HTTPException(status_code=422, detail="Invalid cursor") from None
-    # Handle non-aligned offset correctly (offset % limit != 0)
-    remainder = offset % limit if limit else 0
-    page = offset // limit + 1 if limit else 1
-    fetch_size = limit + remainder if remainder else limit
+    offset = parse_cursor_offset(cursor)
+    page, fetch_size, remainder = pagination_params(offset, limit)
     audit.info(
         "api.v2.scripts.list", cursor=cursor, limit=limit, tag=tag, search=search
     )
@@ -192,9 +167,8 @@ async def list_scripts(
     )
     if remainder:
         scripts = scripts[remainder : remainder + limit]
-    items = [_script_response(s) for s in scripts]
-    has_more = (offset + len(items)) < total
-    next_cursor = encode_offset(offset + limit) if has_more else None
+    items = [script_response(s) for s in scripts]
+    next_cursor, has_more = cursor_next(offset, limit, total, len(items))
     return CursorPage[ScriptResponse](
         items=items,
         next_cursor=next_cursor,
@@ -226,6 +200,7 @@ async def bulk_create_scripts(
                 description=item.description,
                 steps=tuple(_step_dto(step) for step in item.steps),
                 tags=tuple(item.tags),
+                timeout=item.timeout if item.timeout is not None else DEFAULT_TIMEOUT,
             )
             created = await service.create_script(dto)
             return ScriptBulkCreateResult(
@@ -237,16 +212,7 @@ async def bulk_create_scripts(
             )
 
     results = await asyncio.gather(*(_create_one(item) for item in data.items))
-    succeeded = sum(1 for r in results if r.status == "success")
-    failed = len(results) - succeeded
-    if failed > 0 and succeeded > 0:
-        response.status_code = 207
-    return BulkResult[ScriptBulkCreateResult](
-        total=len(results),
-        succeeded=succeeded,
-        failed=failed,
-        results=list(results),
-    )
+    return BulkResponder(response).result(list(results))
 
 
 # ---------------------------------------------------------------------------

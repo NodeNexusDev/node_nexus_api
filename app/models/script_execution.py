@@ -44,6 +44,7 @@ class ScriptExecutionModel(Base):
         ForeignKey("script_schedules.id", ondelete="SET NULL"), nullable=True
     )
     steps: Mapped[list[JsonObject] | None] = mapped_column(JSON, nullable=True)
+    timeout: Mapped[int | None] = mapped_column(sa.Integer, nullable=True)
     started_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_utcnow, server_default=sa.func.now()
     )

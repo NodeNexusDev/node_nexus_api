@@ -13,7 +13,7 @@ from app.main import app
 from tests.types import UnvalidatedJsonObject
 
 OPENAPI_CONTRACT_SHA256 = (
-    "5f41d3e304f783caf9548ca1c9a19f760a33b6cf9e7af007c751bebf2aca39b8"
+    "a45b86f7f068192c8f47e5cce6631ee19dd721beec69b10e6e71b967ed7a0811"
 )
 
 _CANONICAL_ENV = {
@@ -128,7 +128,9 @@ def test_protected_operations_document_standard_auth_errors() -> None:
                 response_schema = responses[status_code]["content"]["application/json"][
                     "schema"
                 ]
-                assert response_schema == {"$ref": "#/components/schemas/ErrorResponse"}
+                assert response_schema == {
+                    "$ref": "#/components/schemas/ProblemResponse"
+                }
 
 
 def test_public_response_schemas_never_expose_credentials() -> None:
