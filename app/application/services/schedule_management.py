@@ -73,6 +73,12 @@ class ScheduleManagementService:
             error_type=None,
             next_run_at=runtime.next_run_at,
         )
+        from app.application.services.sse_broadcaster import get_sse_broadcaster
+
+        get_sse_broadcaster().publish(
+            "script.scheduled",
+            {"script_id": str(script_id)},
+        )
         registered = await self._reader.get_schedule(script_id)
         return registered or desired
 

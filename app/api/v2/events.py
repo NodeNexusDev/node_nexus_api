@@ -55,7 +55,10 @@ async def event_stream(
     """Subscribe to live server-sent events.
 
     Events: node.status_changed, execution.completed, execution.failed,
-    script.scheduled, job.progress.
+    execution.cancelled, script.scheduled, docker.container.start,
+    docker.container.stop, docker.container.restart, docker.container.remove,
+    docker.container.pause, docker.container.unpause, docker.container.kill,
+    docker.container.rename.
     """
     audit.info("api.events.stream.connect")
     broadcaster = get_sse_broadcaster()

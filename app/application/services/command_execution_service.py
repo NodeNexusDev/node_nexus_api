@@ -112,6 +112,16 @@ class CommandExecutionService:
                     finished_at=result.finished_at,
                     command_id=command_id,
                 )
+            from app.application.services.sse_broadcaster import get_sse_broadcaster
+
+            get_sse_broadcaster().publish(
+                "execution.completed",
+                {
+                    "command_id": str(command_id),
+                    "node_id": str(data.node_id),
+                    "exit_code": result.exit_code,
+                },
+            )
             return CommandResultDTO(
                 stdout=result.stdout,
                 stderr=result.stderr,
@@ -128,6 +138,16 @@ class CommandExecutionService:
                 "execute_failed",
                 data.node_id,
                 {"command_id": str(command_id), "error": str(exc)},
+            )
+            from app.application.services.sse_broadcaster import get_sse_broadcaster
+
+            get_sse_broadcaster().publish(
+                "execution.failed",
+                {
+                    "command_id": str(command_id),
+                    "node_id": str(data.node_id),
+                    "error_type": type(exc).__name__,
+                },
             )
             raise ConnectionFailedError(
                 f"Failed to execute command on node {data.node_id}: {exc}"
