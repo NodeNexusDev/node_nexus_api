@@ -46,6 +46,7 @@ COVERED_ENDPOINTS: set[str] = {
     "PATCH /api/v2/nodes/{node_id}",
     "DELETE /api/v2/nodes/{node_id}",
     "GET /api/v2/nodes/{node_id}/status-history",
+    "GET /api/v2/nodes/tags",
     # Docker — single container lifecycle
     "GET /api/v2/nodes/{node_id}/docker/containers",
     "POST /api/v2/nodes/{node_id}/docker/containers",
@@ -153,6 +154,7 @@ COVERED_ENDPOINTS: set[str] = {
     "GET /api/v2/commands/{command_id}/stats",
     "GET /api/v2/commands/stats",
     "GET /api/v2/commands/history",
+    "GET /api/v2/commands/tags",
     "POST /api/v2/commands/executions",
     "POST /api/v2/commands/raw-executions",
     "GET /api/v2/commands/executions/history",
@@ -169,6 +171,7 @@ COVERED_ENDPOINTS: set[str] = {
     "POST /api/v2/scripts/{script_id}/clone",
     "GET /api/v2/scripts/{script_id}/stats",
     "GET /api/v2/scripts/stats",
+    "GET /api/v2/scripts/tags",
     "GET /api/v2/scripts/{script_id}/executions",
     "GET /api/v2/scripts/{script_id}/schedule/history",
     "GET /api/v2/scripts/{script_id}/schedules",

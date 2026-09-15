@@ -218,3 +218,19 @@ async def bulk_create_scripts(
 # ---------------------------------------------------------------------------
 # Per-script executions & schedule history — cursor pagination
 # ---------------------------------------------------------------------------
+
+
+# ---------------------------------------------------------------------------
+# Tags — GET /tags (unique tag vocabulary for filters)
+# ---------------------------------------------------------------------------
+
+
+@router.get("/tags", response_model=list[str])
+@inject
+async def list_script_tags(
+    service: FromDishka[ScriptManagementService],
+    _principal: Principal = Security(get_current_principal),
+) -> list[str]:
+    """List all unique script tags (PostgreSQL unnest aggregation)."""
+    audit.info("api.v2.scripts.tags")
+    return await service.get_all_tags()

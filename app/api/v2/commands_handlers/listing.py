@@ -167,3 +167,19 @@ async def bulk_create_commands(
 # ---------------------------------------------------------------------------
 # History — GET /history ?node_id&cursor&limit
 # ---------------------------------------------------------------------------
+
+
+# ---------------------------------------------------------------------------
+# Tags — GET /tags (unique tag vocabulary for filters)
+# ---------------------------------------------------------------------------
+
+
+@router.get("/tags", response_model=list[str])
+@inject
+async def list_command_tags(
+    service: FromDishka[CommandManagementService],
+    _principal: Principal = Security(get_current_principal),
+) -> list[str]:
+    """List all unique command tags (PostgreSQL unnest aggregation)."""
+    audit.info("api.v2.commands.tags")
+    return await service.get_all_tags()
