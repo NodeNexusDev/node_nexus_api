@@ -237,6 +237,11 @@ EXCLUDED_ENDPOINTS: dict[str, str] = {
         "SSE streaming endpoint — TestClient blocks indefinitely on "
         "streaming responses; covered by unit test for _event_generator."
     ),
+    "GET /api/v2/commands/{command_id}/executions": (
+        "RESTful per-command history alias — covered by dedicated unit tests "
+        "(test_timeout_bg.py::test_get_command_executions_by_command_*); "
+        "no dedicated E2E yet."
+    ),
 }
 
 # WebSocket routes (not in OpenAPI, tracked separately).
