@@ -189,3 +189,19 @@ async def bulk_create_nodes(
 # ---------------------------------------------------------------------------
 # Bulk update — PATCH / (collection) with 207
 # ---------------------------------------------------------------------------
+
+
+# ---------------------------------------------------------------------------
+# Tags — GET /tags (unique tag vocabulary for filters)
+# ---------------------------------------------------------------------------
+
+
+@router.get("/tags", response_model=list[str])
+@inject
+async def list_node_tags(
+    service: FromDishka[NodeManagementService],
+    _principal: Principal = Security(get_current_principal),
+) -> list[str]:
+    """List all unique node tags (PostgreSQL unnest aggregation)."""
+    audit.info("api.v2.nodes.tags")
+    return await service.get_all_tags()

@@ -145,6 +145,19 @@ class NodeCommandService:
                     node_id=str(node_id),
                     error=str(exc),
                 )
+            else:
+                from app.application.services.sse_broadcaster import (
+                    get_sse_broadcaster,
+                )
+
+                get_sse_broadcaster().publish(
+                    "node.status_changed",
+                    {
+                        "node_id": str(node_id),
+                        "old_status": old_status,
+                        "new_status": new_status,
+                    },
+                )
         elif self._status_history_writer is not None and old_status == new_status:
             audit.info(
                 "node.connectivity.history_skipped_noop",

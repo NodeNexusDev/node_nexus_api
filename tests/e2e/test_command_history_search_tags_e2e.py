@@ -87,6 +87,37 @@ def test_script_search_and_tags(e2e_client: httpx.Client, e2e_resources) -> None
     assert any(item["id"] == script["id"] for item in tag_data["items"])
 
 
+def test_command_tags_endpoint(e2e_client: httpx.Client, e2e_resources) -> None:
+    """GET /commands/tags returns the unique command tag vocabulary."""
+    unique_tag = e2e_resources.unique_name("e2e-cmd-vocab-tag")
+    e2e_resources.create_command(
+        name=e2e_resources.unique_name("vocab-command"),
+        command="echo vocab",
+        tags=[unique_tag],
+    )
+
+    resp = e2e_client.get("/api/v2/commands/tags")
+    assert resp.status_code == 200
+    tags = resp.json()
+    assert tags == sorted(tags)
+    assert unique_tag in tags
+
+
+def test_script_tags_endpoint(e2e_client: httpx.Client, e2e_resources) -> None:
+    """GET /scripts/tags returns the unique script tag vocabulary."""
+    unique_tag = e2e_resources.unique_name("e2e-script-vocab-tag")
+    e2e_resources.create_script(
+        name=e2e_resources.unique_name("vocab-script"),
+        tags=[unique_tag],
+    )
+
+    resp = e2e_client.get("/api/v2/scripts/tags")
+    assert resp.status_code == 200
+    tags = resp.json()
+    assert tags == sorted(tags)
+    assert unique_tag in tags
+
+
 # ---------------------------------------------------------------------------
 # Bulk command history
 # ---------------------------------------------------------------------------

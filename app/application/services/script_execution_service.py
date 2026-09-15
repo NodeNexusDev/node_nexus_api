@@ -150,6 +150,20 @@ class ScriptExecutionService:
                         execution_id=str(target.execution_id),
                         error=str(exc),
                     )
+                else:
+                    from app.application.services.sse_broadcaster import (
+                        get_sse_broadcaster,
+                    )
+
+                    get_sse_broadcaster().publish(
+                        "execution.failed",
+                        {
+                            "execution_id": str(target.execution_id),
+                            "script_id": str(script_id),
+                            "node_id": str(target.node.id),
+                            "status": "error",
+                        },
+                    )
             raise TimeoutError(f"Script execution timed out after {effective_timeout}s")
         for result in results:
             try:
@@ -169,6 +183,25 @@ class ScriptExecutionService:
                     script_id=str(script_id),
                     execution_id=str(result.execution_id),
                     node_id=str(result.node_id),
+                )
+            else:
+                from app.application.services.sse_broadcaster import (
+                    get_sse_broadcaster,
+                )
+
+                event = (
+                    "execution.completed"
+                    if result.status == "success"
+                    else "execution.failed"
+                )
+                get_sse_broadcaster().publish(
+                    event,
+                    {
+                        "execution_id": str(result.execution_id),
+                        "script_id": str(script_id),
+                        "node_id": str(result.node_id),
+                        "status": result.status,
+                    },
                 )
             await self._log_result(script_id, result)
 

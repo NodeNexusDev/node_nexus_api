@@ -323,6 +323,12 @@ class DockerContainerService:
         event = f"docker.container.{action}"
         audit.info(event, node_id=str(node_id), container_id=validated_id)
         await self._log(event, node_id, {"container_id": validated_id, **details})
+        from app.application.services.sse_broadcaster import get_sse_broadcaster
+
+        get_sse_broadcaster().publish(
+            event,
+            {"node_id": str(node_id), "container_id": validated_id},
+        )
 
     async def start_container(self, node_id: UUID, container_id: str) -> None:
         await self._lifecycle_action(node_id, container_id, "start", "start", {})
@@ -488,6 +494,12 @@ class DockerContainerService:
         await self._log(
             "docker.container.pause", node_id, {"container_id": validated_id}
         )
+        from app.application.services.sse_broadcaster import get_sse_broadcaster
+
+        get_sse_broadcaster().publish(
+            "docker.container.pause",
+            {"node_id": str(node_id), "container_id": validated_id},
+        )
 
     async def unpause_container(self, node_id: UUID, container_id: str) -> None:
         """Unpause a paused container."""
@@ -503,6 +515,12 @@ class DockerContainerService:
         )
         await self._log(
             "docker.container.unpause", node_id, {"container_id": validated_id}
+        )
+        from app.application.services.sse_broadcaster import get_sse_broadcaster
+
+        get_sse_broadcaster().publish(
+            "docker.container.unpause",
+            {"node_id": str(node_id), "container_id": validated_id},
         )
 
     async def rename_container(self, data: ContainerRenameRequestDTO) -> None:
@@ -524,6 +542,16 @@ class DockerContainerService:
             "docker.container.rename",
             data.node_id,
             {"container_id": validated_id, "new_name": data.new_name},
+        )
+        from app.application.services.sse_broadcaster import get_sse_broadcaster
+
+        get_sse_broadcaster().publish(
+            "docker.container.rename",
+            {
+                "node_id": str(data.node_id),
+                "container_id": validated_id,
+                "new_name": data.new_name,
+            },
         )
 
     async def top_container(
@@ -581,6 +609,16 @@ class DockerContainerService:
             "docker.container.kill",
             node_id,
             {"container_id": validated_id, "signal": signal},
+        )
+        from app.application.services.sse_broadcaster import get_sse_broadcaster
+
+        get_sse_broadcaster().publish(
+            "docker.container.kill",
+            {
+                "node_id": str(node_id),
+                "container_id": validated_id,
+                "signal": signal,
+            },
         )
 
     async def update_container(

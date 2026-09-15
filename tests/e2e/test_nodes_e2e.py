@@ -568,13 +568,12 @@ def test_node_get_all_tags(
     e2e_resources.create_node(name="tag-a", tags=["alpha", "beta"])
     e2e_resources.create_node(name="tag-b", tags=["beta", "gamma"])
 
-    # New API has no /nodes/tags; verify via tag filter instead
-    resp = e2e_client.get("/api/v2/nodes/?tag=beta")
+    # Tag vocabulary endpoint (PostgreSQL unnest aggregation)
+    resp = e2e_client.get("/api/v2/nodes/tags")
     assert resp.status_code == 200
-    data = resp.json()
-    names = {n["name"] for n in data["items"]}
-    assert "tag-a" in names
-    assert "tag-b" in names
+    tags = resp.json()
+    assert tags == sorted(tags)
+    assert {"alpha", "beta", "gamma"} <= set(tags)
     # ensure tag filter works for single tag
     resp2 = e2e_client.get("/api/v2/nodes/?tag=alpha")
     assert resp2.status_code == 200
