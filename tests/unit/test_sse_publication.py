@@ -77,9 +77,7 @@ class TestNodeStatusChanged:
             node_view_reader=view_reader,
         )
         node_reader.get_connection = AsyncMock(return_value=_node_conn(NODE_ID))
-        view_reader.get_node = AsyncMock(
-            return_value=MagicMock(status="unreachable")
-        )
+        view_reader.get_node = AsyncMock(return_value=MagicMock(status="unreachable"))
         status_writer.update_node_status = AsyncMock(
             return_value=MagicMock(status="active")
         )
@@ -155,9 +153,7 @@ class TestNodeStatusChanged:
             node_view_reader=view_reader,
         )
         node_reader.get_connection = AsyncMock(return_value=_node_conn(NODE_ID))
-        view_reader.get_node = AsyncMock(
-            return_value=MagicMock(status="unreachable")
-        )
+        view_reader.get_node = AsyncMock(return_value=MagicMock(status="unreachable"))
         status_writer.update_node_status = AsyncMock(return_value=MagicMock())
         broadcaster, published = _broadcaster()
         with (
@@ -196,9 +192,7 @@ class TestExecutionCompletedFailed:
         script_reader: Any = AsyncMock()
         execution_writer: Any = AsyncMock()
         exec_id = uuid.uuid4()
-        script_reader.get_definition = AsyncMock(
-            return_value=self._script_definition()
-        )
+        script_reader.get_definition = AsyncMock(return_value=self._script_definition())
         execution_writer.create_execution = AsyncMock(return_value=exec_id)
         svc = ScriptExecutionService(
             script_reader=script_reader,
@@ -245,9 +239,7 @@ class TestExecutionCompletedFailed:
         script_reader: Any = AsyncMock()
         execution_writer: Any = AsyncMock()
         exec_id = uuid.uuid4()
-        script_reader.get_definition = AsyncMock(
-            return_value=self._script_definition()
-        )
+        script_reader.get_definition = AsyncMock(return_value=self._script_definition())
         execution_writer.create_execution = AsyncMock(return_value=exec_id)
         svc = ScriptExecutionService(
             script_reader=script_reader,
@@ -389,9 +381,7 @@ class TestScriptScheduled:
         script_reader.get_script = AsyncMock(return_value=MagicMock())
         node_reader.get_node = AsyncMock(return_value=MagicMock())
         writer.upsert_schedule = AsyncMock(return_value=MagicMock())
-        scheduler.add_or_replace = MagicMock(
-            return_value=MagicMock(next_run_at=None)
-        )
+        scheduler.add_or_replace = MagicMock(return_value=MagicMock(next_run_at=None))
         reader.get_schedule = AsyncMock(return_value=None)
         svc = ScheduleManagementService(
             reader=reader,
@@ -415,9 +405,7 @@ class TestScriptScheduled:
                     node_ids=(NODE_ID,),
                 ),
             )
-        assert published == [
-            ("script.scheduled", {"script_id": str(SCRIPT_ID)})
-        ]
+        assert published == [("script.scheduled", {"script_id": str(SCRIPT_ID)})]
 
 
 class TestDockerContainerEvents:

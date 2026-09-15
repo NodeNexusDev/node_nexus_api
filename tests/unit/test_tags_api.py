@@ -97,9 +97,7 @@ async def test_node_tags(
         base_url="http://test",
         follow_redirects=True,
     ) as ac:
-        response = await ac.get(
-            "/nodes/tags", headers={"X-API-Key": "test-master-key"}
-        )
+        response = await ac.get("/nodes/tags", headers={"X-API-Key": "test-master-key"})
     assert response.status_code == 200
     assert response.json() == ["alpha", "beta"]
     node_service.get_all_tags.assert_awaited_once_with()
