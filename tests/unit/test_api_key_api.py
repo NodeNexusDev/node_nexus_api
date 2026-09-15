@@ -295,3 +295,67 @@ class TestRevokeApiKey:
                 headers={"X-API-Key": "test-master-key"},
             )
         assert response.status_code == 404
+
+
+# --- POST /api-keys/deletions ---
+
+
+class TestBulkRevokeApiKeys:
+    @patch("app.core.config.get_settings")
+    async def test_all_succeed(
+        self, mock_get_settings: Any, mock_service: AsyncMock
+    ) -> None:
+        mock_get_settings.return_value = _mock_settings("test-master-key")
+        app = _create_test_app(mock_service)
+        key_ids = [uuid.uuid4(), uuid.uuid4()]
+
+        async with AsyncClient(
+            transport=ASGITransport(app=app),
+            base_url="http://test",
+            follow_redirects=True,
+        ) as ac:
+            response = await ac.post(
+                "/api-keys/deletions",
+                json={"key_ids": [str(k) for k in key_ids]},
+                headers={"X-API-Key": "test-master-key"},
+            )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total"] == 2
+        assert data["succeeded"] == 2
+        assert data["failed"] == 0
+
+    @patch("app.core.config.get_settings")
+    async def test_partial_failure_returns_207_without_leaking_errors(
+        self, mock_get_settings: Any, mock_service: AsyncMock
+    ) -> None:
+        mock_get_settings.return_value = _mock_settings("test-master-key")
+        app = _create_test_app(mock_service)
+        ok_id, bad_id = uuid.uuid4(), uuid.uuid4()
+
+        async def _revoke(key_id: uuid.UUID) -> None:
+            if key_id == bad_id:
+                raise RuntimeError("sensitive backend detail password=xyz")
+
+        mock_service.revoke_api_key.side_effect = _revoke
+
+        async with AsyncClient(
+            transport=ASGITransport(app=app),
+            base_url="http://test",
+            follow_redirects=True,
+        ) as ac:
+            response = await ac.post(
+                "/api-keys/deletions",
+                json={"key_ids": [str(ok_id), str(bad_id)]},
+                headers={"X-API-Key": "test-master-key"},
+            )
+        assert response.status_code == 207
+        data = response.json()
+        assert data["total"] == 2
+        assert data["succeeded"] == 1
+        assert data["failed"] == 1
+        by_id = {r["key_id"]: r for r in data["results"]}
+        assert by_id[str(ok_id)]["status"] == "success"
+        assert by_id[str(bad_id)]["status"] == "error"
+        assert by_id[str(bad_id)]["error"] == "Failed to revoke API key"
+        assert "password=xyz" not in by_id[str(bad_id)]["error"]

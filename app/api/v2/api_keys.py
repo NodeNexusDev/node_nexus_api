@@ -112,9 +112,11 @@ async def bulk_revoke_api_keys(
         try:
             await service.revoke_api_key(kid)
             results.append(BulkAPIKeyDeleteResult(key_id=kid, status="success"))
-        except Exception as exc:  # noqa: BLE001
+        except Exception:  # noqa: BLE001 - never leak exception text to clients
             results.append(
-                BulkAPIKeyDeleteResult(key_id=kid, status="error", error=str(exc))
+                BulkAPIKeyDeleteResult(
+                    key_id=kid, status="error", error="Failed to revoke API key"
+                )
             )
     succeeded = sum(1 for r in results if r.status == "success")
     failed = len(results) - succeeded
