@@ -78,4 +78,4 @@ e2e-docker-ops: setup-ssh-keys
 check:
 	uv run ruff check app/ tests/
 	uv run ty check .
-	uv run pytest tests/e2e/test_endpoint_coverage_e2e.py -q
+	uv run pytest tests/architecture/test_endpoint_coverage.py -q
