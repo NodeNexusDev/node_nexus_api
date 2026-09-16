@@ -11,6 +11,7 @@ import structlog
 from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
 from fastapi import APIRouter, Query, Response, Security, status
 
+from app.api.error_mapping import sanitize_bulk_error
 from app.api.deps import Principal, get_current_principal, require_write_or_jwt_scope
 from app.api.pagination import decode_offset, encode_offset
 from app.api.v2._bulk import execute_vert_bulk
@@ -150,7 +151,7 @@ async def bulk_executions(
             )
         except Exception as exc:  # noqa: BLE001
             return ContainerExecBulkResult(
-                container_id=cid, status="error", error=str(exc)
+                container_id=cid, status="error", error=sanitize_bulk_error(exc)
             )
 
     return await execute_vert_bulk(data.container_ids, _one, response)
@@ -186,7 +187,7 @@ async def bulk_inspections(
             )
         except Exception as exc:  # noqa: BLE001
             return ContainerInspectBulkResult(
-                container_id=cid, status="error", error=str(exc)
+                container_id=cid, status="error", error=sanitize_bulk_error(exc)
             )
 
     return await execute_vert_bulk(data.container_ids, _one, response)
@@ -219,7 +220,7 @@ async def bulk_logs(
             )
         except Exception as exc:  # noqa: BLE001
             return ContainerLogsBulkResult(
-                container_id=cid, status="error", error=str(exc)
+                container_id=cid, status="error", error=sanitize_bulk_error(exc)
             )
 
     return await execute_vert_bulk(data.container_ids, _one, response)
@@ -251,7 +252,7 @@ async def bulk_stats(
             )
         except Exception as exc:  # noqa: BLE001
             return ContainerStatsBulkResult(
-                container_id=cid, status="error", error=str(exc)
+                container_id=cid, status="error", error=sanitize_bulk_error(exc)
             )
 
     return await execute_vert_bulk(data.container_ids, _one, response)

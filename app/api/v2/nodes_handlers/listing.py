@@ -11,6 +11,7 @@ import structlog
 from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
 from fastapi import APIRouter, HTTPException, Query, Response, Security
 
+from app.api.error_mapping import sanitize_bulk_error
 from app.api.deps import Principal, get_current_principal, require_write_or_jwt_scope
 from app.api.pagination import decode_offset, encode_offset
 from app.application.dto.bulk_node_operation import BulkNodeDeleteDTO
@@ -166,7 +167,9 @@ async def bulk_create_nodes(
             node = await service.create_node(dto)
             return NodeBulkCreateResult(node_id=node.id, status="success")
         except Exception as exc:  # noqa: BLE001
-            return NodeBulkCreateResult(node_id=None, status="error", error=str(exc))
+            return NodeBulkCreateResult(
+                node_id=None, status="error", error=sanitize_bulk_error(exc)
+            )
 
     results = await asyncio.gather(*(_create_one(item) for item in data.items))
     succeeded = sum(1 for r in results if r.status == "success")

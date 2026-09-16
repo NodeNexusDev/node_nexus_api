@@ -12,6 +12,7 @@ import structlog
 from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
 from fastapi import APIRouter, HTTPException, Query, Response, Security
 
+from app.api.error_mapping import sanitize_bulk_error
 from app.api.deps import Principal, get_current_principal, require_write_or_jwt_scope
 from app.api.v2._shared import command_response
 from app.api.v2._bulk import BulkResponder
@@ -115,7 +116,7 @@ async def bulk_update_commands(
             return CommandBulkUpdateResult(command_id=item.id, status="success")
         except Exception as exc:  # noqa: BLE001
             return CommandBulkUpdateResult(
-                command_id=item.id, status="error", error=str(exc)
+                command_id=item.id, status="error", error=sanitize_bulk_error(exc)
             )
 
     results = await asyncio.gather(*(_update_one(u) for u in data.updates))
@@ -139,7 +140,7 @@ async def bulk_delete_commands(
             return CommandBulkUpdateResult(command_id=cid, status="success")
         except Exception as exc:  # noqa: BLE001
             return CommandBulkUpdateResult(
-                command_id=cid, status="error", error=str(exc)
+                command_id=cid, status="error", error=sanitize_bulk_error(exc)
             )
 
     results = await asyncio.gather(*(_delete_one(cid) for cid in data.ids))

@@ -11,6 +11,7 @@ import structlog
 from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
 from fastapi import APIRouter, Query, Response, Security, status
 
+from app.api.error_mapping import sanitize_bulk_error
 from app.api.deps import Principal, get_current_principal, require_write_or_jwt_scope
 from app.api.pagination import decode_offset, encode_offset
 from app.api.v2._bulk import execute_vert_bulk
@@ -137,7 +138,9 @@ async def bulk_pulls(
                 error="" if st == "success" else res.output,
             )
         except Exception as exc:  # noqa: BLE001
-            return ImageBulkResult(image=image, status="error", error=str(exc))
+            return ImageBulkResult(
+                image=image, status="error", error=sanitize_bulk_error(exc)
+            )
 
     return await execute_vert_bulk(data.images, _one, response)
 
@@ -161,7 +164,9 @@ async def bulk_image_removals(
             await service.remove_image(node_id, image_id)
             return ImageBulkResult(image=image_id, status="success")
         except Exception as exc:  # noqa: BLE001
-            return ImageBulkResult(image=image_id, status="error", error=str(exc))
+            return ImageBulkResult(
+                image=image_id, status="error", error=sanitize_bulk_error(exc)
+            )
 
     return await execute_vert_bulk(data.image_ids, _one, response)
 

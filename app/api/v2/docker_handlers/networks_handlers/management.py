@@ -11,6 +11,7 @@ import structlog
 from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
 from fastapi import APIRouter, Query, Response, Security, status
 
+from app.api.error_mapping import sanitize_bulk_error
 from app.api.deps import Principal, get_current_principal, require_write_or_jwt_scope
 from app.api.pagination import decode_offset, encode_offset
 from app.api.v2._bulk import execute_vert_bulk
@@ -134,7 +135,9 @@ async def bulk_network_removals(
             await service.remove_network(node_id, validated)
             return NetworkBulkResult(network_id=nid, status="success")
         except Exception as exc:  # noqa: BLE001
-            return NetworkBulkResult(network_id=nid, status="error", error=str(exc))
+            return NetworkBulkResult(
+                network_id=nid, status="error", error=sanitize_bulk_error(exc)
+            )
 
     return await execute_vert_bulk(data.network_ids, _one, response)
 

@@ -375,7 +375,7 @@ class TestBulkCreateNodes:
         assert data["succeeded"] == 0
         assert data["failed"] == 1
         assert data["results"][0]["status"] == "error"
-        assert "fail" in data["results"][0]["error"]
+        assert data["results"][0]["error"] == "Internal error"
 
     async def test_bulk_create_with_docker_fields(self) -> None:
         svc = AsyncMock(spec=NodeManagementService)
@@ -420,7 +420,7 @@ class TestBulkCreateNodes:
             ) as ac:
                 resp = await ac.post("/api/v2/nodes/", json=self._payload(1))
         assert resp.status_code == 200
-        assert resp.json()["results"][0]["error"] == "invalid host"
+        assert resp.json()["results"][0]["error"] == "Internal error"
         assert resp.json()["results"][0]["node_id"] is None
 
 
@@ -521,7 +521,7 @@ class TestBulkUpdateNodes:
             ) as ac:
                 resp = await ac.patch("/api/v2/nodes/", json=payload)
         assert resp.status_code == 200
-        assert "bad value" in resp.json()["results"][0]["error"]
+        assert resp.json()["results"][0]["error"] == "Internal error"
 
 
 # ---------------------------------------------------------------------------
@@ -792,7 +792,7 @@ class TestBulkMetrics:
         success = [r for r in data["results"] if r["status"] == "success"][0]
         assert success["metrics"] is not None
         error = [r for r in data["results"] if r["status"] == "error"][0]
-        assert "connection failed" in error["error"]
+        assert error["error"] == "Internal error"
 
     async def test_metrics_all_failed(self) -> None:
         svc = AsyncMock(spec=NodeMetricsService)

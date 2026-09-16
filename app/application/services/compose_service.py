@@ -24,6 +24,7 @@ from app.application.dto.compose import (
     ComposeViewDTO,
 )
 from app.application.services.docker.error_mapper import raise_for_docker_error
+from app.core.error_sanitize import sanitize_bulk_error
 from app.core.exceptions import ComposeProjectNotFoundError
 
 if TYPE_CHECKING:
@@ -226,7 +227,9 @@ class ComposeService:
             except Exception as exc:  # noqa: BLE001
                 return [
                     ComposeServiceResultDTO(
-                        service=project.project_name, status="error", error=str(exc)
+                        service=project.project_name,
+                        status="error",
+                        error=sanitize_bulk_error(exc),
                     )
                 ]
 
@@ -243,7 +246,7 @@ class ComposeService:
                 )
             except Exception as exc:  # noqa: BLE001
                 return ComposeServiceResultDTO(
-                    service=svc, status="error", error=str(exc)
+                    service=svc, status="error", error=sanitize_bulk_error(exc)
                 )
 
         results = await asyncio.gather(*(_one(s) for s in services))
@@ -277,7 +280,7 @@ class ComposeService:
                 )
             except Exception as exc:  # noqa: BLE001
                 result = ComposeServiceResultDTO(
-                    service=project_name, status="error", error=str(exc)
+                    service=project_name, status="error", error=sanitize_bulk_error(exc)
                 )
                 return ComposeBulkResultDTO(
                     total=1, succeeded=0, failed=1, results=(result,)
@@ -293,7 +296,7 @@ class ComposeService:
                 )
             except Exception as exc:  # noqa: BLE001
                 return ComposeServiceResultDTO(
-                    service=svc, status="error", error=str(exc)
+                    service=svc, status="error", error=sanitize_bulk_error(exc)
                 )
 
         results = await asyncio.gather(*(_one(s) for s in services))

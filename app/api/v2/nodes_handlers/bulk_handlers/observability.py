@@ -11,6 +11,7 @@ import structlog
 from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
 from fastapi import APIRouter, HTTPException, Query, Response, Security
 
+from app.api.error_mapping import sanitize_bulk_error
 from app.api.deps import Principal, get_current_principal, require_write_or_jwt_scope
 from app.api.pagination import decode_offset, encode_offset
 from app.application.dto.bulk_node_operation import BulkNodeDeleteDTO
@@ -129,7 +130,7 @@ async def bulk_get_node_metrics(
                 node_id=node_id,
                 node_name="unknown",
                 status="error",
-                error=str(exc),
+                error=sanitize_bulk_error(exc),
             )
 
     results = await asyncio.gather(*(_collect_one(nid) for nid in data.ids))

@@ -33,6 +33,7 @@ from app.application.services.ssh_executor import (
     execute_ssh,
 )
 from app.application.types import JsonObject
+from app.core.error_sanitize import sanitize_bulk_error
 from app.core.exceptions import (
     AuditWriteError,
     ConnectionFailedError,
@@ -172,7 +173,7 @@ class NodeBulkCommandService:
                     node_id=node.id,
                     node_name=node.name,
                     status="error",
-                    message=str(exc),
+                    message=sanitize_bulk_error(exc),
                 )
 
         return list(await asyncio.gather(*(_validate_one(node) for node in nodes)))
@@ -223,7 +224,7 @@ class NodeBulkCommandService:
                     node_id=str(node.id),
                     command_fingerprint=command_fingerprint(command),
                     command_length=len(command),
-                    error=str(exc),
+                    error=sanitize_bulk_error(exc),
                 )
                 return self._error_result(node, exc)
             except Exception as exc:
@@ -233,7 +234,7 @@ class NodeBulkCommandService:
                     command_fingerprint=command_fingerprint(command),
                     command_length=len(command),
                     error_type=type(exc).__name__,
-                    error=str(exc),
+                    error=sanitize_bulk_error(exc),
                 )
                 return self._error_result(node, exc)
 

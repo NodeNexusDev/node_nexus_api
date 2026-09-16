@@ -11,6 +11,7 @@ import structlog
 from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
 from fastapi import APIRouter, HTTPException, Query, Response, Security
 
+from app.api.error_mapping import sanitize_bulk_error
 from app.api.deps import Principal, get_current_principal, require_write_or_jwt_scope
 from app.api.pagination import decode_offset, encode_offset
 from app.api.v2._bulk import set_bulk_status
@@ -107,7 +108,9 @@ async def bulk_update_nodes(
             )
             return BulkNodeUpdateResult(node_id=node_id, status="success")
         except Exception as exc:  # noqa: BLE001
-            return BulkNodeUpdateResult(node_id=node_id, status="error", error=str(exc))
+            return BulkNodeUpdateResult(
+                node_id=node_id, status="error", error=sanitize_bulk_error(exc)
+            )
 
     results = await asyncio.gather(
         *(_update_one(item.id, item.changes) for item in data.updates)

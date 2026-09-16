@@ -11,6 +11,7 @@ import structlog
 from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
 from fastapi import APIRouter, Query, Response, Security, status
 
+from app.api.error_mapping import sanitize_bulk_error
 from app.api.deps import Principal, get_current_principal, require_write_or_jwt_scope
 from app.api.pagination import decode_offset, encode_offset
 from app.api.v2._bulk import execute_vert_bulk
@@ -134,7 +135,9 @@ async def bulk_starts(
             await service.start_container(node_id, validated)
             return ContainerBulkResult(container_id=cid, status="success")
         except Exception as exc:  # noqa: BLE001
-            return ContainerBulkResult(container_id=cid, status="error", error=str(exc))
+            return ContainerBulkResult(
+                container_id=cid, status="error", error=sanitize_bulk_error(exc)
+            )
 
     return await execute_vert_bulk(data.container_ids, _one, response)
 
@@ -162,7 +165,9 @@ async def bulk_stops(
             await service.stop_container(node_id, validated, timeout=timeout)
             return ContainerBulkResult(container_id=cid, status="success")
         except Exception as exc:  # noqa: BLE001
-            return ContainerBulkResult(container_id=cid, status="error", error=str(exc))
+            return ContainerBulkResult(
+                container_id=cid, status="error", error=sanitize_bulk_error(exc)
+            )
 
     return await execute_vert_bulk(data.container_ids, _one, response)
 
@@ -190,7 +195,9 @@ async def bulk_restarts(
             await service.restart_container(node_id, validated, timeout=timeout)
             return ContainerBulkResult(container_id=cid, status="success")
         except Exception as exc:  # noqa: BLE001
-            return ContainerBulkResult(container_id=cid, status="error", error=str(exc))
+            return ContainerBulkResult(
+                container_id=cid, status="error", error=sanitize_bulk_error(exc)
+            )
 
     return await execute_vert_bulk(data.container_ids, _one, response)
 
@@ -218,7 +225,9 @@ async def bulk_removals(
             await service.remove_container(node_id, validated, force=force)
             return ContainerBulkResult(container_id=cid, status="success")
         except Exception as exc:  # noqa: BLE001
-            return ContainerBulkResult(container_id=cid, status="error", error=str(exc))
+            return ContainerBulkResult(
+                container_id=cid, status="error", error=sanitize_bulk_error(exc)
+            )
 
     return await execute_vert_bulk(data.container_ids, _one, response)
 
@@ -245,6 +254,8 @@ async def bulk_pauses(
             await service.pause_container(node_id, validated)
             return ContainerBulkResult(container_id=cid, status="success")
         except Exception as exc:  # noqa: BLE001
-            return ContainerBulkResult(container_id=cid, status="error", error=str(exc))
+            return ContainerBulkResult(
+                container_id=cid, status="error", error=sanitize_bulk_error(exc)
+            )
 
     return await execute_vert_bulk(data.container_ids, _one, response)
