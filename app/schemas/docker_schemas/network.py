@@ -7,6 +7,7 @@ from typing import Literal, Self
 from pydantic import BaseModel, Field, model_validator
 
 from app.core.types import JsonObject
+from app.schemas.common import SafeName
 
 
 class DockerNetwork(BaseModel):
@@ -26,7 +27,7 @@ class DockerNetwork(BaseModel):
 class NetworkCreateRequest(BaseModel):
     """Request body for creating a Docker network."""
 
-    name: str = Field(min_length=1, max_length=128)
+    name: SafeName = Field(min_length=1, max_length=128)
     driver: str = Field(default="bridge", max_length=64)
     subnet: str | None = Field(default=None, max_length=64)
     gateway: str | None = Field(default=None, max_length=64)

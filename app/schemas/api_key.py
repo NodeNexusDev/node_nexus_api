@@ -6,13 +6,13 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.schemas.common import PaginatedResponse
+from app.schemas.common import PaginatedResponse, SafeName
 
 
 class APIKeyCreate(BaseModel):
     """Schema for creating an API key."""
 
-    name: str = Field(..., min_length=1, max_length=255)
+    name: SafeName = Field(..., min_length=1, max_length=255)
     scope: Literal["read-only", "read-write"] = "read-write"
 
 
@@ -29,7 +29,7 @@ class APIKeyCreated(BaseModel):
 class APIKeyUpdate(BaseModel):
     """Schema for updating an API key."""
 
-    name: str | None = Field(default=None, min_length=1, max_length=255)
+    name: SafeName | None = Field(default=None, min_length=1, max_length=255)
     is_active: bool | None = None
     scope: Literal["read-only", "read-write"] | None = None
     expires_at: datetime | None = None

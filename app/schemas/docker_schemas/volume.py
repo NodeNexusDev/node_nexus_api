@@ -7,6 +7,7 @@ from typing import Literal, Self
 from pydantic import BaseModel, Field, model_validator
 
 from app.core.types import JsonObject
+from app.schemas.common import SafeName
 
 
 class DockerVolume(BaseModel):
@@ -24,7 +25,7 @@ class DockerVolume(BaseModel):
 class VolumeCreateRequest(BaseModel):
     """Request body for creating a Docker volume."""
 
-    name: str | None = Field(default=None, min_length=1, max_length=128)
+    name: SafeName | None = Field(default=None, min_length=1, max_length=128)
     driver: str = Field(default="local", max_length=64)
 
 

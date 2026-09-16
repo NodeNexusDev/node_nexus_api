@@ -7,7 +7,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.schemas.command import CommandCreate
-from app.schemas.common import BulkResult
+from app.schemas.common import BulkResult, SafeName
 from app.schemas.script import ScriptCreate
 
 # --- Asset schemas ---
@@ -55,7 +55,7 @@ class PackCreate(BaseModel):
         max_length=100,
         description="Unique pack identifier, e.g. docker-install",
     )
-    name: str = Field(..., min_length=1, max_length=255)
+    name: SafeName = Field(..., min_length=1, max_length=255)
     description: str | None = Field(default=None, max_length=5000)
     version: str = Field(
         ...,
@@ -76,7 +76,7 @@ class PackCreate(BaseModel):
 class PackUpdate(BaseModel):
     """Schema for updating a template pack (partial)."""
 
-    name: str | None = Field(default=None, min_length=1, max_length=255)
+    name: SafeName | None = Field(default=None, min_length=1, max_length=255)
     description: str | None = Field(default=None, max_length=5000)
     version: str | None = Field(default=None, min_length=1, max_length=50)
     author: str | None = Field(default=None, max_length=255)
@@ -210,7 +210,7 @@ class PackManifestRequest(BaseModel):
     """Manifest for local pack upload."""
 
     pack_id: str = Field(..., min_length=1, max_length=100)
-    name: str = Field(..., min_length=1, max_length=255)
+    name: SafeName = Field(..., min_length=1, max_length=255)
     description: str | None = Field(default=None, max_length=5000)
     version: str = Field(..., min_length=1, max_length=50)
     author: str | None = Field(default=None, max_length=255)

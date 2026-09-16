@@ -6,19 +6,19 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.schemas.common import BulkResult
+from app.schemas.common import BulkResult, SafeName
 
 
 class RegistryCreate(BaseModel):
     """Schema for creating a template registry (GitHub repo)."""
 
-    owner: str = Field(
+    owner: SafeName = Field(
         ...,
         min_length=1,
         max_length=255,
         description="GitHub owner or organization",
     )
-    name: str = Field(
+    name: SafeName = Field(
         ...,
         min_length=1,
         max_length=255,
@@ -40,8 +40,8 @@ class RegistryCreate(BaseModel):
 class RegistryUpdate(BaseModel):
     """Schema for updating a template registry (partial)."""
 
-    owner: str | None = Field(default=None, min_length=1, max_length=255)
-    name: str | None = Field(default=None, min_length=1, max_length=255)
+    owner: SafeName | None = Field(default=None, min_length=1, max_length=255)
+    name: SafeName | None = Field(default=None, min_length=1, max_length=255)
     github_token: str | None = Field(default=None, repr=False)
     default_branch: str | None = Field(default=None, min_length=1, max_length=100)
 
