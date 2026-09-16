@@ -18,7 +18,7 @@ services:
   dind:
     image: docker:27-dind@sha256:aa3df78ecf320f5fafdce71c659f1629e96e9de0968305fe1de670e0ca9176ce
     privileged: true
-    command: ["dockerd", "--host=unix:///var/run/docker.sock", "--host=tcp://0.0.0.0:2375", "--tls=false"]
+    command: ["dockerd", "--host=unix:///var/run/docker.sock", "--host=tcp://0.0.0.0:2375", "--tls=false", "--registry-mirror=https://mirror.gcr.io"]
     environment:
       DOCKER_TLS_CERTDIR: ""
     ports:

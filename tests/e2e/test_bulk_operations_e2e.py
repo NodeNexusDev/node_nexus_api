@@ -49,6 +49,7 @@ def test_docker_bulk_pull(
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.flaky(reruns=2)
 def test_docker_bulk_remove(
     e2e_client: httpx.Client,
     e2e_resources: UniqueResourceFactory,

@@ -202,21 +202,25 @@ class TestRequestTimeout:
 
     def test_node_survives_after_timeout(self, timeout_client: httpx.Client) -> None:
         """After a timeout, subsequent requests to the same resource work."""
-        # Create a node (fast)
+        # Create a node (fast, bulk-first envelope with flat credentials)
         resp = timeout_client.post(
             "/api/v2/nodes/",
             json={
-                "name": "e2e-timeout-test",
-                "connection_type": "ssh",
-                "host": "127.0.0.1",
-                "port": 22,
-                "username": "testuser",
-                "auth_method": "password",
-                "credentials": {"password": "testpass"},
+                "items": [
+                    {
+                        "name": "e2e-timeout-test",
+                        "connection_type": "ssh",
+                        "host": "127.0.0.1",
+                        "port": 22,
+                        "username": "testuser",
+                        "password": "testpass",
+                    }
+                ]
             },
         )
-        # May succeed or fail depending on SSH, but shouldn't timeout
-        assert resp.status_code in (201, 400, 409, 500)
+        # May succeed or fail depending on SSH, but shouldn't timeout.
+        # Bulk envelope: 201 created, 200 all-failed, 207 partial.
+        assert resp.status_code in (200, 201, 207)
 
         # Subsequent request should still work
         resp2 = timeout_client.get("/api/v2/nodes/")

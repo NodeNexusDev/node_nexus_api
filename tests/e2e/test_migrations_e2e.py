@@ -134,11 +134,11 @@ class TestMigrationDataPreservation:
         # Create a node (generates audit log)
         node = e2e_resources.create_ssh_node()
 
-        # Wait for audit delivery
+        # Wait for audit delivery (CursorPage shape: items/next_cursor/has_more)
         deadline = time.monotonic() + 10.0
         while time.monotonic() < deadline:
             resp = e2e_client.get(f"/api/v2/audit/?node_id={node['id']}")
-            if resp.status_code == 200 and resp.json()["total"] > 0:
+            if resp.status_code == 200 and len(resp.json().get("items", [])) > 0:
                 break
             time.sleep(0.5)
 
@@ -157,4 +157,4 @@ class TestMigrationDataPreservation:
         # Audit log should still exist
         resp = e2e_client.get(f"/api/v2/audit/?node_id={node['id']}")
         assert resp.status_code == 200
-        assert resp.json()["total"] >= 1
+        assert len(resp.json().get("items", [])) >= 1

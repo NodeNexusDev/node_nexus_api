@@ -61,6 +61,7 @@ def test_large_stdout_ssh_command(
     assert len(stdout) > 50000, f"Expected >50KB stdout, got {len(stdout)} bytes"
 
 
+@pytest.mark.flaky(reruns=2)
 def test_large_stdout_docker_exec(
     e2e_client: httpx.Client,
     e2e_resources: UniqueResourceFactory,

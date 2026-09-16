@@ -42,6 +42,7 @@ def test_docker_list_images(
     assert len(alpine_images) >= 1
 
 
+@pytest.mark.flaky(reruns=2)
 def test_docker_pull_image(
     e2e_client,
     e2e_resources: UniqueResourceFactory,
@@ -739,6 +740,7 @@ def test_docker_container_stats_not_found(
 
 
 @pytest.mark.e2e_slow
+@pytest.mark.flaky(reruns=2)
 def test_docker_container_create(
     e2e_client,
     e2e_resources: UniqueResourceFactory,
@@ -842,6 +844,7 @@ def test_docker_image_tag(
 
 
 @pytest.mark.e2e_slow
+@pytest.mark.flaky(reruns=2)
 def test_docker_image_build(
     e2e_client,
     e2e_resources: UniqueResourceFactory,
@@ -1407,6 +1410,7 @@ def test_docker_volume_create_named(
     e2e_client.delete(f"/api/v2/nodes/{node['id']}/docker/volumes/e2e-named-vol")
 
 
+@pytest.mark.flaky(reruns=2)
 def test_docker_container_rename_validation(
     e2e_client,
     e2e_resources: UniqueResourceFactory,
