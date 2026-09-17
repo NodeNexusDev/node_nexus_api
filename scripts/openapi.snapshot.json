@@ -11,7 +11,7 @@
       "name": "MIT",
       "identifier": "MIT"
     },
-    "version": "2.5.2"
+    "version": "2.5.3"
   },
   "paths": {
     "/health": {
@@ -25370,7 +25370,7 @@
           "templates"
         ],
         "summary": "Install Pack",
-        "description": "Install a pack — bulk create commands/scripts with template_pack_id.\n\nQuery ``on_conflict`` controls name collisions:\n- ``fail`` (default) raises 409 on existing command/script name.\n- ``rename`` generates unique name by appending ``_1``, ``_2`` etc.\n\nReturns 201 when all succeed, 207 when partially, 409 when conflict.",
+        "description": "Install a pack — bulk create commands/scripts with template_pack_id.\n\nQuery ``on_conflict`` controls name collisions:\n- ``fail`` (default) raises 409 on existing command/script name.\n- ``rename`` generates unique name by appending ``_1``, ``_2`` etc.\n\nReturns 201 when all succeed, 207 when partially, 409 when conflict,\n422 when all failed.",
         "operationId": "post_api_v2_templates_packs_pack_id_installations",
         "security": [
           {
