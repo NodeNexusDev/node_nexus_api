@@ -105,7 +105,7 @@ audit = structlog.get_logger("audit")
 # Compatibility aliases for tests importing private helpers
 _encode_offset = encode_offset  # noqa: N816
 _decode_offset = decode_offset  # noqa: N816
-router = APIRouter(tags=["docker"], route_class=DishkaRoute)
+router = APIRouter(route_class=DishkaRoute)
 
 
 # ---------------------------------------------------------------------------

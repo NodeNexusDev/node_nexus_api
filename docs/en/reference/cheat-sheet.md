@@ -141,8 +141,6 @@ Bulk responses use `BulkResult` `{total,succeeded,failed,results}` with `200` al
 | Docker version | `curl -H "X-API-Key: ${NODE_NEXUS_API_KEY}" "${NODE_NEXUS_URL}/api/v2/nodes/${NODE_ID}/docker/system/version"` |
 | Disk usage | `curl -H "X-API-Key: ${NODE_NEXUS_API_KEY}" "${NODE_NEXUS_URL}/api/v2/nodes/${NODE_ID}/docker/system/df"` |
 | System prune | `curl -X POST -H "X-API-Key: ${NODE_NEXUS_API_KEY}" "${NODE_NEXUS_URL}/api/v2/nodes/${NODE_ID}/docker/system/prune?volumes=false"` |
-| Prune containers | `curl -X POST -H "X-API-Key: ${NODE_NEXUS_API_KEY}" "${NODE_NEXUS_URL}/api/v2/nodes/${NODE_ID}/docker/containers/prune"` |
-| Prune images | `curl -X POST -H "X-API-Key: ${NODE_NEXUS_API_KEY}" "${NODE_NEXUS_URL}/api/v2/nodes/${NODE_ID}/docker/images/prune"` |
 
 ## Compose
 

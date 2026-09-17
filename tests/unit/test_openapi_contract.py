@@ -13,7 +13,7 @@ from app.main import app
 from tests.types import UnvalidatedJsonObject
 
 OPENAPI_CONTRACT_SHA256 = (
-    "f8696e8d22d7619b63354dfd7a6b8c7c9dd4835d1104cd347b3fbd5350424041"
+    "d3876a7a925931530202324359b6ca611b4f89af0dec868b8d1efaede9713ceb"
 )
 
 _CANONICAL_ENV = {
@@ -91,6 +91,20 @@ def test_openapi_metadata_and_operation_ids_are_stable() -> None:
     assert operation_ids
     assert len(operation_ids) == len(set(operation_ids))
     assert all(" " not in operation_id for operation_id in operation_ids)
+
+
+def test_openapi_operation_tags_are_unique() -> None:
+    """Each operation must list a tag at most once (no facade duplication)."""
+    schema = app.openapi()
+    methods = {"get", "post", "put", "patch", "delete"}
+    duplicates = [
+        f"{method.upper()} {path}: {operation.get('tags')}"
+        for path, path_item in schema["paths"].items()
+        for method, operation in path_item.items()
+        if method in methods
+        and len(operation.get("tags", [])) != len(set(operation.get("tags", [])))
+    ]
+    assert not duplicates, duplicates
 
 
 def test_openapi_exposes_api_key_security_scheme() -> None:

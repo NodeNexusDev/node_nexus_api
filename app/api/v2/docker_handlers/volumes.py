@@ -102,7 +102,7 @@ from app.schemas.docker import (
 
 audit = structlog.get_logger("audit")
 
-router = APIRouter(tags=["docker"], route_class=DishkaRoute)
+router = APIRouter(route_class=DishkaRoute)
 
 
 # ---------------------------------------------------------------------------

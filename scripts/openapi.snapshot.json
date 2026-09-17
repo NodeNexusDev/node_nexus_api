@@ -11,7 +11,7 @@
       "name": "MIT",
       "identifier": "MIT"
     },
-    "version": "2.4.1"
+    "version": "2.5.2"
   },
   "paths": {
     "/health": {
@@ -8087,7 +8087,6 @@
     "/api/v2/nodes/{node_id}/docker/containers": {
       "post": {
         "tags": [
-          "docker",
           "docker"
         ],
         "summary": "Create Container",
@@ -8248,7 +8247,6 @@
       },
       "get": {
         "tags": [
-          "docker",
           "docker"
         ],
         "summary": "List Containers",
@@ -8445,7 +8443,6 @@
     "/api/v2/nodes/{node_id}/docker/containers/{container_id}": {
       "get": {
         "tags": [
-          "docker",
           "docker"
         ],
         "summary": "Get Container",
@@ -8605,7 +8602,6 @@
       },
       "delete": {
         "tags": [
-          "docker",
           "docker"
         ],
         "summary": "Remove Container",
@@ -8770,7 +8766,6 @@
     "/api/v2/nodes/{node_id}/docker/containers/{container_id}/rename": {
       "post": {
         "tags": [
-          "docker",
           "docker"
         ],
         "summary": "Rename Container",
@@ -8942,7 +8937,6 @@
     "/api/v2/nodes/{node_id}/docker/containers/{container_id}/start": {
       "post": {
         "tags": [
-          "docker",
           "docker"
         ],
         "summary": "Start Container",
@@ -9097,7 +9091,6 @@
     "/api/v2/nodes/{node_id}/docker/containers/{container_id}/stop": {
       "post": {
         "tags": [
-          "docker",
           "docker"
         ],
         "summary": "Stop Container",
@@ -9264,7 +9257,6 @@
     "/api/v2/nodes/{node_id}/docker/containers/{container_id}/restart": {
       "post": {
         "tags": [
-          "docker",
           "docker"
         ],
         "summary": "Restart Container",
@@ -9431,7 +9423,6 @@
     "/api/v2/nodes/{node_id}/docker/containers/{container_id}/pause": {
       "post": {
         "tags": [
-          "docker",
           "docker"
         ],
         "summary": "Pause Container",
@@ -9593,7 +9584,6 @@
     "/api/v2/nodes/{node_id}/docker/containers/{container_id}/unpause": {
       "post": {
         "tags": [
-          "docker",
           "docker"
         ],
         "summary": "Unpause Container",
@@ -9755,7 +9745,6 @@
     "/api/v2/nodes/{node_id}/docker/containers/{container_id}/kill": {
       "post": {
         "tags": [
-          "docker",
           "docker"
         ],
         "summary": "Kill Container",
@@ -9927,7 +9916,6 @@
     "/api/v2/nodes/{node_id}/docker/containers/{container_id}/update": {
       "post": {
         "tags": [
-          "docker",
           "docker"
         ],
         "summary": "Update Container",
@@ -10099,7 +10087,6 @@
     "/api/v2/nodes/{node_id}/docker/containers/{container_id}/port": {
       "get": {
         "tags": [
-          "docker",
           "docker"
         ],
         "summary": "Get Port",
@@ -10278,7 +10265,6 @@
     "/api/v2/nodes/{node_id}/docker/containers/{container_id}/wait": {
       "post": {
         "tags": [
-          "docker",
           "docker"
         ],
         "summary": "Wait Container",
@@ -10458,7 +10444,6 @@
     "/api/v2/nodes/{node_id}/docker/containers/{container_id}/logs": {
       "get": {
         "tags": [
-          "docker",
           "docker"
         ],
         "summary": "Get Logs",
@@ -10649,7 +10634,6 @@
     "/api/v2/nodes/{node_id}/docker/containers/{container_id}/exec": {
       "post": {
         "tags": [
-          "docker",
           "docker"
         ],
         "summary": "Exec Command",
@@ -10821,7 +10805,6 @@
     "/api/v2/nodes/{node_id}/docker/containers/{container_id}/top": {
       "get": {
         "tags": [
-          "docker",
           "docker"
         ],
         "summary": "Top Container",
@@ -10983,7 +10966,6 @@
     "/api/v2/nodes/{node_id}/docker/containers/{container_id}/stats": {
       "get": {
         "tags": [
-          "docker",
           "docker"
         ],
         "summary": "Get Stats",
@@ -11145,7 +11127,6 @@
     "/api/v2/nodes/{node_id}/docker/containers/{container_id}/archive": {
       "get": {
         "tags": [
-          "docker",
           "docker"
         ],
         "summary": "Get Archive",
@@ -11316,7 +11297,6 @@
       },
       "put": {
         "tags": [
-          "docker",
           "docker"
         ],
         "summary": "Put Archive",
@@ -11501,7 +11481,6 @@
     "/api/v2/nodes/{node_id}/docker/containers/starts": {
       "post": {
         "tags": [
-          "docker",
           "docker"
         ],
         "summary": "Bulk Starts",
@@ -11664,7 +11643,6 @@
     "/api/v2/nodes/{node_id}/docker/containers/stops": {
       "post": {
         "tags": [
-          "docker",
           "docker"
         ],
         "summary": "Bulk Stops",
@@ -11839,7 +11817,6 @@
     "/api/v2/nodes/{node_id}/docker/containers/restarts": {
       "post": {
         "tags": [
-          "docker",
           "docker"
         ],
         "summary": "Bulk Restarts",
@@ -12014,7 +11991,6 @@
     "/api/v2/nodes/{node_id}/docker/containers/removals": {
       "post": {
         "tags": [
-          "docker",
           "docker"
         ],
         "summary": "Bulk Removals",
@@ -12187,7 +12163,6 @@
     "/api/v2/nodes/{node_id}/docker/containers/pauses": {
       "post": {
         "tags": [
-          "docker",
           "docker"
         ],
         "summary": "Bulk Pauses",
@@ -12350,7 +12325,6 @@
     "/api/v2/nodes/{node_id}/docker/containers/unpauses": {
       "post": {
         "tags": [
-          "docker",
           "docker"
         ],
         "summary": "Bulk Unpauses",
@@ -12513,7 +12487,6 @@
     "/api/v2/nodes/{node_id}/docker/containers/kills": {
       "post": {
         "tags": [
-          "docker",
           "docker"
         ],
         "summary": "Bulk Kills",
@@ -12676,7 +12649,6 @@
     "/api/v2/nodes/{node_id}/docker/containers/updates": {
       "post": {
         "tags": [
-          "docker",
           "docker"
         ],
         "summary": "Bulk Updates",
@@ -12839,7 +12811,6 @@
     "/api/v2/nodes/{node_id}/docker/containers/prune": {
       "post": {
         "tags": [
-          "docker",
           "docker"
         ],
         "summary": "Prune Containers",
@@ -12992,7 +12963,6 @@
     "/api/v2/nodes/{node_id}/docker/containers/executions": {
       "post": {
         "tags": [
-          "docker",
           "docker"
         ],
         "summary": "Bulk Executions",
@@ -13155,7 +13125,6 @@
     "/api/v2/nodes/{node_id}/docker/containers/inspections": {
       "post": {
         "tags": [
-          "docker",
           "docker"
         ],
         "summary": "Bulk Inspections",
@@ -13318,7 +13287,6 @@
     "/api/v2/nodes/{node_id}/docker/containers/logs": {
       "post": {
         "tags": [
-          "docker",
           "docker"
         ],
         "summary": "Bulk Logs",
@@ -13481,7 +13449,6 @@
     "/api/v2/nodes/{node_id}/docker/containers/stats": {
       "post": {
         "tags": [
-          "docker",
           "docker"
         ],
         "summary": "Bulk Stats",
@@ -13644,7 +13611,6 @@
     "/api/v2/nodes/{node_id}/docker/images": {
       "get": {
         "tags": [
-          "docker",
           "docker"
         ],
         "summary": "List Images",
@@ -13829,7 +13795,6 @@
     "/api/v2/nodes/{node_id}/docker/images/pull": {
       "post": {
         "tags": [
-          "docker",
           "docker"
         ],
         "summary": "Pull Image",
@@ -13992,7 +13957,6 @@
     "/api/v2/nodes/{node_id}/docker/images/build": {
       "post": {
         "tags": [
-          "docker",
           "docker"
         ],
         "summary": "Build Image",
@@ -14155,7 +14119,6 @@
     "/api/v2/nodes/{node_id}/docker/images/{image_id}/history": {
       "get": {
         "tags": [
-          "docker",
           "docker"
         ],
         "summary": "Image History",
@@ -14317,7 +14280,6 @@
     "/api/v2/nodes/{node_id}/docker/images/{image_id}": {
       "get": {
         "tags": [
-          "docker",
           "docker"
         ],
         "summary": "Inspect Image",
@@ -14477,7 +14439,6 @@
       },
       "delete": {
         "tags": [
-          "docker",
           "docker"
         ],
         "summary": "Remove Image",
@@ -14632,7 +14593,6 @@
     "/api/v2/nodes/{node_id}/docker/images/prune": {
       "post": {
         "tags": [
-          "docker",
           "docker"
         ],
         "summary": "Prune Images",
@@ -14785,7 +14745,6 @@
     "/api/v2/nodes/{node_id}/docker/images/pulls": {
       "post": {
         "tags": [
-          "docker",
           "docker"
         ],
         "summary": "Bulk Pulls",
@@ -14948,7 +14907,6 @@
     "/api/v2/nodes/{node_id}/docker/images/removals": {
       "post": {
         "tags": [
-          "docker",
           "docker"
         ],
         "summary": "Bulk Image Removals",
@@ -15111,7 +15069,6 @@
     "/api/v2/nodes/{node_id}/docker/images/{image_id}/tag": {
       "post": {
         "tags": [
-          "docker",
           "docker"
         ],
         "summary": "Tag Image",
@@ -15283,7 +15240,6 @@
     "/api/v2/nodes/{node_id}/docker/images/{image_id}/push": {
       "post": {
         "tags": [
-          "docker",
           "docker"
         ],
         "summary": "Push Image",
@@ -15445,7 +15401,6 @@
     "/api/v2/nodes/{node_id}/docker/images/push": {
       "post": {
         "tags": [
-          "docker",
           "docker"
         ],
         "summary": "Push Image Body",
@@ -15608,8 +15563,6 @@
     "/api/v2/nodes/{node_id}/docker/networks": {
       "get": {
         "tags": [
-          "docker",
-          "docker",
           "docker"
         ],
         "summary": "List Networks",
@@ -15792,8 +15745,6 @@
       },
       "post": {
         "tags": [
-          "docker",
-          "docker",
           "docker"
         ],
         "summary": "Create Network",
@@ -15956,8 +15907,6 @@
     "/api/v2/nodes/{node_id}/docker/networks/{network_id}": {
       "get": {
         "tags": [
-          "docker",
-          "docker",
           "docker"
         ],
         "summary": "Inspect Network",
@@ -16117,8 +16066,6 @@
       },
       "delete": {
         "tags": [
-          "docker",
-          "docker",
           "docker"
         ],
         "summary": "Remove Network",
@@ -16273,8 +16220,6 @@
     "/api/v2/nodes/{node_id}/docker/networks/removals": {
       "post": {
         "tags": [
-          "docker",
-          "docker",
           "docker"
         ],
         "summary": "Bulk Network Removals",
@@ -16437,8 +16382,6 @@
     "/api/v2/nodes/{node_id}/docker/networks/prune": {
       "post": {
         "tags": [
-          "docker",
-          "docker",
           "docker"
         ],
         "summary": "Prune Networks",
@@ -16591,8 +16534,6 @@
     "/api/v2/nodes/{node_id}/docker/networks/{network_id}/connect": {
       "post": {
         "tags": [
-          "docker",
-          "docker",
           "docker"
         ],
         "summary": "Connect To Network",
@@ -16764,8 +16705,6 @@
     "/api/v2/nodes/{node_id}/docker/networks/{network_id}/disconnect": {
       "post": {
         "tags": [
-          "docker",
-          "docker",
           "docker"
         ],
         "summary": "Disconnect From Network",
@@ -16937,7 +16876,6 @@
     "/api/v2/nodes/{node_id}/docker/volumes": {
       "get": {
         "tags": [
-          "docker",
           "docker"
         ],
         "summary": "List Volumes",
@@ -17120,7 +17058,6 @@
       },
       "post": {
         "tags": [
-          "docker",
           "docker"
         ],
         "summary": "Create Volume",
@@ -17283,7 +17220,6 @@
     "/api/v2/nodes/{node_id}/docker/volumes/removals": {
       "post": {
         "tags": [
-          "docker",
           "docker"
         ],
         "summary": "Bulk Volume Removals",
@@ -17446,7 +17382,6 @@
     "/api/v2/nodes/{node_id}/docker/volumes/{volume_name}": {
       "get": {
         "tags": [
-          "docker",
           "docker"
         ],
         "summary": "Inspect Volume",
@@ -17606,7 +17541,6 @@
       },
       "delete": {
         "tags": [
-          "docker",
           "docker"
         ],
         "summary": "Remove Volume",
@@ -17761,7 +17695,6 @@
     "/api/v2/nodes/{node_id}/docker/volumes/prune": {
       "post": {
         "tags": [
-          "docker",
           "docker"
         ],
         "summary": "Prune Volumes",
@@ -17914,7 +17847,6 @@
     "/api/v2/nodes/{node_id}/docker/system/info": {
       "get": {
         "tags": [
-          "docker",
           "docker"
         ],
         "summary": "System Info",
@@ -18067,7 +17999,6 @@
     "/api/v2/nodes/{node_id}/docker/system/version": {
       "get": {
         "tags": [
-          "docker",
           "docker"
         ],
         "summary": "System Version",
@@ -18220,7 +18151,6 @@
     "/api/v2/nodes/{node_id}/docker/system/df": {
       "get": {
         "tags": [
-          "docker",
           "docker"
         ],
         "summary": "System Df",
@@ -18377,7 +18307,6 @@
     "/api/v2/nodes/{node_id}/docker/system/prune": {
       "post": {
         "tags": [
-          "docker",
           "docker"
         ],
         "summary": "System Prune",
@@ -18540,7 +18469,6 @@
     "/api/v2/nodes/{node_id}/docker/compose/projects": {
       "post": {
         "tags": [
-          "docker-compose",
           "docker-compose"
         ],
         "summary": "Create Project",
@@ -18701,7 +18629,6 @@
       },
       "get": {
         "tags": [
-          "docker-compose",
           "docker-compose"
         ],
         "summary": "List Projects",
@@ -18886,7 +18813,6 @@
     "/api/v2/nodes/{node_id}/docker/compose/projects/{project_name}": {
       "get": {
         "tags": [
-          "docker-compose",
           "docker-compose"
         ],
         "summary": "Get Project",
@@ -19046,7 +18972,6 @@
       },
       "patch": {
         "tags": [
-          "docker-compose",
           "docker-compose"
         ],
         "summary": "Update Project",
@@ -19216,7 +19141,6 @@
       },
       "delete": {
         "tags": [
-          "docker-compose",
           "docker-compose"
         ],
         "summary": "Delete Project",
@@ -19371,7 +19295,6 @@
     "/api/v2/nodes/{node_id}/docker/compose/projects/{project_name}/ups": {
       "post": {
         "tags": [
-          "docker-compose",
           "docker-compose"
         ],
         "summary": "Compose Up",
@@ -19543,7 +19466,6 @@
     "/api/v2/nodes/{node_id}/docker/compose/projects/{project_name}/downs": {
       "post": {
         "tags": [
-          "docker-compose",
           "docker-compose"
         ],
         "summary": "Compose Down",
@@ -19715,7 +19637,6 @@
     "/api/v2/nodes/{node_id}/docker/compose/projects/{project_name}/starts": {
       "post": {
         "tags": [
-          "docker-compose",
           "docker-compose"
         ],
         "summary": "Compose Starts",
@@ -19887,7 +19808,6 @@
     "/api/v2/nodes/{node_id}/docker/compose/projects/{project_name}/stops": {
       "post": {
         "tags": [
-          "docker-compose",
           "docker-compose"
         ],
         "summary": "Compose Stops",
@@ -20071,7 +19991,6 @@
     "/api/v2/nodes/{node_id}/docker/compose/projects/{project_name}/restarts": {
       "post": {
         "tags": [
-          "docker-compose",
           "docker-compose"
         ],
         "summary": "Compose Restarts",
@@ -20255,7 +20174,6 @@
     "/api/v2/nodes/{node_id}/docker/compose/projects/{project_name}/pauses": {
       "post": {
         "tags": [
-          "docker-compose",
           "docker-compose"
         ],
         "summary": "Compose Pauses",
@@ -20427,7 +20345,6 @@
     "/api/v2/nodes/{node_id}/docker/compose/projects/{project_name}/unpauses": {
       "post": {
         "tags": [
-          "docker-compose",
           "docker-compose"
         ],
         "summary": "Compose Unpauses",
@@ -20599,7 +20516,6 @@
     "/api/v2/nodes/{node_id}/docker/compose/projects/{project_name}/kills": {
       "post": {
         "tags": [
-          "docker-compose",
           "docker-compose"
         ],
         "summary": "Compose Kills",
@@ -20771,7 +20687,6 @@
     "/api/v2/nodes/{node_id}/docker/compose/projects/{project_name}/creates": {
       "post": {
         "tags": [
-          "docker-compose",
           "docker-compose"
         ],
         "summary": "Compose Creates",
@@ -20943,7 +20858,6 @@
     "/api/v2/nodes/{node_id}/docker/compose/projects/{project_name}/rms": {
       "post": {
         "tags": [
-          "docker-compose",
           "docker-compose"
         ],
         "summary": "Compose Rms",
@@ -21125,7 +21039,6 @@
     "/api/v2/nodes/{node_id}/docker/compose/projects/{project_name}/pulls": {
       "post": {
         "tags": [
-          "docker-compose",
           "docker-compose"
         ],
         "summary": "Compose Pulls",
@@ -21297,7 +21210,6 @@
     "/api/v2/nodes/{node_id}/docker/compose/projects/{project_name}/pushs": {
       "post": {
         "tags": [
-          "docker-compose",
           "docker-compose"
         ],
         "summary": "Compose Pushs",
@@ -21469,7 +21381,6 @@
     "/api/v2/nodes/{node_id}/docker/compose/projects/{project_name}/builds": {
       "post": {
         "tags": [
-          "docker-compose",
           "docker-compose"
         ],
         "summary": "Compose Builds",
@@ -21651,7 +21562,6 @@
     "/api/v2/nodes/{node_id}/docker/compose/projects/{project_name}/ps": {
       "get": {
         "tags": [
-          "docker-compose",
           "docker-compose"
         ],
         "summary": "Compose Ps",
@@ -21823,7 +21733,6 @@
     "/api/v2/nodes/{node_id}/docker/compose/projects/{project_name}/logs": {
       "get": {
         "tags": [
-          "docker-compose",
           "docker-compose"
         ],
         "summary": "Compose Logs",
@@ -22031,7 +21940,6 @@
     "/api/v2/nodes/{node_id}/docker/compose/projects/{project_name}/config": {
       "get": {
         "tags": [
-          "docker-compose",
           "docker-compose"
         ],
         "summary": "Compose Config",
@@ -22193,7 +22101,6 @@
     "/api/v2/nodes/{node_id}/docker/compose/projects/{project_name}/images": {
       "get": {
         "tags": [
-          "docker-compose",
           "docker-compose"
         ],
         "summary": "Compose Images",
@@ -22355,7 +22262,6 @@
     "/api/v2/nodes/{node_id}/docker/compose/projects/{project_name}/top": {
       "get": {
         "tags": [
-          "docker-compose",
           "docker-compose"
         ],
         "summary": "Compose Top",
@@ -22534,7 +22440,6 @@
     "/api/v2/nodes/{node_id}/docker/compose/projects/{project_name}/port": {
       "get": {
         "tags": [
-          "docker-compose",
           "docker-compose"
         ],
         "summary": "Compose Port",
@@ -22718,7 +22623,6 @@
     "/api/v2/nodes/{node_id}/docker/compose/projects/{project_name}/version": {
       "get": {
         "tags": [
-          "docker-compose",
           "docker-compose"
         ],
         "summary": "Compose Version",
@@ -22880,7 +22784,6 @@
     "/api/v2/nodes/{node_id}/docker/compose/projects/{project_name}/executions": {
       "post": {
         "tags": [
-          "docker-compose",
           "docker-compose"
         ],
         "summary": "Compose Exec",
@@ -23052,7 +22955,6 @@
     "/api/v2/nodes/{node_id}/docker/compose/projects/{project_name}/runs": {
       "post": {
         "tags": [
-          "docker-compose",
           "docker-compose"
         ],
         "summary": "Compose Run",
@@ -30126,7 +30028,7 @@
           "events"
         ],
         "summary": "Event Stream",
-        "description": "Subscribe to live server-sent events.\n\nEvents: node.status_changed, execution.completed, execution.failed,\nscript.scheduled, job.progress.",
+        "description": "Subscribe to live server-sent events.\n\nEvents: node.status_changed, execution.completed, execution.failed,\nexecution.cancelled, script.scheduled, docker.container.start,\ndocker.container.stop, docker.container.restart, docker.container.remove,\ndocker.container.pause, docker.container.unpause, docker.container.kill,\ndocker.container.rename.",
         "operationId": "get_api_v2_events_stream",
         "responses": {
           "200": {

@@ -9,6 +9,6 @@ from fastapi import APIRouter
 from app.api.v2.docker_handlers.images_handlers.listing import router as listing_router
 from app.api.v2.docker_handlers.images_handlers.ops import router as ops_router
 
-router = APIRouter(tags=["docker"], route_class=DishkaRoute)
+router = APIRouter(route_class=DishkaRoute)
 router.include_router(listing_router)
 router.include_router(ops_router)

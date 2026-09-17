@@ -10,6 +10,6 @@ from app.api.v2.compose_handlers.bulk_handlers.lifecycle import (
 )
 from app.api.v2.compose_handlers.bulk_handlers.ops import router as ops_router
 
-router = APIRouter(tags=["docker-compose"], route_class=DishkaRoute)
+router = APIRouter(route_class=DishkaRoute)
 router.include_router(lifecycle_router)
 router.include_router(ops_router)
