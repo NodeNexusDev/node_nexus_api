@@ -386,7 +386,13 @@ class DockerContainerService:
             node_id,
             {"container_id": validated_id, "tail": tail},
         )
-        return stdout
+        # `docker logs` replays the container's own streams: apps logging to
+        # stderr would be silently dropped if only stdout were returned.
+        # Cross-stream order is unrecoverable post-hoc, so concatenate.
+        if stdout and stderr:
+            separator = "" if stdout.endswith("\n") or stderr.startswith("\n") else "\n"
+            return f"{stdout}{separator}{stderr}"
+        return stdout or stderr
 
     async def exec_command(
         self,
