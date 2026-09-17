@@ -17,6 +17,7 @@ from app.application.services.template_pack_service import (
     PackNotFoundError,
     TemplatePackService,
 )
+from app.api.error_mapping import sanitize_bulk_error
 from app.schemas.common import BulkResult
 from app.schemas.template_pack import (
     BulkPackDeleteRequest,
@@ -91,11 +92,15 @@ async def bulk_delete_packs(
             results.append(BulkPackDeleteResult(pack_id=pid, status="success"))
         except PackNotFoundError as exc:
             results.append(
-                BulkPackDeleteResult(pack_id=pid, status="error", error=str(exc))
+                BulkPackDeleteResult(
+                    pack_id=pid, status="error", error=sanitize_bulk_error(exc)
+                )
             )
         except Exception as exc:  # noqa: BLE001
             results.append(
-                BulkPackDeleteResult(pack_id=pid, status="error", error=str(exc))
+                BulkPackDeleteResult(
+                    pack_id=pid, status="error", error=sanitize_bulk_error(exc)
+                )
             )
     succeeded = sum(1 for r in results if r.status == "success")
     failed = len(results) - succeeded

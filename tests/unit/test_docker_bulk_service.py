@@ -49,7 +49,7 @@ async def test_prepare_docker_error() -> None:
 
     assert prepared == []
     assert slots[0].status == "error"
-    assert "connection refused" in slots[0].error
+    assert slots[0].error == "Docker operation failed"
 
 
 @pytest.mark.asyncio
@@ -63,7 +63,7 @@ async def test_prepare_value_error() -> None:
 
     assert prepared == []
     assert slots[0].status == "error"
-    assert "bad host" in slots[0].error
+    assert slots[0].error == "Internal error"
 
 
 # ── _resolve_node_ids: tag exception branch ──
@@ -152,7 +152,7 @@ async def test_bulk_pull_image_exception() -> None:
 
     assert result.total == 1
     assert result.failed == 1
-    assert "ssh timeout" in result.results[0].error
+    assert result.results[0].error == "Internal error"
 
 
 # ── bulk_image_remove ──
@@ -205,7 +205,7 @@ async def test_bulk_image_remove_exception() -> None:
 
     assert result.total == 1
     assert result.failed == 1
-    assert "connection lost" in result.results[0].error
+    assert result.results[0].error == "Internal error"
 
 
 # ── bulk_image_build ──
@@ -272,7 +272,7 @@ async def test_bulk_image_build_exception() -> None:
 
     assert result.total == 1
     assert result.failed == 1
-    assert "docker daemon down" in result.results[0].error
+    assert result.results[0].error == "Internal error"
 
 
 # -- bulk_inspect --
@@ -330,7 +330,7 @@ async def test_bulk_inspect_exception() -> None:
 
     assert result.total == 1
     assert result.failed == 1
-    assert "ssh timeout" in result.results[0].error
+    assert result.results[0].error == "Internal error"
 
 
 # -- bulk_logs --
@@ -405,7 +405,7 @@ async def test_bulk_logs_exception() -> None:
 
     assert result.total == 1
     assert result.failed == 1
-    assert "connection lost" in result.results[0].error
+    assert result.results[0].error == "Internal error"
 
 
 # -- bulk_stats --
@@ -467,4 +467,4 @@ async def test_bulk_stats_exception() -> None:
 
     assert result.total == 1
     assert result.failed == 1
-    assert "ssh timeout" in result.results[0].error
+    assert result.results[0].error == "Internal error"

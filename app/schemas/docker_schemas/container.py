@@ -7,6 +7,7 @@ from typing import Literal, Self
 from pydantic import BaseModel, Field, model_validator
 
 from app.core.types import JsonObject
+from app.schemas.common import SafeName
 
 
 class DockerContainer(BaseModel):
@@ -85,7 +86,7 @@ class DockerExecResult(BaseModel):
 class ContainerRenameRequest(BaseModel):
     """Request body for renaming a container."""
 
-    new_name: str = Field(min_length=1, max_length=255)
+    new_name: SafeName = Field(min_length=1, max_length=255)
 
 
 class DockerTopProcess(BaseModel):
@@ -112,7 +113,7 @@ class ContainerCreateRequest(BaseModel):
     """Request body for ``POST /containers`` (``docker create``)."""
 
     image: str = Field(min_length=1, max_length=255)
-    name: str | None = Field(default=None, min_length=1, max_length=255)
+    name: SafeName | None = Field(default=None, min_length=1, max_length=255)
     command: str | None = Field(default=None, max_length=4096)
     ports: dict[str, str] = Field(default_factory=dict)
     volumes: dict[str, ContainerVolumeMount] = Field(default_factory=dict)

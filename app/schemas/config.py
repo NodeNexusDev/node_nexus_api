@@ -10,6 +10,7 @@ from app.application.dto.config import CONFIG_FORMAT_VERSION
 from app.core.docker_validation import validate_docker_host
 from app.core.types import ConnectionType
 from app.schemas.command import CommandParameter
+from app.schemas.common import SafeName
 from app.schemas.script import ScriptStep
 
 
@@ -24,7 +25,7 @@ def application_version() -> str:
 class NodeExport(BaseModel):
     """Exported node configuration (secrets excluded)."""
 
-    name: str
+    name: SafeName
     host: str
     port: int
     connection_type: ConnectionType
@@ -48,7 +49,7 @@ class NodeExport(BaseModel):
 class CommandExport(BaseModel):
     """Exported command template."""
 
-    name: str
+    name: SafeName
     description: str | None = None
     command: str
     parameters: list[CommandParameter] | None = None
@@ -58,7 +59,7 @@ class CommandExport(BaseModel):
 class ScriptExport(BaseModel):
     """Exported script configuration."""
 
-    name: str
+    name: SafeName
     description: str | None = None
     steps: list[ScriptStep] = Field(default_factory=list)
     tags: list[str] = Field(default_factory=list)

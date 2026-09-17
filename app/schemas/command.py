@@ -8,12 +8,13 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from app.core.constants import DEFAULT_TIMEOUT, OptionalTimeout, Timeout
 from app.core.types import JsonObject, JsonValue
+from app.schemas.common import SafeName
 
 
 class CommandParameter(BaseModel):
     """Definition of a single command parameter."""
 
-    name: str = Field(..., min_length=1, max_length=100)
+    name: SafeName = Field(..., min_length=1, max_length=100)
     type: Literal["string", "integer", "boolean"] = Field(default="string")
     required: bool = Field(default=True)
     default: JsonValue = Field(default=None)
@@ -23,7 +24,7 @@ class CommandParameter(BaseModel):
 class CommandCreate(BaseModel):
     """Schema for creating a command template."""
 
-    name: str = Field(..., min_length=1, max_length=255)
+    name: SafeName = Field(..., min_length=1, max_length=255)
     description: str | None = Field(default=None, max_length=1000)
     command: str = Field(..., min_length=1, max_length=4096)
     parameters: list[CommandParameter] = Field(default_factory=list)
@@ -34,7 +35,7 @@ class CommandCreate(BaseModel):
 class CommandUpdate(BaseModel):
     """Schema for updating a command template."""
 
-    name: str | None = Field(default=None, min_length=1, max_length=255)
+    name: SafeName | None = Field(default=None, min_length=1, max_length=255)
     description: str | None = Field(default=None, max_length=1000)
     command: str | None = Field(default=None, min_length=1, max_length=4096)
     parameters: list[CommandParameter] | None = None

@@ -8,16 +8,17 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.core.constants import DEFAULT_TIMEOUT, OptionalTimeout, Timeout
 from app.core.types import JsonObject
+from app.schemas.common import SafeName
 
 
 class ScriptStep(BaseModel):
     """Definition of a single step in a script."""
 
-    label: str = Field(..., min_length=1, max_length=255)
+    label: SafeName = Field(..., min_length=1, max_length=255)
     type: Literal["inline", "command"]
     command: str | None = Field(default=None, max_length=4096)
     command_id: uuid.UUID | None = None
-    command_name: str | None = Field(default=None, max_length=255)
+    command_name: SafeName | None = Field(default=None, max_length=255)
     params: JsonObject = Field(default_factory=dict)
     on_failure: Literal["stop", "continue"] = Field(default="stop")
 
@@ -33,7 +34,7 @@ class ScriptStep(BaseModel):
 class ScriptCreate(BaseModel):
     """Schema for creating a script."""
 
-    name: str = Field(..., min_length=1, max_length=255)
+    name: SafeName = Field(..., min_length=1, max_length=255)
     description: str | None = Field(default=None, max_length=1000)
     steps: list[ScriptStep] = Field(..., min_length=1)
     tags: list[str] = Field(default_factory=list)
@@ -43,7 +44,7 @@ class ScriptCreate(BaseModel):
 class ScriptUpdate(BaseModel):
     """Schema for updating a script."""
 
-    name: str | None = Field(default=None, min_length=1, max_length=255)
+    name: SafeName | None = Field(default=None, min_length=1, max_length=255)
     description: str | None = Field(default=None, max_length=1000)
     steps: list[ScriptStep] | None = Field(default=None, min_length=1)
     tags: list[str] | None = None

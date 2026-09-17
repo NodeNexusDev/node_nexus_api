@@ -6,13 +6,13 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.schemas.common import BulkResult
+from app.schemas.common import BulkResult, SafeName
 
 
 class ComposeCreate(BaseModel):
     """Schema for creating a compose project."""
 
-    project_name: str = Field(
+    project_name: SafeName = Field(
         ...,
         min_length=1,
         max_length=100,
@@ -89,7 +89,7 @@ class BulkComposeCreateRequest(BaseModel):
 class BulkComposeCreateItem(BaseModel):
     """Single compose create item for bulk request (alternative flat)."""
 
-    project_name: str = Field(..., min_length=1, max_length=100)
+    project_name: SafeName = Field(..., min_length=1, max_length=100)
     compose: str = Field(..., min_length=1, max_length=1048576)
     env: dict[str, str] = Field(default_factory=dict)
     template_pack_id: uuid.UUID | None = None
@@ -127,7 +127,7 @@ class BulkComposeCreateResponse(BulkResult[BulkComposeResult]):
 class BulkComposeDeleteRequest(BaseModel):
     """Request to delete multiple compose projects by project_name."""
 
-    project_names: list[str] = Field(
+    project_names: list[SafeName] = Field(
         ...,
         min_length=1,
         max_length=100,
@@ -155,7 +155,7 @@ class BulkComposeDeleteResponse(BaseModel):
 class BulkComposeUpdateItem(BaseModel):
     """Single item for bulk compose update."""
 
-    project_name: str = Field(..., min_length=1, max_length=100)
+    project_name: SafeName = Field(..., min_length=1, max_length=100)
     changes: ComposeUpdate
 
 

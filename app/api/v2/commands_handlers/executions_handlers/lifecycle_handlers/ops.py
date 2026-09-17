@@ -12,6 +12,7 @@ import structlog
 from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
 from fastapi import APIRouter, HTTPException, Query, Response, Security
 
+from app.api.error_mapping import sanitize_bulk_error
 from app.api.deps import Principal, get_current_principal, require_write_or_jwt_scope
 from app.api.v2._bulk import BulkResponder
 from app.application.dto.command_execution import BulkCommandRequestDTO
@@ -105,7 +106,9 @@ async def bulk_retry_executions(
             )
         except Exception as exc:  # noqa: BLE001
             return BulkRetryCommandResult(
-                execution_id=str(execution_id), status="error", message=str(exc)
+                execution_id=str(execution_id),
+                status="error",
+                message=sanitize_bulk_error(exc),
             )
 
     results = list(
@@ -138,7 +141,9 @@ async def bulk_cancel_executions(
             )  # noqa: E501
         except Exception as exc:  # noqa: BLE001
             return BulkCancelCommandResult(
-                execution_id=str(execution_id), status="error", message=str(exc)
+                execution_id=str(execution_id),
+                status="error",
+                message=sanitize_bulk_error(exc),
             )
 
     results = list(

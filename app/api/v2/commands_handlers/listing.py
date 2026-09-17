@@ -12,6 +12,7 @@ import structlog
 from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
 from fastapi import APIRouter, HTTPException, Query, Response, Security
 
+from app.api.error_mapping import sanitize_bulk_error
 from app.api.deps import Principal, get_current_principal, require_write_or_jwt_scope
 from app.api.v2._bulk import BulkResponder
 from app.api.v2._shared import (
@@ -157,7 +158,7 @@ async def bulk_create_commands(
             )  # noqa: E501
         except Exception as exc:  # noqa: BLE001
             return CommandBulkCreateResult(
-                name=item.name, status="error", error=str(exc)
+                name=item.name, status="error", error=sanitize_bulk_error(exc)
             )  # noqa: E501
 
     results = await asyncio.gather(*(_create_one(item) for item in data.items))

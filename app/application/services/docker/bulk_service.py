@@ -22,6 +22,7 @@ from app.core.docker_validation import (
     validate_image_name,
     validate_image_tag,
 )
+from app.core.error_sanitize import sanitize_bulk_error
 from app.core.exceptions import DockerError, NodeNotFoundError
 
 audit = structlog.get_logger("audit")
@@ -60,7 +61,7 @@ class DockerBulkService:
                     node_id=str(node_id),
                     node_name="unknown",
                     status="error",
-                    error=str(exc),
+                    error=sanitize_bulk_error(exc),
                 )
         return prepared, errors
 
@@ -83,7 +84,7 @@ class DockerBulkService:
             audit.warning(
                 "docker.bulk.resolve_tags.failed",
                 tags=node_tags,
-                error=str(exc),
+                error=sanitize_bulk_error(exc),
                 error_type=type(exc).__name__,
             )
             tag_nodes = []
@@ -152,7 +153,7 @@ class DockerBulkService:
                     node_id=node_id_str,
                     node_name="unknown",
                     status="error",
-                    error=str(exc),
+                    error=sanitize_bulk_error(exc),
                 )
 
         remote = list(
@@ -196,7 +197,7 @@ class DockerBulkService:
                     node_id=node_id_str,
                     node_name="unknown",
                     status="error",
-                    error=str(exc),
+                    error=sanitize_bulk_error(exc),
                 )
 
         remote = list(
@@ -269,7 +270,7 @@ class DockerBulkService:
                     node_id=node_id_str,
                     node_name="unknown",
                     status="error",
-                    error=str(exc),
+                    error=sanitize_bulk_error(exc),
                 )
 
         remote = list(
@@ -357,7 +358,7 @@ class DockerBulkService:
                     node_id=node_id_str,
                     node_name="unknown",
                     status="error",
-                    error=str(exc),
+                    error=sanitize_bulk_error(exc),
                 )
 
         remote = list(
@@ -466,7 +467,7 @@ class DockerBulkService:
                     node_id=node_id_str,
                     node_name="unknown",
                     status="error",
-                    error=str(exc),
+                    error=sanitize_bulk_error(exc),
                 )
 
         remote = list(
@@ -549,7 +550,7 @@ class DockerBulkService:
                     node_id=node_id_str,
                     node_name="unknown",
                     status="error",
-                    error=str(exc),
+                    error=sanitize_bulk_error(exc),
                 )
 
         remote = list(
@@ -590,7 +591,7 @@ class DockerBulkService:
                     node_id=node_id_str,
                     node_name="unknown",
                     status="error",
-                    error=str(exc),
+                    error=sanitize_bulk_error(exc),
                 )
 
         remote = list(
@@ -629,7 +630,7 @@ class DockerBulkService:
                     node_id=node_id_str,
                     node_name="unknown",
                     status="error",
-                    error=str(exc),
+                    error=sanitize_bulk_error(exc),
                 )
 
         remote = list(

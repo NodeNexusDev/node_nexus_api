@@ -9,13 +9,13 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.core.docker_validation import validate_docker_host
 from app.core.types import ConnectionType, JsonObject, NodeStatus
-from app.schemas.common import CursorPage, PaginatedResponse
+from app.schemas.common import CursorPage, PaginatedResponse, SafeName
 
 
 class NodeCreate(BaseModel):
     """Schema for creating a node."""
 
-    name: str = Field(min_length=1, max_length=255)
+    name: SafeName = Field(min_length=1, max_length=255)
     host: str = Field(min_length=1, max_length=255)
     port: int = Field(default=22, ge=1, le=65535)
     connection_type: ConnectionType = "ssh"
@@ -45,7 +45,7 @@ class NodeCreate(BaseModel):
 class NodeUpdate(BaseModel):
     """Schema for updating a node."""
 
-    name: str | None = Field(default=None, min_length=1, max_length=255)
+    name: SafeName | None = Field(default=None, min_length=1, max_length=255)
     host: str | None = Field(default=None, min_length=1, max_length=255)
     port: int | None = Field(default=None, ge=1, le=65535)
     connection_type: ConnectionType | None = None

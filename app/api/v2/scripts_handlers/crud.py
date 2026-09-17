@@ -12,6 +12,7 @@ import structlog
 from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
 from fastapi import APIRouter, HTTPException, Query, Response, Security
 
+from app.api.error_mapping import sanitize_bulk_error
 from app.api.deps import Principal, get_current_principal, require_write_or_jwt_scope
 from app.api.v2._bulk import BulkResponder
 from app.api.v2._shared import script_response
@@ -167,7 +168,7 @@ async def bulk_update_scripts(
             return ScriptBulkUpdateResult(script_id=item.id, status="success")
         except Exception as exc:  # noqa: BLE001
             return ScriptBulkUpdateResult(
-                script_id=item.id, status="error", error=str(exc)
+                script_id=item.id, status="error", error=sanitize_bulk_error(exc)
             )
 
     results = await asyncio.gather(*(_update_one(u) for u in data.updates))
@@ -190,7 +191,9 @@ async def bulk_delete_scripts(
             await service.delete_script(sid)
             return ScriptBulkUpdateResult(script_id=sid, status="success")
         except Exception as exc:  # noqa: BLE001
-            return ScriptBulkUpdateResult(script_id=sid, status="error", error=str(exc))
+            return ScriptBulkUpdateResult(
+                script_id=sid, status="error", error=sanitize_bulk_error(exc)
+            )
 
     results = await asyncio.gather(*(_delete_one(sid) for sid in data.ids))
     return BulkResponder(response).result(list(results))

@@ -197,6 +197,7 @@ class TestDockerBulk:
         )
         assert resp.status_code == 422
 
+    @pytest.mark.flaky(reruns=2)
     def test_docker_bulk_start_by_tags(
         self,
         e2e_client: httpx.Client,

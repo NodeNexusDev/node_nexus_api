@@ -2,11 +2,29 @@
 
 import base64
 import json
+import re
 from datetime import UTC, datetime
-from typing import Any
+from typing import Annotated, Any
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, BeforeValidator
+
+_CONTROL_CHARS_RE = re.compile(r"[\x00-\x1f\x7f]")
+
+
+def _reject_control_characters(value: str) -> str:
+    """Reject strings with control characters (incl. null byte).
+
+    Postgres text/jsonb columns cannot store NUL and friends; reject early
+    with 422 instead of leaking a driver error at insert time.
+    """
+    if _CONTROL_CHARS_RE.search(value):
+        raise ValueError("must not contain control characters")
+    return value
+
+
+#: User-supplied names/identifiers without control characters.
+SafeName = Annotated[str, BeforeValidator(_reject_control_characters)]
 
 
 class PaginatedResponse[T](BaseModel):

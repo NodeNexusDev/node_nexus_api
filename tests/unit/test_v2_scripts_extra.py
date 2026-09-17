@@ -1020,7 +1020,7 @@ class TestBulkExecutions:
             ) as ac:
                 resp = await ac.post("/api/v2/scripts/executions", json=payload)
         assert resp.status_code == 200
-        assert resp.json()["results"][0]["error"] == "boom"
+        assert resp.json()["results"][0]["error"] == "Internal error"
         assert resp.json()["results"][0]["status"] == "error"
 
     async def test_mxn_207_mixed_success_error(self) -> None:

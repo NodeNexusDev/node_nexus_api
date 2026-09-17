@@ -12,6 +12,7 @@ import structlog
 from dishka.integrations.fastapi import DishkaRoute, FromDishka, inject
 from fastapi import APIRouter, HTTPException, Query, Response, Security
 
+from app.api.error_mapping import sanitize_bulk_error
 from app.api.deps import Principal, get_current_principal, require_write_or_jwt_scope
 from app.api.v2._bulk import HTTP_207_MULTI_STATUS
 from app.core.constants import DEFAULT_TIMEOUT
@@ -163,7 +164,7 @@ async def bulk_executions(
                     stderr=str(exc),
                     exit_code=None,
                     status="error",
-                    error=str(exc),
+                    error=sanitize_bulk_error(exc),
                 )
             ]
 
@@ -244,7 +245,7 @@ async def bulk_raw_executions(
                     stderr=str(exc),
                     exit_code=None,
                     status="error",
-                    error=str(exc),
+                    error=sanitize_bulk_error(exc),
                 )
             ]
 
