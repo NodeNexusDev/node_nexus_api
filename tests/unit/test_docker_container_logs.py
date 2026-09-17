@@ -30,9 +30,7 @@ class TestGetLogsStreams:
         assert await service.get_logs(NODE, CID) == "oops\n"
 
     async def test_both_streams_concatenated(self) -> None:
-        service = DockerContainerService(
-            _make_runner(stdout="out\n", stderr="err\n")
-        )
+        service = DockerContainerService(_make_runner(stdout="out\n", stderr="err\n"))
         assert await service.get_logs(NODE, CID) == "out\nerr\n"
 
     async def test_both_empty(self) -> None:
