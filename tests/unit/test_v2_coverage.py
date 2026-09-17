@@ -11,7 +11,9 @@ import io
 import json
 import tarfile
 import uuid
+from collections.abc import Mapping
 from datetime import UTC, datetime
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import UUID
 
@@ -2348,12 +2350,12 @@ class TestTemplateRegistryService:
 
 class TestGitHubTemplateSource:
     @staticmethod
-    def _client(routes: dict[str, tuple[int, object]]) -> AsyncMock:
+    def _client(routes: Mapping[str, tuple[int, Any]]) -> AsyncMock:
         import base64 as _b64
 
         client = AsyncMock()
 
-        async def _get(url: str, params: dict | None = None) -> MagicMock:
+        async def _get(url: str, params: dict[str, Any] | None = None) -> MagicMock:
             status, payload = routes.get(url, (404, None))
             resp = MagicMock()
             resp.status_code = status
@@ -2390,7 +2392,7 @@ class TestGitHubTemplateSource:
 
         from app.adapters.github.template_source import GitHubTemplateSource
 
-        async def _get(url: str, params: dict | None = None) -> MagicMock:
+        async def _get(url: str, params: dict[str, Any] | None = None) -> MagicMock:
             resp = MagicMock()
             if url == "/repos/o/r":
                 resp.status_code = 200
