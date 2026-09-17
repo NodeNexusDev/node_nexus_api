@@ -141,8 +141,6 @@ Bulk ответы — `BulkResult` `{total,succeeded,failed,results}` с код�
 | Версия Docker | `curl -H "X-API-Key: ${NODE_NEXUS_API_KEY}" "${NODE_NEXUS_URL}/api/v2/nodes/${NODE_ID}/docker/system/version"` |
 | Использование диска | `curl -H "X-API-Key: ${NODE_NEXUS_API_KEY}" "${NODE_NEXUS_URL}/api/v2/nodes/${NODE_ID}/docker/system/df"` |
 | System prune | `curl -X POST -H "X-API-Key: ${NODE_NEXUS_API_KEY}" "${NODE_NEXUS_URL}/api/v2/nodes/${NODE_ID}/docker/system/prune?volumes=false"` |
-| Очистить контейнеры | `curl -X POST -H "X-API-Key: ${NODE_NEXUS_API_KEY}" "${NODE_NEXUS_URL}/api/v2/nodes/${NODE_ID}/docker/containers/prune"` |
-| Очистить images | `curl -X POST -H "X-API-Key: ${NODE_NEXUS_API_KEY}" "${NODE_NEXUS_URL}/api/v2/nodes/${NODE_ID}/docker/images/prune"` |
 
 ## Compose
 

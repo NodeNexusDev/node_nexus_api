@@ -45,7 +45,7 @@ from app.schemas.compose import (
 
 audit = structlog.get_logger("audit")
 
-router = APIRouter(tags=["docker-compose"], route_class=DishkaRoute)
+router = APIRouter(route_class=DishkaRoute)
 
 _PROJECT_NAME_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9_.-]*$")
 

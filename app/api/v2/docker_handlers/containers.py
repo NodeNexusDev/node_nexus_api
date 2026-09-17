@@ -25,7 +25,7 @@ __all__ = [
     "router",
 ]
 
-router = APIRouter(tags=["docker"], route_class=DishkaRoute)
+router = APIRouter(route_class=DishkaRoute)
 router.include_router(crud_router)
 router.include_router(lifecycle_router)
 router.include_router(exec_inspect_router)

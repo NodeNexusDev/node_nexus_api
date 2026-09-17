@@ -13,6 +13,6 @@ from app.api.v2.docker_handlers.networks_handlers.management import (  # noqa: E
     router as management_router,
 )
 
-router = APIRouter(tags=["docker"], route_class=DishkaRoute)
+router = APIRouter(route_class=DishkaRoute)
 router.include_router(listing_router)
 router.include_router(management_router)

@@ -24,6 +24,14 @@ def main() -> None:
                 operation_ids.append(operation["operationId"])
     if len(operation_ids) != len(set(operation_ids)):
         raise ValueError("OpenAPI operationId values must be unique")
+    for path, path_item in schema["paths"].items():
+        for method, operation in path_item.items():
+            if method in {"get", "post", "put", "patch", "delete"}:
+                tags = operation.get("tags", [])
+                if len(tags) != len(set(tags)):
+                    raise ValueError(
+                        f"Duplicate tags in {method.upper()} {path}: {tags}"
+                    )
     if not operation_ids:
         raise ValueError("OpenAPI contains no HTTP operations")
     print(f"OpenAPI validation passed: {len(operation_ids)} operations")

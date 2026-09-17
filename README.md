@@ -1,8 +1,8 @@
 # Node Nexus API
 
 [![CI](https://github.com/NodeNexusDev/node_nexus_api/actions/workflows/ci.yml/badge.svg)](https://github.com/NodeNexusDev/node_nexus_api/actions/workflows/ci.yml)
-[![Coverage](https://img.shields.io/badge/coverage-95%25-brightgreen)](.agents/workflow.md)
-[![Version](https://img.shields.io/badge/version-2.0.0-blue)](https://github.com/NodeNexusDev/node_nexus_api)
+[![Coverage](https://img.shields.io/badge/coverage-95%25-brightgreen)](https://github.com/NodeNexusDev/node_nexus_api/actions/workflows/ci.yml)
+[![Version](https://img.shields.io/badge/version-2.5.2-blue)](https://github.com/NodeNexusDev/node_nexus_api)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 REST API for centrally managing server nodes, SSH commands, reusable scripts,
@@ -41,7 +41,7 @@ git clone https://github.com/NodeNexusDev/node_nexus_api.git && cd node_nexus_ap
 
 cp .env.example .env
 docker compose pull && docker compose up -d
-# pin version: IMAGE_TAG=2.0.0 docker compose up -d
+# pin version: IMAGE_TAG=2.5.2 docker compose up -d
 # build from source: docker compose -f docker-compose.build.yml up -d --build
 ```
 
