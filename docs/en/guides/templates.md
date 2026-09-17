@@ -88,7 +88,7 @@ curl --fail-with-body -X POST \
   # -> {registry_id, total, succeeded, failed, results:[{pack_id,status:"success"|"error",error,message}]}
 ```
 
-`total` counts discovered pack directories; `succeeded`/`failed` summarize file parsing and DB upserts. `404` when the registry does not exist; partial syncs return `207`.
+`total` counts discovered pack directories; `succeeded`/`failed` summarize file parsing and DB upserts. `404` when the registry does not exist; partial syncs return `207`. Packs whose `manifest_sha` matches the stored one are skipped as `unchanged` (no re-download of assets on the next sync). Deleting a registry keeps its packs with `registry_id` set to null.
 
 ## Packs
 
@@ -218,7 +218,7 @@ curl --fail-with-body \
 Installation materializes pack contents as real commands and scripts with `template_pack_id` FK, linked through `template_installations`. `on_conflict` controls name collisions.
 
 ```bash
-  # Install — creates commands/scripts with template_pack_id FK (201|207|409)
+  # Install — creates commands/scripts with template_pack_id FK (201|207|409|422)
 curl --fail-with-body -X POST \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
   "${NODE_NEXUS_URL}/api/v2/templates/packs/${PACK_ID}/installations?on_conflict=fail"
@@ -237,14 +237,16 @@ curl --fail-with-body -X POST \
   "${NODE_NEXUS_URL}/api/v2/templates/packs/${PACK_ID}/uninstallations"
   # -> 204 No Content
 
-  # Update — uninstall+install atomically, warn: local edits to generated commands/scripts are lost
+  # Update — uninstall+install in one transaction, warn: local edits to generated commands/scripts are lost.
+  # A 409 is still possible in fail mode when an unrelated row owns a
+  # colliding name — the pack is then left uninstalled (retry with rename).
 curl --fail-with-body -X POST \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
   "${NODE_NEXUS_URL}/api/v2/templates/packs/${PACK_ID}/updates?on_conflict=fail"
   # -> 200|207 {total,succeeded,failed,results:[...]}  (409 on fail conflict)
 ```
 
-`201` when all installations succeed, `207` when partially succeeded. Inspect `results[]` for per-entity `status`/`error`. Uninstall/install are not transactional across remote nodes — treat `207` as partial materialization.
+`201` when all installations succeed, `207` when partially succeeded, `422` when all failed. Inspect `results[]` for per-entity `status`/`error`. Conflicts in `fail` mode raise `409` before anything is written. Uninstall removes exactly the rows created by the installation (tracked by `entity_id` links); rows deleted directly are tolerated.
 
 ## Hierarchy and conventions
 
@@ -257,4 +259,4 @@ curl --fail-with-body -X POST \
 
 ## Validation and security
 
-`owner`, `name`, and `pack_id` lengths are enforced (255/100). `github_token` is optional and redacted. Binary assets must be base64-encoded; oversized or malformed payloads yield `422`. Sync failures for individual packs do not roll back other successful pack upserts in the same sync (`207`). Require a read-write key for `POST /registries`, `DELETE`, `syncs`, `packs`, `installations`, `uninstallations`, and `updates`.
+`owner`, `name`, and `pack_id` lengths are enforced (255/100); `pack_id` must match `^[a-zA-Z0-9][a-zA-Z0-9_.-]*$` and owner/name must not contain path separators. `github_token` is optional, stored encrypted, and never returned. Asset paths must be relative (`..`, absolute paths, and backslashes rejected); at most 100 assets per pack, 1 MiB per asset, 10 MiB total — oversized or malformed payloads yield `422`. Binary assets must be base64-encoded. Sync failures for individual packs do not roll back other successful pack upserts in the same sync (`207`). `group_by` accepts only `registry_id`, `tag`, `installed`, `version`. Require a read-write key for `POST /registries`, `DELETE`, `syncs`, `packs`, `installations`, `uninstallations`, and `updates`. The pack archive streams in 64 KiB chunks.

@@ -175,3 +175,11 @@ class PackNotFoundError(DomainError):
 
 class PackConflictError(DomainError):
     """Raised when a template pack name conflicts (409)."""
+
+
+class RegistryNotFoundError(DomainError):
+    """Raised when a template registry is not found."""
+
+
+class RegistryConflictError(DomainError):
+    """Raised when a template registry already exists (409)."""

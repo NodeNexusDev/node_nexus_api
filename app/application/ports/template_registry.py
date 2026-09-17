@@ -8,7 +8,7 @@ from uuid import UUID
 from app.application.dto.template_registry import (
     RegistryCreateDTO,
     RegistryPageDTO,
-    RegistrySyncResultDTO,
+    RegistryUpdateDTO,
     RegistryViewDTO,
 )
 
@@ -32,10 +32,24 @@ class TemplateRegistryWriter(Protocol):
         """Create a registry."""
         ...
 
-    async def delete_registry(self, registry_id: UUID) -> bool:
-        """Delete and report."""
+    async def delete_registry(self, registry_id: UUID) -> None:
+        """Delete or raise when missing."""
         ...
 
-    async def sync_registry(self, registry_id: UUID) -> RegistrySyncResultDTO:
-        """Sync packs from GitHub."""
+    async def patch_registry(
+        self, registry_id: UUID, data: RegistryUpdateDTO
+    ) -> RegistryViewDTO:
+        """Partial update (owner/name/branch/token)."""
         ...
+
+    async def get_registry_token(self, registry_id: UUID) -> str | None:
+        """Return the decrypted GitHub token for sync (internal use)."""
+        ...
+
+    async def touch_synced(self, registry_id: UUID) -> RegistryViewDTO:
+        """Mark registry synced now."""
+        ...
+
+
+class TemplateRegistryGateway(TemplateRegistryReader, TemplateRegistryWriter, Protocol):
+    """Full registry persistence port."""

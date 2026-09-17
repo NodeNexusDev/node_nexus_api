@@ -13,6 +13,7 @@ from app.application.dto.favorite import FavoriteDTO
 from app.application.ports.jwt_handler import JWTHandler
 from app.application.services.api_key_authentication import APIKeyAuthenticationService
 from app.application.services.favorite_service import FavoriteService
+from app.application.services.template_pack_service import TemplatePackService
 from app.core.config import Settings, get_settings
 from app.core.exceptions import DomainError
 
@@ -144,19 +145,17 @@ class TestFavoritesRemainder:
 
 # --- template pack service extra ---
 class TestTemplatePackExtra:
-    async def test_list_packs_search_and_tag(self):
+    async def test_list_packs_search_and_tag(self, pack_service: TemplatePackService):
         from app.application.dto.template_pack import (
             PackCreateDTO,
             PackListQueryDTO,
             PackManifestDTO,
         )
-        from app.application.services.template_pack_service import TemplatePackService
 
-        svc = TemplatePackService()
         # Create two packs
         pid1 = f"pack-search-{uuid4()}"
         pid2 = f"pack-search2-{uuid4()}"
-        await svc.create_pack(
+        await pack_service.create_pack(
             PackCreateDTO(
                 manifest=PackManifestDTO(
                     pack_id=pid1,
@@ -169,7 +168,7 @@ class TestTemplatePackExtra:
                 scripts=(),
             )
         )
-        await svc.create_pack(
+        await pack_service.create_pack(
             PackCreateDTO(
                 manifest=PackManifestDTO(
                     pack_id=pid2, name="Other", version="1.0.0", tags=("t2",)
@@ -178,20 +177,20 @@ class TestTemplatePackExtra:
                 scripts=(),
             )
         )
-        page = await svc.list_packs(
+        page = await pack_service.list_packs(
             PackListQueryDTO(offset=0, limit=10, search="searchme")
         )
         assert any("SearchMe" in p.name for p in page.items)
-        page_tag = await svc.list_packs(PackListQueryDTO(offset=0, limit=10, tag="t2"))
+        page_tag = await pack_service.list_packs(
+            PackListQueryDTO(offset=0, limit=10, tag="t2")
+        )
         assert any("Other" in p.name for p in page_tag.items)
 
-    async def test_create_pack_duplicate(self):
+    async def test_create_pack_duplicate(self, pack_service: TemplatePackService):
         from app.application.dto.template_pack import PackCreateDTO, PackManifestDTO
-        from app.application.services.template_pack_service import TemplatePackService
 
-        svc = TemplatePackService()
         pid = f"dup-{uuid4()}"
-        await svc.create_pack(
+        await pack_service.create_pack(
             PackCreateDTO(
                 manifest=PackManifestDTO(pack_id=pid, name="n", version="1.0.0"),
                 commands=(),
@@ -199,7 +198,7 @@ class TestTemplatePackExtra:
             )
         )
         try:
-            await svc.create_pack(
+            await pack_service.create_pack(
                 PackCreateDTO(
                     manifest=PackManifestDTO(pack_id=pid, name="n2", version="1.0.0"),
                     commands=(),
@@ -210,18 +209,16 @@ class TestTemplatePackExtra:
         except DomainError:
             pass
 
-    async def test_create_pack_invalid_base64(self):
+    async def test_create_pack_invalid_base64(self, pack_service: TemplatePackService):
         from app.application.dto.template_pack import (
             PackAssetCreateDTO,
             PackCreateDTO,
             PackManifestDTO,
         )
-        from app.application.services.template_pack_service import TemplatePackService
 
-        svc = TemplatePackService()
         pid = f"bad-b64-{uuid4()}"
         try:
-            await svc.create_pack(
+            await pack_service.create_pack(
                 PackCreateDTO(
                     manifest=PackManifestDTO(pack_id=pid, name="n", version="1.0.0"),
                     commands=(),
@@ -235,46 +232,41 @@ class TestTemplatePackExtra:
         except Exception as exc:
             assert "Invalid base64" in str(exc)
 
-    async def test_install_pack_already_installed(self):
+    async def test_install_pack_already_installed(
+        self, pack_service: TemplatePackService
+    ):
         from app.application.dto.template_pack import PackCreateDTO, PackManifestDTO
-        from app.application.services.template_pack_service import TemplatePackService
         from app.core.exceptions import PackConflictError
 
-        svc = TemplatePackService()
         pid = f"inst-{uuid4()}"
-        detail = await svc.create_pack(
+        detail = await pack_service.create_pack(
             PackCreateDTO(
                 manifest=PackManifestDTO(pack_id=pid, name="n", version="1.0.0"),
                 commands=({"name": "cmd1", "command": "echo hi"},),
                 scripts=(),
             )
         )
-        await svc.install_pack(detail.pack.id, on_conflict="fail")
+        await pack_service.install_pack(detail.pack.id, on_conflict="fail")
         try:
-            await svc.install_pack(detail.pack.id, on_conflict="fail")
+            await pack_service.install_pack(detail.pack.id, on_conflict="fail")
             assert False
         except PackConflictError:
             pass
 
-    async def test_uninstall_not_found(self):
-        from app.application.services.template_pack_service import TemplatePackService
+    async def test_uninstall_not_found(self, pack_service: TemplatePackService):
         from app.core.exceptions import PackNotFoundError
 
-        svc = TemplatePackService()
         with pytest.raises(PackNotFoundError):
-            await svc.uninstall_pack(uuid4())
+            await pack_service.uninstall_pack(uuid4())
 
-    async def test_get_stats_group_by(self):
-        from app.application.services.template_pack_service import TemplatePackService
-
-        svc = TemplatePackService()
-        stats = await svc.get_stats(group_by="registry_id")
+    async def test_get_stats_group_by(self, pack_service: TemplatePackService):
+        stats = await pack_service.get_stats(group_by="registry_id")
         assert stats.total >= 0
-        stats2 = await svc.get_stats(group_by="tag")
+        stats2 = await pack_service.get_stats(group_by="tag")
         assert stats2.total >= 0
-        stats3 = await svc.get_stats(group_by="installed")
+        stats3 = await pack_service.get_stats(group_by="installed")
         assert stats3.total >= 0
-        stats4 = await svc.get_stats(group_by="version")
+        stats4 = await pack_service.get_stats(group_by="version")
         assert stats4.total >= 0
-        stats5 = await svc.get_stats(group_by="unknown")
-        assert stats5.total >= 0
+        with pytest.raises(DomainError, match="Invalid group_by"):
+            await pack_service.get_stats(group_by="unknown")

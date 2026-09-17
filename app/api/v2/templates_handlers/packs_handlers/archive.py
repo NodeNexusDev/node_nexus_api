@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import io
 import uuid
+from collections.abc import AsyncIterator
 from typing import Annotated, Any, Literal, cast
 
 import structlog
@@ -58,6 +59,8 @@ _decode_offset = decode_offset  # noqa: N816
 
 router = APIRouter(route_class=DishkaRoute)
 
+_TAR_CHUNK_SIZE = 65_536
+
 
 # ---------------------------------------------------------------------------
 # Helpers to map DTO -> response (centralized in _shared)
@@ -91,8 +94,13 @@ async def get_pack_archive(
         data = await service.get_assets_tar(pack_id)
     except PackNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    async def _chunks() -> AsyncIterator[bytes]:
+        for offset in range(0, len(data), _TAR_CHUNK_SIZE):
+            yield data[offset : offset + _TAR_CHUNK_SIZE]
+
     return StreamingResponse(
-        io.BytesIO(data),
+        _chunks(),
         media_type="application/x-tar",
         headers={"Content-Disposition": f'attachment; filename="{pack_id}.tar"'},
     )
@@ -110,8 +118,13 @@ async def get_pack_assets_archive_alias(
         data = await service.get_assets_tar(pack_id)
     except PackNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    async def _chunks() -> AsyncIterator[bytes]:
+        for offset in range(0, len(data), _TAR_CHUNK_SIZE):
+            yield data[offset : offset + _TAR_CHUNK_SIZE]
+
     return StreamingResponse(
-        io.BytesIO(data),
+        _chunks(),
         media_type="application/x-tar",
         headers={"Content-Disposition": f'attachment; filename="{pack_id}.tar"'},
     )

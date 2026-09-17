@@ -41,6 +41,8 @@ from app.core.exceptions import (
     NodeNotFoundError,
     PackConflictError,
     PackNotFoundError,
+    RegistryConflictError,
+    RegistryNotFoundError,
     RequestTimeoutError,
     ScheduledScriptExecutionError,
     ScheduleNotFoundError,
@@ -103,6 +105,8 @@ DOMAIN_ERROR_STATUS: dict[type[DomainError], int] = {
     ComposeProjectAlreadyExistsError: 409,
     PackNotFoundError: 404,
     PackConflictError: 409,
+    RegistryNotFoundError: 404,
+    RegistryConflictError: 409,
     DomainError: 422,
 }
 

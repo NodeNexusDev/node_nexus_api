@@ -1,9 +1,11 @@
 """Shared test fixtures for unit tests."""
 
 import uuid
+from collections.abc import AsyncGenerator
 from typing import cast
 from unittest.mock import AsyncMock, MagicMock
 
+import pytest_asyncio
 from dishka import Provider, Scope, provide
 
 from app.application.dto.node_view import NodeViewDTO
@@ -13,6 +15,8 @@ from app.application.services.api_key_authentication import (
     APIKeyAuthenticationService,
     AuthenticatedPrincipal,
 )
+from app.application.services.template_pack_service import TemplatePackService
+from app.application.services.template_registry_service import TemplateRegistryService
 from app.core.types import ConnectionType, NodeStatus
 from app.models.api_key import APIKeyModel  # noqa: F401
 from app.models.audit_log import AuditLogModel  # noqa: F401
@@ -34,6 +38,23 @@ from app.models.template_registry import TemplateRegistryModel  # noqa: F401
 from app.models.user import UserModel  # noqa: F401
 from app.schemas.node import NodeResponse
 from tests.typing import as_typed_mock
+from tests.unit._template_db import make_pack_service, make_registry_service
+
+
+@pytest_asyncio.fixture
+async def pack_service() -> AsyncGenerator[TemplatePackService]:
+    """Fresh DB-backed TemplatePackService per test (isolated SQLite)."""
+    service, engine = await make_pack_service()
+    yield service
+    await engine.dispose()
+
+
+@pytest_asyncio.fixture
+async def registry_service() -> AsyncGenerator[TemplateRegistryService]:
+    """Fresh DB-backed TemplateRegistryService per test (isolated SQLite)."""
+    service, _fake, engine = await make_registry_service()
+    yield service
+    await engine.dispose()
 
 
 def _mock_settings(master_key: str = "") -> MagicMock:

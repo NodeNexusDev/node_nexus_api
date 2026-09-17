@@ -33,7 +33,6 @@ from app.adapters.persistence.template_pack import (
 )
 from app.application.dto.template_pack import (
     PackAssetCreateDTO,
-    PackAssetDTO,
     PackCreateDTO,
     PackListQueryDTO,
     PackManifestDTO,
@@ -143,57 +142,21 @@ async def test_create_pack_same_pack_id_different_registry_ok(
     assert detail.pack.pack_id == "shared-pack"
 
 
-async def test_create_pack_typeerror_fallback(engine: AsyncEngine) -> None:
+async def test_create_pack_asset_write_errors_propagate(
+    engine: AsyncEngine,
+) -> None:
     gw = SqlAlchemyTemplatePackGateway(make_sm(engine))
-    now = datetime.now(UTC)
-    fake_asset = PackAssetDTO(
-        id=uuid.uuid4(),
-        pack_id=uuid.uuid4(),
-        path="a.txt",
-        size=5,
-        sha="x",
-        created_at=now,
-        updated_at=now,
-    )
-    with (
-        patch.object(
-            gw._asset_gateway,
-            "write_assets_in_session",
-            side_effect=TypeError("no session arg"),
-        ),
-        patch.object(
-            gw._asset_gateway, "write_assets", new=AsyncMock(return_value=[fake_asset])
-        ),
+    with patch.object(
+        gw._asset_gateway,
+        "write_assets_in_session",
+        side_effect=RuntimeError("disk down"),
     ):
-        detail = await gw.create_pack(
-            make_create(
-                assets=(PackAssetCreateDTO(path="a.txt", content_base64=b64("hi")),)
+        with pytest.raises(RuntimeError, match="disk down"):
+            await gw.create_pack(
+                make_create(
+                    assets=(PackAssetCreateDTO(path="a.txt", content_base64=b64("hi")),)
+                )
             )
-        )
-    assert detail.assets == (fake_asset,)
-
-
-async def test_create_pack_no_in_session_attr_fallback(engine: AsyncEngine) -> None:
-    gw = SqlAlchemyTemplatePackGateway(make_sm(engine))
-    now = datetime.now(UTC)
-    fake_asset = PackAssetDTO(
-        id=uuid.uuid4(),
-        pack_id=uuid.uuid4(),
-        path="b.txt",
-        size=2,
-        sha="y",
-        created_at=now,
-        updated_at=now,
-    )
-    gw._asset_gateway = SimpleNamespace(  # ty: ignore[invalid-assignment]
-        write_assets=AsyncMock(return_value=[fake_asset])
-    )
-    detail = await gw.create_pack(
-        make_create(
-            assets=(PackAssetCreateDTO(path="b.txt", content_base64=b64("hi")),)
-        )
-    )
-    assert detail.assets == (fake_asset,)
 
 
 async def test_create_pack_in_session_success_path(engine: AsyncEngine) -> None:
@@ -546,12 +509,11 @@ async def test_get_stats_counts_and_registry_buckets(engine: AsyncEngine) -> Non
     assert by_group["local"].total == 1
 
 
-async def test_get_stats_other_group_by_no_buckets(engine: AsyncEngine) -> None:
+async def test_get_stats_other_group_by_raises(engine: AsyncEngine) -> None:
     gw = SqlAlchemyTemplatePackGateway(make_sm(engine))
     await gw.create_pack(make_create())
-    stats = await gw.get_stats(group_by="something-else")
-    assert stats.total == 1
-    assert stats.buckets == ()
+    with pytest.raises(DomainError, match="Invalid group_by"):
+        await gw.get_stats(group_by="something-else")
 
 
 async def test_get_stats_fallback_on_execute_error() -> None:
@@ -701,26 +663,12 @@ async def test_create_pack_legacy_inline_asset_branch(engine: AsyncEngine) -> No
 async def test_install_pack_marks_installed_when_succeeded(
     engine: AsyncEngine,
 ) -> None:
-    """Covers the `if succeeded > 0` mark-installed branch via scoped sum."""
-    import builtins
-    import os
-
+    """Installed version is set when at least one row was created."""
     gw = SqlAlchemyTemplatePackGateway(make_sm(engine))
-    created = await gw.create_pack(make_create())
-    real_sum = builtins.sum
-    target = os.path.normcase(os.path.abspath(tp_mod.__file__))
-
-    def fake_sum(iterable: Any, *args: Any, **kwargs: Any) -> Any:
-        frame = getattr(iterable, "gi_frame", None)
-        if (
-            frame is not None
-            and os.path.normcase(os.path.abspath(frame.f_code.co_filename)) == target
-        ):
-            return 1
-        return real_sum(iterable, *args, **kwargs)
-
-    with patch("builtins.sum", new=fake_sum):
-        result = await gw.install_pack(created.pack.id)
+    created = await gw.create_pack(
+        make_create(commands=({"name": "c1", "command": "echo hi"},))
+    )
+    result = await gw.install_pack(created.pack.id)
     assert result.succeeded == 1
     sm = make_sm(engine)
     async with sm() as session:

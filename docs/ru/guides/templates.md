@@ -87,7 +87,7 @@ curl --fail-with-body -X POST \
   # -> {registry_id, total, succeeded, failed, results:[{pack_id,status:"success"|"error",error,message}]}
 ```
 
-`total` — число найденных каталогов паков; `succeeded`/`failed` суммируют парсинг файлов и DB-upsert'ы. `404`, если реестр не найден; частичные синки → `207`.
+`total` — число найденных каталогов паков; `succeeded`/`failed` суммируют парсинг файлов и DB-upsert'ы. `404`, если реестр не найден; частичные синки → `207`. Паки с совпавшим `manifest_sha` пропускаются как `unchanged` (без перекачки активов). Удаление реестра оставляет его паки с `registry_id` null.
 
 ## Паки
 
@@ -217,7 +217,7 @@ curl --fail-with-body \
 Установка материализует содержимое пака как реальные команды и скрипты с FK `template_pack_id` и связями через `template_installations`. `on_conflict` управляет коллизиями имён.
 
 ```bash
-  # Install — создаёт commands/scripts с template_pack_id FK (201|207|409)
+  # Install — создаёт commands/scripts с template_pack_id FK (201|207|409|422)
 curl --fail-with-body -X POST \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
   "${NODE_NEXUS_URL}/api/v2/templates/packs/${PACK_ID}/installations?on_conflict=fail"
@@ -236,14 +236,16 @@ curl --fail-with-body -X POST \
   "${NODE_NEXUS_URL}/api/v2/templates/packs/${PACK_ID}/uninstallations"
   # -> 204 No Content
 
-  # Update — uninstall+install атомарно, внимание: локальные правки сгенерированных команд/скриптов будут потеряны
+  # Update — uninstall+install в одной транзакции, внимание: локальные правки сгенерированных команд/скриптов будут потеряны.
+  # 409 всё ещё возможен в режиме fail, если чужбина строка владеет конфликтующим
+  # именем — пак тогда остаётся неустановленным (повторите с rename).
 curl --fail-with-body -X POST \
   -H "X-API-Key: ${NODE_NEXUS_API_KEY}" \
   "${NODE_NEXUS_URL}/api/v2/templates/packs/${PACK_ID}/updates?on_conflict=fail"
   # -> 200|207 {total,succeeded,failed,results:[...]}  (409 при конфликте fail)
 ```
 
-`201` при полной установке, `207` при частичной. Проверяйте `results[]` на `status`/`error`. Uninstall/install не транзакционны между удалёнными нодами — `207` означает частичную материализацию.
+`201` при полной установке, `207` при частичной, `422` когда всё неуспешно. Проверяйте `results[]` на `status`/`error`. Конфликты в режиме `fail` дают `409` до любых записей. Uninstall удаляет ровно те строки, что созданы установкой (по связям `entity_id`); строки, удалённые напрямую, переносятся молча.
 
 ## Иерархия и соглашения
 
@@ -256,4 +258,4 @@ curl --fail-with-body -X POST \
 
 ## Валидация и безопасность
 
-Длины `owner`, `name` и `pack_id` ограничены (255/100). `github_token` опционален и скрывается. Бинарные активы должны быть в base64; переполненные или битые payload → `422`. Ошибки синка по отдельным пакам не откатывают остальные успешные upsert'ы в том же синке (`207`). Нужен ключ `read-write` для `POST /registries`, `DELETE`, `syncs`, `packs`, `installations`, `uninstallations` и `updates`.
+Длины `owner`, `name` и `pack_id` ограничены (255/100); `pack_id` — `^[a-zA-Z0-9][a-zA-Z0-9_.-]*$`, в owner/name запрещены разделители пути. `github_token` опционален, хранится в шифрованном виде и не возвращается. Пути активов — только относительные (`..`, абсолютные и бэкслэши запрещены); максимум 100 активов на пак, 1 MiB на актив, 10 MiB всего — переполненные или битые payload → `422`. Бинарные активы должны быть в base64. Ошибки синка по отдельным пакам не откатывают остальные успешные upsert'ы в том же синке (`207`). `group_by` принимает только `registry_id`, `tag`, `installed`, `version`. Нужен ключ `read-write` для `POST /registries`, `DELETE`, `syncs`, `packs`, `installations`, `uninstallations` и `updates`. Архив пака стримится чанками по 64 KiB.

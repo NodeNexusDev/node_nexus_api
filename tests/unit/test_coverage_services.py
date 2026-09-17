@@ -11,6 +11,7 @@ from app.application.dto.node_connection import NodeConnectionDTO
 from app.application.dto.value_objects import NodeCredentials, NodeEndpoint
 from app.application.services.command_management_service import CommandManagementService
 from app.application.services.docker.command_runner import DockerCommandRunner
+from app.application.services.template_pack_service import TemplatePackService
 from app.core.exceptions import CommandNotFoundError
 from app.di.providers import RepositoryProvider, ServiceProvider
 
@@ -38,33 +39,15 @@ def _mock_runner() -> MagicMock:
 
 class TestTemplatePackService:
     @pytest.mark.asyncio
-    async def test_create_and_install(self) -> None:
+    async def test_create_and_install(
+        self, pack_service: TemplatePackService
+    ) -> None:
         from app.application.dto.template_pack import (
             PackCreateDTO,
             PackListQueryDTO,
             PackManifestDTO,
         )
 
-        # clear global state
-        from app.application.services.template_pack_service import (
-            _ASSET_RAW,
-            _COMMAND_NAMES,
-            _INSTALLATION_NAMES,
-            _INSTALLATIONS,
-            _PACKS,
-            _SCRIPT_NAMES,
-        )
-
-        _PACKS.clear()
-        _INSTALLATIONS.clear()
-        _ASSET_RAW.clear()
-        _INSTALLATION_NAMES.clear()
-        _COMMAND_NAMES.clear()
-        _SCRIPT_NAMES.clear()
-        svc = __import__(
-            "app.application.services.template_pack_service",
-            fromlist=["TemplatePackService"],
-        ).TemplatePackService()
         manifest = PackManifestDTO(
             pack_id="test-pack",
             name="Test",
@@ -85,28 +68,30 @@ class TestTemplatePackService:
             manifest=manifest,
             readme="readme",
             assets=(asset,),
-            commands=({"name": "cmd1"},),
-            scripts=({"name": "scr1"},),
+            commands=({"name": "cmd1", "command": "echo hi"},),
+            scripts=(
+                {
+                    "name": "scr1",
+                    "steps": [{"label": "run", "type": "inline"}],
+                },
+            ),
         )
-        detail = await svc.create_pack(dto)
+        detail = await pack_service.create_pack(dto)
         assert detail.pack.name == "Test"
         # list
-        lst = await svc.list_packs(PackListQueryDTO(limit=10, offset=0))
+        lst = await pack_service.list_packs(PackListQueryDTO(limit=10, offset=0))
         assert lst.total == 1
         # install
-        res = await svc.install_pack(detail.pack.id)
+        res = await pack_service.install_pack(detail.pack.id)
         assert res.succeeded == 2
         # stats
-        stats = await svc.get_stats(group_by="tag")
+        stats = await pack_service.get_stats(group_by="tag")
         assert stats.total == 1
         # uninstall
-        await svc.uninstall_pack(detail.pack.id)
+        await pack_service.uninstall_pack(detail.pack.id)
         assert (
-            detail.pack.id not in _INSTALLATIONS
-            or len(_INSTALLATIONS[detail.pack.id]) == 0
-        )
-        # cleanup
-        _PACKS.clear()
+            await pack_service.list_installations(detail.pack.id, 0, 10)
+        ).total == 0
 
 
 class TestComposeService:
@@ -286,8 +271,8 @@ class TestProvidersCoverage:
             is not None
         )
         assert sp.get_user_service(MagicMock(), MagicMock()) is not None
-        assert sp.get_template_registry_service() is not None
-        assert sp.get_template_pack_service() is not None
+        assert sp.get_template_registry_service(MagicMock(), MagicMock()) is not None
+        assert sp.get_template_pack_service(MagicMock()) is not None
         assert sp.get_compose_service(MagicMock(), MagicMock(), MagicMock()) is not None
 
         from app.di.providers import SchedulerProvider

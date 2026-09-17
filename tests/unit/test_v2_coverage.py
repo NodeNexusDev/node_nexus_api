@@ -2023,6 +2023,45 @@ class TestTemplatesApiV2:
                 resp = await client.post(f"/api/v2/templates/packs/{pid}/installations")
         assert resp.status_code == 207
 
+    async def test_install_422_all_failed(self) -> None:
+        from app.application.dto.template_pack import (
+            PackInstallItemDTO,
+            PackInstallResultDTO,
+        )
+
+        mock_reg = AsyncMock()
+        mock_pack = AsyncMock()
+        pid = uuid.uuid4()
+        result = PackInstallResultDTO(
+            pack_id=pid,
+            version="1.0.0",
+            total=1,
+            succeeded=0,
+            failed=1,
+            results=(
+                PackInstallItemDTO(
+                    entity_type="command",
+                    entity_id=None,
+                    name="c1",
+                    status="error",
+                    error="fail",
+                ),
+            ),
+        )
+        mock_pack.install_pack.return_value = result
+        app = _create_templates_app(mock_reg, mock_pack)
+        async with AsyncClient(
+            transport=ASGITransport(app=app),
+            base_url="http://test",
+            headers={"X-API-Key": "test-master"},
+        ) as client:
+            with patch(
+                "app.core.config.get_settings",
+                return_value=_mock_settings("test-master"),
+            ):
+                resp = await client.post(f"/api/v2/templates/packs/{pid}/installations")
+        assert resp.status_code == 422
+
     async def test_templates_helpers(self) -> None:
         from app.api.v2.templates import (
             _decode_offset,
@@ -2089,25 +2128,7 @@ class TestTemplatesApiV2:
 
 
 class TestTemplatePackService:
-    async def test_create_and_get(self) -> None:
-        from app.application.services.template_pack_service import (
-            _ASSET_RAW,
-            _COMMAND_NAMES,
-            _INSTALLATION_NAMES,
-            _INSTALLATIONS,
-            _PACKS,
-            _SCRIPT_NAMES,
-        )
-
-        _PACKS.clear()
-        _INSTALLATIONS.clear()
-        _ASSET_RAW.clear()
-        _COMMAND_NAMES.clear()
-        _SCRIPT_NAMES.clear()
-        _INSTALLATION_NAMES.clear()
-        from app.application.services.template_pack_service import TemplatePackService
-
-        svc = TemplatePackService()
+    async def test_create_and_get(self, pack_service) -> None:
         manifest = PackManifestDTO(
             pack_id="p1", name="P1", version="1.0.0", tags=("t1",)
         )
@@ -2116,268 +2137,183 @@ class TestTemplatePackService:
         data = PackCreateDTO(
             manifest=manifest, commands=(), scripts=(), assets=(asset,)
         )
-        detail = await svc.create_pack(data)
+        detail = await pack_service.create_pack(data)
         assert detail.pack.pack_id == "p1"
-        fetched = await svc.get_pack_detail(detail.pack.id)
+        fetched = await pack_service.get_pack_detail(detail.pack.id)
         assert fetched.pack.name == "P1"
-        view = await svc.get_pack_view(detail.pack.id)
+        view = await pack_service.get_pack_view(detail.pack.id)
         assert view.version == "1.0.0"
-        tar = await svc.get_assets_tar(detail.pack.id)
+        tar = await pack_service.get_assets_tar(detail.pack.id)
         assert len(tar) > 0
         # verify tar contains file
         buf = io.BytesIO(tar)
         with tarfile.open(fileobj=buf, mode="r") as tf:
             names = tf.getnames()
             assert "a.txt" in names
-        tar2 = await svc.stream_assets_tar(detail.pack.id)
+        tar2 = await pack_service.stream_assets_tar(detail.pack.id)
         assert tar == tar2
 
-    async def test_create_duplicate_raises(self) -> None:
-        from app.application.services.template_pack_service import (
-            _INSTALLATIONS,
-            _PACKS,
-        )
-
-        _PACKS.clear()
-        _INSTALLATIONS.clear()
-        from app.application.services.template_pack_service import TemplatePackService
-
-        svc = TemplatePackService()
+    async def test_create_duplicate_raises(self, pack_service) -> None:
         manifest = PackManifestDTO(pack_id="dup", name="P", version="1.0.0")
         data = PackCreateDTO(manifest=manifest)
-        await svc.create_pack(data)
+        await pack_service.create_pack(data)
         with pytest.raises(DomainError):
-            await svc.create_pack(data)
+            await pack_service.create_pack(data)
 
-    async def test_create_invalid_base64(self) -> None:
-        from app.application.services.template_pack_service import (
-            _INSTALLATIONS,
-            _PACKS,
-        )
-
-        _PACKS.clear()
-        _INSTALLATIONS.clear()
-        from app.application.services.template_pack_service import TemplatePackService
-
-        svc = TemplatePackService()
+    async def test_create_invalid_base64(self, pack_service) -> None:
         manifest = PackManifestDTO(pack_id="p2", name="P2", version="1.0.0")
         bad = PackAssetCreateDTO(path="a", content_base64="!!!notbase64")
         data = PackCreateDTO(manifest=manifest, assets=(bad,))
         with pytest.raises(DomainError):
-            await svc.create_pack(data)
+            await pack_service.create_pack(data)
 
-    async def test_install_and_uninstall(self) -> None:
-        from app.application.services.template_pack_service import (
-            _ASSET_RAW,
-            _COMMAND_NAMES,
-            _INSTALLATION_NAMES,
-            _INSTALLATIONS,
-            _PACKS,
-            _SCRIPT_NAMES,
-        )
-
-        _PACKS.clear()
-        _INSTALLATIONS.clear()
-        _ASSET_RAW.clear()
-        _COMMAND_NAMES.clear()
-        _SCRIPT_NAMES.clear()
-        _INSTALLATION_NAMES.clear()
-        from app.application.services.template_pack_service import TemplatePackService
-
-        svc = TemplatePackService()
+    async def test_install_and_uninstall(self, pack_service) -> None:
         manifest = PackManifestDTO(pack_id="p3", name="P3", version="1.0.0")
         data = PackCreateDTO(
-            manifest=manifest, commands=({"name": "c1"},), scripts=({"name": "s1"},)
+            manifest=manifest,
+            commands=({"name": "c1", "command": "echo c1"},),
+            scripts=(
+                {
+                    "name": "s1",
+                    "steps": [{"label": "run", "type": "inline"}],
+                },
+            ),
         )
-        detail = await svc.create_pack(data)
-        res = await svc.install_pack(detail.pack.id, on_conflict="fail")
+        detail = await pack_service.create_pack(data)
+        res = await pack_service.install_pack(detail.pack.id, on_conflict="fail")
         assert res.succeeded == 2
         # already installed -> conflict
         with pytest.raises(Exception):
-            await svc.install_pack(detail.pack.id, on_conflict="fail")
-        await svc.uninstall_pack(detail.pack.id)
+            await pack_service.install_pack(detail.pack.id, on_conflict="fail")
+        await pack_service.uninstall_pack(detail.pack.id)
         # reinstall should succeed after uninstall
-        res2 = await svc.install_pack(detail.pack.id, on_conflict="fail")
+        res2 = await pack_service.install_pack(detail.pack.id, on_conflict="fail")
         assert res2.succeeded == 2
 
-    async def test_install_on_conflict_rename(self) -> None:
-        from app.application.services.template_pack_service import (
-            _ASSET_RAW,
-            _COMMAND_NAMES,
-            _INSTALLATION_NAMES,
-            _INSTALLATIONS,
-            _PACKS,
-            _SCRIPT_NAMES,
-        )
-
-        _PACKS.clear()
-        _INSTALLATIONS.clear()
-        _ASSET_RAW.clear()
-        _COMMAND_NAMES.clear()
-        _SCRIPT_NAMES.clear()
-        _INSTALLATION_NAMES.clear()
-        # pre-populate global name to force conflict
-        _COMMAND_NAMES.add("c1")
-        from app.application.services.template_pack_service import TemplatePackService
-
-        svc = TemplatePackService()
+    async def test_install_on_conflict_rename(self, pack_service) -> None:
+        # pre-existing command forces conflict (created by another pack)
         manifest = PackManifestDTO(pack_id="p4", name="P4", version="1.0.0")
-        data = PackCreateDTO(manifest=manifest, commands=({"name": "c1"},))
-        detail = await svc.create_pack(data)
+        other = PackManifestDTO(pack_id="p4-other", name="P4o", version="1.0.0")
+        other_detail = await pack_service.create_pack(
+            PackCreateDTO(
+                manifest=other, commands=({"name": "c1", "command": "echo x"},)
+            )
+        )
+        await pack_service.install_pack(other_detail.pack.id, on_conflict="fail")
+        data = PackCreateDTO(
+            manifest=manifest, commands=({"name": "c1", "command": "echo y"},)
+        )
+        detail = await pack_service.create_pack(data)
         # fail should raise
         with pytest.raises(Exception):
-            await svc.install_pack(detail.pack.id, on_conflict="fail")
+            await pack_service.install_pack(detail.pack.id, on_conflict="fail")
         # rename should succeed with new name
-        res = await svc.install_pack(detail.pack.id, on_conflict="rename")
+        res = await pack_service.install_pack(detail.pack.id, on_conflict="rename")
         assert res.succeeded == 1
         assert res.results[0].name == "c1_1"
 
-    async def test_install_with_fail_entity(self) -> None:
-        from app.application.services.template_pack_service import (
-            _ASSET_RAW,
-            _COMMAND_NAMES,
-            _INSTALLATION_NAMES,
-            _INSTALLATIONS,
-            _PACKS,
-            _SCRIPT_NAMES,
-        )
-
-        _PACKS.clear()
-        _INSTALLATIONS.clear()
-        _ASSET_RAW.clear()
-        _COMMAND_NAMES.clear()
-        _SCRIPT_NAMES.clear()
-        _INSTALLATION_NAMES.clear()
-        from app.application.services.template_pack_service import TemplatePackService
-
-        svc = TemplatePackService()
+    async def test_install_with_fail_entity(self, pack_service) -> None:
         manifest = PackManifestDTO(pack_id="p5", name="P5", version="1.0.0")
-        data = PackCreateDTO(manifest=manifest, commands=({"name": "will-fail"},))
-        detail = await svc.create_pack(data)
-        res = await svc.install_pack(detail.pack.id, on_conflict="fail")
+        data = PackCreateDTO(
+            manifest=manifest, commands=({"name": "bad", "command": ""},)
+        )
+        detail = await pack_service.create_pack(data)
+        res = await pack_service.install_pack(detail.pack.id, on_conflict="fail")
         assert res.failed == 1
         assert res.succeeded == 0
 
-    async def test_list_and_stats(self) -> None:
-        from app.application.services.template_pack_service import (
-            _ASSET_RAW,
-            _COMMAND_NAMES,
-            _INSTALLATION_NAMES,
-            _INSTALLATIONS,
-            _PACKS,
-            _SCRIPT_NAMES,
-        )
-
-        _PACKS.clear()
-        _INSTALLATIONS.clear()
-        _ASSET_RAW.clear()
-        _COMMAND_NAMES.clear()
-        _SCRIPT_NAMES.clear()
-        _INSTALLATION_NAMES.clear()
-        from app.application.services.template_pack_service import TemplatePackService
-
-        svc = TemplatePackService()
+    async def test_list_and_stats(self, pack_service) -> None:
         manifest = PackManifestDTO(
             pack_id="p6", name="P6", version="1.0.0", tags=("docker",)
         )
-        await svc.create_pack(
-            PackCreateDTO(manifest=manifest, commands=({"name": "c0"},))
+        await pack_service.create_pack(
+            PackCreateDTO(
+                manifest=manifest,
+                commands=({"name": "c0", "command": "echo c0"},),
+            )
         )
         manifest2 = PackManifestDTO(pack_id="p7", name="Other", version="2.0.0")
-        detail2 = await svc.create_pack(
-            PackCreateDTO(manifest=manifest2, commands=({"name": "c1"},))
+        detail2 = await pack_service.create_pack(
+            PackCreateDTO(
+                manifest=manifest2,
+                commands=({"name": "c1", "command": "echo c1"},),
+            )
         )
-        await svc.install_pack(detail2.pack.id)
-        page = await svc.list_packs(PackListQueryDTO(offset=0, limit=10, tag="docker"))
+        await pack_service.install_pack(detail2.pack.id)
+        page = await pack_service.list_packs(
+            PackListQueryDTO(offset=0, limit=10, tag="docker")
+        )
         assert page.total == 1
-        page2 = await svc.list_packs(
+        page2 = await pack_service.list_packs(
             PackListQueryDTO(offset=0, limit=10, search="other")
         )
         assert page2.total == 1
-        page3 = await svc.list_packs(
+        page3 = await pack_service.list_packs(
             PackListQueryDTO(offset=0, limit=10, installed=True)
         )
         assert page3.total == 1
-        stats = await svc.get_stats(group_by="tag")
+        stats = await pack_service.get_stats(group_by="tag")
         assert stats.total == 2
-        stats2 = await svc.get_stats(group_by="registry_id")
+        stats2 = await pack_service.get_stats(group_by="registry_id")
         assert stats2.total == 2
-        stats3 = await svc.get_stats(group_by="installed")
+        stats3 = await pack_service.get_stats(group_by="installed")
         assert len(stats3.buckets) == 2
-        stats4 = await svc.get_stats(group_by="version")
+        stats4 = await pack_service.get_stats(group_by="version")
         assert any(b.group == "1.0.0" for b in stats4.buckets)
-        stats5 = await svc.get_stats(group_by="custom")
-        assert stats5.total == 2
+        with pytest.raises(DomainError):
+            await pack_service.get_stats(group_by="custom")
 
-    async def test_update_pack(self) -> None:
-        from app.application.services.template_pack_service import (
-            _ASSET_RAW,
-            _COMMAND_NAMES,
-            _INSTALLATION_NAMES,
-            _INSTALLATIONS,
-            _PACKS,
-            _SCRIPT_NAMES,
-        )
-
-        _PACKS.clear()
-        _INSTALLATIONS.clear()
-        _ASSET_RAW.clear()
-        _COMMAND_NAMES.clear()
-        _SCRIPT_NAMES.clear()
-        _INSTALLATION_NAMES.clear()
-        from app.application.services.template_pack_service import TemplatePackService
-
-        svc = TemplatePackService()
+    async def test_update_pack(self, pack_service) -> None:
         manifest = PackManifestDTO(pack_id="p8", name="P8", version="1.0.0")
-        detail = await svc.create_pack(
-            PackCreateDTO(manifest=manifest, commands=({"name": "c1"},))
+        detail = await pack_service.create_pack(
+            PackCreateDTO(
+                manifest=manifest, commands=({"name": "c1", "command": "echo c1"},)
+            )
         )
-        await svc.install_pack(detail.pack.id)
-        res = await svc.update_pack(detail.pack.id, on_conflict="fail")
+        await pack_service.install_pack(detail.pack.id)
+        res = await pack_service.update_pack(detail.pack.id, on_conflict="fail")
         assert res.succeeded == 1
 
-    async def test_list_installations(self) -> None:
-        from app.application.services.template_pack_service import (
-            _ASSET_RAW,
-            _COMMAND_NAMES,
-            _INSTALLATION_NAMES,
-            _INSTALLATIONS,
-            _PACKS,
-            _SCRIPT_NAMES,
-        )
-
-        _PACKS.clear()
-        _INSTALLATIONS.clear()
-        _ASSET_RAW.clear()
-        _COMMAND_NAMES.clear()
-        _SCRIPT_NAMES.clear()
-        _INSTALLATION_NAMES.clear()
-        from app.application.services.template_pack_service import TemplatePackService
-
-        svc = TemplatePackService()
+    async def test_list_installations(self, pack_service) -> None:
         manifest = PackManifestDTO(pack_id="p9", name="P9", version="1.0.0")
-        detail = await svc.create_pack(
-            PackCreateDTO(manifest=manifest, commands=({"name": "c1"},))
+        detail = await pack_service.create_pack(
+            PackCreateDTO(
+                manifest=manifest, commands=({"name": "c1", "command": "echo c1"},)
+            )
         )
-        await svc.install_pack(detail.pack.id)
-        page = await svc.list_installations(detail.pack.id, offset=0, limit=10)
+        await pack_service.install_pack(detail.pack.id)
+        page = await pack_service.list_installations(detail.pack.id, offset=0, limit=10)
         assert page.total == 1
         with pytest.raises(Exception):
-            await svc.list_installations(uuid.uuid4(), offset=0, limit=10)
+            await pack_service.list_installations(uuid.uuid4(), offset=0, limit=10)
         with pytest.raises(Exception):
-            await svc.get_pack_detail(uuid.uuid4())
+            await pack_service.get_pack_detail(uuid.uuid4())
 
 
 class TestTemplateRegistryService:
     async def test_create_list_get_delete_sync(self) -> None:
-        from app.application.services.template_registry_service import _REGISTRIES
+        from app.application.ports.template_source import FetchedPack
+        from tests.unit._template_db import FakeSource, make_registry_service
 
-        _REGISTRIES.clear()
-        from app.application.services.template_registry_service import (
-            TemplateRegistryService,
+        source = FakeSource(
+            packs=[
+                FetchedPack(
+                    dirname="web",
+                    manifest={
+                        "pack_id": "web",
+                        "name": "Web",
+                        "version": "1.0.0",
+                        "tags": ["docker"],
+                    },
+                    commands=[{"name": "up", "command": "echo up"}],
+                    scripts=[],
+                    readme="# web",
+                    assets=(),
+                    manifest_sha="sha-web-1",
+                )
+            ]
         )
-
-        svc = TemplateRegistryService()
+        svc, fake, _engine = await make_registry_service(source)
         dto = RegistryCreateDTO(owner="octocat", name="repo", default_branch="main")
         view = await svc.create_registry(dto)
         assert view.owner == "octocat"
@@ -2392,6 +2328,15 @@ class TestTemplateRegistryService:
             await svc.get_registry(uuid.uuid4())
         sync = await svc.sync_registry(view.id)
         assert sync.registry_id == view.id
+        assert sync.total == 1
+        assert sync.succeeded == 1
+        assert fake.seen is not None and fake.seen[0] == "octocat"
+        # second sync is a no-op for unchanged packs (manifest_sha match)
+        sync2 = await svc.sync_registry(view.id)
+        assert sync2.succeeded == 1
+        assert sync2.results[0].message == "unchanged"
+        # registry view records last sync
+        assert (await svc.get_registry(view.id)).last_synced_at is not None
         with pytest.raises(Exception):
             await svc.sync_registry(uuid.uuid4())
         await svc.delete_registry(view.id)
@@ -2399,6 +2344,117 @@ class TestTemplateRegistryService:
             await svc.delete_registry(view.id)
         with pytest.raises(Exception):
             await svc.get_registry(view.id)
+
+
+class TestGitHubTemplateSource:
+    @staticmethod
+    def _client(routes: dict[str, tuple[int, object]]) -> AsyncMock:
+        import base64 as _b64
+
+        client = AsyncMock()
+
+        async def _get(url: str, params: dict | None = None) -> MagicMock:
+            status, payload = routes.get(url, (404, None))
+            resp = MagicMock()
+            resp.status_code = status
+            if isinstance(payload, bytes):
+                resp.json.return_value = {
+                    "type": "file",
+                    "content": _b64.b64encode(payload).decode(),
+                    "sha": "abc123",
+                }
+            else:
+                resp.json.return_value = payload
+            return resp
+
+        client.get.side_effect = _get
+        client.__aenter__.return_value = client
+        return client
+
+    async def test_missing_repo_raises(self) -> None:
+        from unittest.mock import patch
+
+        from app.adapters.github.template_source import GitHubTemplateSource
+        from app.core.exceptions import DomainError
+
+        client = self._client({})
+        with patch(
+            "app.adapters.github.template_source.httpx2.AsyncClient",
+            return_value=client,
+        ):
+            with pytest.raises(DomainError, match="not found"):
+                await GitHubTemplateSource().fetch_packs("o", "nope", "main", None)
+
+    async def test_missing_templates_dir_returns_empty(self) -> None:
+        from unittest.mock import patch
+
+        from app.adapters.github.template_source import GitHubTemplateSource
+
+        async def _get(url: str, params: dict | None = None) -> MagicMock:
+            resp = MagicMock()
+            if url == "/repos/o/r":
+                resp.status_code = 200
+            else:
+                resp.status_code = 404
+            return resp
+
+        client = AsyncMock()
+        client.get.side_effect = _get
+        client.__aenter__.return_value = client
+        with patch(
+            "app.adapters.github.template_source.httpx2.AsyncClient",
+            return_value=client,
+        ):
+            packs = await GitHubTemplateSource().fetch_packs("o", "r", "main", None)
+        assert packs == []
+
+    async def test_pack_without_manifest_skipped(self) -> None:
+        from unittest.mock import patch
+
+        from app.adapters.github.template_source import GitHubTemplateSource
+
+        routes = {
+            "/repos/o/r/contents/templates": (
+                200,
+                [{"type": "dir", "name": "empty"}],
+            ),
+            "/repos/o/r": (200, {"id": 1}),
+        }
+        client = self._client(routes)
+        with patch(
+            "app.adapters.github.template_source.httpx2.AsyncClient",
+            return_value=client,
+        ):
+            packs = await GitHubTemplateSource().fetch_packs("o", "r", "main", None)
+        assert packs == []
+
+    async def test_fetches_pack_tree(self) -> None:
+        import json as _json
+        from unittest.mock import patch
+
+        from app.adapters.github.template_source import GitHubTemplateSource
+
+        manifest = {"pack_id": "web", "name": "Web", "version": "1.0.0"}
+        routes = {
+            "/repos/o/r/contents/templates": (200, [{"type": "dir", "name": "web"}]),
+            "/repos/o/r/contents/templates/web/manifest.json": (
+                200,
+                _json.dumps(manifest).encode(),
+            ),
+            "/repos/o/r/contents/templates/web/commands.json": (
+                200,
+                _json.dumps([{"name": "up"}]).encode(),
+            ),
+        }
+        client = self._client(routes)
+        with patch(
+            "app.adapters.github.template_source.httpx2.AsyncClient",
+            return_value=client,
+        ):
+            packs = await GitHubTemplateSource().fetch_packs("o", "r", "main", None)
+        assert len(packs) == 1
+        assert packs[0].manifest["pack_id"] == "web"
+        assert packs[0].commands == [{"name": "up"}]
 
 
 # ---------------------------------------------------------------------------
