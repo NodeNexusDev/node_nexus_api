@@ -158,8 +158,10 @@ def _validate_script_payload(payload: dict[str, Any]) -> dict[str, Any]:
         step_type = step.get("type")
         if step_type not in ("inline", "command"):
             raise DomainError(f"Invalid step type in script {name!r}: {step_type!r}")
-        if step_type == "command" and not step.get("command_id") and not step.get(
-            "command_name"
+        if (
+            step_type == "command"
+            and not step.get("command_id")
+            and not step.get("command_name")
         ):
             raise DomainError(
                 f"Command step in script {name!r} requires command_id or command_name"
@@ -209,9 +211,7 @@ class SqlAlchemyTemplatePackGateway(TemplatePackGateway):
         session: AsyncSession, pack_id: str, registry_id: uuid.UUID | None
     ) -> bool:
         """NULL-safe duplicate check (partial unique index is not NULL-blind)."""
-        query = select(TemplatePackModel.id).where(
-            TemplatePackModel.pack_id == pack_id
-        )
+        query = select(TemplatePackModel.id).where(TemplatePackModel.pack_id == pack_id)
         if registry_id is None:
             query = query.where(TemplatePackModel.registry_id.is_(None))
         else:
@@ -393,9 +393,7 @@ class SqlAlchemyTemplatePackGateway(TemplatePackGateway):
             name = str(raw.get("name", "command"))
             if name in existing_commands or any(n == name for n, _ in planned_commands):
                 if on_conflict == "fail":
-                    raise PackConflictError(
-                        f"Command name '{name}' already exists"
-                    )
+                    raise PackConflictError(f"Command name '{name}' already exists")
                 name = _unique_name(
                     name,
                     existing_commands | {n for n, _ in planned_commands},
@@ -955,9 +953,7 @@ class SqlAlchemyTemplatePackGateway(TemplatePackGateway):
                 for path, content, size, mtime in snapshot:
                     safe = sanitize_tar_name(path)
                     if safe is None:
-                        logger.warning(
-                            "template_asset.unsafe_path_skipped", path=path
-                        )
+                        logger.warning("template_asset.unsafe_path_skipped", path=path)
                         continue
                     raw = _decode_stored_content(content, size, safe)
                     info = tarfile.TarInfo(name=safe)

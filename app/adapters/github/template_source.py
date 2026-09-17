@@ -31,9 +31,7 @@ class GitHubTemplateSource(TemplateSource):
     """Read ``templates/{pack_id}/`` trees from a GitHub repository."""
 
     def __init__(self, timeout: float = 20.0) -> None:
-        self._timeout = httpx2.Timeout(
-            connect=5.0, read=timeout, write=5.0, pool=5.0
-        )
+        self._timeout = httpx2.Timeout(connect=5.0, read=timeout, write=5.0, pool=5.0)
 
     def _headers(self, token: str | None) -> dict[str, str]:
         headers = {
@@ -62,9 +60,7 @@ class GitHubTemplateSource(TemplateSource):
             entries = await self._contents(client, owner, repo, TEMPLATES_ROOT, branch)
             if entries is None:
                 if not await self._repo_exists(client, owner, repo):
-                    raise DomainError(
-                        f"GitHub repository {owner}/{repo} not found"
-                    )
+                    raise DomainError(f"GitHub repository {owner}/{repo} not found")
                 # No templates/ directory — nothing to sync.
                 return []
             packs: list[FetchedPack] = []
@@ -99,8 +95,7 @@ class GitHubTemplateSource(TemplateSource):
             return False
         if response.status_code >= 400:
             raise DomainError(
-                f"GitHub request failed for {owner}/{repo}: "
-                f"HTTP {response.status_code}"
+                f"GitHub request failed for {owner}/{repo}: HTTP {response.status_code}"
             )
         return True
 

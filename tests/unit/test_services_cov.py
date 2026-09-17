@@ -160,9 +160,7 @@ class TestTemplateCreate:
             detail.pack.id
         )
 
-    async def test_create_with_assets(
-        self, pack_service: TemplatePackService
-    ) -> None:
+    async def test_create_with_assets(self, pack_service: TemplatePackService) -> None:
         data = _create(
             assets=(PackAssetCreateDTO(path="a.txt", content_base64=_b64("hello")),)
         )
@@ -213,9 +211,7 @@ class TestTemplateCreate:
         )
         assert len(detail.commands) == 1
 
-    async def test_create_bad_pack_id(
-        self, pack_service: TemplatePackService
-    ) -> None:
+    async def test_create_bad_pack_id(self, pack_service: TemplatePackService) -> None:
         with pytest.raises(DomainError):
             await pack_service.create_pack(_create(manifest=_manifest(pack_id="../x")))
 

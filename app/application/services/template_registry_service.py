@@ -98,9 +98,7 @@ class TemplateRegistryService:
         succeeded = 0
         for pack in fetched:
             try:
-                _pack_id, outcome = await self._upsert_fetched_pack(
-                    registry_id, pack
-                )
+                _pack_id, outcome = await self._upsert_fetched_pack(registry_id, pack)
                 succeeded += 1
                 results.append(
                     RegistrySyncItemDTO(
@@ -174,12 +172,8 @@ class TemplateRegistryService:
                 tags=tuple(tags),
                 manifest_sha=manifest_sha,
                 readme=pack.readme,
-                commands=tuple(
-                    dict(c) for c in pack.commands if isinstance(c, dict)
-                ),
-                scripts=tuple(
-                    dict(s) for s in pack.scripts if isinstance(s, dict)
-                ),
+                commands=tuple(dict(c) for c in pack.commands if isinstance(c, dict)),
+                scripts=tuple(dict(s) for s in pack.scripts if isinstance(s, dict)),
                 assets=assets,
             )
         )

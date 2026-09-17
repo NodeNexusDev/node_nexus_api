@@ -39,9 +39,7 @@ def _mock_runner() -> MagicMock:
 
 class TestTemplatePackService:
     @pytest.mark.asyncio
-    async def test_create_and_install(
-        self, pack_service: TemplatePackService
-    ) -> None:
+    async def test_create_and_install(self, pack_service: TemplatePackService) -> None:
         from app.application.dto.template_pack import (
             PackCreateDTO,
             PackListQueryDTO,
@@ -89,9 +87,7 @@ class TestTemplatePackService:
         assert stats.total == 1
         # uninstall
         await pack_service.uninstall_pack(detail.pack.id)
-        assert (
-            await pack_service.list_installations(detail.pack.id, 0, 10)
-        ).total == 0
+        assert (await pack_service.list_installations(detail.pack.id, 0, 10)).total == 0
 
 
 class TestComposeService:
