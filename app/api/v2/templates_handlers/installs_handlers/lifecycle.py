@@ -92,7 +92,8 @@ async def install_pack(
     - ``fail`` (default) raises 409 on existing command/script name.
     - ``rename`` generates unique name by appending ``_1``, ``_2`` etc.
 
-    Returns 201 when all succeed, 207 when partially, 409 when conflict.
+    Returns 201 when all succeed, 207 when partially, 409 when conflict,
+    422 when all failed.
     """
     audit.info(
         "api.v2.templates.packs.install",
@@ -124,8 +125,7 @@ async def install_pack(
     if result.failed > 0 and result.succeeded > 0:
         response.status_code = 207
     elif result.failed > 0 and result.succeeded == 0 and result.total > 0:
-        # pure failure still 201? keep 201 unless 207; but allow 200 fallback
-        response.status_code = 201
+        response.status_code = 422
     return bulk
 
 

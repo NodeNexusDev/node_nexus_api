@@ -184,6 +184,24 @@ class PackUpdateDTO:
 
 
 @dataclass(frozen=True, slots=True)
+class SyncedPackDTO:
+    """Pack content discovered by registry sync (ready to upsert)."""
+
+    registry_id: uuid.UUID
+    pack_id: str
+    name: str
+    version: str
+    description: str | None = None
+    author: str | None = None
+    tags: tuple[str, ...] = ()
+    manifest_sha: str | None = None
+    readme: str | None = None
+    commands: tuple[dict[str, object], ...] = ()
+    scripts: tuple[dict[str, object], ...] = ()
+    assets: tuple[PackAssetCreateDTO, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
 class PackStatsDTO:
     """Stats result."""
 

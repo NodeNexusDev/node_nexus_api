@@ -291,6 +291,22 @@ Type: `https://nodenexusdev.github.io/node_nexus_api/en/errors/pack-conflict-err
 
 Type: `https://nodenexusdev.github.io/node_nexus_api/en/errors/pack-not-found-error`
 
+## registry-conflict-error
+
+| Status | Title | Когда |
+|---|---|---|
+| `409` | Conflict | Template registry уже существует (`code: RegistryConflictError`) |
+
+Type: `https://nodenexusdev.github.io/node_nexus_api/en/errors/registry-conflict-error`
+
+## registry-not-found-error
+
+| Status | Title | Когда |
+|---|---|---|
+| `404` | Not Found | Template registry не существует (`code: RegistryNotFoundError`) |
+
+Type: `https://nodenexusdev.github.io/node_nexus_api/en/errors/registry-not-found-error`
+
 ## request-timeout-error
 
 | Status | Title | Когда |

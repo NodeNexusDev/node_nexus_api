@@ -1,7 +1,7 @@
 """Coverage tests for template_pack, user and favorite application services.
 
 Patterns: mocked gateways (AsyncMock readers/writers), no live infra.
-In-memory TemplatePackService state is reset per test.
+Template services are DB-backed (isolated SQLite per test).
 """
 
 from __future__ import annotations
@@ -18,6 +18,12 @@ from uuid import uuid4
 
 import pytest
 
+from app.adapters.persistence.template_pack import (
+    _unique_name,
+    sanitize_tar_name,
+    validate_asset_path,
+    validate_pack_id,
+)
 from app.application.dto.favorite import (
     FavoriteCreateDTO,
     FavoriteDTO,
@@ -32,18 +38,7 @@ from app.application.dto.template_pack import (
 )
 from app.application.dto.user import UserUpdateDTO, UserViewDTO
 from app.application.services.favorite_service import FavoriteService
-from app.application.services.template_pack_service import (
-    _ASSET_RAW,
-    _COMMAND_NAMES,
-    _INSTALLATION_NAMES,
-    _INSTALLATIONS,
-    _PACKS,
-    _SCRIPT_NAMES,
-    TemplatePackService,
-    _extract_name,
-    _extract_raw_payload,
-    _unique_name,
-)
+from app.application.services.template_pack_service import TemplatePackService
 from app.application.services.user_service import UserService
 from app.core.exceptions import (
     DomainError,
@@ -54,23 +49,6 @@ from app.core.exceptions import (
     UserAlreadyExistsError,
     UserNotFoundError,
 )
-
-
-@pytest.fixture(autouse=True)
-def _clean_template_state():
-    _PACKS.clear()
-    _INSTALLATIONS.clear()
-    _ASSET_RAW.clear()
-    _INSTALLATION_NAMES.clear()
-    _COMMAND_NAMES.clear()
-    _SCRIPT_NAMES.clear()
-    yield
-    _PACKS.clear()
-    _INSTALLATIONS.clear()
-    _ASSET_RAW.clear()
-    _INSTALLATION_NAMES.clear()
-    _COMMAND_NAMES.clear()
-    _SCRIPT_NAMES.clear()
 
 
 def _b64(text: str) -> str:
@@ -122,22 +100,25 @@ def _fav_dto(**overrides) -> FavoriteDTO:
     return FavoriteDTO(**defaults)
 
 
+def _cmd(name: str, **over: Any) -> dict[str, Any]:
+    payload: dict[str, Any] = {"name": name, "command": f"echo {name}"}
+    payload.update(over)
+    return payload
+
+
+def _scr(name: str, **over: Any) -> dict[str, Any]:
+    payload: dict[str, Any] = {
+        "name": name,
+        "steps": [{"label": "run", "type": "inline", "command": f"echo {name}"}],
+    }
+    payload.update(over)
+    return payload
+
+
 # ---------------------------------------------------------------- helpers
 
 
 class TestTemplateHelpers:
-    def test_extract_name_dict(self) -> None:
-        assert _extract_name({"name": "a"}, "fb") == "a"
-
-    def test_extract_name_dict_fallback(self) -> None:
-        assert _extract_name({}, "fb") == "fb"
-
-    def test_extract_name_object(self) -> None:
-        assert _extract_name(SimpleNamespace(name="n"), "fb") == "n"
-
-    def test_extract_name_object_fallback(self) -> None:
-        assert _extract_name(SimpleNamespace(), "fb") == "fb"
-
     def test_unique_name_free(self) -> None:
         assert _unique_name("cmd", set()) == "cmd"
 
@@ -145,94 +126,124 @@ class TestTemplateHelpers:
         assert _unique_name("cmd", {"cmd"}) == "cmd_1"
         assert _unique_name("cmd", {"cmd", "cmd_1", "cmd_2"}) == "cmd_3"
 
-    def test_extract_raw_payload_dict(self) -> None:
-        assert _extract_raw_payload({"name": "x"}) == {"name": "x"}
+    def test_validate_pack_id_ok(self) -> None:
+        assert validate_pack_id("docker-install") == "docker-install"
 
-    def test_extract_raw_payload_model(self) -> None:
-        obj = SimpleNamespace(model_dump=lambda: {"name": "y"})
-        assert _extract_raw_payload(obj) == {"name": "y"}
+    def test_validate_pack_id_bad(self) -> None:
+        for bad in ("", "../x", "a/b", "has space", "x" * 101):
+            with pytest.raises(DomainError):
+                validate_pack_id(bad)
 
-    def test_extract_raw_payload_model_raises(self) -> None:
-        def _boom():
-            raise RuntimeError("boom")
+    def test_validate_asset_path_ok(self) -> None:
+        assert validate_asset_path("assets/a.txt") == "assets/a.txt"
 
-        obj = SimpleNamespace(model_dump=_boom)
-        assert _extract_raw_payload(obj) is None
+    def test_validate_asset_path_bad(self) -> None:
+        for bad in ("", "/abs", "../up", "a/../b", "a//b", "a\\b", "a/./b"):
+            with pytest.raises(DomainError):
+                validate_asset_path(bad)
 
-    def test_extract_raw_payload_model_non_dict(self) -> None:
-        obj = SimpleNamespace(model_dump=lambda: "not-a-dict")
-        assert _extract_raw_payload(obj) is None
-
-    def test_extract_raw_payload_no_dump(self) -> None:
-        assert _extract_raw_payload(SimpleNamespace(name="z")) is None
-        assert _extract_raw_payload("plain-string") is None
+    def test_sanitize_tar_name(self) -> None:
+        assert sanitize_tar_name("assets/a.txt") == "assets/a.txt"
+        assert sanitize_tar_name("../evil") is None
+        assert sanitize_tar_name("/abs") is None
 
 
 # ---------------------------------------------------------------- create
 
 
 class TestTemplateCreate:
-    async def test_create_no_assets(self) -> None:
-        svc = TemplatePackService()
-        detail = await svc.create_pack(_create())
+    async def test_create_no_assets(self, pack_service: TemplatePackService) -> None:
+        detail = await pack_service.create_pack(_create())
         assert detail.pack.name == "Pack"
         assert detail.assets == ()
-        assert detail.pack.id in _PACKS
+        assert (await pack_service.get_pack_detail(detail.pack.id)).pack.id == (
+            detail.pack.id
+        )
 
-    async def test_create_with_assets(self) -> None:
-        svc = TemplatePackService()
+    async def test_create_with_assets(self, pack_service: TemplatePackService) -> None:
         data = _create(
             assets=(PackAssetCreateDTO(path="a.txt", content_base64=_b64("hello")),)
         )
-        detail = await svc.create_pack(data)
+        detail = await pack_service.create_pack(data)
         assert len(detail.assets) == 1
         assert detail.assets[0].size == 5
-        assert detail.pack.id in _ASSET_RAW
+        tar = await pack_service.get_assets_tar(detail.pack.id)
+        assert b"hello" in tar
 
-    async def test_create_duplicate_same_registry(self) -> None:
-        svc = TemplatePackService()
+    async def test_create_duplicate_same_registry(
+        self, pack_service: TemplatePackService
+    ) -> None:
         manifest = _manifest(pack_id="dup")
         reg = uuid.uuid4()
-        await svc.create_pack(_create(manifest=manifest, registry_id=reg))
-        with pytest.raises(DomainError, match="already exists"):
-            await svc.create_pack(_create(manifest=manifest, registry_id=reg))
+        await pack_service.create_pack(_create(manifest=manifest, registry_id=reg))
+        with pytest.raises(PackConflictError, match="already exists"):
+            await pack_service.create_pack(_create(manifest=manifest, registry_id=reg))
 
-    async def test_create_same_pack_id_different_registry_ok(self) -> None:
-        svc = TemplatePackService()
+    async def test_create_same_pack_id_different_registry_ok(
+        self, pack_service: TemplatePackService
+    ) -> None:
         manifest = _manifest(pack_id="shared")
-        await svc.create_pack(_create(manifest=manifest, registry_id=uuid.uuid4()))
-        detail = await svc.create_pack(
+        await pack_service.create_pack(
+            _create(manifest=manifest, registry_id=uuid.uuid4())
+        )
+        detail = await pack_service.create_pack(
             _create(manifest=manifest, registry_id=uuid.uuid4())
         )
         assert detail.pack.pack_id == "shared"
-        # also same pack_id with None registry twice is duplicate
+        # same pack_id with None registry twice is duplicate (partial unique index)
         m2 = _manifest(pack_id="samenone")
-        await svc.create_pack(_create(manifest=m2, registry_id=None))
-        with pytest.raises(DomainError):
-            await svc.create_pack(_create(manifest=m2, registry_id=None))
+        await pack_service.create_pack(_create(manifest=m2, registry_id=None))
+        with pytest.raises(PackConflictError):
+            await pack_service.create_pack(_create(manifest=m2, registry_id=None))
 
-    async def test_create_invalid_base64(self) -> None:
-        svc = TemplatePackService()
+    async def test_create_invalid_base64(
+        self, pack_service: TemplatePackService
+    ) -> None:
         data = _create(assets=(PackAssetCreateDTO(path="a.txt", content_base64="!!!"),))
         with pytest.raises(DomainError, match="Invalid base64"):
-            await svc.create_pack(data)
+            await pack_service.create_pack(data)
 
-    async def test_create_with_pydantic_commands(self) -> None:
-        svc = TemplatePackService()
-        detail = await svc.create_pack(
+    async def test_create_with_pydantic_commands(
+        self, pack_service: TemplatePackService
+    ) -> None:
+        detail = await pack_service.create_pack(
             _create(commands=(_manifest(),), scripts=(_manifest(),))
         )
         assert len(detail.commands) == 1
+
+    async def test_create_bad_pack_id(self, pack_service: TemplatePackService) -> None:
+        with pytest.raises(DomainError):
+            await pack_service.create_pack(_create(manifest=_manifest(pack_id="../x")))
+
+    async def test_create_bad_asset_path(
+        self, pack_service: TemplatePackService
+    ) -> None:
+        data = _create(
+            assets=(PackAssetCreateDTO(path="../evil", content_base64=_b64("x")),)
+        )
+        with pytest.raises(DomainError):
+            await pack_service.create_pack(data)
+
+    async def test_create_duplicate_asset_path(
+        self, pack_service: TemplatePackService
+    ) -> None:
+        data = _create(
+            assets=(
+                PackAssetCreateDTO(path="a.txt", content_base64=_b64("x")),
+                PackAssetCreateDTO(path="a.txt", content_base64=_b64("y")),
+            )
+        )
+        with pytest.raises(DomainError, match="Duplicate asset path"):
+            await pack_service.create_pack(data)
 
 
 # ---------------------------------------------------------------- list/get
 
 
 class TestTemplateListGet:
-    async def test_list_filters(self) -> None:
-        svc = TemplatePackService()
+    async def test_list_filters(self, pack_service: TemplatePackService) -> None:
         reg = uuid.uuid4()
-        await svc.create_pack(
+        await pack_service.create_pack(
             _create(
                 manifest=_manifest(
                     name="alpha-one", description="web server", tags=("web",)
@@ -240,80 +251,88 @@ class TestTemplateListGet:
                 registry_id=reg,
             )
         )
-        d2 = await svc.create_pack(
+        d2 = await pack_service.create_pack(
             _create(
                 manifest=_manifest(name="beta", description="db thing", tags=("db",)),
                 registry_id=uuid.uuid4(),
-                commands=({"name": "beta-cmd"},),
+                commands=(_cmd("beta-cmd"),),
             )
         )
         # registry filter
-        page = await svc.list_packs(PackListQueryDTO(registry_id=reg))
+        page = await pack_service.list_packs(PackListQueryDTO(registry_id=reg))
         assert page.total == 1
         # tag filter
-        page = await svc.list_packs(PackListQueryDTO(tag="web"))
+        page = await pack_service.list_packs(PackListQueryDTO(tag="web"))
         assert page.total == 1
-        page = await svc.list_packs(PackListQueryDTO(tag="missing"))
+        page = await pack_service.list_packs(PackListQueryDTO(tag="missing"))
         assert page.total == 0
         # installed filters (none installed yet)
-        assert (await svc.list_packs(PackListQueryDTO(installed=True))).total == 0
-        assert (await svc.list_packs(PackListQueryDTO(installed=False))).total == 2
+        assert (
+            await pack_service.list_packs(PackListQueryDTO(installed=True))
+        ).total == 0
+        assert (
+            await pack_service.list_packs(PackListQueryDTO(installed=False))
+        ).total == 2
         # install one then re-check installed filters
-        await svc.install_pack(d2.pack.id)
-        assert (await svc.list_packs(PackListQueryDTO(installed=True))).total == 1
-        assert (await svc.list_packs(PackListQueryDTO(installed=False))).total == 1
+        await pack_service.install_pack(d2.pack.id)
+        assert (
+            await pack_service.list_packs(PackListQueryDTO(installed=True))
+        ).total == 1
+        assert (
+            await pack_service.list_packs(PackListQueryDTO(installed=False))
+        ).total == 1
         # search by name (case-insensitive)
-        page = await svc.list_packs(PackListQueryDTO(search="ALPHA"))
+        page = await pack_service.list_packs(PackListQueryDTO(search="ALPHA"))
         assert page.total == 1
         # search by description
-        page = await svc.list_packs(PackListQueryDTO(search="db thing"))
+        page = await pack_service.list_packs(PackListQueryDTO(search="db thing"))
         assert page.total == 1
         # search no match
-        assert (await svc.list_packs(PackListQueryDTO(search="zzz"))).total == 0
+        assert (
+            await pack_service.list_packs(PackListQueryDTO(search="zzz"))
+        ).total == 0
         # search with None description pack
-        await svc.create_pack(
+        await pack_service.create_pack(
             _create(manifest=_manifest(name="nodesc", description=None))
         )
-        assert (await svc.list_packs(PackListQueryDTO(search="nodesc"))).total == 1
+        assert (
+            await pack_service.list_packs(PackListQueryDTO(search="nodesc"))
+        ).total == 1
         # pagination slice
-        page = await svc.list_packs(PackListQueryDTO(offset=0, limit=1))
+        page = await pack_service.list_packs(PackListQueryDTO(offset=0, limit=1))
         assert len(page.items) == 1
         assert page.total >= 3
 
-    async def test_get_detail_missing(self) -> None:
-        svc = TemplatePackService()
+    async def test_get_detail_missing(self, pack_service: TemplatePackService) -> None:
         with pytest.raises(PackNotFoundError):
-            await svc.get_pack_detail(uuid.uuid4())
+            await pack_service.get_pack_detail(uuid.uuid4())
 
-    async def test_get_view(self) -> None:
-        svc = TemplatePackService()
-        detail = await svc.create_pack(_create())
-        view = await svc.get_pack_view(detail.pack.id)
+    async def test_get_view(self, pack_service: TemplatePackService) -> None:
+        detail = await pack_service.create_pack(_create())
+        view = await pack_service.get_pack_view(detail.pack.id)
         assert view.id == detail.pack.id
         with pytest.raises(PackNotFoundError):
-            await svc.get_pack_view(uuid.uuid4())
+            await pack_service.get_pack_view(uuid.uuid4())
 
 
 # ---------------------------------------------------------------- tar
 
 
 class TestTemplateTar:
-    async def test_tar_empty(self) -> None:
-        svc = TemplatePackService()
-        detail = await svc.create_pack(_create())
-        data = await svc.get_assets_tar(detail.pack.id)
+    async def test_tar_empty(self, pack_service: TemplatePackService) -> None:
+        detail = await pack_service.create_pack(_create())
+        data = await pack_service.get_assets_tar(detail.pack.id)
         buf = io.BytesIO(data)
         with tarfile.open(fileobj=buf, mode="r") as tar:
             assert tar.getnames() == []
 
-    async def test_tar_with_assets(self) -> None:
-        svc = TemplatePackService()
-        detail = await svc.create_pack(
+    async def test_tar_with_assets(self, pack_service: TemplatePackService) -> None:
+        detail = await pack_service.create_pack(
             _create(
                 assets=(PackAssetCreateDTO(path="a.txt", content_base64=_b64("hello")),)
             )
         )
-        data = await svc.get_assets_tar(detail.pack.id)
+        data = await pack_service.get_assets_tar(detail.pack.id)
         buf = io.BytesIO(data)
         with tarfile.open(fileobj=buf, mode="r") as tar:
             assert tar.getnames() == ["a.txt"]
@@ -321,202 +340,253 @@ class TestTemplateTar:
             assert member is not None
             assert member.read() == b"hello"
 
-    async def test_tar_missing_raw_falls_back_empty(self) -> None:
-        svc = TemplatePackService()
-        detail = await svc.create_pack(
+    async def test_tar_skips_unsafe_stored_path(
+        self, pack_service: TemplatePackService
+    ) -> None:
+        # Unsafe paths cannot be created via API; sanitize_tar_name guards
+        # legacy rows at archive build time.
+        assert sanitize_tar_name("assets/ok.txt") == "assets/ok.txt"
+        assert sanitize_tar_name("../../etc/passwd") is None
+
+    async def test_tar_missing_pack(self, pack_service: TemplatePackService) -> None:
+        with pytest.raises(PackNotFoundError):
+            await pack_service.get_assets_tar(uuid.uuid4())
+
+    async def test_stream_alias(self, pack_service: TemplatePackService) -> None:
+        detail = await pack_service.create_pack(_create())
+        assert await pack_service.stream_assets_tar(detail.pack.id) == (
+            await pack_service.get_assets_tar(detail.pack.id)
+        )
+
+    async def test_iterate_chunks(self, pack_service: TemplatePackService) -> None:
+        detail = await pack_service.create_pack(
             _create(
-                assets=(PackAssetCreateDTO(path="a.txt", content_base64=_b64("hi")),)
+                assets=(PackAssetCreateDTO(path="a.txt", content_base64=_b64("hello")),)
             )
         )
-        _ASSET_RAW.pop(detail.pack.id)
-        data = await svc.get_assets_tar(detail.pack.id)
-        buf = io.BytesIO(data)
-        with tarfile.open(fileobj=buf, mode="r") as tar:
-            assert tar.getnames() == ["a.txt"]
-            member = tar.extractfile("a.txt")
-            assert member is not None
-            assert member.read() == b""
-
-    async def test_tar_missing_pack(self) -> None:
-        svc = TemplatePackService()
-        with pytest.raises(PackNotFoundError):
-            await svc.get_assets_tar(uuid.uuid4())
-
-    async def test_stream_alias(self) -> None:
-        svc = TemplatePackService()
-        detail = await svc.create_pack(_create())
-        assert await svc.stream_assets_tar(detail.pack.id) == await svc.get_assets_tar(
-            detail.pack.id
-        )
+        chunks = [c async for c in pack_service.iterate_assets_tar(detail.pack.id)]
+        assert b"".join(chunks) == await pack_service.get_assets_tar(detail.pack.id)
 
 
 # ---------------------------------------------------------------- install
 
 
 class TestTemplateInstall:
-    async def test_install_not_found(self) -> None:
-        svc = TemplatePackService()
+    async def test_install_not_found(self, pack_service: TemplatePackService) -> None:
         with pytest.raises(PackNotFoundError):
-            await svc.install_pack(uuid.uuid4())
+            await pack_service.install_pack(uuid.uuid4())
 
-    async def test_install_empty(self) -> None:
-        svc = TemplatePackService()
-        detail = await svc.create_pack(_create())
-        res = await svc.install_pack(detail.pack.id)
+    async def test_install_empty(self, pack_service: TemplatePackService) -> None:
+        detail = await pack_service.create_pack(_create())
+        res = await pack_service.install_pack(detail.pack.id)
         assert res.total == 0
         assert res.succeeded == 0
         assert res.failed == 0
 
-    async def test_install_success_commands_scripts(self) -> None:
-        svc = TemplatePackService()
-        detail = await svc.create_pack(
-            _create(commands=({"name": "c1"},), scripts=({"name": "s1"},))
+    async def test_install_success_commands_scripts(
+        self, pack_service: TemplatePackService
+    ) -> None:
+        detail = await pack_service.create_pack(
+            _create(commands=(_cmd("c1"),), scripts=(_scr("s1"),))
         )
-        res = await svc.install_pack(detail.pack.id)
+        res = await pack_service.install_pack(detail.pack.id)
         assert res.succeeded == 2
         assert res.failed == 0
+        assert all(r.entity_id is not None for r in res.results)
         # installed info set
-        updated = await svc.get_pack_detail(detail.pack.id)
+        updated = await pack_service.get_pack_detail(detail.pack.id)
         assert updated.pack.installed_version == "1.0.0"
         # installations recorded
-        page = await svc.list_installations(detail.pack.id, 0, 10)
+        page = await pack_service.list_installations(detail.pack.id, 0, 10)
         assert page.total == 2
 
-    async def test_install_already_installed(self) -> None:
-        svc = TemplatePackService()
-        detail = await svc.create_pack(_create(commands=({"name": "c1"},)))
-        await svc.install_pack(detail.pack.id)
+    async def test_install_already_installed(
+        self, pack_service: TemplatePackService
+    ) -> None:
+        detail = await pack_service.create_pack(_create(commands=(_cmd("c1"),)))
+        await pack_service.install_pack(detail.pack.id)
         with pytest.raises(PackConflictError, match="already installed"):
-            await svc.install_pack(detail.pack.id)
+            await pack_service.install_pack(detail.pack.id)
 
-    async def test_install_command_conflict_fail(self) -> None:
-        svc = TemplatePackService()
-        d1 = await svc.create_pack(_create(commands=({"name": "dup"},)))
-        await svc.install_pack(d1.pack.id)
-        d2 = await svc.create_pack(_create(commands=({"name": "dup"},)))
+    async def test_install_command_conflict_fail(
+        self, pack_service: TemplatePackService
+    ) -> None:
+        d1 = await pack_service.create_pack(_create(commands=(_cmd("dup"),)))
+        await pack_service.install_pack(d1.pack.id)
+        d2 = await pack_service.create_pack(_create(commands=(_cmd("dup"),)))
         with pytest.raises(PackConflictError, match="Command name"):
-            await svc.install_pack(d2.pack.id, on_conflict="fail")
+            await pack_service.install_pack(d2.pack.id, on_conflict="fail")
+        # nothing was persisted for the conflicting pack
+        assert (
+            await pack_service.get_pack_detail(d2.pack.id)
+        ).pack.installed_version is None
+        assert (await pack_service.list_installations(d2.pack.id, 0, 10)).total == 0
 
-    async def test_install_script_conflict_fail(self) -> None:
-        svc = TemplatePackService()
-        d1 = await svc.create_pack(_create(scripts=({"name": "dup"},)))
-        await svc.install_pack(d1.pack.id)
-        d2 = await svc.create_pack(_create(scripts=({"name": "dup"},)))
+    async def test_install_script_conflict_fail(
+        self, pack_service: TemplatePackService
+    ) -> None:
+        d1 = await pack_service.create_pack(_create(scripts=(_scr("dup"),)))
+        await pack_service.install_pack(d1.pack.id)
+        d2 = await pack_service.create_pack(_create(scripts=(_scr("dup"),)))
         with pytest.raises(PackConflictError, match="Script name"):
-            await svc.install_pack(d2.pack.id, on_conflict="fail")
+            await pack_service.install_pack(d2.pack.id, on_conflict="fail")
 
-    async def test_install_rename_and_intra_pack_dup(self) -> None:
-        svc = TemplatePackService()
-        d1 = await svc.create_pack(_create(commands=({"name": "cmd"},)))
-        await svc.install_pack(d1.pack.id)
-        d2 = await svc.create_pack(_create(commands=({"name": "cmd"}, {"name": "cmd"})))
-        res = await svc.install_pack(d2.pack.id, on_conflict="rename")
+    async def test_install_rename_and_intra_pack_dup(
+        self, pack_service: TemplatePackService
+    ) -> None:
+        d1 = await pack_service.create_pack(_create(commands=(_cmd("cmd"),)))
+        await pack_service.install_pack(d1.pack.id)
+        d2 = await pack_service.create_pack(
+            _create(commands=(_cmd("cmd"), _cmd("cmd")))
+        )
+        res = await pack_service.install_pack(d2.pack.id, on_conflict="rename")
         assert res.succeeded == 2
         names = [r.name for r in res.results]
         assert "cmd_1" in names
         assert "cmd_2" in names
 
-    async def test_install_script_rename(self) -> None:
-        svc = TemplatePackService()
-        d1 = await svc.create_pack(_create(scripts=({"name": "s"},)))
-        await svc.install_pack(d1.pack.id)
-        d2 = await svc.create_pack(_create(scripts=({"name": "s"},)))
-        res = await svc.install_pack(d2.pack.id, on_conflict="rename")
+    async def test_install_script_rename(
+        self, pack_service: TemplatePackService
+    ) -> None:
+        d1 = await pack_service.create_pack(_create(scripts=(_scr("s"),)))
+        await pack_service.install_pack(d1.pack.id)
+        d2 = await pack_service.create_pack(_create(scripts=(_scr("s"),)))
+        res = await pack_service.install_pack(d2.pack.id, on_conflict="rename")
         assert res.succeeded == 1
         assert res.results[0].name == "s_1"
 
-    async def test_install_partial_failure_fail_substring(self) -> None:
-        svc = TemplatePackService()
-        detail = await svc.create_pack(
+    async def test_install_partial_failure_bad_payload(
+        self, pack_service: TemplatePackService
+    ) -> None:
+        detail = await pack_service.create_pack(
             _create(
-                commands=({"name": "good"}, {"name": "will-fail-cmd"}),
-                scripts=({"name": "ok-script"}, {"name": "fail-script"}),
+                commands=(_cmd("good"), {"name": "bad-cmd", "command": ""}),
+                scripts=(_scr("ok-script"), {"name": "bad-script", "steps": []}),
             )
         )
-        res = await svc.install_pack(detail.pack.id)
+        res = await pack_service.install_pack(detail.pack.id)
         assert res.total == 4
         assert res.succeeded == 2
         assert res.failed == 2
-        assert all(r.status == "error" for r in res.results if "fail" in r.name.lower())
+        assert all(r.error for r in res.results if r.status == "error")
         # still marks installed since at least one succeeded
-        updated = await svc.get_pack_detail(detail.pack.id)
+        updated = await pack_service.get_pack_detail(detail.pack.id)
         assert updated.pack.installed_version is not None
 
-    async def test_install_all_fail_no_installed_update(self) -> None:
-        svc = TemplatePackService()
-        detail = await svc.create_pack(_create(commands=({"name": "fail-only"},)))
-        res = await svc.install_pack(detail.pack.id)
+    async def test_install_all_fail_no_installed_update(
+        self, pack_service: TemplatePackService
+    ) -> None:
+        detail = await pack_service.create_pack(
+            _create(commands=({"name": "bad-only", "command": ""},))
+        )
+        res = await pack_service.install_pack(detail.pack.id)
         assert res.succeeded == 0
         assert res.failed == 1
-        updated = await svc.get_pack_detail(detail.pack.id)
+        updated = await pack_service.get_pack_detail(detail.pack.id)
         assert updated.pack.installed_version is None
 
-    async def test_install_with_model_dump_payloads(self) -> None:
-        svc = TemplatePackService()
-        cmd = SimpleNamespace(name="m1", model_dump=lambda: {"name": "m1"})
-        scr = SimpleNamespace(name="ms1", model_dump=lambda: {"name": "ms1"})
-        detail = await svc.create_pack(_create(commands=(cmd,), scripts=(scr,)))
-        res = await svc.install_pack(detail.pack.id)
+    async def test_install_with_model_dump_payloads(
+        self, pack_service: TemplatePackService
+    ) -> None:
+        cmd = SimpleNamespace(
+            name="m1", model_dump=lambda: {"name": "m1", "command": "echo m1"}
+        )
+        scr = SimpleNamespace(
+            name="ms1",
+            model_dump=lambda: {
+                "name": "ms1",
+                "steps": [{"label": "run", "type": "inline"}],
+            },
+        )
+        detail = await pack_service.create_pack(
+            _create(commands=(cmd,), scripts=(scr,))
+        )
+        res = await pack_service.install_pack(detail.pack.id)
         assert res.succeeded == 2
 
-    async def test_install_model_dump_raises_goes_error_path(self) -> None:
-        # model_dump raising is swallowed for payload but install still succeeds
-        # (payload extraction failure does not fail install); use fail name for error
-        svc = TemplatePackService()
-        detail = await svc.create_pack(_create(commands=({"name": "fail-x"},)))
-        res = await svc.install_pack(detail.pack.id)
+    async def test_install_errors_are_sanitized(
+        self, pack_service: TemplatePackService
+    ) -> None:
+        detail = await pack_service.create_pack(
+            _create(commands=({"name": "bad-x", "command": ""},))
+        )
+        res = await pack_service.install_pack(detail.pack.id)
         assert res.failed == 1
+        assert "Traceback" not in res.results[0].error
+
+    async def test_install_actually_creates_rows(
+        self, pack_service: TemplatePackService
+    ) -> None:
+        # Created rows are real: a second pack cannot reuse the name in fail mode.
+        d1 = await pack_service.create_pack(_create(commands=(_cmd("real"),)))
+        res = await pack_service.install_pack(d1.pack.id)
+        assert res.results[0].entity_id is not None
+        d2 = await pack_service.create_pack(_create(commands=(_cmd("real"),)))
+        with pytest.raises(PackConflictError):
+            await pack_service.install_pack(d2.pack.id)
 
 
 # ---------------------------------------------------------------- uninstall/update
 
 
 class TestTemplateUninstallUpdate:
-    async def test_uninstall_not_found(self) -> None:
-        svc = TemplatePackService()
+    async def test_uninstall_not_found(self, pack_service: TemplatePackService) -> None:
         with pytest.raises(PackNotFoundError):
-            await svc.uninstall_pack(uuid.uuid4())
+            await pack_service.uninstall_pack(uuid.uuid4())
 
-    async def test_uninstall_installed_releases_names(self) -> None:
-        svc = TemplatePackService()
-        detail = await svc.create_pack(
-            _create(commands=({"name": "c1"},), scripts=({"name": "s1"},))
+    async def test_uninstall_installed_removes_rows(
+        self, pack_service: TemplatePackService
+    ) -> None:
+        detail = await pack_service.create_pack(
+            _create(commands=(_cmd("c1"),), scripts=(_scr("s1"),))
         )
-        await svc.install_pack(detail.pack.id)
-        assert "c1" in _COMMAND_NAMES
-        await svc.uninstall_pack(detail.pack.id)
-        assert "c1" not in _COMMAND_NAMES
-        assert "s1" not in _SCRIPT_NAMES
-        updated = await svc.get_pack_detail(detail.pack.id)
+        await pack_service.install_pack(detail.pack.id)
+        await pack_service.uninstall_pack(detail.pack.id)
+        updated = await pack_service.get_pack_detail(detail.pack.id)
         assert updated.pack.installed_version is None
-        # reinstall with same names works after release
-        res = await svc.install_pack(detail.pack.id)
+        assert (await pack_service.list_installations(detail.pack.id, 0, 10)).total == 0
+        # reinstall with same names works after removal
+        res = await pack_service.install_pack(detail.pack.id)
         assert res.succeeded == 2
 
-    async def test_uninstall_not_installed(self) -> None:
-        svc = TemplatePackService()
-        detail = await svc.create_pack(_create())
-        await svc.uninstall_pack(detail.pack.id)  # no error
-        assert (
-            detail.pack.id not in _INSTALLATIONS or _INSTALLATIONS[detail.pack.id] == []
-        )
-
-    async def test_update_pack_not_found(self) -> None:
-        svc = TemplatePackService()
-        with pytest.raises(PackNotFoundError):
-            await svc.update_pack(uuid.uuid4())
-
-    async def test_update_pack_reinstall(self) -> None:
-        svc = TemplatePackService()
-        detail = await svc.create_pack(_create(commands=({"name": "c1"},)))
-        await svc.install_pack(detail.pack.id)
-        res = await svc.update_pack(detail.pack.id)
+    async def test_uninstall_removes_created_rows(
+        self, pack_service: TemplatePackService
+    ) -> None:
+        # After uninstall the names are free for an unrelated pack.
+        detail = await pack_service.create_pack(_create(commands=(_cmd("gone"),)))
+        await pack_service.install_pack(detail.pack.id)
+        await pack_service.uninstall_pack(detail.pack.id)
+        other = await pack_service.create_pack(_create(commands=(_cmd("gone"),)))
+        res = await pack_service.install_pack(other.pack.id)
         assert res.succeeded == 1
 
-    async def test_update_pack_not_installed(self) -> None:
-        svc = TemplatePackService()
-        detail = await svc.create_pack(_create(commands=({"name": "c1"},)))
-        res = await svc.update_pack(detail.pack.id, on_conflict="rename")
+    async def test_uninstall_not_installed(
+        self, pack_service: TemplatePackService
+    ) -> None:
+        detail = await pack_service.create_pack(_create())
+        await pack_service.uninstall_pack(detail.pack.id)  # no error
+        assert (await pack_service.list_installations(detail.pack.id, 0, 10)).total == 0
+
+    async def test_update_pack_not_found(
+        self, pack_service: TemplatePackService
+    ) -> None:
+        with pytest.raises(PackNotFoundError):
+            await pack_service.update_pack(uuid.uuid4())
+
+    async def test_update_pack_reinstall(
+        self, pack_service: TemplatePackService
+    ) -> None:
+        detail = await pack_service.create_pack(_create(commands=(_cmd("c1"),)))
+        await pack_service.install_pack(detail.pack.id)
+        res = await pack_service.update_pack(detail.pack.id)
+        assert res.succeeded == 1
+        assert (await pack_service.list_installations(detail.pack.id, 0, 10)).total == 1
+
+    async def test_update_pack_not_installed(
+        self, pack_service: TemplatePackService
+    ) -> None:
+        detail = await pack_service.create_pack(_create(commands=(_cmd("c1"),)))
+        res = await pack_service.update_pack(detail.pack.id, on_conflict="rename")
         assert res.succeeded == 1
 
 
@@ -524,108 +594,102 @@ class TestTemplateUninstallUpdate:
 
 
 class TestTemplateInstallationsStats:
-    async def test_list_installations_not_found(self) -> None:
-        svc = TemplatePackService()
+    async def test_list_installations_not_found(
+        self, pack_service: TemplatePackService
+    ) -> None:
         with pytest.raises(PackNotFoundError):
-            await svc.list_installations(uuid.uuid4(), 0, 10)
+            await pack_service.list_installations(uuid.uuid4(), 0, 10)
 
-    async def test_list_installations_pagination_sorted(self) -> None:
-        svc = TemplatePackService()
-        detail = await svc.create_pack(
-            _create(commands=({"name": "a"}, {"name": "b"}, {"name": "c"}))
+    async def test_list_installations_pagination_sorted(
+        self, pack_service: TemplatePackService
+    ) -> None:
+        detail = await pack_service.create_pack(
+            _create(commands=(_cmd("a"), _cmd("b"), _cmd("c")))
         )
-        await svc.install_pack(detail.pack.id)
-        page = await svc.list_installations(detail.pack.id, 0, 2)
+        await pack_service.install_pack(detail.pack.id)
+        page = await pack_service.list_installations(detail.pack.id, 0, 2)
         assert page.total == 3
         assert len(page.items) == 2
-        page2 = await svc.list_installations(detail.pack.id, 2, 10)
+        page2 = await pack_service.list_installations(detail.pack.id, 2, 10)
         assert len(page2.items) == 1
-        empty = await svc.list_installations(detail.pack.id, 10, 10)
+        empty = await pack_service.list_installations(detail.pack.id, 10, 10)
         assert empty.items == ()
 
-    async def test_stats_no_group(self) -> None:
-        svc = TemplatePackService()
-        stats = await svc.get_stats(None)
+    async def test_stats_no_group(self, pack_service: TemplatePackService) -> None:
+        stats = await pack_service.get_stats(None)
         assert stats.total == 0
         assert stats.buckets == ()
-        d = await svc.create_pack(_create(commands=({"name": "x"},)))
-        await svc.install_pack(d.pack.id)
-        await svc.create_pack(_create())
-        stats = await svc.get_stats(None)
+        d = await pack_service.create_pack(_create(commands=(_cmd("x"),)))
+        await pack_service.install_pack(d.pack.id)
+        await pack_service.create_pack(_create())
+        stats = await pack_service.get_stats(None)
         assert stats.total == 2
         assert stats.installed == 1
         assert stats.not_installed == 1
 
-    async def test_stats_registry(self) -> None:
-        svc = TemplatePackService()
+    async def test_stats_registry(self, pack_service: TemplatePackService) -> None:
         reg = uuid.uuid4()
-        d1 = await svc.create_pack(
-            _create(manifest=_manifest(), registry_id=reg, commands=({"name": "c1"},))
+        d1 = await pack_service.create_pack(
+            _create(manifest=_manifest(), registry_id=reg, commands=(_cmd("c1"),))
         )
-        await svc.install_pack(d1.pack.id)
-        await svc.create_pack(_create(manifest=_manifest(), registry_id=None))
-        stats = await svc.get_stats("registry_id")
+        await pack_service.install_pack(d1.pack.id)
+        await pack_service.create_pack(_create(manifest=_manifest(), registry_id=None))
+        stats = await pack_service.get_stats("registry_id")
         assert stats.total == 2
         by = {b.group: b for b in stats.buckets}
         assert by[str(reg)].installed == 1
         assert by["local"].total == 1
 
-    async def test_stats_tag(self) -> None:
-        svc = TemplatePackService()
-        d1 = await svc.create_pack(
-            _create(manifest=_manifest(tags=("web", "api")), commands=({"name": "c1"},))
+    async def test_stats_tag(self, pack_service: TemplatePackService) -> None:
+        d1 = await pack_service.create_pack(
+            _create(manifest=_manifest(tags=("web", "api")), commands=(_cmd("c1"),))
         )
-        await svc.install_pack(d1.pack.id)
-        await svc.create_pack(_create(manifest=_manifest(tags=())))
-        stats = await svc.get_stats("tag")
+        await pack_service.install_pack(d1.pack.id)
+        await pack_service.create_pack(_create(manifest=_manifest(tags=())))
+        stats = await pack_service.get_stats("tag")
         by = {b.group: b for b in stats.buckets}
         assert by["web"].total == 1
         assert by["web"].installed == 1
         assert by["untagged"].total == 1
 
-    async def test_stats_installed(self) -> None:
-        svc = TemplatePackService()
-        d = await svc.create_pack(_create(commands=({"name": "x"},)))
-        await svc.install_pack(d.pack.id)
-        await svc.create_pack(_create())
-        stats = await svc.get_stats("installed")
+    async def test_stats_installed(self, pack_service: TemplatePackService) -> None:
+        d = await pack_service.create_pack(_create(commands=(_cmd("x"),)))
+        await pack_service.install_pack(d.pack.id)
+        await pack_service.create_pack(_create())
+        stats = await pack_service.get_stats("installed")
         assert len(stats.buckets) == 2
         by = {b.group: b for b in stats.buckets}
         assert by["installed"].total == 1
         assert by["not_installed"].total == 1
 
-    async def test_stats_version(self) -> None:
-        svc = TemplatePackService()
-        await svc.create_pack(_create(manifest=_manifest(version="1.0.0")))
-        await svc.create_pack(_create(manifest=_manifest(version="2.0.0")))
-        stats = await svc.get_stats("version")
+    async def test_stats_version(self, pack_service: TemplatePackService) -> None:
+        await pack_service.create_pack(_create(manifest=_manifest(version="1.0.0")))
+        await pack_service.create_pack(_create(manifest=_manifest(version="2.0.0")))
+        stats = await pack_service.get_stats("version")
         by = {b.group: b for b in stats.buckets}
         assert by["1.0.0"].total == 1
         assert by["2.0.0"].total == 1
 
-    async def test_stats_generic(self) -> None:
-        svc = TemplatePackService()
-        await svc.create_pack(_create())
-        stats = await svc.get_stats("custom-group")
-        assert len(stats.buckets) == 1
-        assert stats.buckets[0].group == "custom-group"
+    async def test_stats_invalid_group_by(
+        self, pack_service: TemplatePackService
+    ) -> None:
+        await pack_service.create_pack(_create())
+        with pytest.raises(DomainError, match="Invalid group_by"):
+            await pack_service.get_stats("custom-group")
 
-    async def test_patch_not_found(self) -> None:
-        svc = TemplatePackService()
+    async def test_patch_not_found(self, pack_service: TemplatePackService) -> None:
         with pytest.raises(PackNotFoundError):
-            await svc.patch_pack(uuid.uuid4(), PackUpdateDTO(name="x"))
+            await pack_service.patch_pack(uuid.uuid4(), PackUpdateDTO(name="x"))
 
-    async def test_patch_no_changes(self) -> None:
-        svc = TemplatePackService()
-        detail = await svc.create_pack(_create())
-        view = await svc.patch_pack(detail.pack.id, PackUpdateDTO())
+    async def test_patch_no_changes(self, pack_service: TemplatePackService) -> None:
+        detail = await pack_service.create_pack(_create())
+        view = await pack_service.patch_pack(detail.pack.id, PackUpdateDTO())
         assert view.name == detail.pack.name
         assert view.version == detail.pack.version
 
-    async def test_patch_all_fields(self) -> None:
-        svc = TemplatePackService()
-        detail = await svc.create_pack(_create())
-        view = await svc.patch_pack(
+    async def test_patch_all_fields(self, pack_service: TemplatePackService) -> None:
+        detail = await pack_service.create_pack(_create())
+        view = await pack_service.patch_pack(
             detail.pack.id,
             PackUpdateDTO(
                 name="new",
@@ -645,27 +709,26 @@ class TestTemplateInstallationsStats:
         assert view.manifest_sha == "newsha"
         assert view.readme == "nr"
 
-    async def test_delete_not_found(self) -> None:
-        svc = TemplatePackService()
+    async def test_delete_not_found(self, pack_service: TemplatePackService) -> None:
         with pytest.raises(PackNotFoundError):
-            await svc.delete_pack(uuid.uuid4())
+            await pack_service.delete_pack(uuid.uuid4())
 
-    async def test_delete_ok_cleans_up(self) -> None:
-        svc = TemplatePackService()
-        detail = await svc.create_pack(
+    async def test_delete_ok_cleans_up(self, pack_service: TemplatePackService) -> None:
+        detail = await pack_service.create_pack(
             _create(
                 assets=(PackAssetCreateDTO(path="a.txt", content_base64=_b64("hi")),),
-                commands=({"name": "c1"},),
-                scripts=({"name": "s1"},),
+                commands=(_cmd("c1"),),
+                scripts=(_scr("s1"),),
             )
         )
-        await svc.install_pack(detail.pack.id)
-        await svc.delete_pack(detail.pack.id)
-        assert detail.pack.id not in _PACKS
-        assert detail.pack.id not in _ASSET_RAW
-        assert detail.pack.id not in _INSTALLATIONS
+        await pack_service.install_pack(detail.pack.id)
+        await pack_service.delete_pack(detail.pack.id)
         with pytest.raises(PackNotFoundError):
-            await svc.get_pack_detail(detail.pack.id)
+            await pack_service.get_pack_detail(detail.pack.id)
+        # created rows are gone: names are reusable by an unrelated pack
+        other = await pack_service.create_pack(_create(commands=(_cmd("c1"),)))
+        res = await pack_service.install_pack(other.pack.id)
+        assert res.succeeded == 1
 
 
 # ---------------------------------------------------------------- user service

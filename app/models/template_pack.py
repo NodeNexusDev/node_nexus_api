@@ -2,6 +2,7 @@
 
 import uuid
 from datetime import datetime
+from typing import Any
 
 import sqlalchemy as sa
 from sqlalchemy import ARRAY, JSON, DateTime, ForeignKey, Index, String, Text
@@ -23,6 +24,16 @@ class TemplatePackModel(Base):
             "pack_id",
             unique=True,
         ),
+        # Local packs have registry_id NULL, which the composite unique
+        # index ignores (NULLs are distinct in PostgreSQL/SQLite).
+        # This partial index enforces pack_id uniqueness for local packs.
+        Index(
+            "uq_template_packs_local_pack_id",
+            "pack_id",
+            unique=True,
+            postgresql_where=sa.text("registry_id IS NULL"),
+            sqlite_where=sa.text("registry_id IS NULL"),
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -43,6 +54,14 @@ class TemplatePackModel(Base):
     )
     manifest_sha: Mapped[str | None] = mapped_column(String(64), nullable=True)
     readme: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Pack content: commands.json / scripts.json payloads stored as JSON
+    # so install can materialize real Command/Script rows from the DB.
+    commands: Mapped[list[dict[str, Any]] | None] = mapped_column(
+        JSON, nullable=True, default=list
+    )
+    scripts: Mapped[list[dict[str, Any]] | None] = mapped_column(
+        JSON, nullable=True, default=list
+    )
     installed_version: Mapped[str | None] = mapped_column(String(50), nullable=True)
     installed_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True

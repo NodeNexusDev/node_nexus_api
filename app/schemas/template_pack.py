@@ -1,14 +1,36 @@
 """Template pack schemas for API 2.0 with assets."""
 
+import re
 import uuid
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.schemas.command import CommandCreate
 from app.schemas.common import BulkResult, SafeName
 from app.schemas.script import ScriptCreate
+
+# pack_id is a filesystem directory name (mirrors compose project_name rules).
+_PACK_ID_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9_.-]*$")
+
+
+def _check_pack_id(value: str) -> str:
+    if not _PACK_ID_RE.fullmatch(value):
+        raise ValueError(f"Invalid pack_id: {value!r}")
+    return value
+
+
+def _check_asset_path(value: str) -> str:
+    if (
+        not value
+        or value.startswith("/")
+        or "\\" in value
+        or any(part in ("", ".", "..") for part in value.split("/"))
+    ):
+        raise ValueError(f"Invalid asset path: {value!r}")
+    return value
+
 
 # --- Asset schemas ---
 
@@ -27,6 +49,11 @@ class PackAssetCreate(BaseModel):
         min_length=1,
         description="Base64-encoded file content",
     )
+
+    @field_validator("path")
+    @classmethod
+    def _validate_path(cls, value: str) -> str:
+        return _check_asset_path(value)
 
 
 class PackAssetResponse(BaseModel):
@@ -71,6 +98,11 @@ class PackCreate(BaseModel):
         default=None,
         description="Optional assets with base64 content",
     )
+
+    @field_validator("pack_id")
+    @classmethod
+    def _validate_pack_id(cls, value: str) -> str:
+        return _check_pack_id(value)
 
 
 class PackUpdate(BaseModel):
@@ -217,12 +249,22 @@ class PackManifestRequest(BaseModel):
     tags: list[str] = Field(default_factory=list)
     manifest_sha: str | None = Field(default=None, max_length=64)
 
+    @field_validator("pack_id")
+    @classmethod
+    def _validate_pack_id(cls, value: str) -> str:
+        return _check_pack_id(value)
+
 
 class PackAssetCreateRequest(BaseModel):
     """Asset with base64 content."""
 
     path: str = Field(..., min_length=1, max_length=255)
     content_base64: str = Field(..., min_length=1)
+
+    @field_validator("path")
+    @classmethod
+    def _validate_path(cls, value: str) -> str:
+        return _check_asset_path(value)
 
 
 class PackLocalCreateRequest(BaseModel):

@@ -118,12 +118,11 @@ async def create_pack(
                 registry_id=data.registry_id,
             )
         )
+    except PackConflictError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     except DomainError:
         raise
     except Exception as exc:  # noqa: BLE001
-        # DomainError maps to 422 via handler, but local create conflict -> 409
-        if "already exists" in str(exc):
-            raise HTTPException(status_code=409, detail=str(exc)) from exc
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     return _pack_detail_response(detail)
 

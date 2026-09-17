@@ -8,6 +8,8 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from app.application.services.template_pack_service import TemplatePackService
+
 
 class TestSmall7:
     async def test_bulk_status_not_207(self):
@@ -36,14 +38,14 @@ class TestSmall7:
             target_type=None, offset=10, limit=10
         )
 
-    async def test_template_pack_install_on_conflict_rename(self):
+    async def test_template_pack_install_on_conflict_rename(
+        self, pack_service: TemplatePackService
+    ):
         from app.application.dto.template_pack import PackCreateDTO, PackManifestDTO
-        from app.application.services.template_pack_service import TemplatePackService
 
-        svc = TemplatePackService()
         pid = f"rename-{uuid.uuid4()}"
         # Create pack with command named "cmd"
-        detail = await svc.create_pack(
+        detail = await pack_service.create_pack(
             PackCreateDTO(
                 manifest=PackManifestDTO(pack_id=pid, name="n", version="1.0.0"),
                 commands=({"name": "cmd", "command": "echo hi"},),
@@ -51,17 +53,17 @@ class TestSmall7:
             )
         )
         # First install
-        await svc.install_pack(detail.pack.id, on_conflict="fail")
+        await pack_service.install_pack(detail.pack.id, on_conflict="fail")
         # Second pack same name, rename should succeed
         pid2 = f"rename2-{uuid.uuid4()}"
-        detail2 = await svc.create_pack(
+        detail2 = await pack_service.create_pack(
             PackCreateDTO(
                 manifest=PackManifestDTO(pack_id=pid2, name="n2", version="1.0.0"),
                 commands=({"name": "cmd", "command": "echo hi"},),
                 scripts=(),
             )
         )
-        result = await svc.install_pack(detail2.pack.id, on_conflict="rename")
+        result = await pack_service.install_pack(detail2.pack.id, on_conflict="rename")
         # Should have renamed to cmd_1
         assert result.succeeded == 1
         assert any("cmd_1" in r.name for r in result.results if r.status == "success")

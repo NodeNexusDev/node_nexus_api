@@ -15,7 +15,9 @@ from app.application.dto.template_pack import (
     PackListQueryDTO,
     PackPageDTO,
     PackStatsDTO,
+    PackUpdateDTO,
     PackViewDTO,
+    SyncedPackDTO,
 )
 
 
@@ -38,6 +40,10 @@ class TemplatePackReader(Protocol):
         self, pack_id: UUID, offset: int, limit: int
     ) -> PackInstallationPageDTO:
         """Return installations page."""
+        ...
+
+    async def get_assets_tar(self, pack_id: UUID) -> bytes:
+        """Return tar archive bytes for pack assets."""
         ...
 
 
@@ -68,9 +74,25 @@ class TemplatePackWriter(Protocol):
         """Update pack (uninstall+install)."""
         ...
 
-    async def get_pack_view(self, pack_id: UUID) -> PackViewDTO | None:
-        """Return view only."""
+    async def patch_pack(self, pack_id: UUID, data: PackUpdateDTO) -> PackViewDTO:
+        """Update pack metadata (partial)."""
         ...
+
+    async def delete_pack(self, pack_id: UUID) -> None:
+        """Hard delete pack with assets, installations and created rows."""
+        ...
+
+    async def upsert_synced_pack(self, data: SyncedPackDTO) -> tuple[UUID, str]:
+        """Create or update a pack from registry sync.
+
+        Returns ``(pack_id, outcome)`` with outcome ``created``,
+        ``updated`` or ``unchanged``.
+        """
+        ...
+
+
+class TemplatePackGateway(TemplatePackReader, TemplatePackWriter, Protocol):
+    """Full pack persistence port."""
 
 
 class TemplateAssetWriter(Protocol):

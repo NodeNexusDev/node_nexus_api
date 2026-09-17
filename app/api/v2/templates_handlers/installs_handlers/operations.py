@@ -13,7 +13,7 @@ from fastapi import APIRouter, HTTPException, Query, Response, Security
 from fastapi.responses import StreamingResponse
 
 from app.api.deps import Principal, get_current_principal, require_write_or_jwt_scope
-from app.api.pagination import decode_offset, encode_offset
+from app.api.pagination import decode_offset, encode_offset, parse_cursor_offset
 from app.api.v2._shared import pack_detail_response, pack_response, registry_response
 from app.application.dto.template_pack import (
     PackAssetCreateDTO,
@@ -139,12 +139,7 @@ async def list_installations(
         cursor=cursor,
         limit=limit,
     )
-    offset = 0
-    if cursor is not None:
-        try:
-            offset = decode_offset(cursor)
-        except ValueError:
-            raise HTTPException(status_code=422, detail="Invalid cursor") from None
+    offset = parse_cursor_offset(cursor)
     try:
         page_dto = await service.list_installations(pack_id, offset=offset, limit=limit)
     except PackNotFoundError as exc:

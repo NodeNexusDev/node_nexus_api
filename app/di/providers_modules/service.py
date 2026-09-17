@@ -14,7 +14,12 @@ from app.adapters.persistence.audit import (
     RequestAuditOutbox,
     RequiredAuditOutbox,
 )
+from app.adapters.github.template_source import GitHubTemplateSource
 from app.adapters.persistence.node_reader import ScopedNodeConnectionReader
+from app.adapters.persistence.template_pack import SqlAlchemyTemplatePackGateway
+from app.adapters.persistence.template_registry import (
+    SqlAlchemyTemplateRegistryGateway,
+)
 from app.application.ports.api_key import APIKeyReader, APIKeyWriter
 from app.application.ports.api_key_hasher import APIKeyHasher
 from app.application.ports.audit_log import AuditLogReader, AuditLogWriter
@@ -566,14 +571,23 @@ class ServiceProvider(Provider):
         return UserService(reader=reader, writer=writer)
 
     @provide(scope=Scope.REQUEST)
-    def get_template_registry_service(self) -> TemplateRegistryService:
-        """Get template registry service (in-memory stub)."""
-        return TemplateRegistryService()
+    def get_template_registry_service(
+        self,
+        sessionmaker: async_sessionmaker[AsyncSession],
+        cipher: CredentialCipher,
+    ) -> TemplateRegistryService:
+        """Get template registry service (DB-backed)."""
+        pack_gateway = SqlAlchemyTemplatePackGateway(sessionmaker)
+        gateway = SqlAlchemyTemplateRegistryGateway(sessionmaker, cipher)
+        return TemplateRegistryService(gateway, pack_gateway, GitHubTemplateSource())
 
     @provide(scope=Scope.REQUEST)
-    def get_template_pack_service(self) -> TemplatePackService:
-        """Get template pack service (in-memory stub with assets)."""
-        return TemplatePackService()
+    def get_template_pack_service(
+        self,
+        sessionmaker: async_sessionmaker[AsyncSession],
+    ) -> TemplatePackService:
+        """Get template pack service (DB-backed)."""
+        return TemplatePackService(SqlAlchemyTemplatePackGateway(sessionmaker))
 
     @provide(scope=Scope.REQUEST)
     def get_compose_service(

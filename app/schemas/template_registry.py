@@ -1,12 +1,28 @@
 """Template registry schemas for API 2.0."""
 
+import re
 import uuid
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.schemas.common import BulkResult, SafeName
+
+# Owner/repo names go into the GitHub API URL path — no separators allowed.
+_GITHUB_NAME_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9_.-]*$")
+
+
+def _check_github_name(value: str) -> str:
+    if not _GITHUB_NAME_RE.fullmatch(value):
+        raise ValueError(f"Invalid GitHub owner/repo name: {value!r}")
+    return value
+
+
+def _check_optional_github_name(value: str | None) -> str | None:
+    if value is None:
+        return None
+    return _check_github_name(value)
 
 
 class RegistryCreate(BaseModel):
@@ -36,6 +52,11 @@ class RegistryCreate(BaseModel):
         description="Default branch to fetch templates from",
     )
 
+    @field_validator("owner", "name")
+    @classmethod
+    def _validate_names(cls, value: str) -> str:
+        return _check_github_name(value)
+
 
 class RegistryUpdate(BaseModel):
     """Schema for updating a template registry (partial)."""
@@ -44,6 +65,11 @@ class RegistryUpdate(BaseModel):
     name: SafeName | None = Field(default=None, min_length=1, max_length=255)
     github_token: str | None = Field(default=None, repr=False)
     default_branch: str | None = Field(default=None, min_length=1, max_length=100)
+
+    @field_validator("owner", "name")
+    @classmethod
+    def _validate_names(cls, value: str | None) -> str | None:
+        return _check_optional_github_name(value)
 
 
 class RegistryResponse(BaseModel):
